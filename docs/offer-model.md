@@ -208,7 +208,7 @@ export function computeTaxes(input: TaxInput, params?: TaxParams): TaxResult;
 | SALT cap and phase-down | Statutory schedule, below | IRC §164(b)(7), verified on Cornell LII including the Pub. L. 119-21 amendments |
 | SS wage base | × index factor | Really indexed to the national average wage, not CPI (documented simplification) |
 | Additional Medicare thresholds ($200k / $250k) | Fixed | IRC §3101(b)(2): not indexed |
-| State brackets, deductions, exemptions, credits, special-rule thresholds | **Held flat at 2026 law** | Scope decision 3a: no per-state indexing research; error is tens of dollars a year (known gap) |
+| State brackets, deductions, exemptions, credits, special-rule thresholds | **Held flat at 2026 law**, except CA (indexed per R&TC 17041(h), 17073.5(d), 17054(i), 17054.1(f)) | Scope decision 3a: no per-state indexing research; error is tens of dollars a year (known gap) |
 | State standard deduction equal to federal by statute | Follows the federal value **where verified** | Verified: CO, IA, MO, MT, NM, ND (rolling conformity, citations in `states2026.ts`). ID stays flat: static conformity by annual bill |
 | UT taxpayer credit (6% of the federal standard deduction) | Follows the federal value | Utah Code 59-10-1018(2)(a)(i), "for that taxable year"; phase-out thresholds stay flat |
 | State payroll wage caps set to the SS wage base | Follow the SS wage base | CO, CT, DE, ME, MA, OR, WA (already `SS_BASE` in the data) |
@@ -283,10 +283,10 @@ plumbing, and the oracle catches any 2026 drift.
 - **Nonresident tax in the employer state** isn't computed: no nonresident return, no
   resident credit. Decision 9 only warns.
 - **Projected state tax:** state law is held flat at 2026, apart from verified federal
-  links (decision 3a). Measured as an upper bound (single filers at $75k-$250k, 2.5%
-  inflation), this overstates state tax by about $20 at the median in the first projected
-  year, compounding to about $100 by year 5. It's largest in states that do index (CA:
-  about $110 in 2027 and $570 by 2031 at $150k).
+  links (decision 3a) and CA, which is indexed. Measured as an upper bound (single filers
+  at $75k-$250k, 2.5% inflation), this overstates state tax by about $15-20 at the median
+  in the first projected year, compounding to about $80-100 by year 5. It's largest in
+  states that do index (VT: about $95 in 2027 and $500 by 2031 at $150k).
 
 **Out of scope:**
 

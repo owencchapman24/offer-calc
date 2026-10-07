@@ -16,7 +16,9 @@ Later years are projections: `paramsForYear(year, { inflation })` in
 `src/tax/params/index.ts`. Federal amounts that the IRC indexes scale by
 (1 + inflation)^(year - 2026); the SALT cap follows IRC 164(b)(7) (1%/yr through 2029,
 $10,000 from 2030); Additional Medicare thresholds stay fixed. State and local law is held
-at 2026, except amounts linked to federal ones by statute: the standard deduction in CO,
+at 2026, except CA (indexed by statute: brackets, standard deduction, exemption credit and
+its phase-out threshold; `StateSpec.indexed`) and amounts linked to federal ones by
+statute: the standard deduction in CO,
 IA, MO, MT, NM, ND (`stdDeductionIsFederal`); UT's credit (6% of the federal standard
 deduction); payroll caps at the SS wage base in CO, CT, DE, ME, MA, OR, WA
 (`"ssWageBase"`). ID is held flat: its IRC conformity is static, updated by annual bill.
@@ -31,9 +33,11 @@ There's deliberately no default inflation in the engine.
 - Pure functions, no I/O in `src/`. The engine must run client-side in the browser.
 - Engine functions take `TaxParams` as an argument; never import `*_2026` constants into
   `federal.ts`/`state.ts`/`local.ts`. Hardcoded thresholds in `state.ts` specials are
-  2026 law and stay flat in projected years.
-- A state amount follows federal indexing only via an explicit link with a statute source
-  (`stdDeductionIsFederal`, `wageCap: "ssWageBase"`). Unverified = held flat.
+  2026 law; wrap them in `ix()` only if the state sets `indexed.specialThresholds`.
+- A state amount changes in projected years only via an explicit, sourced flag: `indexed`
+  (the state indexes it by statute) or a federal link (`stdDeductionIsFederal`,
+  `wageCap: "ssWageBase"`). Unverified = held flat. To upgrade a state, add `indexed`
+  with the statute and a hand-checked projected-year test (see CA in params.test.ts).
 
 ## Validation workflow (run after any tax change)
 1. `npm test` — unit tests with hand-checked values.
@@ -81,12 +85,12 @@ There's deliberately no default inflation in the engine.
   settle this: we copied PolicyEngine's value, so agreement is circular. Needs a primary
   source (ADOR 2026 Form 140 instructions).
 - No dependents/credits (CTC, EITC), no AMT, head-of-household uses single state params.
-- Projected years: state indexing not modeled. State brackets, deductions, exemptions,
-  credits and special-rule thresholds are held at 2026 law. Measured upper bound (single,
-  $75k-$250k, 2.5% inflation, as if every state indexed): overstates state tax by ~$20
-  at the median in 2027, compounding to ~$100 by 2031. Largest where states do index:
-  CA ~$110 in 2027 and ~$570 by 2031 at $150k; VT, MN, HI, DC similar. States that don't
-  index (e.g. NY) are already right. Upgrade states one at a time, each with a source.
+- Projected years: state indexing modeled for CA only. Other states' brackets,
+  deductions, exemptions, credits and special-rule thresholds are held at 2026 law.
+  Measured upper bound (single, $75k-$250k, 2.5% inflation, as if every state indexed):
+  overstates state tax by ~$15-20 at the median in 2027, compounding to ~$80-100 by 2031.
+  Largest: VT ~$95 in 2027 and ~$500 by 2031 at $150k; MN, DC, HI, RI similar. States that
+  don't index (e.g. NY, NJ) are already right. Upgrade states one at a time, each with a source.
 - Projected years: scheduled state rate cuts not modeled; 2026 rates are held, so tax is
   overstated where cuts are enacted (phased schedules such as NE and MS; revenue-trigger
   cuts such as KY and WV). Not yet itemized with sources.

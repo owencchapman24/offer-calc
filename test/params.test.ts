@@ -61,11 +61,38 @@ describe("projected years (federal indexed, state held at 2026)", () => {
     expect(p.federal.k401Limit).toBeCloseTo(25_112.5, 6);
     expect(p.payroll.socialSecurityWageBase).toBeCloseTo(189_112.5, 6);
   });
-  it("keeps statutory amounts fixed: Additional Medicare thresholds, state and local law", () => {
+  it("keeps statutory amounts fixed: Additional Medicare thresholds, non-indexed states, local law", () => {
     const p = at(2028, 0.025);
+    const p26 = paramsForYear(2026);
     expect(p.payroll.additionalMedicareThreshold).toEqual({ single: 200_000, joint: 250_000, headOfHousehold: 200_000 });
-    expect(p.states).toBe(paramsForYear(2026).states);
-    expect(p.local).toBe(paramsForYear(2026).local);
+    for (const code of Object.keys(p26.states)) {
+      if (!p26.states[code].indexed) expect(p.states[code]).toBe(p26.states[code]);
+    }
+    expect(p.local).toBe(p26.local);
+  });
+  it("CA indexes brackets, standard deduction and exemption credit (R&TC 17041(h), 17073.5(d), 17054(i))", () => {
+    const ca = at(2027, 0.025).states.CA;
+    expect(ca.single?.[1][0]).toBeCloseTo(11_330 * 1.025, 6);
+    expect(ca.joint?.[9][0]).toBeCloseTo(1_519_581 * 1.025, 6);
+    expect(ca.stdDeduction?.[0]).toBeCloseTo(5_835 * 1.025, 6);
+    expect(ca.exemptionCredit?.[1]).toBeCloseTo(313 * 1.025, 6);
+    expect(paramsForYear(2026).states.CA.single?.[1][0]).toBe(11_330);
+  });
+  it("CA $100k single: $4,959.29 in 2026, $4,850.77 in 2027 at 2.5% (hand-checked)", () => {
+    // 2027: taxable 100,000 - 5,980.875 = 94,019.125 over brackets x1.025:
+    // 116.1325 + 318.3445 + 636.812 + 1,011.9825 + 1,273.132 + 9.3% x 17,787.825 = 5,010.6712,
+    // less exemption credit 159.90 = 4,850.77.
+    const ca = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 100_000, state: "CA" },
+      at(year, 0.025)).stateIncomeTax;
+    expect(ca(2026)).toBe(4_959.29);
+    expect(ca(2027)).toBe(4_850.77);
+  });
+  it("CA credit phase-out threshold is indexed (R&TC 17054.1(f)): $300k single in 2027", () => {
+    // Threshold 257,919 x 1.025 = 264,366.975: ceil(35,633.025 / 2,500) = 15 steps x $6 = $90,
+    // credit 159.90 - 90 = 69.90 (a flat threshold would give 17 steps and $12 more tax).
+    // Tax 3,356.4035 + 9.3% x (294,019.125 - 76,231.30) = 23,610.6712, less 69.90 = 23,540.77.
+    const r = computeTaxes({ year: 2027, filingStatus: "single", wages: 300_000, state: "CA" }, at(2027, 0.025));
+    expect(r.stateIncomeTax).toBe(23_540.77);
   });
   it("with 0% inflation, 2027 differs from 2026 only in the SALT schedule", () => {
     const p26 = paramsForYear(2026);

@@ -41,6 +41,7 @@ export interface TaxParams {
   projected: boolean;
   federal: FederalParams;
   payroll: PayrollParams;
+  /** State law for this year: 2026 amounts, with `indexed` amounts scaled in projected years. */
   states: Readonly<Record<string, StateSpec>>;
   local: LocalParams;
 }
@@ -79,6 +80,24 @@ const PARAMS_2026: TaxParams = {
 const byStatus = <T, U>(r: Readonly<Record<FilingStatus, T>>, f: (v: T) => U): Record<FilingStatus, U> =>
   ({ single: f(r.single), joint: f(r.joint), headOfHousehold: f(r.headOfHousehold) });
 
+const scaleSchedule = (s: Schedule, f: number): Schedule => s.map(([lo, rate]) => [lo * f, rate] as const);
+const scalePair = (p: readonly [number, number], f: number) => [p[0] * f, p[1] * f] as const;
+
+/** A state's projected spec: amounts listed in `indexed` scaled by `f`, everything else as in 2026. */
+function projectState(s: StateSpec, f: number): StateSpec {
+  const ix = s.indexed;
+  if (!ix) return s;
+  const out: StateSpec = { ...s };
+  if (ix.brackets) {
+    if (s.single) out.single = scaleSchedule(s.single, f);
+    if (s.joint) out.joint = scaleSchedule(s.joint, f);
+  }
+  if (ix.stdDeduction && s.stdDeduction) out.stdDeduction = scalePair(s.stdDeduction, f);
+  if (ix.exemption && s.exemption) out.exemption = scalePair(s.exemption, f);
+  if (ix.exemptionCredit && s.exemptionCredit) out.exemptionCredit = scalePair(s.exemptionCredit, f);
+  return out; // specialThresholds: state.ts scales them with params.indexFactor
+}
+
 /**
  * Tax parameters for `year`.
  * - 2026: enacted 2026 law (`inflation` is ignored).
@@ -86,7 +105,8 @@ const byStatus = <T, U>(r: Readonly<Record<FilingStatus, T>>, f: (v: T) => U): R
  *   (1 + inflation)^(year - 2026), with no IRS rounding; the SALT cap follows its statutory
  *   schedule; Additional Medicare thresholds stay fixed (IRC 3101(b)(2), not indexed).
  *   The SS wage base is scaled by the same factor, though it really tracks the national
- *   average wage index. State and local law is held at 2026.
+ *   average wage index. State law is held at 2026 except amounts a state indexes by
+ *   statute (`StateSpec.indexed`) and federal links; local law is held at 2026.
  * There's no default inflation: callers choose it, so the assumption stays visible.
  */
 export function paramsForYear(year: number, opts: { inflation?: number } = {}): TaxParams {
@@ -111,7 +131,7 @@ export function paramsForYear(year: number, opts: { inflation?: number } = {}): 
       k401Limit: ix(FEDERAL_2026.k401Limit), // IRC 402(g)(4)
     },
     payroll: { ...PAYROLL_2026, socialSecurityWageBase: ix(PAYROLL_2026.socialSecurityWageBase) },
-    states: STATES_2026,
+    states: Object.fromEntries(Object.entries(STATES_2026).map(([k, s]) => [k, projectState(s, indexFactor)])),
     local: PARAMS_2026.local, // NYC brackets are statutory; Philadelphia's rate is set yearly, so hold 2026
   };
 }

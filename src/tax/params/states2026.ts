@@ -28,6 +28,19 @@ export interface StateSpec {
    * verified, with a source. Every other state amount is held at 2026 law in projected years.
    */
   stdDeductionIsFederal?: boolean;
+  /**
+   * Amounts this state indexes for inflation by statute. Projected years scale them by the
+   * inflation input (not the state's own CPI measure or rounding). `specialThresholds` means
+   * the dollar thresholds in this state's state.ts special rule. Set only with a source;
+   * everything unlisted is held at 2026 law.
+   */
+  indexed?: {
+    brackets?: boolean;
+    stdDeduction?: boolean;
+    exemption?: boolean;
+    exemptionCredit?: boolean;
+    specialThresholds?: boolean;
+  };
   /** Personal exemption as a deduction from income. [single, joint] */
   exemption?: readonly [number, number];
   /** Personal exemption structured as a tax credit. [single, joint] */
@@ -93,6 +106,10 @@ export const STATES_2026: Record<string, StateSpec> = {
     joint: [[0, 0.01], [22_660, 0.02], [53_718, 0.04], [84_783, 0.06], [117_692, 0.08],
       [148_744, 0.093], [759_796, 0.103], [911_747, 0.113], [1_000_000, 0.123], [1_519_581, 0.133]],
     stdDeduction: [5_835, 11_671], exemptionCredit: [156, 313],
+    // Indexed yearly by the CA CPI (June to June), rounded to $1: brackets R&TC 17041(h),
+    // standard deduction 17073.5(d), exemption credits 17054(i), credit phase-out
+    // thresholds 17054.1(f). The $6/$12 reduction per $2,500 is not indexed.
+    indexed: { brackets: true, stdDeduction: true, exemptionCredit: true, specialThresholds: true },
     payroll: [{ label: "CA State Disability Insurance", rate: 0.013 }],
     special: "CA",
   },

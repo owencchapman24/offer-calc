@@ -53,6 +53,8 @@ export function stateTax(
   const sched: Schedule = (joint ? spec.joint : spec.single)!;
   const agi = spec.taxes401kDeferrals ? ctx.federalAGI + ctx.pretax401k : ctx.federalAGI;
 
+  // Dollar thresholds in special rules are 2026 law; they scale only if the state indexes them.
+  const ix = (n: number) => (spec.indexed?.specialThresholds ? n * params.indexFactor : n);
   // Head of household uses the single amount here, matching the single-params approximation above.
   const federalStd = params.federal.standardDeduction[joint ? "joint" : "single"];
   let std = spec.stdDeductionIsFederal ? federalStd : spec.stdDeduction?.[i] ?? 0;
@@ -80,8 +82,9 @@ export function stateTax(
       break;
     }
     case "CA": {
-      // Exemption credit falls $6 per $2,500 of AGI above ~$257,919 ($515,842 joint), 2026 indexed.
-      credit = clamp0(credit - 6 * (joint ? 2 : 1) * steps(agi - (joint ? 515_842 : 257_919), 2_500));
+      // Exemption credit falls $6 ($12 joint) per $2,500 of AGI above ~$257,919 ($515,842 joint),
+      // 2026 amounts; R&TC 17054.1(f) indexes the thresholds, not the $6 or the $2,500 step.
+      credit = clamp0(credit - 6 * (joint ? 2 : 1) * steps(agi - ix(joint ? 515_842 : 257_919), 2_500));
       break;
     }
     case "CO": {
