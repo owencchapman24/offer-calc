@@ -76,8 +76,42 @@ const PARAMS_2026: TaxParams = {
   local: { nyc: NYC_2026, philadelphia: PHILLY_2026 },
 };
 
-/** Tax parameters for `year`. */
-export function paramsForYear(year: number): TaxParams {
+const byStatus = <T, U>(r: Readonly<Record<FilingStatus, T>>, f: (v: T) => U): Record<FilingStatus, U> =>
+  ({ single: f(r.single), joint: f(r.joint), headOfHousehold: f(r.headOfHousehold) });
+
+/**
+ * Tax parameters for `year`.
+ * - 2026: enacted 2026 law (`inflation` is ignored).
+ * - Later years: projected. Federal amounts that the IRC indexes are scaled by
+ *   (1 + inflation)^(year - 2026), with no IRS rounding; the SALT cap follows its statutory
+ *   schedule; Additional Medicare thresholds stay fixed (IRC 3101(b)(2), not indexed).
+ *   The SS wage base is scaled by the same factor, though it really tracks the national
+ *   average wage index. State and local law is held at 2026.
+ * There's no default inflation: callers choose it, so the assumption stays visible.
+ */
+export function paramsForYear(year: number, opts: { inflation?: number } = {}): TaxParams {
+  if (!Number.isInteger(year) || year < BASE_YEAR) {
+    throw new Error(`Tax year ${year} isn't supported: parameters start in ${BASE_YEAR}.`);
+  }
   if (year === BASE_YEAR) return PARAMS_2026;
-  throw new Error("Only tax year 2026 is supported.");
+  const { inflation } = opts;
+  if (inflation === undefined || !Number.isFinite(inflation) || inflation <= -1) {
+    throw new Error(`Tax year ${year} is projected from ${BASE_YEAR} law: pass paramsForYear(${year}, { inflation }).`);
+  }
+  const indexFactor = (1 + inflation) ** (year - BASE_YEAR);
+  const ix = (n: number) => n * indexFactor;
+  return {
+    year,
+    indexFactor,
+    projected: true,
+    federal: {
+      standardDeduction: byStatus(FEDERAL_2026.standardDeduction, ix), // IRC 63(c)(7)
+      brackets: byStatus(FEDERAL_2026.brackets, (s) => s.map(([lo, rate]) => [ix(lo), rate] as const)), // IRC 1(f), 1(j)(3)
+      salt: saltForYear(year),
+      k401Limit: ix(FEDERAL_2026.k401Limit), // IRC 402(g)(4)
+    },
+    payroll: { ...PAYROLL_2026, socialSecurityWageBase: ix(PAYROLL_2026.socialSecurityWageBase) },
+    states: STATES_2026,
+    local: PARAMS_2026.local, // NYC brackets are statutory; Philadelphia's rate is set yearly, so hold 2026
+  };
 }

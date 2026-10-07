@@ -11,7 +11,8 @@ export type Locality =
   | { kind: "flat"; label: string; rate: number; base: "wages" | "stateTaxableIncome" };
 
 export interface TaxInput {
-  year: 2026;
+  /** 2026 or later. Years after 2026 need params from paramsForYear(year, { inflation }). */
+  year: number;
   filingStatus: FilingStatus;
   /** Gross W-2 compensation for the calendar year: salary + bonuses + vested RSUs. */
   wages: number;
