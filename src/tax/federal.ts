@@ -1,15 +1,16 @@
-import { FEDERAL_2026, PAYROLL_2026 } from "./params/federal2026";
+import type { FederalParams, PayrollParams, SaltParams } from "./params";
 import { applySchedule, clamp0 } from "./schedule";
 import type { FilingStatus } from "./types";
 
-export function federalIncomeTax(agi: number, status: FilingStatus, deduction = FEDERAL_2026.standardDeduction[status]) {
+export function federalIncomeTax(fed: FederalParams, agi: number, status: FilingStatus, deduction: number) {
   const taxableIncome = clamp0(agi - deduction);
-  return { taxableIncome, tax: applySchedule(FEDERAL_2026.brackets[status], taxableIncome) };
+  return { taxableIncome, tax: applySchedule(fed.brackets[status], taxableIncome) };
 }
 
-/** OBBBA SALT cap for 2026: $40,400, reduced by 30% of MAGI over $505,000, floor $10,000. */
-export function saltCap(magi: number): number {
-  return Math.max(10_000, 40_400 - 0.3 * clamp0(magi - 505_000));
+/** OBBBA SALT cap, IRC 164(b)(7): the cap less 30% of MAGI over the threshold, floor $10,000. */
+export function saltCap(salt: SaltParams, magi: number): number {
+  const p = salt.phaseDown;
+  return p ? Math.max(p.floor, salt.cap - p.rate * clamp0(magi - p.threshold)) : salt.cap;
 }
 
 /**
@@ -18,8 +19,7 @@ export function saltCap(magi: number): number {
  * Social Security is capped per person; Additional Medicare is a liability on
  * combined wages above the filing-status threshold (what you owe, not what's withheld).
  */
-export function payrollTaxes(ficaWagesByPerson: number[], status: FilingStatus) {
-  const p = PAYROLL_2026;
+export function payrollTaxes(p: PayrollParams, ficaWagesByPerson: number[], status: FilingStatus) {
   let socialSecurity = 0;
   let medicare = 0;
   for (const w of ficaWagesByPerson) {

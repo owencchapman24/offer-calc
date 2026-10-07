@@ -179,6 +179,10 @@ compute nonresident tax or the resident credit.
 
 ## 8. Prerequisite: per-year tax parameters (refactor plan)
 
+**Status: implemented** on branch `refactor/params-by-year`, merged to main. Each step's
+2026 oracle report is byte-identical to the pre-refactor baseline. CLAUDE.md describes the
+result.
+
 **Goal.** `computeTaxes` works for any year from 2026 on, and 2026 results stay
 byte-identical.
 
@@ -205,8 +209,8 @@ export function computeTaxes(input: TaxInput, params?: TaxParams): TaxResult;
 | SS wage base | × index factor | Really indexed to the national average wage, not CPI (documented simplification) |
 | Additional Medicare thresholds ($200k / $250k) | Fixed | IRC §3101(b)(2): not indexed |
 | State brackets, deductions, exemptions, credits, special-rule thresholds | **Held flat at 2026 law** | Scope decision 3a: no per-state indexing research; error is tens of dollars a year (known gap) |
-| State standard deduction equal to federal by statute | Follows the federal value **where verified** | Candidates CO, ID, IA, MO, MT, NM, ND; unverified ones stay flat |
-| UT taxpayer credit (6% of the federal standard deduction) | Follows the federal value | Defined by reference to the federal amount; replaces the 16,100/32,200 literals |
+| State standard deduction equal to federal by statute | Follows the federal value **where verified** | Verified: CO, IA, MO, MT, NM, ND (rolling conformity, citations in `states2026.ts`). ID stays flat: static conformity by annual bill |
+| UT taxpayer credit (6% of the federal standard deduction) | Follows the federal value | Utah Code 59-10-1018(2)(a)(i), "for that taxable year"; phase-out thresholds stay flat |
 | State payroll wage caps set to the SS wage base | Follow the SS wage base | CO, CT, DE, ME, MA, OR, WA (already `SS_BASE` in the data) |
 | NYC brackets | Fixed | Not indexed by statute |
 | Philadelphia wage tax | 2026 blended rate held | Set by the annual budget; unknowable |
@@ -279,7 +283,10 @@ plumbing, and the oracle catches any 2026 drift.
 - **Nonresident tax in the employer state** isn't computed: no nonresident return, no
   resident credit. Decision 9 only warns.
 - **Projected state tax:** state law is held flat at 2026, apart from verified federal
-  links (decision 3a).
+  links (decision 3a). Measured as an upper bound (single filers at $75k-$250k, 2.5%
+  inflation), this overstates state tax by about $20 at the median in the first projected
+  year, compounding to about $100 by year 5. It's largest in states that do index (CA:
+  about $110 in 2027 and $570 by 2031 at $150k).
 
 **Out of scope:**
 

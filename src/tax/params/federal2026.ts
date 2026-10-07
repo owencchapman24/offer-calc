@@ -27,6 +27,16 @@ export const FEDERAL_2026 = {
       [201_750, 0.32], [256_200, 0.35], [640_600, 0.37],
     ],
   } satisfies Record<FilingStatus, Schedule>,
+
+  /**
+   * SALT deduction cap, IRC 164(b)(7) as added by Pub. L. 119-21 sec. 70120:
+   * $40,400 for 2026 (A)(ii); reduced by 30% of MAGI over $505,000 (B)(i), (B)(ii)(II),
+   * but not below $10,000. Later years: see saltForYear() in params/index.ts.
+   */
+  salt: { cap: 40_400, phaseDown: { threshold: 505_000, rate: 0.3, floor: 10_000 } },
+
+  /** Elective deferral limit, IRC 402(g). 2026 amount per IRS Notice 2025-67. Used for a warning only. */
+  k401Limit: 24_500,
 } as const;
 
 /**

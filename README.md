@@ -4,8 +4,9 @@ Compare job offers on what they're actually worth: after federal, state, local a
 taxes, adjusted for cost of living, year by year.
 
 ## Status
-Tax engine (2026) complete and validated against [PolicyEngine-US](https://github.com/PolicyEngine/policyengine-us).
-Offer model and UI are next — see `CLAUDE.md`.
+Tax engine complete on enacted 2026 law and validated against [PolicyEngine-US](https://github.com/PolicyEngine/policyengine-us),
+with projected later years (federal indexing, the OBBBA SALT schedule including its 2030
+reversion). Offer model is next: see `docs/offer-model.md` and `CLAUDE.md`.
 
 ## Setup
 ```bash
@@ -36,9 +37,13 @@ npm run oracle
 
 ## Example
 ```ts
-import { computeTaxes } from "./src/tax";
+import { computeTaxes, paramsForYear } from "./src/tax";
 computeTaxes({ year: 2026, filingStatus: "single", wages: 110_000, state: "NY",
   locality: { kind: "nyc" }, pretax401k: 6_000, section125: 1_440 });
+
+// Later years are projections, and you choose the inflation assumption:
+computeTaxes({ year: 2030, filingStatus: "single", wages: 125_000, state: "NY" },
+  paramsForYear(2030, { inflation: 0.025 }));
 ```
 
 Estimates only; not tax advice.
