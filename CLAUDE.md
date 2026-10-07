@@ -6,11 +6,21 @@ and show the work. Portfolio piece for analyst-track roles, so correctness and a
 methodology page matter more than features.
 
 ## Current state
-`src/tax/` is a 2026 tax engine (annual liability, not withholding):
+`src/tax/` is a tax engine (annual liability, not withholding) on enacted 2026 law:
 federal income tax, FICA + Additional Medicare, state income tax (50 states + DC),
 employee state payroll taxes (SDI/paid leave/LTC), NYC + Philadelphia local tax,
 a flat-rate local escape hatch, and a standard-vs-itemize optimizer (OBBBA SALT cap).
-Entry point: `computeTaxes(input)` in `src/tax/index.ts`.
+Entry point: `computeTaxes(input, params?)` in `src/tax/index.ts`.
+
+Later years are projections: `paramsForYear(year, { inflation })` in
+`src/tax/params/index.ts`. Federal amounts that the IRC indexes scale by
+(1 + inflation)^(year - 2026); the SALT cap follows IRC 164(b)(7) (1%/yr through 2029,
+$10,000 from 2030); Additional Medicare thresholds stay fixed. State and local law is held
+at 2026, except amounts linked to federal ones by statute: the standard deduction in CO,
+IA, MO, MT, NM, ND (`stdDeductionIsFederal`); UT's credit (6% of the federal standard
+deduction); payroll caps at the SS wage base in CO, CT, DE, ME, MA, OR, WA
+(`"ssWageBase"`). ID is held flat: its IRC conformity is static, updated by annual bill.
+There's deliberately no default inflation in the engine.
 
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
@@ -19,6 +29,11 @@ Entry point: `computeTaxes(input)` in `src/tax/index.ts`.
 - State quirks live in `state.ts` under the state's `special` key; keep data in `params/`.
 - All money math is annual. Round only at output (`round2`).
 - Pure functions, no I/O in `src/`. The engine must run client-side in the browser.
+- Engine functions take `TaxParams` as an argument; never import `*_2026` constants into
+  `federal.ts`/`state.ts`/`local.ts`. Hardcoded thresholds in `state.ts` specials are
+  2026 law and stay flat in projected years.
+- A state amount follows federal indexing only via an explicit link with a statute source
+  (`stdDeductionIsFederal`, `wageCap: "ssWageBase"`). Unverified = held flat.
 
 ## Validation workflow (run after any tax change)
 1. `npm test` — unit tests with hand-checked values.
@@ -31,6 +46,8 @@ Entry point: `computeTaxes(input)` in `src/tax/index.ts`.
    Baseline (2026-10-07, policyengine-us 2.30.3): FICA, state payroll, NYC all exact.
    Single $60k-$200k: 44/51 within $5. The 7 misses are all listed below (VT, CO, ND,
    OR, CT, AR, MO). A new state over $10 there is a regression.
+   The oracle checks 2026 only. Projected years are covered by `test/params.test.ts`
+   (SALT schedule, indexing, held-flat state law, federal links).
 
 ## Intentional differences vs PolicyEngine (do not "fix")
 - SALT: PolicyEngine deducts *estimated withholding*; we deduct state/local tax *owed*
@@ -64,6 +81,19 @@ Entry point: `computeTaxes(input)` in `src/tax/index.ts`.
   settle this: we copied PolicyEngine's value, so agreement is circular. Needs a primary
   source (ADOR 2026 Form 140 instructions).
 - No dependents/credits (CTC, EITC), no AMT, head-of-household uses single state params.
+- Projected years: state indexing not modeled. State brackets, deductions, exemptions,
+  credits and special-rule thresholds are held at 2026 law. Measured upper bound (single,
+  $75k-$250k, 2.5% inflation, as if every state indexed): overstates state tax by ~$20
+  at the median in 2027, compounding to ~$100 by 2031. Largest where states do index:
+  CA ~$110 in 2027 and ~$570 by 2031 at $150k; VT, MN, HI, DC similar. States that don't
+  index (e.g. NY) are already right. Upgrade states one at a time, each with a source.
+- Projected years: scheduled state rate cuts not modeled; 2026 rates are held, so tax is
+  overstated where cuts are enacted (phased schedules such as NE and MS; revenue-trigger
+  cuts such as KY and WV). Not yet itemized with sources.
+- Projected years, federal: the SS wage base is scaled by the inflation input, though it
+  really tracks the national average wage index (usually faster). Indexed amounts aren't
+  rounded the way the IRS rounds them (at most ~$50 per threshold). The inflation input
+  stands in for chained CPI.
 - Convenience-of-employer rule (NY, DE, NE, PA; CT/NJ reciprocal) not modeled — should
   at least warn on remote offers.
 - Offer model (planned, docs/offer-model.md §9): part-year residency in a relocation year
