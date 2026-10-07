@@ -1,4 +1,5 @@
-import type { StateSpec } from "./params/states2026";
+import type { TaxParams } from "./params";
+import type { PayrollComponent, StateSpec } from "./params/states2026";
 import { applySchedule, bandIndex, clamp0 } from "./schedule";
 import type { FilingStatus, Schedule } from "./types";
 
@@ -30,15 +31,17 @@ const phaseOut = (amount: number, agi: number, start: number, width: number) =>
   amount * Math.min(1, Math.max(0, 1 - (agi - start) / width));
 
 export function stateTax(
-  states: Readonly<Record<string, StateSpec>>, code: string, ctx: StateContext, payrollWagesByPerson: number[],
+  params: TaxParams, code: string, ctx: StateContext, payrollWagesByPerson: number[],
 ): StateTaxOutput {
-  const spec: StateSpec | undefined = states[code];
+  const spec: StateSpec | undefined = params.states[code];
   if (!spec) throw new Error(`Unknown state code: ${code}`);
   const warnings: string[] = [...(spec.notes ?? [])];
 
   // Payroll taxes apply per worker; callers pass each person's wages.
+  const cap = (c: PayrollComponent) =>
+    c.wageCap === "ssWageBase" ? params.payroll.socialSecurityWageBase : c.wageCap ?? Infinity;
   const payrollTax = payrollWagesByPerson.filter((w) => w > 0).reduce((total, w) =>
-    total + (spec.payroll ?? []).reduce((sum, c) => sum + (c.flat ?? 0) + Math.min(w, c.wageCap ?? Infinity) * c.rate, 0), 0);
+    total + (spec.payroll ?? []).reduce((sum, c) => sum + (c.flat ?? 0) + Math.min(w, cap(c)) * c.rate, 0), 0);
 
   if (spec.kind === "none") return { taxableIncome: 0, tax: 0, payrollTax, warnings };
 
@@ -50,7 +53,9 @@ export function stateTax(
   const sched: Schedule = (joint ? spec.joint : spec.single)!;
   const agi = spec.taxes401kDeferrals ? ctx.federalAGI + ctx.pretax401k : ctx.federalAGI;
 
-  let std = spec.stdDeduction?.[i] ?? 0;
+  // Head of household uses the single amount here, matching the single-params approximation above.
+  const federalStd = params.federal.standardDeduction[joint ? "joint" : "single"];
+  let std = spec.stdDeductionIsFederal ? federalStd : spec.stdDeduction?.[i] ?? 0;
   let exemption = spec.exemption?.[i] ?? 0;
   let credit = spec.exemptionCredit?.[i] ?? 0;
   let otherDeductions = 0;
@@ -154,8 +159,9 @@ export function stateTax(
     }
     case "UT": {
       // fn (gg): nonrefundable credit = 6% of federal std deduction, phased out at 1.3% of AGI over threshold.
-      const fedStd = joint ? 32_200 : 16_100;
-      credit = clamp0(0.06 * fedStd - 0.013 * clamp0(agi - (joint ? 37_252 : 18_626)));
+      // Federal link: Utah Code 59-10-1018(2)(a)(i), 6% of the standard deduction on the federal
+      // return "for that taxable year". The phase-out thresholds are held at 2026 (UT indexes them).
+      credit = clamp0(0.06 * federalStd - 0.013 * clamp0(agi - (joint ? 37_252 : 18_626)));
       break;
     }
     case "WI": {

@@ -86,6 +86,38 @@ describe("projected years (federal indexed, state held at 2026)", () => {
     expect(computeTaxes({ ...input, year: 2026 }).itemizes).toBe(true);
     expect(computeTaxes({ ...input, year: 2030 }, at(2030, 0)).itemizes).toBe(false);
   });
+  it("state law is held at 2026: NY tax on the same $100k is unchanged in 2027", () => {
+    const ny = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 100_000, state: "NY" },
+      paramsForYear(year, { inflation: 0.025 })).stateIncomeTax;
+    expect(ny(2027)).toBe(ny(2026));
+  });
+  it("state payroll caps tied to the SS wage base follow it: WA at $300k", () => {
+    // WA Cares 0.58% (uncapped) + WA PFML 0.80716% up to the SS wage base.
+    const wa = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 300_000, state: "WA" },
+      paramsForYear(year, { inflation: 0.025 })).statePayrollTax;
+    expect(wa(2026)).toBeCloseTo(1_740 + 184_500 * 0.0080716, 2);
+    expect(wa(2027)).toBeCloseTo(1_740 + 189_112.5 * 0.0080716, 2);
+  });
+  it("federal-linked state standard deductions: verified states only, equal to federal in 2026", () => {
+    const p = paramsForYear(2026);
+    const linked = Object.entries(p.states).filter(([, s]) => s.stdDeductionIsFederal);
+    expect(linked.map(([code]) => code).sort()).toEqual(["CO", "IA", "MO", "MT", "ND", "NM"]);
+    for (const [, s] of linked) {
+      expect(s.stdDeduction).toEqual([p.federal.standardDeduction.single, p.federal.standardDeduction.joint]);
+    }
+  });
+  it("CO follows the federal standard deduction: $100k single, 4.4% flat (hand-checked)", () => {
+    // 2026: (100,000 - 16,100) x 4.4% = 3,691.60. 2027 at 2.5%: (100,000 - 16,502.50) x 4.4% = 3,673.89.
+    const co = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 100_000, state: "CO" },
+      paramsForYear(year, { inflation: 0.025 })).stateIncomeTax;
+    expect(co(2026)).toBe(3_691.6);
+    expect(co(2027)).toBe(3_673.89);
+  });
+  it("ID is held flat (static IRC conformity): $100k single owes the same in 2027 as 2026", () => {
+    const id = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 100_000, state: "ID" },
+      paramsForYear(year, { inflation: 0.025 })).stateIncomeTax;
+    expect(id(2027)).toBe(id(2026));
+  });
   it("rejects params for a different year than the input", () => {
     expect(() => computeTaxes({ year: 2026, filingStatus: "single", wages: 1, state: "TX" }, at(2027, 0))).toThrow();
   });

@@ -41,7 +41,7 @@ function computeOnce(input: TaxInput, params: TaxParams): Omit<TaxResult, "margi
 
   const run = (deduction: number, itemized: boolean, exIncomeTax: number): Pass => {
     const fed = federalIncomeTax(params.federal, federalAGI, status, deduction);
-    const state = stateTax(params.states, input.state, {
+    const state = stateTax(params, input.state, {
       status, federalAGI, pretax401k: k401, federalIncomeTax: fed.tax, ficaByPerson,
       itemizingFederally: itemized, federalItemizedExIncomeTax: exIncomeTax,
     }, ficaByWorker);

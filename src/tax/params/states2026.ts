@@ -22,6 +22,12 @@ export interface StateSpec {
   joint?: Schedule;
   /** [single, joint] */
   stdDeduction?: readonly [number, number];
+  /**
+   * The standard deduction is the federal one for the same tax year by statute, so projected
+   * years follow federal indexing (`stdDeduction` documents the 2026 amount). Set only where
+   * verified, with a source. Every other state amount is held at 2026 law in projected years.
+   */
+  stdDeductionIsFederal?: boolean;
   /** Personal exemption as a deduction from income. [single, joint] */
   exemption?: readonly [number, number];
   /** Personal exemption structured as a tax credit. [single, joint] */
@@ -44,16 +50,15 @@ export interface StateSpec {
   notes?: string[];
 }
 
+/** Source for payroll components: PolicyEngine-US 2.30.3 parameters, cross-checked by sampling. */
 export interface PayrollComponent {
   label: string;
   rate: number;
-  wageCap?: number;
+  /** Annual wage cap. "ssWageBase" = the Social Security wage base for the tax year. */
+  wageCap?: number | "ssWageBase";
   /** Fixed annual amount (e.g. NY SDI $0.60/week). */
   flat?: number;
 }
-
-/** Source for payroll components: PolicyEngine-US 2.30.3 parameters, cross-checked by sampling. */
-const SS_BASE = 184_500;
 
 const NONE = (name: string, notes?: string[]): StateSpec => ({ name, kind: "none", notes });
 
@@ -95,8 +100,11 @@ export const STATES_2026: Record<string, StateSpec> = {
     name: "Colorado", kind: "income",
     single: [[0, 0.044]], joint: [[0, 0.044]],
     stdDeduction: [16_100, 32_200], // fn (o): starts from federal taxable income
+    // Federal link: C.R.S. 39-22-104(1) taxes federal taxable income; 39-22-103(5.3) IRC
+    // "as amended ... for the taxable year" (rolling).
+    stdDeductionIsFederal: true,
     itemizedWhenFederalItemizes: true,
-    payroll: [{ label: "CO FAMLI", rate: 0.0044, wageCap: SS_BASE }],
+    payroll: [{ label: "CO FAMLI", rate: 0.0044, wageCap: "ssWageBase" }],
     special: "CO",
     notes: ["Colorado's TABOR sales-tax refund varies by year and is not modeled."],
   },
@@ -105,7 +113,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     single: [[0, 0.02], [10_000, 0.045], [50_000, 0.055], [100_000, 0.06], [200_000, 0.065], [250_000, 0.069], [500_000, 0.0699]],
     joint: [[0, 0.02], [20_000, 0.045], [100_000, 0.055], [200_000, 0.06], [400_000, 0.065], [500_000, 0.069], [1_000_000, 0.0699]],
     exemption: [15_000, 24_000],
-    payroll: [{ label: "CT Paid Leave", rate: 0.005, wageCap: SS_BASE }],
+    payroll: [{ label: "CT Paid Leave", rate: 0.005, wageCap: "ssWageBase" }],
     special: "CT", // fns (p), (q), (r): exemption phase-out, 2% phase-out, benefit recapture
   },
   DE: {
@@ -113,7 +121,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     single: [[0, 0], [2_000, 0.022], [5_000, 0.039], [10_000, 0.048], [20_000, 0.052], [25_000, 0.0555], [60_000, 0.066]],
     joint: [[0, 0], [2_000, 0.022], [5_000, 0.039], [10_000, 0.048], [20_000, 0.052], [25_000, 0.0555], [60_000, 0.066]],
     stdDeduction: [3_250, 6_500], exemptionCredit: [110, 220],
-    payroll: [{ label: "DE Paid Leave", rate: 0.004, wageCap: SS_BASE }],
+    payroll: [{ label: "DE Paid Leave", rate: 0.004, wageCap: "ssWageBase" }],
   },
   FL: NONE("Florida"),
   GA: {
@@ -134,6 +142,8 @@ export const STATES_2026: Record<string, StateSpec> = {
   ID: {
     name: "Idaho", kind: "income",
     single: [[0, 0], [4_811, 0.053]], joint: [[0, 0], [9_622, 0.053]],
+    // Not federal-linked for projections: Idaho Code 63-3004 adopts the IRC as of Jan 1 of
+    // each year via an annual conformity bill (static), so later amounts aren't automatic.
     stdDeduction: [16_100, 32_200], itemizedWhenFederalItemizes: true,
     refundableCreditPerPerson: 155, // Idaho grocery credit
   },
@@ -153,6 +163,9 @@ export const STATES_2026: Record<string, StateSpec> = {
     name: "Iowa", kind: "income",
     single: [[0, 0.038]], joint: [[0, 0.038]],
     stdDeduction: [16_100, 32_200], exemptionCredit: [40, 80], itemizedWhenFederalItemizes: true,
+    // Federal link: Iowa Code 422.7 starts from federal taxable income; 422.3(5)(b) IRC
+    // "as amended" for tax years from 2020 (rolling).
+    stdDeductionIsFederal: true,
   },
   KS: {
     name: "Kansas", kind: "income",
@@ -176,7 +189,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     joint: [[0, 0.058], [54_849, 0.0675], [129_749, 0.0715]],
     // OVERRIDE: 2026 std deduction per P.L. 2025 c. 650 (via PolicyEngine-US); phase-out per 36 M.R.S. 5124-C.
     stdDeduction: [15_700, 31_400], exemption: [5_300, 10_600],
-    payroll: [{ label: "ME Paid Family & Medical Leave", rate: 0.005, wageCap: SS_BASE }],
+    payroll: [{ label: "ME Paid Family & Medical Leave", rate: 0.005, wageCap: "ssWageBase" }],
     special: "ME",
   },
   MD: {
@@ -193,7 +206,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     name: "Massachusetts", kind: "income",
     single: [[0, 0.05], [1_083_150, 0.09]], joint: [[0, 0.05], [1_083_150, 0.09]],
     exemption: [4_400, 8_800],
-    payroll: [{ label: "MA Paid Family & Medical Leave", rate: 0.0046, wageCap: SS_BASE }], // TF fn (rr)
+    payroll: [{ label: "MA Paid Family & Medical Leave", rate: 0.0046, wageCap: "ssWageBase" }], // TF fn (rr)
     special: "MA", // deduction for Social Security/Medicare contributions, up to $2,000 per person
   },
   MI: {
@@ -220,6 +233,9 @@ export const STATES_2026: Record<string, StateSpec> = {
     single: [[0, 0], [1_348, 0.02], [2_696, 0.025], [4_044, 0.03], [5_392, 0.035], [6_740, 0.04], [8_088, 0.045], [9_436, 0.047]],
     joint: [[0, 0], [1_348, 0.02], [2_696, 0.025], [4_044, 0.03], [5_392, 0.035], [6_740, 0.04], [8_088, 0.045], [9_436, 0.047]],
     stdDeduction: [16_100, 32_200],
+    // Federal link: RSMo 143.131.2 "The Missouri standard deduction shall be the allowable
+    // federal standard deduction"; 143.091 IRC as effective "for the taxable year" (rolling).
+    stdDeductionIsFederal: true,
     special: "MO", // fn (b): partial federal income tax deduction
     notes: ["Kansas City and St. Louis levy a 1% earnings tax. Add as a flat local rate."],
   },
@@ -227,6 +243,8 @@ export const STATES_2026: Record<string, StateSpec> = {
     name: "Montana", kind: "income",
     single: [[0, 0.047], [47_500, 0.0565]], joint: [[0, 0.047], [95_000, 0.0565]],
     stdDeduction: [16_100, 32_200], itemizedWhenFederalItemizes: true,
+    // Federal link: MCA 15-30-2101 taxes federal taxable income (from 2024); IRC "as amended" (rolling).
+    stdDeductionIsFederal: true,
   },
   NE: {
     name: "Nebraska", kind: "income",
@@ -248,6 +266,9 @@ export const STATES_2026: Record<string, StateSpec> = {
     single: [[0, 0.015], [5_500, 0.032], [16_500, 0.043], [33_500, 0.047], [66_500, 0.049], [210_000, 0.059]],
     joint: [[0, 0.015], [8_000, 0.032], [25_000, 0.043], [50_000, 0.047], [100_000, 0.049], [315_000, 0.059]],
     stdDeduction: [16_100, 32_200], itemizedWhenFederalItemizes: true,
+    // Federal link: NMSA 7-2-2(N)(1), the standard deduction "allowed the taxpayer for the
+    // taxpayer's taxable year by Section 63" (text as shown in 2026 HB 93, which failed).
+    stdDeductionIsFederal: true,
   },
   NY: {
     name: "New York", kind: "income",
@@ -272,6 +293,8 @@ export const STATES_2026: Record<string, StateSpec> = {
     single: [[0, 0], [48_475, 0.0195], [244_825, 0.025]],
     joint: [[0, 0], [80_975, 0.0195], [298_075, 0.025]],
     stdDeduction: [16_100, 32_200], itemizedWhenFederalItemizes: true,
+    // Federal link: NDCC 57-38-30.3 taxes federal taxable income; 57-38-01 IRC "as amended" (rolling).
+    stdDeductionIsFederal: true,
   },
   OH: {
     name: "Ohio", kind: "income",
@@ -294,7 +317,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     joint: [[0, 0.0475], [9_100, 0.0675], [22_800, 0.0875], [250_000, 0.099]],
     stdDeduction: [2_910, 5_820], exemptionCredit: [256, 512],
     payroll: [
-      { label: "OR Paid Leave", rate: 0.006, wageCap: SS_BASE },
+      { label: "OR Paid Leave", rate: 0.006, wageCap: "ssWageBase" },
       { label: "OR statewide transit tax", rate: 0.001 },
     ],
     special: "OR", // fn (b) federal tax subtraction; fn (ee) credit disallowed above AGI $100k/$200k
@@ -350,7 +373,7 @@ export const STATES_2026: Record<string, StateSpec> = {
     ...NONE("Washington"),
     payroll: [
       { label: "WA Cares (long-term care)", rate: 0.0058 }, // TF fn (ss)
-      { label: "WA Paid Family & Medical Leave", rate: 0.0080716, wageCap: SS_BASE },
+      { label: "WA Paid Family & Medical Leave", rate: 0.0080716, wageCap: "ssWageBase" },
     ],
   },
   WV: {
