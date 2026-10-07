@@ -1,4 +1,4 @@
-import { STATES_2026, type StateSpec } from "./params/states2026";
+import type { StateSpec } from "./params/states2026";
 import { applySchedule, bandIndex, clamp0 } from "./schedule";
 import type { FilingStatus, Schedule } from "./types";
 
@@ -29,8 +29,10 @@ const steps = (excess: number, step: number) => (excess > 0 ? Math.ceil(excess /
 const phaseOut = (amount: number, agi: number, start: number, width: number) =>
   amount * Math.min(1, Math.max(0, 1 - (agi - start) / width));
 
-export function stateTax(code: string, ctx: StateContext, payrollWagesByPerson: number[]): StateTaxOutput {
-  const spec: StateSpec | undefined = STATES_2026[code];
+export function stateTax(
+  states: Readonly<Record<string, StateSpec>>, code: string, ctx: StateContext, payrollWagesByPerson: number[],
+): StateTaxOutput {
+  const spec: StateSpec | undefined = states[code];
   if (!spec) throw new Error(`Unknown state code: ${code}`);
   const warnings: string[] = [...(spec.notes ?? [])];
 
