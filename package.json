@@ -6,9 +6,9 @@
   "description": "Job offer comparison calculator: correct after-tax, location-adjusted, year-by-year comparisons.",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p .",
+    "typecheck": "tsc -p . && tsc -p scripts",
     "grid": "tsx scripts/grid.ts > grid_ts.json",
-    "oracle": "npm run grid && python3 scripts/oracle.py grid_ts.json"
+    "oracle": "npm run grid && tsx scripts/run-oracle.ts grid_ts.json"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

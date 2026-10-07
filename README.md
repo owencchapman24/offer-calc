@@ -12,8 +12,25 @@ Offer model and UI are next — see `CLAUDE.md`.
 npm install
 npm test            # unit tests
 npm run typecheck
-# optional: validate against PolicyEngine (Python 3.10+)
-pip install -r requirements.txt
+```
+
+### Optional: validate against PolicyEngine
+Needs Python 3.10+. Install PolicyEngine into a virtual environment named `.venv`.
+`npm run oracle` uses `.venv` automatically, so you don't need to activate it. Without a
+`.venv`, it falls back to `python3`, then `python`, on your PATH. A run takes a few minutes
+and writes `oracle_report.json`.
+
+macOS / Linux:
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+npm run oracle
+```
+
+Windows (PowerShell):
+```powershell
+py -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
 npm run oracle
 ```
 

@@ -1,7 +1,8 @@
 """
 Oracle check: run PolicyEngine-US over the same grid as scripts/grid.ts and report
 per-state differences. Usage:
-  npx tsx scripts/grid.ts > grid_ts.json && python3 scripts/oracle.py grid_ts.json
+  npm run oracle    # writes grid_ts.json, then runs this file via scripts/run-oracle.ts
+                    # (which picks .venv's Python if present, else python3/python)
 """
 import json, sys, warnings
 warnings.filterwarnings("ignore")

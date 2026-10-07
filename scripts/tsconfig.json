@@ -1,0 +1,6 @@
+{
+  // Dev scripts run under Node; src/ must stay browser-safe, so only this config sees Node types.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["."]
+}
