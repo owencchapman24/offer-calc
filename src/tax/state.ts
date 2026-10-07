@@ -117,6 +117,7 @@ export function stateTax(code: string, ctx: StateContext, payrollWagesByPerson: 
     }
     case "MO": {
       // fn (b): partial deduction of federal income tax, by AGI tier; capped.
+      // Tiers include their upper bound: RSMo 143.171.2 "From $50,001 to $100,000" = 15%.
       const pct = agi <= 25_000 ? 0.35 : agi <= 50_000 ? 0.25 : agi <= 100_000 ? 0.15 : agi <= 125_000 ? 0.05 : 0;
       otherDeductions += Math.min(joint ? 10_000 : 5_000, pct * ctx.federalIncomeTax);
       break;
