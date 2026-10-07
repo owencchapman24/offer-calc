@@ -1,0 +1,19 @@
+{
+  "name": "offer-calc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Job offer comparison calculator: correct after-tax, location-adjusted, year-by-year comparisons.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "grid": "tsx scripts/grid.ts > grid_ts.json",
+    "oracle": "npm run grid && python3 scripts/oracle.py grid_ts.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

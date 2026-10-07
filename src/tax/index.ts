@@ -1,0 +1,105 @@
+import { FEDERAL_2026 } from "./params/federal2026";
+import { federalIncomeTax, payrollTaxes, saltCap } from "./federal";
+import { localTax } from "./local";
+import { round2, clamp0 } from "./schedule";
+import { stateTax } from "./state";
+import type { TaxInput, TaxResult } from "./types";
+
+export * from "./types";
+export { STATES_2026 } from "./params/states2026";
+
+interface Pass {
+  itemized: boolean;
+  deduction: number;
+  fed: { taxableIncome: number; tax: number };
+  state: ReturnType<typeof stateTax>;
+  local: ReturnType<typeof localTax>;
+  incomeTaxes: number; // federal + state + local income taxes (excludes FICA/payroll)
+}
+
+function computeOnce(input: TaxInput): Omit<TaxResult, "marginalRate"> {
+  if (input.year !== 2026) throw new Error("Only tax year 2026 is supported.");
+  const status = input.filingStatus;
+  const k401 = input.pretax401k ?? 0;
+  const s125 = input.section125 ?? 0;
+  const commute = input.commuterPretax ?? 0;
+  const spouse = status === "joint" ? input.spouseWages ?? 0 : 0;
+  const propertyTax = input.propertyTax ?? 0;
+  const otherItemized = input.otherItemizedDeductions ?? 0;
+
+  // Box 1 (income-tax) wages exclude 401(k), cafeteria-plan and 132(f) amounts.
+  // FICA wages exclude cafeteria-plan and 132(f) amounts but INCLUDE 401(k) deferrals.
+  const ficaWages = clamp0(input.wages - s125 - commute);
+  const ficaByWorker = spouse > 0 ? [ficaWages, spouse] : [ficaWages];
+  const federalAGI = clamp0(input.wages + spouse - k401 - s125 - commute);
+  const fica = payrollTaxes(ficaByWorker, status);
+  const ficaByPerson = ficaByWorker.map((w) => payrollTaxes([w], "single"))
+    .map((f) => f.socialSecurity + f.medicare);
+  if (status === "joint" && ficaByPerson.length === 1) ficaByPerson.push(0);
+
+  const run = (deduction: number, itemized: boolean, exIncomeTax: number): Pass => {
+    const fed = federalIncomeTax(federalAGI, status, deduction);
+    const state = stateTax(input.state, {
+      status, federalAGI, pretax401k: k401, federalIncomeTax: fed.tax, ficaByPerson,
+      itemizingFederally: itemized, federalItemizedExIncomeTax: exIncomeTax,
+    }, ficaByWorker);
+    const local = localTax(input.locality, {
+      status, federalAGI, localWageBase: ficaWages, stateTaxableIncome: state.taxableIncome, stateCode: input.state,
+    });
+    return { itemized, deduction, fed, state, local, incomeTaxes: fed.tax + state.tax + local.tax };
+  };
+
+  // Path A: standard deduction.
+  const std = run(FEDERAL_2026.standardDeduction[status], false, 0);
+
+  // Path B: itemize. SALT depends on state/local tax, which can depend on the federal choice,
+  // so iterate to a fixed point (converges in 2-3 passes).
+  let itm = std;
+  let stateLocal = std.state.tax + std.local.tax;
+  const cap = saltCap(federalAGI);
+  for (let i = 0; i < 4; i++) {
+    const salt = Math.min(cap, clamp0(stateLocal) + propertyTax);
+    const incomeTaxShare = salt * (clamp0(stateLocal) / Math.max(1, clamp0(stateLocal) + propertyTax));
+    const itemizedTotal = salt + otherItemized;
+    itm = run(itemizedTotal, true, itemizedTotal - incomeTaxShare);
+    stateLocal = itm.state.tax + itm.local.tax;
+  }
+
+  // A real filer picks whichever election minimizes total income tax (federal + state + local).
+  const best = itm.incomeTaxes < std.incomeTaxes ? itm : std;
+
+  const warnings = [...best.state.warnings, ...best.local.warnings];
+  if (best.itemized) warnings.push(`Itemizing beats the standard deduction here (SALT and other deductions total $${Math.round(best.deduction).toLocaleString()}).`);
+  if (k401 > 24_500) warnings.push("401(k) deferral exceeds the 2026 limit of $24,500.");
+  if (federalAGI > 400_000) warnings.push("Alternative minimum tax is not modeled; check AMT above roughly $400k of income.");
+
+  const totalTax = best.fed.tax + fica.socialSecurity + fica.medicare + fica.additionalMedicare
+    + best.state.tax + best.state.payrollTax + best.local.tax;
+  const gross = input.wages + spouse;
+  const afterTaxIncome = gross - totalTax;
+
+  return {
+    federalAGI: round2(federalAGI),
+    federalTaxableIncome: round2(best.fed.taxableIncome),
+    itemizes: best.itemized,
+    federalIncomeTax: round2(best.fed.tax),
+    socialSecurity: round2(fica.socialSecurity),
+    medicare: round2(fica.medicare),
+    additionalMedicare: round2(fica.additionalMedicare),
+    stateIncomeTax: round2(best.state.tax),
+    statePayrollTax: round2(best.state.payrollTax),
+    localIncomeTax: round2(best.local.tax),
+    totalTax: round2(totalTax),
+    afterTaxIncome: round2(afterTaxIncome),
+    netPay: round2(afterTaxIncome - k401 - s125 - commute),
+    effectiveRate: gross > 0 ? totalTax / gross : 0,
+    warnings,
+  };
+}
+
+/** Annual tax liability (not paycheck withholding) for one household in tax year 2026. */
+export function computeTaxes(input: TaxInput): TaxResult {
+  const base = computeOnce(input);
+  const bumped = computeOnce({ ...input, wages: input.wages + 1_000 });
+  return { ...base, marginalRate: (bumped.totalTax - base.totalTax) / 1_000 };
+}
