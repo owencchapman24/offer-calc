@@ -45,11 +45,32 @@ export interface TaxParams {
   local: LocalParams;
 }
 
+/**
+ * SALT cap for `year`, IRC 164(b)(7) as added by Pub. L. 119-21 sec. 70120 (text verified on
+ * Cornell LII, Oct 2026). No rounding anywhere in the paragraph.
+ *  - Cap (A): $40,400 for 2026; for years after 2026 and before 2030, 101% of the prior
+ *    year's amount; $10,000 after 2029.
+ *  - Phase-down (B): only for years beginning before Jan 1, 2030. Reduce by 30% of MAGI over
+ *    the threshold ($505,000 for 2026, then 101% of the prior year's), not below $10,000.
+ */
+export function saltForYear(year: number): SaltParams {
+  if (year < BASE_YEAR) throw new Error(`No SALT parameters before ${BASE_YEAR}.`);
+  if (year >= 2030) return { cap: 10_000 };
+  const { cap, phaseDown } = FEDERAL_2026.salt;
+  let c: number = cap;
+  let threshold: number = phaseDown.threshold;
+  for (let y = BASE_YEAR + 1; y <= year; y++) {
+    c *= 1.01;
+    threshold *= 1.01;
+  }
+  return { cap: c, phaseDown: { ...phaseDown, threshold } };
+}
+
 const PARAMS_2026: TaxParams = {
   year: BASE_YEAR,
   indexFactor: 1,
   projected: false,
-  federal: FEDERAL_2026,
+  federal: { ...FEDERAL_2026, salt: saltForYear(BASE_YEAR) },
   payroll: PAYROLL_2026,
   states: STATES_2026,
   local: { nyc: NYC_2026, philadelphia: PHILLY_2026 },

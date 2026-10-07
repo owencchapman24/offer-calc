@@ -7,7 +7,7 @@ import type { TaxInput, TaxResult } from "./types";
 
 export * from "./types";
 export { STATES_2026 } from "./params/states2026";
-export { paramsForYear } from "./params";
+export { paramsForYear, saltForYear } from "./params";
 export type { TaxParams, FederalParams, PayrollParams, SaltParams, LocalParams } from "./params";
 
 interface Pass {
