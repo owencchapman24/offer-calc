@@ -66,11 +66,15 @@ Entry point: `computeTaxes(input)` in `src/tax/index.ts`.
 - No dependents/credits (CTC, EITC), no AMT, head-of-household uses single state params.
 - Convenience-of-employer rule (NY, DE, NE, PA; CT/NJ reciprocal) not modeled — should
   at least warn on remote offers.
+- Offer model (planned, docs/offer-model.md §9): part-year residency in a relocation year
+  (we tax the whole year as a resident of the new state); spouse income is shared across
+  offers (can't vary per offer).
 
 ## Roadmap
 1. Offer model on top of the engine: year-by-year cash comp (base, bonus as range,
    sign-on with clawback exposure, RSU vesting incl. back-loaded schedules, refreshers),
    calendar-year vs employment-year split (partial first year for new grads).
+   Approved design: `docs/offer-model.md` (rev 3). Prerequisite: per-year tax params (§8).
 2. Benefits: 401(k) match x vesting x expected tenure; health plan expected cost
    (premium + OOP scenarios - employer HSA); tax-free perks grossed up at marginal rate
    (Section 127 $5,250, 132(f) $340/mo).
