@@ -132,28 +132,29 @@ cites a workpaper.
 | Bonus | Target, as a % of salary or $ a year. Payout timing is a `D` default: "paid each March for the prior calendar year; the first one is prorated". |
 | City | Where you'd live. Searches BEA metro areas. For a multi-state metro it asks the state (New York metro: NY, NJ or PA), and in New York State it asks "Inside New York City?" (city income tax). The employer state defaults to the same state; detailed mode can change it. |
 | Start date | Today or later. A date in the past gets a note: PV would compound pay already received. |
-| Rent | Monthly, per offer. Prefilled with an estimate and an `E` tickmark: "estimate: edit to your actual rent". |
+| Rent | Monthly, per offer. Prefilled with HUD's Fair Market Rent for a 1-bedroom in that metro, with an `E` tickmark: "estimate (HUD Fair Market Rent): edit to your actual rent". |
 
-**The rent estimate** is the engine's existing derivation (`rentSource: "derived"`): your
-current rent × (the offer metro's housing RPP ÷ the housing RPP where you pay it).
-- **Your current rent** is one field in About you, defaulting to the 2024 U.S. median gross
-  rent, $1,487. That's ACS 1-year, table B25064: all unit sizes, utilities included. It
-  carries a `D` tickmark and its source.
-- **Sample estimates** from the default: New York metro $2,196, Charlotte $1,443, Seattle
-  $2,236.
-- **Metro-wide, so often low.** A Manhattan one-bedroom runs well above the New York
-  metro's $2,196, which is why the label asks for your actual rent.
-- **Engine work:** one small item (§11, item 9). The engine applies the reference rent at
-  the price-reference location, so a current rent paid somewhere else needs its own area.
+**The rent estimate** is HUD's FY2027 Fair Market Rent (`rentSource: "fmr"`). It's the 40th
+percentile of gross rents for recent movers, for the FMR area that holds most of the metro's
+people, in your residence state if any is (`npm run fetch-fmr`).
+- **Bedrooms:** 1 by default; a studio is one setting away (household `fmrBedrooms`).
+- **Fallback:** the BEA-derived estimate covers only areas without an FMR (state nonmetro
+  portions). It's the U.S. median gross rent, $1,487 (ACS 2024 1-year, B25064, checked on
+  data.census.gov), times the housing RPP ratio.
+- **Sample estimates** (1 bedroom, with the derived figure for comparison):
 
-HUD Fair Market Rents (40th-percentile rents for recent movers) would be a better anchor.
-They're on the roadmap, not in this build.
+  | Metro | HUD FMR area | FMR | BEA-derived |
+  |---|---|---:|---:|
+  | New York | New York, NY HMFA | $2,729 | $2,196 |
+  | Charlotte | Charlotte-Concord-Gastonia HMFA | $1,640 | $1,443 |
+  | Seattle | Seattle-Bellevue HMFA | $2,180 | $2,236 |
+- **Metro-wide, so often low:** a Manhattan one-bedroom runs above $2,729, which is why the
+  label asks for your actual rent.
 
 **About you:** one strip, shared by all offers.
 - **Filing status:** default Single (`D`).
 - **How long do you expect to stay?** Default 4 years (`D`). It sets the comparison window
   (§4.1).
-- **Your rent now,** and where: default $1,487, U.S. median (`D`).
 - **Your wages from another job this year:** default $0 (`D`). It matters for the first
   year's tax: an internship, or the job you're leaving.
 - **Prices in:** default U.S. average (`D`); can be your current city (§5).
@@ -252,7 +253,7 @@ Examples of the tone:
 | Salary | Per year, before tax. | Your starting base salary from the offer letter. Raises and promotions are separate (detailed mode). Pay accrues by calendar month, so a July start earns about half of it in 2026. |
 | Bonus | Target bonus; first one is prorated. | Enter the target from your offer, as a % of salary or dollars. Most firms pay it once a year for the prior year, so a July start gets a partial first bonus about eight months later. If yours works differently, change the timing in detailed mode. |
 | How long do you expect to stay? | Sets how many years we compare. | We compare every offer over the same stretch, starting on the earliest start date. Pay after that isn't counted. The row under the verdict shows whether the winner changes if you stay 2, 3, 4 or 5 years. |
-| Rent | Estimate: edit to your actual rent. | We start from your rent now and scale it by how housing costs compare between metros (BEA). It's a metro-wide average, so city-center rents usually run higher. |
+| Rent | Estimate (HUD Fair Market Rent): edit to your actual rent. | HUD's Fair Market Rent: what recent movers pay for a typical 1-bedroom across the metro (the 40th percentile, utilities included). City-center rents usually run higher, so enter yours if you know it. |
 
 The help text lives in one typed file keyed by input path (`app/help.ts`). A unit test
 fails if any input lacks a hint or help. Each UI slice writes the help for its own inputs.
@@ -266,8 +267,7 @@ why. Editing removes it, and "Reset to default" sits in the help.
 |---|---|---|
 | Filing status | Single | Most new grads; visible in About you |
 | How long do you expect to stay? | 4 years | A typical first-job tenure; the if-you-stay row shows 2-5 |
-| Rent now | $1,487, U.S. median gross rent (ACS 2024, B25064) | Sourced; the anchor for every rent estimate |
-| Rent (per offer) | Estimate (`E`): rent now × housing RPP ratio | Labeled "edit to your actual rent" |
+| Rent (per offer) | Estimate (`E`): HUD FY2027 Fair Market Rent, 1 bedroom, for the metro | Published, sourced and labeled "estimate (HUD Fair Market Rent): edit to your actual rent" |
 | Wages from another job this year | $0 | Visible; the help explains the first-year effect |
 | Bonus timing | Paid March 15 for the prior calendar year; no cutoff | The common pattern; shown under the field |
 | Raises, share-price growth, refreshers | 0, 0, none | Uncertain, so zero until you say otherwise |
@@ -984,7 +984,7 @@ font requests.
 | Role | Face | Notes |
 |---|---|---|
 | Schedule titles and workpaper refs | Next, bold, small caps, tracked | `L-2 · IF THINGS GO BADLY` |
-| UI, labels, numbers | Next | Tabular figures in tables and axes. Proportional for the hero figure, which stays in the same face (dataviz rule). |
+| UI, labels, numbers | Next | Tabular figures (`font-variant-numeric: tabular-nums`) in tables and axes. Checked in the shipped Fontsource files (2026-10-08): Next's digits are proportional by default (widths 407-648 units), and its `tnum` feature makes all ten 632 units wide, the same as Mono. Proportional for the hero figure, which stays in the same face (dataviz rule). |
 | Derivations, formulas, the tickmark legend | Mono | |
 
 - **Scale:** 13 / 15 / 17 / 21 / 28 / 40 / 56 px. Body 15/24, tables 13.5/20.
@@ -1139,13 +1139,14 @@ font requests.
 | 6 | Pay per extra hour (needs item 5's window hours) | Lead schedule |
 | 7 | Error codes with input paths instead of message-only throws | Inline validation |
 | 8 | Samples moved to `src/samples.ts`, shared by the table script and the app. Done with item 1. | §7 |
-| 9 | Rent anchor area: the household's current rent can be paid somewhere other than the price reference; the ACS median as the default anchor | Rent estimate |
+| 9 | Rent estimate. Done (2026-10-08): HUD FY2027 FMRs, with the BEA-derived fallback anchored at the ACS median | Rent estimate |
 | 10 | City picker data: metro → states, the NYC locality, multi-state prompts (`findRppAreas` exists) | Quick mode |
 | 11 | (Optional) Rent flip: the rent change that ties, closed form, since the total is linear in rent | Close calls |
 | 12 | (Optional) Leave sweep on the COL basis | L-4 |
 
-**Roadmap, not this build:** HUD Fair Market Rents by metro as a better rent anchor
-(`npm run fetch-fmr` and a HUD area ↔ BEA metro crosswalk).
+**Also done before UI code (2026-10-08):** the engine returns numbers and codes, and
+`src/format` writes the words. That's faster (a projection takes 2.5 ms) and lets the UI own
+all formatting.
 
 ## 12. Build plan
 
@@ -1166,9 +1167,9 @@ font requests.
      short stay doesn't get an artificially low final-year rate.
    - **Clawbacks:** ones triggered by leaving at the end of the stay belong to L-4, not to
      the if-you-stay row.
-2. **The rent anchor's default is the ACS 2024 U.S. median gross rent ($1,487).** It's one
-   sourced constant, checked against the published table when it's added. It's not a new
-   data slice.
+2. **Rent defaults to HUD's Fair Market Rent** (revised after review). The ACS median
+   ($1,487, checked against table B25064) anchors only the fallback for areas without an
+   FMR.
 3. **Tickmarks are graphite, not colored.** Shape carries meaning, and the highlighter wash
    shows tracing. A colored tickmark failed the palette validator against the offer colors.
 4. **Pay per extra hour shows a ratio only when the extra hours also pay more.** Otherwise it
