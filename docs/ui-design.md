@@ -1166,23 +1166,27 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   - Samples loaded by default, stamped illustrative, and moved to start next July so PV is
     taken from today.
 
-**Slice 1 versus this design:**
-- **Tickmarks:** they show with their legend but don't open derivations yet (slice 3).
+**UI slice 1 versus this design:**
+- **Tickmarks:** they show with their legend but don't open derivations yet (UI slice 2).
 - **Phones:** the ledger scrolls one offer at a time instead of tabs, and there's no
-  sticky verdict bar yet.
-- **Lead schedule:** the close-call stamp shows; the flip line comes with breakeven
-  (slice 5).
+  sticky verdict bar yet (UI slice 6).
+- **Lead schedule:** the close-call stamp shows; the flip line comes with breakeven (UI
+  slice 4). Pay per extra hour isn't shown yet (UI slice 2).
+- **First run:** the samples load by default with a "Start with my offers" link, instead
+  of the W1 choice screen.
 
-**Slices:**
-1. **Engine prerequisites** (§11, items 1-5), with a review stop and timings.
-2. **Shell:** quick mode, About you, the lead schedule, the if-you-stay row, the pipeline
-   toggle, local saving, the samples and the first run. Engine items 6-10 come with it.
-3. **Explanations:** tickmarks and Show the work, L-1, the bridge and first-use note, and
-   methodology v1.
-4. **Detailed mode:** every section, with the help text for each.
-5. **L-2 and L-3:** the risk view and breakeven.
-6. **L-4 and L-5:** leaving early and warnings.
-7. **Finish:** export and import, print, an accessibility pass, then deploy.
+**UI slices**, numbered as shipped. The engine prerequisites came first and aren't
+numbered.
+1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
+   row, the pipeline toggle, local saving and the samples. Engine item 10 came with it.
+2. **Explanations** (next): tickmarks and Show the work, L-1, the bridge and first-use
+   note, and methodology v1. Engine item 6 (pay per extra hour) comes with it.
+3. **Detailed mode:** every section, with the help text for each. Engine item 7 (error
+   codes with input paths) comes with it.
+4. **L-2 and L-3:** the risk view and breakeven, with the close-call flip line.
+5. **L-4 and L-5:** leaving early and warnings.
+6. **Finish:** export and import, print, an accessibility pass, phone tabs and a sticky
+   verdict bar.
 
 ## 13. Decided in rev 2 (say if you disagree)
 

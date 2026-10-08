@@ -6,59 +6,86 @@ and show the work. Portfolio piece for analyst-track roles, so correctness and a
 methodology page matter more than features.
 
 ## Status (2026-10-08)
-- **Tax engine** (`src/tax/`): done and validated against PolicyEngine-US for 2026, with
-  projected later years (`paramsForYear`).
-- **Offer model** (`src/offer/`): slices 1-6 done, merged to main and pushed:
-  - **Slice 1:** salary, bonus and cash awards.
-  - **Slice 2:** RSUs, vesting and refreshers.
-  - **Slice 3:** leave date, clawbacks and the leave-date sweep.
-  - **Slice 4:** raises and promotions, bear/base/bull, PV, `compareOffers` and `breakeven`.
-  - **Slice 5:** 401(k), health, perks, hours and total rewards.
-  - **Slice 6:** cost of living (BEA RPPs). The fixes made with it: after-tax comp and
-    take-home as the cash measures, plan-year-hours vesting.
-  - **After slice 6:** the COL-adjusted total (per year, window nominal and PV, a third
-    breakeven basis) and rent growth.
-  - **UI engine prerequisites (2026-10-08):**
-    - profiling and caching: a projection is 10× faster;
-    - `breakeven` outcomes;
-    - `cliffs` / `nextCliff`;
-    - `withholdingShortfall`;
-    - `horizonSweep` with window hours, per hour and `monthlyEquivalent`.
-  - **Before UI code (2026-10-08):**
-    - the engine returns numbers and codes, and `src/format` writes the words;
-    - HUD FY2027 Fair Market Rents as the rent estimate;
-    - the type check for tabular figures.
-- **UI slice 1 (2026-10-08):** the app in `app/`:
-  - Vite and React, with the engine in a Web Worker: debounced, and stale results dropped.
-  - Saved in this browser.
-  - Quick mode for 2-3 offers, About you with the expected stay, and HUD rent estimates.
-  - The lead schedule: verdict, basis pipeline and the "if you stay" row.
-  - The samples are loaded by default and marked illustrative.
-- **Tests:** 156 passing: `test/offer.test.ts` 110, `test/params.test.ts` 22,
-  `test/tax.test.ts` 10, `app/src/app.test.ts` 14. Hand-checked values carry their
-  arithmetic in comments.
-  `npm test` also runs `scripts/check-engine.ts`: no text formatting inside the engine.
-- `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
-  Seattle tech finance. Inputs are illustrative, not market data.
+**Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
+- **Tax engine:** 2026 law, validated against PolicyEngine-US. Projected later years come
+  from `paramsForYear`, cached and frozen.
+- **Offer model:**
+  - salary, bonus and cash awards; RSUs and refreshers;
+  - leave date, clawbacks and the leave-date sweep;
+  - raises and promotions; bear/base/bull scenarios; PV;
+  - `compareOffers`, and `breakeven`, including the "alreadyAhead" outcome;
+  - 401(k), health, perks, hours;
+  - cost of living (BEA RPPs), the COL-adjusted total, rent growth;
+  - `cliffs` / `nextCliff`, `withholdingShortfall`, and `horizonSweep` (window hours,
+    per hour, `monthlyEquivalent`).
+- **Structured output:** the engine returns numbers and codes. `src/format` writes all the
+  words (labels, formulas, warnings, assumptions).
+- **Rent estimates:** HUD FY2027 Fair Market Rents by metro (`npm run fetch-fmr`). A
+  BEA-derived fallback, anchored at the ACS 2024 median gross rent ($1,487), covers areas
+  without an FMR.
+- **Speed** (`npm run bench`, median of warm runs):
+  - one projection 2.5 ms; `compareOffers` 19 ms; `horizonSweep` (stays of 2-5) 21 ms;
+  - one breakeven 50 ms; a 60-month leave sweep 81 ms.
+
+**UI: slice 1 is live at https://offer-calc.vercel.app.**
+- **App:** `app/`, React 19 and Vite 8.
+  - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
+  - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
+    login.
+- **Features:**
+  - quick mode for 2-3 offers;
+  - About you, with "How long do you expect to stay?" (default 4 years);
+  - HUD rent estimates;
+  - the lead schedule: verdict, rank list, basis pipeline, the "if you stay 2-5 years"
+    row and the disagreement line;
+  - light and dark themes.
+- **Samples:** loaded by default and stamped illustrative.
+- **Deploys:** Vercel deploys every push to `main` from the private GitHub repo.
+  - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
+  - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
+    plus a one-year immutable cache for `/assets/`. All were checked live.
+- **Bundles** (raw / gzip):
+  - **Main thread:** 276 / 85 KB. It was 437 / 122 KB before the slim city list.
+  - **Worker:** 232 / 60 KB.
+  - Only the worker holds the engine and the BEA/HUD tables.
+
+**Tests:** 156 passing.
+- `test/offer.test.ts` 110, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+  `app/src/app.test.ts` 14.
+- Hand-checked values carry their arithmetic in comments.
+- `npm test` also runs `scripts/check-engine.ts`, the no-formatting-in-the-engine guard.
+
+**Other:**
+- `npm run offers` prints the sample tables (NYC IB analyst, Charlotte corporate finance,
+  Seattle tech finance), plus FMR vs BEA-derived rent estimates. Inputs are illustrative,
+  not market data.
 - **Design docs:**
   - `docs/offer-model.md`: approved rev 3, updated per slice. Its §12 types were the
     pre-build proposal; `src/offer/types.ts` is authoritative.
   - `docs/ui-design.md`: UI design, approved rev 2 (2026-10-08). Audit tickmarks are the
-    signature element; the default basis is "After rent, at U.S. prices".
+    signature element; the default basis is "After rent, at U.S. prices". §12 numbers the
+    UI slices as shipped.
 
 ## Next steps
-1. **Live at https://offer-calc.vercel.app.** Vercel deploys main from the private repo:
-   - framework none, `npm ci`, `npm run build`, output `dist/`;
-   - CSP and other headers, plus immutable caching for `/assets/`, in `vercel.json`.
-2. **UI slices** per `docs/ui-design.md` §12. Deferred from slice 1:
-   - phone tabs and a sticky verdict bar;
-   - interactive tickmarks (slice 3);
-   - pay per extra hour and the close-call flip line (engine items 6 and 11);
-   - error codes with input paths (item 7).
+1. **UI slice 2: Explanations** (`docs/ui-design.md` §8-9, §12).
+   - Tickmarks that open **Show the work**: the derivation with your values, each part
+     ticked, and the figures it uses highlighted on the page.
+   - L-1 by year (chart plus table view).
+   - The bridge from the offer letter, and the first-use note for the after-rent basis.
+   - Methodology v1 (M-1 to M-13): written sections plus each offer's live
+     `assumptions[]` through `src/format`.
+   - Carried over from slice 1: pay per extra hour in the lead schedule (§11, item 6).
+   - Stop for review with light and dark screenshots of the live site.
+2. **Later slices**, per §12:
+   - 3: detailed mode, plus error codes with input paths (§11, item 7);
+   - 4: risk and breakeven, plus the close-call flip line;
+   - 5: leaving early and warnings;
+   - 6: finish (export/import, print, accessibility, phone tabs and a sticky verdict bar).
 
 ## Commands
-- `npm test`: unit tests. `npm run typecheck`: `tsc -p .` (src and test, no Node types)
-  and `tsc -p scripts` (Node types).
+- `npm test`: unit tests (engine and app) plus the engine formatting guard.
+- `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node
+  types) and `tsc -p app` (DOM, React).
 - `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
   `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
 - `npm run offers`: sample comparison tables.
@@ -124,9 +151,14 @@ methodology page matter more than features.
 ## Working agreements
 - **Branches:** one branch per slice. Merge to main with `--no-ff` when green (tests,
   typecheck, grid unchanged), push, delete the branch.
+- **Pushing `main` deploys to production** (Vercel, offer-calc.vercel.app). Keep main green,
+  and run `npm run build` before merging UI work.
 - **Tests:** hand-check at the edges: the day before vs the day of a vest, payout or
   window end; thresholds; bracket crossings.
-- **Review stops:** stop after each slice and show `npm run offers` tables for review.
+- **Review stops:** stop after each slice for review.
+  - Engine slices: show the `npm run offers` tables.
+  - UI slices: show light and dark screenshots of the live site and note anything that
+    differs from the design.
 - **Tax-engine changes:** branch, then separate commits. After each: tests pass and the
   2026 oracle report is byte-identical to the baseline (or the diff is explained).
 - **Windows PowerShell 5.1:** pass multi-line commit messages with `git commit -F <file>`;
@@ -142,7 +174,12 @@ methodology page matter more than features.
   "Today" is always passed in (`valuationDate`), never read from the clock.
 - The engine (`src/tax`, `src/offer`, `src/col`) returns numbers and codes, never
   formatted text. Events carry a `detail`; warnings and assumptions are `{ code, params }`.
-  New text goes in `src/format`, and `npm test` enforces this.
+  New text goes in `src/format`. `scripts/check-engine.ts` (run by `npm test`) fails on
+  `toLocaleString`, `Intl` or an import from `src/format` inside the engine.
+- Generated data files aren't edited by hand:
+  - `src/col/rpp.json` (`fetch-rpp`), `src/col/fmr.json` (`fetch-fmr`);
+  - `src/col/cities.json` (`build-cities`, which both fetch scripts run; a test fails if
+    it's stale).
 - Engine functions take `TaxParams` as an argument; never import `*_2026` constants into
   `federal.ts`/`state.ts`/`local.ts`. Hardcoded thresholds in `state.ts` specials are
   2026 law; wrap them in `ix()` only if the state sets `indexed.specialThresholds`.
@@ -156,6 +193,31 @@ methodology page matter more than features.
   - refreshers
   - savings rate
   The engine has no default inflation; the offer model defaults to 2.5%, shown.
+
+## UI conventions (keep these)
+- **Bundles:** the main thread never imports engine values (`src/offer`, `src/tax`,
+  `src/col/index.ts`, `src/col/rent.ts`); type imports are fine.
+  - It uses `src/col/cities.ts` (the slim city list) and gets everything else from the
+    worker.
+  - Message types and `rentKey` live in `app/src/protocol.ts`. Never import a value from
+    `engine.worker.ts`: that pulls the engine and its data into the main bundle.
+- **Type:**
+  - Atkinson Hyperlegible Next for all text and figures.
+  - `font-variant-numeric: tabular-nums` wherever numbers align: tables, axes, inputs, the
+    rank list. Next's `tnum` makes every digit 632 units wide; checked in the shipped
+    Fontsource files.
+  - Proportional figures on the hero number.
+  - Atkinson Hyperlegible Mono only for formulas and derivations.
+- **Samples:** `src/samples.ts` keeps fixed dates (start 2026-07-13) for the table script
+  and tests. The app moves them forward by whole years to start on or after today, next
+  July, so PV is taken from today. They're stamped illustrative wherever they appear.
+- **Today:** the app passes the user's local date as `valuationDate`; nothing in `src/`
+  reads the clock.
+- **Colors and marks:** offer colors (cobalt, berry, bronze) are for marks and rules only;
+  text stays ink. Each offer keeps its letter and color for life. Tokens and validation are
+  in `docs/ui-design.md` §9; re-run the dataviz validator if a color changes.
+- **Defaults:** every default shows as a real value with a `D` tickmark; every estimate
+  shows an `E` tickmark.
 
 ## Key design decisions (settled; don't relitigate without the user)
 **Time and tax attribution**
@@ -182,8 +244,8 @@ methodology page matter more than features.
 - **Present value:** each event's after-tax cash is discounted by
   (1 + r)^-((date - valuationDate) / 365.25), default r = 5% nominal. The UI passes
   today's date.
-- **Comparison window:** earliest start + horizon (default 5 years), so a later start
-  counts as lost pay.
+- **Comparison window:** earliest start + horizon, so a later start counts as lost pay.
+  The engine defaults to 5 years; the UI's "How long do you expect to stay?" defaults to 4.
 - **Breakeven:** bisection to the cent on base-scenario PV, on after-tax comp, total
   rewards or the COL-adjusted total. "alreadyAhead" (B leads even at $0) is an outcome,
   not an error; `aheadBy` is always given.
@@ -355,8 +417,7 @@ methodology page matter more than features.
 ## Roadmap (remaining)
 Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
 
-2. (Next) UI: the design is approved (`docs/ui-design.md`); next are the engine
-   prerequisites, then the UI (item 6 below).
+2. UI: in progress. Slice 1 is live; see Next steps and `docs/ui-design.md` §12.
 3. Time: commute cost (IRS 76c/mi includes depreciation — offer a variable-cost option),
    remote-work valuation default ~5% of pay (editable). Weekly hours and effective hourly
    rate are done.
@@ -367,7 +428,8 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
    many offers. Warn and estimate the April balance due. Totals are already right; this
    is a cash-timing warning. Engine done (`withholdingShortfall`); the UI shows it in L-5.
 6. UI (React/TS, client-side only, no login, live-updating, inline input help, no
-   misleading defaults, per NN/g calculator guidelines) and a methodology page.
+   misleading defaults, per NN/g calculator guidelines) and a methodology page. Slice 1
+   live; the methodology page comes in UI slice 2.
 7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
    step, and the after-tax value of staying until it. Engine done (`cliffs`,
    `nextCliff`); the UI shows it in L-4.
