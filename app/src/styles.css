@@ -238,17 +238,31 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .tick { display: inline-block; margin-left: 0.18em; font-size: 0.72em; font-weight: 700; color: var(--graphite); transform: translateY(-0.35em) rotate(-6deg); font-family: var(--mono); }
 .hero .tick { font-size: 18px; transform: translateY(-1.1em) rotate(-6deg); }
 
-/* A tickmark is a button: a 24px hit target from its ::before, graphite until hovered or open. */
-.tick-btn { position: relative; border: none; background: none; padding: 0 1px; line-height: 1; cursor: pointer; }
-.tick-btn::before { content: ""; position: absolute; inset: -7px -7px; }
+/* A lone tickmark (an input's default or estimate) is a button: the mark stays small, and its
+   ::before is a hit area of at least 24 x 24 px, centered on it (WCAG 2.5.8). */
+.tick-btn { position: relative; border: none; background: none; padding: 0 1px; line-height: 1; cursor: pointer; color: var(--graphite); }
+.tick-btn::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%);
+}
 .tick-btn:hover, .tick-btn.is-open { color: var(--ink); }
 .tick-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
-/* The highlighter wash: on a figure whose tickmark is hovered, focused or open, and on everything an open derivation uses. */
-.fig, .trace { transition: background-color 120ms, box-shadow 120ms; }
-.fig:has(> .tick-btn:hover), .fig:has(> .tick-btn:focus-visible), .fig:has(> .tick-btn.is-open), .fig.is-traced {
-  background: var(--highlighter); box-shadow: 0 0 0 3px var(--highlighter);
+/* A figure is one button with its tickmark: the number itself opens Show the work. A dotted
+   underline and the pointer on hover say so; its hit area is at least 24px tall. */
+.fig {
+  display: inline; font: inherit; color: inherit; letter-spacing: inherit; text-align: inherit; padding: 0; margin: 0;
+  transform: none; border-radius: 1px;
 }
+.fig::before { left: 0; top: 50%; width: 100%; height: max(100%, 24px); transform: translateY(-50%); }
+.fig .tick { pointer-events: none; }
+.fig:hover .fig-value, .fig:focus-visible .fig-value, .fig.is-open .fig-value {
+  text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 0.18em;
+}
+.fig:focus-visible { outline-offset: 2px; }
+
+/* The highlighter wash: on a figure that's hovered, focused or open, and on everything an open derivation uses. */
+.fig, .trace { transition: background-color 120ms, box-shadow 120ms; }
+.fig:hover, .fig:focus-visible, .fig.is-open, .fig.is-traced { background: var(--highlighter); box-shadow: 0 0 0 3px var(--highlighter); }
 .trace.is-traced { background: var(--highlighter); }
 .about-label { display: inline-flex; align-items: baseline; gap: 2px; }
 .about-field.trace { display: flex; flex-direction: column; gap: 4px; min-width: 180px; padding: 2px 4px; margin: -2px -4px; }
@@ -267,13 +281,14 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .work-close:hover { color: var(--ink); }
 .work-back { margin-top: 6px; font-size: 13px; }
 .work-scope { margin: 4px 0 10px; font-size: 13px; color: var(--graphite); }
-.work-lines { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* Set like an accountant's schedule: labels in Next, figures in tabular digits, right-aligned. */
+.work-lines { width: 100%; border-collapse: collapse; font-size: 14px; }
 .work-lines td, .work-lines th { padding: 3px 4px; vertical-align: baseline; }
 /* 16px bold: at 13px the font's ÷ closes up into a +. */
 .work-op { width: 1.3em; color: var(--graphite); text-align: center; font-family: var(--sans); font-size: 16px; font-weight: 700; line-height: 1; }
 .work-label { text-align: left; font-weight: 400; }
-.work-gloss { color: var(--graphite); font-family: var(--sans); font-size: 12px; }
-.work-value { text-align: right; white-space: nowrap; padding-right: 0 !important; }
+.work-gloss { color: var(--graphite); font-size: 12.5px; }
+.work-value { text-align: right; white-space: nowrap; padding-right: 0 !important; font-variant-numeric: tabular-nums; }
 .work-lines .tick { min-width: 1em; text-align: left; }
 .rule-single > * { border-top: 1px solid var(--ink); }
 .rule-double > * { border-top: 3px double var(--ink); font-weight: 700; }
@@ -288,7 +303,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .extra-title { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
 .extra-line { margin: 6px 0 0; font-size: 14.5px; font-variant-numeric: tabular-nums; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); }
-.legend-title { font-weight: 700; color: var(--graphite); }
+.legend-title { font-weight: 700; color: var(--graphite); text-decoration: underline dotted; text-underline-offset: 2px; }
 .legend .tick { transform: none; margin: 0 2px 0 0; font-size: 13px; }
 
 .stamp {
@@ -296,6 +311,118 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
   letter-spacing: 0.12em; text-transform: uppercase; transform: rotate(-2deg); white-space: nowrap; line-height: 1.6;
 }
 .stamp-muted { border-color: var(--graphite); color: var(--graphite); }
+
+/* ---- hints ------------------------------------------------------------------------------------- */
+
+.got-it { border: 1px solid var(--rule); background: var(--sheet); padding: 2px 10px; font-size: 13px; cursor: pointer; }
+.got-it:hover { border-color: var(--ink); }
+.first-use { margin: 0 0 14px; padding: 10px 12px; background: var(--band); border-left: 3px solid var(--ink); font-size: 14px; }
+.first-use p { margin: 0; }
+.first-use-actions { display: flex; gap: 16px; align-items: center; margin-top: 8px !important; }
+.hint-ticks { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 10px 0 0; font-size: 13.5px; color: var(--graphite); }
+.hint-ticks .tick { transform: none; margin: 0 1px; font-size: 13px; }
+
+/* ---- L-1 by year and the bridge ------------------------------------------------------------------ */
+
+.by-year { margin-top: 24px; }
+.by-year-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.chart-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.chart-title { margin: 0; font-size: 15px; font-weight: 700; outline: none; }
+.chart { position: relative; }
+.chart-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 4px; padding: 0; font-size: 13px; font-weight: 700; align-items: center; }
+.chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.line-key { display: inline-block; width: 16px; height: 2px; background: var(--offer); border-radius: 1px; }
+.chart-unit { margin-left: auto; font-weight: 400; color: var(--muted); }
+.chart-plot { position: relative; }
+.chart-plot svg { display: block; overflow: visible; }
+.chart .grid { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .axis { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart .crosshair { stroke: var(--graphite); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .leader { stroke: var(--muted); stroke-width: 1; }
+.series-line { fill: none; stroke: var(--offer); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.series-dot { fill: var(--offer); stroke: var(--sheet); stroke-width: 2; }
+.chart-hit { position: absolute; cursor: crosshair; }
+.chart-hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.end-label { position: absolute; display: inline-flex; align-items: baseline; gap: 2px; white-space: nowrap; font-size: 13px; font-variant-numeric: tabular-nums; }
+.end-letter { font-weight: 700; padding: 0 2px; box-shadow: inset 0 -3px 0 var(--offer); }
+.chart-tip {
+  position: absolute; z-index: 3; pointer-events: none; min-width: 150px; padding: 6px 10px; background: var(--sheet);
+  border: 1px solid var(--ink); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.chart-tip p { margin: 0; display: flex; align-items: center; gap: 6px; }
+.tip-head { color: var(--graphite); font-size: 12px; margin-bottom: 2px !important; }
+.tip-who { color: var(--muted); }
+.chart-notes { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 18px; }
+.caption { margin: 8px 0 0; font-size: 13px; color: var(--graphite); }
+.tie { font-family: var(--mono); font-weight: 700; color: var(--graphite); font-size: 0.8em; margin-left: 2px; }
+
+.year-table, .bridge-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 10px; }
+.year-table th, .year-table td { padding: 4px 10px; text-align: right; border-left: 1px solid var(--rule); }
+.year-table th:first-child { text-align: left; border-left: none; font-weight: 400; color: var(--graphite); }
+.year-table thead th { font-weight: 700; border-bottom: 1px solid var(--rule); }
+.year-table td:nth-child(even), .year-table th:nth-child(even) { background: var(--band); }
+.year-table tfoot th { color: var(--ink) !important; }
+
+.bridge-scope { margin: 0 0 4px; font-size: 13.5px; color: var(--graphite); }
+.bridge-pick { display: flex; gap: 10px; align-items: center; }
+.bridge-pick select { min-height: 30px; padding: 2px 6px; }
+.bridge-table th, .bridge-table td { padding: 4px 6px; vertical-align: baseline; }
+.bridge-table th { text-align: left; font-weight: 400; }
+.bridge-table .bridge-subtotal th, .bridge-table .bridge-total th, .bridge-table .bridge-letter th { font-weight: 700; }
+/* A hanging indent: "less" and "plus" sit in the margin, and a wrapped label lines up after them. */
+.bridge-change th, .bridge-less th, .bridge-plus th { padding-left: calc(18px + 3em); }
+.bridge-table td { width: 1%; }
+.bridge-lead { display: inline-block; width: 3em; margin-left: -3em; color: var(--graphite); }
+.bridge-value { text-align: right; white-space: nowrap; }
+.bridge-gloss { display: block; font-size: 12.5px; font-weight: 400; color: var(--graphite); line-height: 1.35; }
+.bridge-month { margin: 8px 0 0; font-size: 14px; }
+
+/* ---- pages and the methodology -------------------------------------------------------------- */
+
+.brand { color: inherit; text-decoration: none; }
+.pages { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
+.pages a { color: var(--ink); text-decoration: none; padding: 2px 0; border-bottom: 2px solid transparent; }
+.pages a:hover { border-bottom-color: var(--rule); }
+.pages a[aria-current="page"] { font-weight: 700; border-bottom-color: var(--ink); }
+
+.method { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
+.method-toc { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; background: var(--sheet); border: 1px solid var(--rule); padding: 14px 16px; }
+.method-toc ol { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13.5px; }
+.method-toc li { margin: 2px 0; }
+.method-toc li.toc-sub { padding-left: 16px; font-size: 13px; }
+.method-toc a { color: var(--ink); text-decoration: none; display: block; padding: 2px 4px; }
+.method-toc a:hover { background: var(--band); }
+.method-toc a[aria-current="location"] { background: var(--highlighter); font-weight: 700; }
+.toc-ref { display: inline-block; min-width: 3.4em; color: var(--graphite); font-variant-numeric: tabular-nums; }
+.method-body { background: var(--sheet); border: 1px solid var(--rule); padding: 8px 32px 32px; max-width: 920px; }
+.method-head h1 { margin: 16px 0 8px; font-size: 28px; outline: none; }
+.method-head p { margin: 0 0 8px; color: var(--graphite); }
+.method-version { font-size: 13px; color: var(--muted) !important; }
+.method-section { margin-top: 28px; scroll-margin-top: 16px; }
+.method-section.is-sub { margin-top: 18px; }
+.method-section h2, .method-section h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 18px; outline: none; }
+.method-section h3 { font-size: 16px; }
+.method-section h2 .ref, .method-section h3 .ref { min-width: 0; height: auto; padding: 2px 8px; font-size: 13px; }
+.method-section p, .method-section li { max-width: 72ch; }
+.method-section :target, .method-section h2:focus, .method-section h3:focus { background: var(--highlighter); }
+.method-sub { font-size: 15px; margin: 18px 0 6px; }
+.method-table { border-collapse: collapse; margin: 10px 0; font-size: 14px; width: 100%; }
+.method-table th, .method-table td { text-align: left; vertical-align: top; padding: 6px 10px; border-top: 1px solid var(--rule); }
+.method-table thead th { border-top: none; border-bottom: 1px solid var(--ink); font-size: 13px; }
+.method-table tbody th { font-weight: 700; width: 34%; }
+.method-table.sources td:last-child { width: 18%; color: var(--graphite); }
+.method-table .overrides { margin: 4px 0; padding-left: 18px; }
+.method-table.ticks .tick { transform: none; margin: 0 6px 0 0; }
+.method-table.work-like { width: auto; min-width: 60%; font-variant-numeric: tabular-nums; }
+.method-table.work-like td { text-align: right; }
+.method-table.work-like th { font-weight: 400; width: auto; }
+.formula { font-family: var(--mono); font-size: 13.5px; background: var(--band); padding: 10px 12px; border-left: 2px solid var(--rule); }
+.method-live { margin: 12px 0; padding: 10px 14px; background: var(--band); border-left: 3px solid var(--ink); }
+.method-live p { margin: 6px 0; }
+.live-head { font-weight: 700; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.method-note { font-size: 13px; color: var(--graphite); }
+.method-assumptions h4 { margin: 14px 0 4px; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+.method-assumptions ul { margin: 0; padding-left: 20px; font-size: 14px; }
 
 /* ---- footer ------------------------------------------------------------------------------- */
 
@@ -309,12 +436,23 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* ---- smaller screens ----------------------------------------------------------------------- */
 
 @media (max-width: 1179px) {
+  .by-year-grid { grid-template-columns: minmax(0, 1fr); }
+  .method { grid-template-columns: minmax(0, 1fr); }
+  .method-toc { position: static; max-height: none; }
   .workpaper { grid-template-columns: minmax(0, 1fr); }
   .results { position: static; }
 }
 
 @media (max-width: 759px) {
   .page { padding: 16px 16px 32px; }
+  .pages { margin-left: 0; }
+  .method-body { padding: 4px 16px 24px; }
+  .method-table tbody th { width: auto; }
+  .method-table.sources, .method-table.sources tbody, .method-table.sources tr, .method-table.sources th, .method-table.sources td { display: block; width: auto !important; }
+  .method-table.sources thead { display: none; }
+  .method-table.sources td { border-top: none; padding-top: 0; }
+  .bridge-pick { width: 100%; justify-content: space-between; }
+  .chart-unit { margin-left: 0; width: 100%; }
   .ledger { grid-template-columns: 104px repeat(var(--cols), minmax(calc(100vw - 168px), 1fr)); scroll-snap-type: x mandatory; }
   .ledger .cell { scroll-snap-align: end; }
   .stays-margin { font-size: 14px; }

@@ -1,8 +1,11 @@
-import { createContext, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext, type MouseEvent, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { SECTIONS } from "./sections";
 import { TICKS, type TickKind } from "./ui";
-import { type Derivation, derive, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
+import { type Derivation, derive, highlightedSentence, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
 
 // Show the work (docs/ui-design.md §8, §9.1): every figure's tickmark is a button that opens its
 // derivation in a popover. While it's open, the figures it uses wear the highlighter wash wherever
@@ -19,7 +22,7 @@ interface WorkApi {
 
 const Api = createContext<WorkApi | null>(null);
 
-export function WorkProvider({ ctx, children }: { ctx: WorkContext; children: ReactNode }) {
+export function WorkProvider({ ctx, children, onOpen }: { ctx: WorkContext; children: ReactNode; /** Called when a derivation opens. */ onOpen?: () => void }) {
   const [stack, setStack] = useState<MetricId[]>([]);
   const anchor = useRef<HTMLElement | null>(null);
   const openId = stack.length ? stack[stack.length - 1] : null;
@@ -33,16 +36,19 @@ export function WorkProvider({ ctx, children }: { ctx: WorkContext; children: Re
       problem = e instanceof Error ? e.message : String(e);
     }
   }
-  const tracedKey = derivation ? [openId, ...derivation.uses, ...derivation.ties.map((t) => t.id)].join("|") : openId ?? "";
+  const tracedKey = derivation ? [openId, ...derivation.uses, ...derivation.ties].join("|") : openId ?? "";
   const traced = useMemo(() => new Set(tracedKey ? tracedKey.split("|") : []), [tracedKey]);
 
   const close = useCallback((refocus: boolean) => {
     setStack([]);
     if (refocus) anchor.current?.focus();
   }, []);
+  const opened = useRef(onOpen);
+  useEffect(() => { opened.current = onOpen; });
   const toggle = useCallback((id: MetricId, el: HTMLElement) => {
     setStack((s) => (s.length === 1 && s[0] === id ? [] : [id]));
     anchor.current = el;
+    opened.current?.();
   }, []);
   const push = useCallback((id: MetricId) => setStack((s) => (s[s.length - 1] === id ? s : [...s, id])), []);
   const api = useMemo<WorkApi>(() => ({ ctx, openId, traced, toggle, push }), [ctx, openId, traced, toggle, push]);
@@ -73,9 +79,19 @@ const PHRASE: Record<TickKind, (label: string) => string> = {
   estimate: (l) => `How ${l} was estimated`,
 };
 
+/** What a tickmark button does when pressed: open its derivation, or (in a popover) drill down to it. */
+function useOpen(id: MetricId, drill: boolean) {
+  const api = useApi();
+  return (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (drill) api.push(id);
+    else api.toggle(id, e.currentTarget);
+  };
+}
+
 /**
- * An audit tickmark: a button that opens the figure's derivation. `drill` (inside a popover) opens it
- * on top of the current one, with a way back.
+ * A lone audit tickmark, for an input's default or estimate: a small mark with a 24px hit area
+ * (WCAG 2.5.8). `drill` (inside a popover) opens it on top of the current one, with a way back.
  */
 export function TickButton({ id, label, drill = false }: { id: MetricId; label: string; drill?: boolean }) {
   const api = useApi();
@@ -84,23 +100,29 @@ export function TickButton({ id, label, drill = false }: { id: MetricId; label: 
   return (
     <button type="button" className={`tick tick-btn tick-${kind}${open ? " is-open" : ""}`} data-tick={id}
       aria-label={`${PHRASE[kind](label)} (${tickWord(kind)})`} aria-haspopup="dialog" aria-expanded={drill ? undefined : open}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (drill) api.push(id);
-        else api.toggle(id, e.currentTarget);
-      }}>
+      onClick={useOpen(id, drill)}>
       {TICKS[kind].mark}
     </button>
   );
 }
 
-/** A figure with its tickmark. It wears the wash while a derivation that uses it is open. */
-export function Fig({ id, label, children, className = "" }: { id: MetricId; label: string; children: ReactNode; className?: string }) {
+/**
+ * A figure and its tickmark, as one button: the whole figure opens its derivation, so the ✓ doesn't
+ * have to be found. It wears the wash while a derivation that uses it is open.
+ */
+export function Fig({ id, label, children, className = "", drill = false }: {
+  id: MetricId; label: string; children: ReactNode; className?: string; drill?: boolean;
+}) {
   const api = useApi();
+  const kind = metricKind(id, api.ctx);
+  const open = api.openId === id;
+  const cls = `fig tick-btn${api.traced.has(id) ? " is-traced" : ""}${open ? " is-open" : ""} ${className}`.trim();
   return (
-    <span className={`fig${api.traced.has(id) ? " is-traced" : ""} ${className}`.trim()} data-metric={id}>
-      {children}<TickButton id={id} label={label} />
-    </span>
+    <button type="button" className={cls} data-metric={id} data-tick={id}
+      aria-label={`${PHRASE[kind](label)} (${tickWord(kind)})`} aria-haspopup="dialog" aria-expanded={drill ? undefined : open}
+      onClick={useOpen(id, drill)}>
+      <span className="fig-value">{children}</span><span className={`tick tick-${kind}`} aria-hidden="true">{TICKS[kind].mark}</span>
+    </button>
   );
 }
 
@@ -234,7 +256,11 @@ function ShowTheWork({ id, derivation, problem, anchor, depth, back, close }: {
   );
 }
 
+/** A figure is named in "the highlighted figures" only if it's on the page to light up. */
+const onPage = (id: MetricId) => typeof document !== "undefined" && !!document.querySelector(`[data-metric="${id}"], [data-trace="${id}"]`);
+
 function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }) {
+  const { ctx } = useApi();
   return (
     <>
       {d.scope && <p className="work-scope">{d.scope}</p>}
@@ -247,21 +273,23 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
                 {l.label}{l.note && <span className="work-gloss"> {l.note}</span>}
               </th>
               <td className="work-value">
-                {l.value}{l.value && (l.ref ? <TickButton id={l.ref} label={l.value} drill /> : <StaticTick kind="recomputed" />)}
+                {l.value && (l.ref
+                  ? <Fig id={l.ref} label={`${l.label}, ${l.value}`} drill>{l.value}</Fig>
+                  : <>{l.value}<StaticTick kind={l.tick ?? (l.rule ? "footed" : "recomputed")} /></>)}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       {d.notes.map((n) => <p key={n} className="work-note">{n}</p>)}
-      {d.ties.length > 0 && (
+      {(d.uses.length > 0 || d.ties.length > 0) && (
         <p className="work-ties">
-          <span className="tick">&lt;</span> Ties to {d.ties.map((t) => t.label).join(" and ")}, highlighted on the page.
+          {d.ties.length > 0 && <><span className="tick" aria-hidden="true">&lt;</span>{" "}</>}
+          {highlightedSentence(d, ctx, onPage)}
         </p>
       )}
-      {d.uses.length > 0 && <p className="work-ties">The figures it uses are highlighted on the page.</p>}
       <p className="work-foot">
-        <span>Methodology {d.section} · {SECTIONS[d.section]}</span>
+        <a href={`#/method/${d.section}`} onClick={() => close(false)}>Methodology {d.section} · {SECTIONS[d.section]}</a>
         {d.edit && (
           <button type="button" className="link" onClick={() => {
             close(false);

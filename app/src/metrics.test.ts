@@ -3,11 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Basis } from "../../src/offer/types";
 import { About } from "./About";
+import { ByYear } from "./ByYear";
 import { compute } from "./compute";
 import { Lead } from "./Lead";
+import Methodology, { sectionAnchor } from "./Methodology";
 import { Ledger } from "./Ledger";
 import { type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
-import { derive, type MetricId, metricKind, metricSection, type WorkContext } from "./metrics";
+import { bridge, byYear, derive, highlightedSentence, type MetricId, metricKind, metricSection, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
 import { initialSession } from "./session";
 import { figure } from "./text";
@@ -49,13 +51,17 @@ describe("show the work: the verdict a month", () => {
     expect(d.lines[0].ref).toBe("pv.C.colAdjustedTotal");
     expect(d.lines[3].ref).toBe("af.4");
   });
-  it("says why it isn't the gap / 48: $21,181.92 / 48 = $441.29", () => {
-    expect(d.notes[1]).toBe("Not $21,182 ÷ 48 = $441: later dollars are worth less today, so it takes $487 a month, "
+  it("says why it isn't the gap / 48 first, then what the factor is: $21,181.92 / 48 = $441.29", () => {
+    expect(d.notes[1]).toMatch(/^The annuity factor is what \$1 paid/);
+    expect(d.notes[0]).toBe("Not $21,182 ÷ 48 = $441: later dollars are worth less today, so it takes $487 a month, "
       + "every month for 48 months, to be worth $21,182 today.");
   });
-  it("lights up the two totals it uses and ties to the same figure in the stay row and the pipeline", () => {
+  it("lights up the two totals it uses and ties to the same figure in the stay row and the pipeline, in one sentence", () => {
     expect(d.uses).toEqual(["pv.C.colAdjustedTotal", "pv.A.colAdjustedTotal"]);
-    expect(d.ties.map((t) => t.id)).toEqual(["stay.4", "step.colAdjustedTotal"]);
+    expect(d.ties).toEqual(["stay.4", "step.colAdjustedTotal"]);
+    expect(highlightedSentence(d, ctx)).toBe("Uses and ties to the highlighted figures: C's and A's 4-year totals, the 4-year stay column "
+      + "and the “− Rent & prices” step.");
+    expect(highlightedSentence(d, ctx, (id) => id.startsWith("stay"))).toBe("Ties to the highlighted figures: the 4-year stay column.");
     expect(d.kind).toBe("recomputed");
     expect(d.section).toBe("M-7.2");
   });
@@ -76,7 +82,11 @@ describe("show the work: an offer's totals", () => {
     const v = (label: string) => parse(d.lines.find((l) => l.label.startsWith(label))!.value);
     const local = v("Take-home pay") - v("Rent");
     expect(local).toBeCloseTo(v("Spending money after rent"), -1); // whole-dollar display
-    expect(v("Spending money after rent") * v("Price factor")).toBeCloseTo(v("The same spending"), -1);
+    // The two BEA indexes, not a factor: the product foots to the dollar as displayed (here at 3 decimals).
+    const us = d.lines.find((l) => l.label === "U.S. non-housing prices (BEA)")!;
+    const ny = d.lines.find((l) => l.label === "New York non-housing prices (BEA)")!;
+    expect([us.op, us.value, us.ref, ny.op, ny.value, ny.ref]).toEqual(["×", "99.880", "rpp.A.us", "÷", "105.696", "rpp.A.area"]);
+    expect(Math.abs((v("Spending money after rent") * parse(us.value)) / parse(ny.value) - v("The same spending"))).toBeLessThan(1);
     const total = v("The same spending") - v("Out-of-pocket") + v("Saved, at face value");
     expect(Math.abs(total - v("After rent, at U.S. prices"))).toBeLessThanOrEqual(2);
     expect(d.lines[d.lines.length - 1].value).toBe("313,175");
@@ -112,16 +122,76 @@ describe("pay per extra hour (docs/ui-design.md §4.2)", () => {
   });
 });
 
+describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
+  const ctx = context();
+  it("A, year 1: the letter's 190,000 to 62,595 after rent, as in W4, footing at every subtotal", () => {
+    const b = bridge(ctx, "A", 1);
+    expect(b.rows.map((r) => [r.kind, r.label, Math.round(r.value)])).toEqual([
+      ["letter", "Offer letter: salary + target bonus + sign-on", 190_000],
+      ["change", "first bonus is a stub", -37_014],
+      ["subtotal", "Paid in year 1", 152_986],
+      ["less", "tax", -41_724], ["less", "health premiums", -1_800],
+      ["subtotal", "After-tax pay", 109_463],
+      ["plus", "employer 401(k)", 3_300], ["less", "expected out-of-pocket health costs", -1_500],
+      ["subtotal", "Total rewards", 111_263],
+      ["less", "rent", -45_600], ["less", "New York prices", -3_068],
+      ["total", "After rent, at U.S. prices", 62_595],
+    ]);
+    expect(b.rows[1].gloss).toBe("paid Jan 31 for Jul–Dec only"); // the bonus year runs Jan-Dec; A worked from Jul 13
+    expect(b.rows[3].gloss).toBe("federal, FICA, NY, NYC");
+    // Each subtotal foots: the rows since the last one, added.
+    let running = 0;
+    for (const r of b.rows) {
+      if (r.kind === "subtotal" || r.kind === "total") {
+        expect(r.value).toBeCloseTo(running, 1);
+        running = r.value;
+      } else running += r.value;
+    }
+    // 62,594.52 = spending at U.S. prices 52,694.52 + saved 9,900: $4,391 a month to spend and $825 saved (W4).
+    expect([Math.round(b.spend!), Math.round(b.saved!)]).toEqual([4_391, 825]);
+    // It ties to A's year 1 in L-1 on the after-rent basis.
+    expect(byYear(ctx, "A").years[0].value).toBe(b.rows[b.rows.length - 1].value);
+    expect(derive("br.A.1.total", ctx).ties).toEqual(["ey.A.1"]);
+  });
+  it("C, year 2: RSUs vest on company dates, so less than the letter's schedule lands in year 2", () => {
+    const rsu = bridge(ctx, "C", 2).rows.find((r) => r.line === "rsu")!;
+    expect([rsu.label, Math.round(rsu.value), rsu.gloss]).toEqual(["RSUs vest on company dates", -3_000, "vests Aug 15 and Feb 15"]);
+  });
+  it("year 1's tax splits across 2026 and 2027 at each year's rate and adds up", () => {
+    const d = derive("br.A.1.tax", ctx);
+    const parts = d.lines.slice(0, -1).map((l) => parse(l.value));
+    expect(Math.abs(parts.reduce((s, x) => s + x, 0) - 41_724)).toBeLessThanOrEqual(1);
+    expect(d.lines.map((l) => l.label.replace(/[\d,]+ paid/, "# paid"))).toEqual(["On # paid in 2026", "On # paid in 2027", "Tax in year 1"]);
+  });
+});
+
+describe("L-1 by year", () => {
+  it("the years add up to the stay as paid; a later start's last year runs past it and is reconciled", () => {
+    const a = byYear(context(), "A");
+    expect(a.years.map((y) => Math.round(y.value))).toEqual([62_595, 80_562, 87_631, 118_764]); // W4a's end label: 118,764
+    expect(a.sum!).toBeCloseTo(a.window!, 1);
+    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, quick: { ...o.quick, startDate: "2026-10-01" } } : o)));
+    const b = byYear(later, "B");
+    expect(b.sum! - b.window!).toBeGreaterThan(1_000); // B's year 4 ends Sep 30, 2030, after the stay's last day, Jul 12, 2030
+    const d = derive("eysum.B", later);
+    expect(d.lines.map((l) => l.label)).toContain("After your stay's last day (not counted)");
+    expect(d.lines[d.lines.length - 1].value).toBe(figure(b.window!));
+  });
+});
+
 describe("every figure has a tickmark kind, a methodology section and a derivation", () => {
   const noop = () => {};
-  const render = (ctx: WorkContext) => {
+  // L-1 with its table view open, each year or running, and the bridge for one offer.
+  const render = (ctx: WorkContext, running = false, bridgeOf: Letter = "A") => {
     const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
+    const ui = { ...session.ui, byYear: { mode: running ? "running" as const : "each" as const, table: true }, bridge: { letter: bridgeOf, year: running ? 2 : 1 } };
     const tree = (children: ReactElement[]) => createElement(WorkProvider, { ctx, children });
     return renderToStaticMarkup(tree([
       createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
       createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, dispatch: noop }),
       createElement(Lead, { key: "s", view: ctx.results!.view, letters: LETTERS, stayYears: 4, updating: false, error: null, notes: [],
         sample: true, dispatch: noop }),
+      createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
     ]));
   };
   // The samples on each basis, and with B as your own offer (default bonus timing) on an estimated rent.
@@ -134,9 +204,10 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
 
   for (const [name, ctx] of contexts) {
     it(name, () => {
-      const html = render(ctx);
+      const html = render(ctx) + render(ctx, true, "C");
+      expect(html).toContain('id="bridge"');
       const ids = [...new Set([...html.matchAll(/data-(?:tick|metric|trace)="([^"]+)"/g)].map((m) => m[1] as MetricId))];
-      const ticks = [...html.matchAll(/<button[^>]*class="tick tick-btn[^"]*"[^>]*>/g)];
+      const ticks = [...html.matchAll(/<button[^>]*class="[^"]*\btick-btn\b[^"]*"[^>]*>/g)];
       expect(ticks.length).toBeGreaterThan(10);
       expect(ticks.every((t) => /data-tick="/.test(t[0]))).toBe(true);
       const seen = new Set<MetricId>();
@@ -156,6 +227,18 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       expect(seen.size).toBeGreaterThan(15);
     });
   }
+
+  it("every methodology section a popover can name has its anchor on the methodology page, with live numbers", () => {
+    const ctx = contexts[0][1];
+    const html = renderToStaticMarkup(createElement(Methodology, { ctx, section: null, sample: true }));
+    for (const id of Object.keys(SECTIONS) as Array<keyof typeof SECTIONS>) expect(html, id).toContain(`id="${sectionAnchor(id)}"`);
+    // M-7.2 works the verdict's own numbers: 21,182 / 43.5191 = $487, not $441.
+    expect(html).toContain("334,357");
+    expect(html).toContain("43.5191");
+    expect(html).toMatch(/Why not \$21,182 ÷ 48 = \$441\?/);
+    // M-12 lists each offer's live assumptions.
+    expect(html).toContain("Taxed as a full-year resident of NY and New York City.");
+  });
 
   it("estimated rents carry an E tickmark; entered ones don't", () => {
     const ctx = contexts[2][1];

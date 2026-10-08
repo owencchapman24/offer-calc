@@ -5,11 +5,25 @@ import { type AppHousehold, type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, type L
 
 export type Theme = "system" | "light" | "dark";
 
+export type Hint = "ticks" | "afterRent";
+
+/** View choices remembered in this browser. The optional ones arrived after slice 1; saved sessions without them still load. */
+export interface UiState {
+  basis: Basis;
+  theme: Theme;
+  /** Hints dismissed with "Got it". */
+  dismissed?: Partial<Record<Hint, true>>;
+  /** L-1: each year or the running total, and whether the table view is open. */
+  byYear?: { mode: "each" | "running"; table: boolean };
+  /** The bridge's offer and employment year. */
+  bridge?: { letter: Letter; year: number };
+}
+
 export interface Session {
   schemaVersion: 1;
   household: AppHousehold;
   offers: AppOffer[];
-  ui: { basis: Basis; theme: Theme };
+  ui: UiState;
 }
 
 export const STORAGE_KEY = "offer-calc:v1";
@@ -26,7 +40,9 @@ export type Action =
   | { type: "loadSamples"; today: string }
   | { type: "startBlank" }
   | { type: "basis"; basis: Basis }
-  | { type: "theme"; theme: Theme };
+  | { type: "theme"; theme: Theme }
+  | { type: "dismiss"; hint: Hint }
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge">> };
 
 export function reducer(s: Session, a: Action): Session {
   switch (a.type) {
@@ -43,6 +59,8 @@ export function reducer(s: Session, a: Action): Session {
     case "startBlank": return { ...s, household: DEFAULT_HOUSEHOLD, offers: (["A", "B"] as Letter[]).map(blankOffer) };
     case "basis": return { ...s, ui: { ...s.ui, basis: a.basis } };
     case "theme": return { ...s, ui: { ...s.ui, theme: a.theme } };
+    case "dismiss": return { ...s, ui: { ...s.ui, dismissed: { ...s.ui.dismissed, [a.hint]: true } } };
+    case "ui": return { ...s, ui: { ...s.ui, ...a.patch } };
   }
 }
 

@@ -1,7 +1,7 @@
 import { type Dispatch, useRef } from "react";
 import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
-import type { Action } from "./session";
+import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Stamp, TickLegend } from "./ui";
 import { BASIS_PHRASE } from "./metrics";
@@ -13,10 +13,12 @@ import { extraHoursView, type ExtraHoursLine, PIPELINE, type StepView, totalsCap
 const margin = (basis: Basis, lead: NonNullable<StepView["lead"]>) =>
   basis === "perHour" ? `${cents(lead.margin)}` : dollars(lead.perMonth ?? 0);
 const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
+/** A touch screen: the hint says "Tap". */
+const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Lead({ view, letters, stayYears, updating, error, notes, sample, dispatch }: {
+export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch }: {
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
-  sample: boolean; dispatch: Dispatch<Action>;
+  sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
@@ -35,7 +37,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
       {error && <p className="note error" role="alert">Couldn't compute: {error}</p>}
-      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dispatch={dispatch} /> : !error && notes.length === 0 && (
+      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} /> : !error && notes.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
       <TickLegend />
@@ -43,13 +45,32 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dispatch }: { view: VerdictView; letters: Letter[]; stayYears: number; dispatch: Dispatch<Action> }) {
+function Verdict({ view, letters, stayYears, dismissed, dispatch }: {
+  view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>;
+}) {
   const { lead, basis, row, perHourOf } = view;
   const step = PIPELINE.find((p) => p.basis === basis)!;
   const pv = basis !== "perHour";
   const extra = extraHoursView(view, letters);
   return (
     <>
+      {basis === "colAdjustedTotal" && !dismissed?.afterRent && (
+        // The first time this basis is shown (docs/ui-design.md §5, item 5): an inline note, not a modal.
+        <div className="first-use" role="note">
+          <p>
+            This is much lower than your salary on purpose. It's what's left to spend after tax and rent, priced as in an average
+            U.S. city, plus what you save.
+          </p>
+          <p className="first-use-actions">
+            <button type="button" className="link" onClick={() => {
+              const b = document.getElementById("bridge");
+              b?.scrollIntoView({ behavior: "smooth", block: "start" });
+              document.getElementById("bridge-title")?.focus({ preventScroll: true });
+            }}>See how we get there</button>
+            <button type="button" className="got-it" onClick={() => dispatch({ type: "dismiss", hint: "afterRent" })}>Got it</button>
+          </p>
+        </div>
+      )}
       <div className="verdict" aria-live="polite">
         {lead && lead.margin > 0 ? (
           <>
@@ -71,6 +92,12 @@ function Verdict({ view, letters, stayYears, dispatch }: { view: VerdictView; le
           {pv ? " · today's dollars" : " · nominal"}
         </p>
         {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
+        {!dismissed?.ticks && (
+          <p className="hint-ticks">
+            <span>{touch() ? "Tap" : "Click"} any figure or <span className="tick" aria-hidden="true">✓</span><span className="sr-only">tickmark</span> to see how it's calculated.</span>
+            <button type="button" className="got-it" onClick={() => dispatch({ type: "dismiss", hint: "ticks" })}>Got it</button>
+          </p>
+        )}
       </div>
 
       <div className="ranks">
