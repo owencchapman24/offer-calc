@@ -1,7 +1,7 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
 
-// Offer model types (docs/offer-model.md §12b). Slices 1-3: salary, bonus, cash awards, RSUs,
-// leave date and clawbacks, one scenario at a time. Raises and multi-scenario totals come later.
+// Offer model types (docs/offer-model.md §12b). projectScenario runs one scenario;
+// projectOffer runs bear/base/bull together; compareOffers puts offers on one window.
 
 // ---- shared -----------------------------------------------------------------
 /** Civil date "YYYY-MM-DD". Date math is on calendar days (UTC), never local time. */
@@ -74,14 +74,35 @@ export interface RefresherPolicy {
 }
 
 export interface Salary {
-  /** Annual rate. */
+  /** Starting annual rate. */
   annual: number;
+  /** Annual merit raise, e.g. 0.03. Default 0 in every scenario. Pay growth, not tax inflation. */
+  raise?: ByScenario;
+  /** When merit raises take effect: each work anniversary (default) or each Jan 1 after you start. */
+  raiseOn?: "anniversary" | "jan1";
+  promotions?: Promotion[];
 }
 
-export interface AnnualBonus {
-  /** percentOfSalary: fraction of salary earned in the period. fixed: dollars, prorated by days. */
-  basis: "percentOfSalary" | "fixed";
-  amount: ByScenario;
+export interface Promotion {
+  on: ISODate;
+  /** Increase at that date, e.g. 0.35 = +35%. Merit raises compound from the new salary. */
+  stepUp: number;
+  /** Scenarios that include this promotion. Default all three. */
+  scenarios?: Scenario[];
+}
+
+/**
+ * percentOfSalary: a fraction of salary earned in the period. fixed: dollars a year, prorated
+ * by days employed. byEmploymentYear: dollars by employment year (the year the period ends in;
+ * the last entry repeats), prorated by days employed.
+ */
+export type AnnualBonus = BonusTiming & (
+  | { basis: "percentOfSalary"; amount: ByScenario }
+  | { basis: "fixed"; amount: ByScenario }
+  | { basis: "byEmploymentYear"; amounts: ByScenario[] }
+);
+
+export interface BonusTiming {
   /** Performance period = 12 months from this date. Default Jan 1. */
   periodStart?: MonthDay;
   /** Paid on the first occurrence of this date after the period ends. */
@@ -129,13 +150,22 @@ export interface Household {
 }
 
 export interface ProjectionOptions {
-  /** Default "base". */
+  /** Default "base". projectScenario only; projectOffer runs all three. */
   scenario?: Scenario;
   /** Employment years to show. Default 5. */
   years?: number;
   /** Indexes tax law after 2026 (not pay growth). Default 0.025. */
   inflation?: number;
+  /** Present values are as of this date. The UI passes today; tests pass a fixed date. */
+  valuationDate?: ISODate;
+  /** Nominal annual discount rate for present values. Default 0.05. */
+  discountRate?: number;
+  /** Totals window. Default [startDate, startDate + years). compareOffers sets a shared one. */
+  window?: { start: ISODate; years: number };
 }
+
+/** projectOffer, compareOffers and breakeven need a valuation date. */
+export type ValuedOptions = Omit<ProjectionOptions, "scenario"> & { valuationDate: ISODate };
 
 // ---- outputs ------------------------------------------------------------------
 export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback";
@@ -155,6 +185,21 @@ export interface CompEvent {
   employmentYear: number;
   tax: number;
   net: number;
+  /** Inside the totals window. */
+  inWindow: boolean;
+  /** (1 + discountRate)^-((date - valuationDate) / 365.25), when a valuation date is given. */
+  discountFactor?: number;
+}
+
+export interface Money { gross: number; tax: number; net: number }
+
+export interface WindowTotals {
+  start: ISODate;
+  /** Exclusive. */
+  end: ISODate;
+  nominal: Money;
+  /** Each event discounted by its cash date. Present when a valuation date is given. */
+  presentValue?: Money;
 }
 
 export interface CalendarYearResult {
@@ -233,10 +278,40 @@ export interface ScenarioResult {
   events: CompEvent[];
   calendarYears: CalendarYearResult[];
   employmentYears: EmploymentYearResult[];
+  /** Totals over the window: nominal, and present value when a valuation date is given. */
+  window: WindowTotals;
   /** Present when the offer has a leave date. */
   leave?: LeaveResult;
   /** Input-specific, plain language. */
   warnings: string[];
   /** Assumptions behind these numbers, for the methodology page. */
   assumptions: string[];
+}
+
+/** One offer under all three joint scenarios. */
+export interface OfferProjection {
+  label: string;
+  scenarios: Record<Scenario, ScenarioResult>;
+  /** Unique warnings across the scenarios. */
+  warnings: string[];
+}
+
+/** Offers projected over one shared window, with nominal and present-value totals per scenario. */
+export interface Comparison {
+  window: { start: ISODate; end: ISODate };
+  valuationDate: ISODate;
+  discountRate: number;
+  projections: OfferProjection[];
+}
+
+export interface BreakevenResult {
+  field: "salary" | "signOn";
+  /** Change to B's starting salary (or first sign-on) that ties A; negative if B is already ahead. */
+  increase: number;
+  /** B's value before and after the change. */
+  from: number;
+  to: number;
+  /** A's base-scenario present value of net pay over the shared window: the target. */
+  targetPV: number;
+  window: { start: ISODate; end: ISODate };
 }
