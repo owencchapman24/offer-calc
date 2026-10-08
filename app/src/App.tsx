@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useReducer, useState } from "react";
 import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey } from "./protocol";
 import { About } from "./About";
+import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
 import { Ledger } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Missing, toHousehold, toOfferInput } from "./model";
@@ -10,9 +11,12 @@ import type { WorkContext } from "./metrics";
 import { localToday } from "./text";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
+import { SECTIONS, type SectionId } from "./sections";
 import { verdict } from "./verdict";
 
 const STAYS = [2, 3, 4, 5];
+// The methodology is code-split: it loads when you open it.
+const Methodology = lazy(() => import("./Methodology"));
 
 function storage(): KeyValueStore | undefined {
   try {
@@ -28,8 +32,29 @@ const themeOverride = (): Theme | null => {
   return t === "light" || t === "dark" ? t : null;
 };
 
+/** Hash routes, so static hosting needs no rewrites: #/ (compare) and #/method or #/method/M-7.2 (methodology). */
+function parseRoute(hash: string): { page: "compare" } | { page: "method"; section: SectionId | null } {
+  const m = hash.match(/^#\/method(?:\/(M-[\d.]+))?/);
+  if (!m) return { page: "compare" };
+  return { page: "method", section: m[1] && m[1] in SECTIONS ? (m[1] as SectionId) : null };
+}
+
+function useRoute() {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const on = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  return parseRoute(hash);
+}
+
 export function App() {
   const today = useMemo(() => localToday(), []);
+  const route = useRoute();
+  const page = route.page;
+  // Back on the comparison from the methodology, start at the top.
+  useEffect(() => { if (page === "compare") window.scrollTo(0, 0); }, [page]);
   const [session, dispatch] = useReducer(reducer, undefined, () => loadSession(storage(), today));
   const [saved, setSaved] = useState(true);
 
@@ -76,25 +101,38 @@ export function App() {
   };
 
   return (
-    <WorkProvider ctx={work}>
+    <WorkProvider ctx={work} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
     <div className="page">
       <header className="masthead">
-        <div className="brand">
+        <a className="brand" href="#/">
           <span className="brand-mark" aria-hidden="true">✓</span>
           <span className="brand-name">Offer Calc</span>
-        </div>
+        </a>
         <p className="tagline">Job offers compared the way they'd pay out: after tax, after rent and prices, per hour, year by year.</p>
+        <nav className="pages" aria-label="Pages">
+          <a href="#/" aria-current={route.page === "compare" ? "page" : undefined}>Compare</a>
+          <a href="#/method" aria-current={route.page === "method" ? "page" : undefined}>Methodology</a>
+        </nav>
       </header>
 
-      <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
+      {route.page === "method" ? (
+        <Suspense fallback={<p className="note">Loading the methodology…</p>}>
+          <Methodology ctx={work} section={route.section} sample={sample} />
+        </Suspense>
+      ) : (
+        <>
+          <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
 
-      <main className="workpaper">
-        <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />
-        <div className="results">
-          <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
-            sample={sample} dispatch={dispatch} />
-        </div>
-      </main>
+          <main className="workpaper">
+            <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />
+            <div className="results">
+              <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
+                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} />
+            </div>
+          </main>
+          {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}
+        </>
+      )}
 
       <footer className="colophon">
         <div className="theme" role="radiogroup" aria-label="Theme">

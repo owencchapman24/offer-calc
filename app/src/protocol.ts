@@ -33,6 +33,16 @@ export interface OfferDetail {
   costOfLiving?: CostOfLivingInfo;
   assumptions: Assumption[];
   warnings: OfferWarning[];
+  /** Each calendar year with pay: the offer's gross and tax, its rate, and the tax by kind (with the offer minus without). */
+  taxYears: Array<{ year: number; gross: number; tax: number; rate: number; projectedLaw: boolean;
+    parts: { federal: number; fica: number; state: number; local: number } }>;
+  /** Gross and tax by employment year and calendar year: how a year's tax splits across tax years. */
+  split: Array<{ ey: number; year: number; gross: number; tax: number }>;
+  /** Bonus payments: when, how much, for which stretch of work. */
+  bonuses: Array<{ ey: number; date: ISODate; gross: number; periodFrom: ISODate; periodTo: ISODate }>;
+  /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
+  rsus: Array<{ ey: number; date: ISODate; gross: number; refresher: boolean; tranche: number; tranches: number;
+    priceFactor: number; nominalDate?: ISODate }>;
 }
 
 export interface AnnuityTerm { date: ISODate; days: number; factor: number }

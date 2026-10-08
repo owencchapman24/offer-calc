@@ -23,7 +23,7 @@ export function Tick({ kind, note }: { kind: TickKind; note?: string }) {
 export function TickLegend() {
   return (
     <p className="legend">
-      <span className="legend-title">Tickmarks</span>
+      <a className="legend-title" href="#/method/M-13">Tickmarks</a>
       {(Object.keys(TICKS) as TickKind[]).map((k) => (
         <span key={k} className="legend-item"><span className="tick">{TICKS[k].mark}</span> {TICKS[k].name.toLowerCase()}</span>
       ))}

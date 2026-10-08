@@ -21,6 +21,13 @@ export function longDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
+/** "Jan 31" */
+export function shortDate(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${d}`;
+}
+/** "Jul" */
+export const monthName = (iso: string) => MONTHS[Number(iso.slice(5, 7)) - 1];
 /** The day before an ISO date (window ends are exclusive). */
 export function dayBefore(iso: string): string {
   const t = Date.parse(`${iso}T00:00:00Z`) - 86_400_000;
