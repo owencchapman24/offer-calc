@@ -249,6 +249,16 @@ describe("RSUs in the projection", () => {
     const r = projectScenario(worked, single);
     expect(r.employmentYears.map((y) => y.quotedTC)).toEqual([205_000, 195_000, 245_000, 245_000, 165_000]);
   });
+  it("quoted TC by component: the offer letter's lines, which the bridge sets against what's paid", () => {
+    // Year 1: $150k salary + 10% target bonus $15k + $30k sign-on + the month-12 tranche, 5% of $200k = $10k.
+    // Year 2: no sign-on; the month-18 and month-24 tranches, 7.5% + 7.5% of $200k = $30k.
+    const [y1, y2] = projectScenario(worked, single).employmentYears;
+    expect(y1.quoted).toEqual({ salary: 150_000, bonus: 15_000, cash: 30_000, rsu: 10_000 });
+    expect(y2.quoted).toEqual({ salary: 150_000, bonus: 15_000, cash: 0, rsu: 30_000 });
+    // Paid in year 1 is $186,169.35: the bonus paid in it is the $6,169.35 stub, and the first vest snaps into year 2.
+    expect(y1.gross.bonus - y1.quoted.bonus).toBeCloseTo(-8_830.65, 2);
+    expect(y1.gross.rsu - y1.quoted.rsu).toBe(-10_000);
+  });
   it("vests are taxed as wages at their calendar year's offer rate", () => {
     const r = projectScenario(worked, single);
     const first = rsus(r)[0];

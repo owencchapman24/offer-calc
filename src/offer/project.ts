@@ -480,6 +480,10 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const yearDays = anniversaries[n] - anniversaries[n - 1];
     const employedDays = Math.max(0, Math.min(workEnd, anniversaries[n]) - anniversaries[n - 1]);
     const worked = hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) * (employedDays / yearDays) : undefined;
+    const quoted = {
+      salary: round2(rateAt(path, anniversaries[n - 1])), bonus: round2(bonusTarget(n)),
+      cash: round2(quotedCash.get(n) ?? 0), rsu: round2(quotedRsu.get(n) ?? 0),
+    };
     employmentYears.push({
       year: n,
       start: fromDays(anniversaries[n - 1]),
@@ -488,7 +492,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
       tax: round2(tax),
       afterTaxComp: round2(m.afterTaxComp),
       takeHome: round2(m.takeHome),
-      quotedTC: round2(rateAt(path, anniversaries[n - 1]) + bonusTarget(n) + (quotedCash.get(n) ?? 0) + (quotedRsu.get(n) ?? 0)),
+      // The sum of the rounded parts, so the offer-letter bridge foots to the cent.
+      quotedTC: round2(quoted.salary + quoted.bonus + quoted.cash + quoted.rsu),
+      quoted,
       retirement: { employee: round2(b.employee401k), employerCredited: round2(b.credited), employerVested: round2(b.retirement) },
       health: {
         premiums: round2(b.premiums), outOfPocket: round2(b.oop), employerHsa: round2(b.employerHsa),

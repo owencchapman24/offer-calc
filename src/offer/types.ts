@@ -508,6 +508,8 @@ export interface EmploymentYearResult {
    *  in the year + new-hire RSU tranches nominally due in the year, at grant value. No
    *  proration, payout lag, vest-date snapping, price growth or refreshers. */
   quotedTC: number;
+  /** quotedTC by component, so the offer letter can be bridged to what's paid, line by line. Sums to quotedTC. */
+  quoted: { salary: number; bonus: number; cash: number; rsu: number };
   retirement: { employee: number; employerCredited: number; employerVested: number };
   health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
   perks: { face: number; preTaxEquivalent: number };
