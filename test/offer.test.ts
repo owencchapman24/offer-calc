@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
   breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, leaveDateSweep, nextCliff, projectOffer,
-  projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, type AnnualBonus, type Household, type OfferInput,
+  projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, annuityTerms, type AnnualBonus, type Household,
+  type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { describeSchedule, formatWarning } from "../src/format/index";
@@ -1009,6 +1010,11 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
     const h = horizonSweep([A, B], single, [1, 3], { valuationDate: "2026-01-01", inflation: 0 });
     expect(h.rows[0].annuityFactor).toBeCloseTo(days.reduce((s, d) => s + 1.05 ** (-d / 365.25), 0), 12);
     for (const r of h.rows) expect(r.leads.cash!.perMonth).toBeCloseTo(r.leads.cash!.margin / r.annuityFactor, 2);
+    // Its terms: each month's last day (Jan 31 is day 30), its days from the valuation date, and its factor; they sum to it.
+    const terms = annuityTerms({ start: "2026-01-01", years: 1 }, "2026-01-01");
+    expect(terms.map((t) => t.days)).toEqual(days);
+    expect([terms[0].date, terms[11].date]).toEqual(["2026-01-31", "2026-12-31"]);
+    expect(terms.reduce((s, t) => s + t.factor, 0)).toBeCloseTo(h.rows[0].annuityFactor, 12);
     // At a 0% discount rate it's just the number of months.
     expect(horizonSweep([A, B], single, [2], { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 }).rows[0].annuityFactor).toBe(24);
   });

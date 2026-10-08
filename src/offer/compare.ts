@@ -33,6 +33,18 @@ export function annuityFactor(window: { start: ISODate; years: number }, valuati
   return factor;
 }
 
+/** The terms annuityFactor sums: each month's last day, its days from the valuation date, and its discount factor. */
+export function annuityTerms(
+  window: { start: ISODate; years: number }, valuationDate: ISODate, discountRate = 0.05,
+): Array<{ date: ISODate; days: number; factor: number }> {
+  const start = toDays(window.start);
+  const valuation = toDays(valuationDate);
+  return Array.from({ length: 12 * window.years }, (_, i) => {
+    const day = addMonths(start, i + 1) - 1;
+    return { date: fromDays(day), days: day - valuation, factor: (1 + discountRate) ** (-(day - valuation) / 365.25) };
+  });
+}
+
 /** Pay per extra hour shows when two offers' scheduled hours differ by at least 2 a week over a 50-week year. */
 export const EXTRA_HOURS_MIN = 100;
 
