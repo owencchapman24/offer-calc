@@ -7,8 +7,8 @@ import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEve
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
 import { healthFlows, perkFlows, type RawBenefit, retirementFlows, vestedFraction } from "./benefits";
 import type {
-  BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, ClawbackResult, CompEvent, Component,
-  EmploymentYearResult, Household, LeaveSweepRow, Money, OfferInput, ProjectionOptions, ScenarioResult,
+  BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
+  EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -253,27 +253,39 @@ export function projectScenario(offer: OfferInput, household: Household, options
     calendarYear: yearOfDay(e.day),
     employmentYear: e.ey,
     tax: round2(e.tax),
-    net: round2(e.gross - e.tax),
+    afterTax: round2(e.gross - e.tax),
     inWindow: inWindow(e.day),
     ...(valuation !== undefined ? { discountFactor: discount(e.day) } : {}),
   }));
-  const money = (weight: (day: number) => number): Money => {
-    const m = { gross: 0, tax: 0, net: 0 };
-    for (const e of taxed) {
-      if (!inWindow(e.day)) continue;
-      const w = weight(e.day);
-      m.gross += e.gross * w;
-      m.tax += e.tax * w;
-      m.net += (e.gross - e.tax) * w;
-    }
-    return { gross: round2(m.gross), tax: round2(m.tax), net: round2(m.net) };
-  };
+
+  const hours = offer.hours;
+  if (hours) {
+    const weekly = hours.weekly[scenario];
+    const weeks = hours.weeksPerYear ?? 50;
+    if (!(weekly > 0 && weekly <= 168)) throw new Error("Weekly hours must be between 0 and 168.");
+    if (!(weeks > 0 && weeks <= 52)) throw new Error("Weeks per year must be between 0 and 52.");
+  }
+
   // ---- benefit events --------------------------------------------------------------
   // Employer 401(k) money vests by completed years of service at the leave date (or the
-  // window's last day if you stay): a year is complete once you work through the day before
-  // its anniversary. The vested share applies to the whole employer balance.
+  // window's last day if you stay). The vested share applies to the whole employer balance.
   const vestingDay = leave ?? windowEnd - 1;
-  const completedYears = anniversaries.filter((d, n) => n >= 1 && d <= vestingDay + 1).length;
+  let completedYears: number;
+  if ((offer.retirement?.vestingService ?? "elapsedTime") === "elapsedTime") {
+    // A year completes once you work through the day before its anniversary.
+    completedYears = anniversaries.filter((d, n) => n >= 1 && d <= vestingDay + 1).length;
+  } else {
+    // Each calendar plan year with 1,000+ hours counts, credited once the 1,000th hour is worked;
+    // employment on the year's last day isn't required (29 CFR 2530.200b-1). Hours accrue evenly:
+    // weekly x weeks per year x days employed / days in the year.
+    if (!hours) throw new Error("vestingService \"planYearHours\" needs offer.hours.");
+    const perYear = hours.weekly[scenario] * (hours.weeksPerYear ?? 50);
+    completedYears = 0;
+    for (let y = yearOfDay(start); jan1(y) <= vestingDay; y++) {
+      const days = Math.max(0, Math.min(vestingDay + 1, jan1(y + 1), workEnd) - Math.max(start, jan1(y)));
+      if (perYear * (days / (jan1(y + 1) - jan1(y))) >= 1_000) completedYears++;
+    }
+  }
   const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
   const isPerk = (k: string) => k === "section127" || k === "commuter";
   const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
@@ -307,21 +319,43 @@ export function projectScenario(offer: OfferInput, household: Household, options
   };
   const totals = (t: ReturnType<typeof benefitSum>): BenefitTotals =>
     ({ retirement: round2(t.retirement), perks: round2(t.perks), healthNet: round2(t.healthNet) });
-  const totalRewards = (cashNet: number, t: ReturnType<typeof benefitSum>) => cashNet + t.retirement + t.perks - t.healthNet;
+  // Cash measures (unrounded): after-tax comp = gross - tax - premiums; take-home also less your
+  // 401(k) and HSA. Total rewards = after-tax comp + retirement + perks - out-of-pocket + employer HSA.
+  const measures = (gross: number, tax: number, t: ReturnType<typeof benefitSum>) => {
+    const afterTaxComp = gross - tax - t.premiums;
+    return {
+      gross, tax, premiums: t.premiums, afterTaxComp,
+      takeHome: afterTaxComp - t.employee401k - t.employeeHsa,
+      totalRewards: afterTaxComp + t.retirement + t.perks - t.oop + t.employerHsa,
+    };
+  };
   const windowBenefits = benefits.filter((b) => inWindow(b.day));
-  const nominalCash = money(() => 1);
-  const nominalBenefits = benefitSum(windowBenefits);
-  const pvCash = valuation !== undefined ? money((day) => discount(day)!) : undefined;
-  const pvBenefits = valuation !== undefined ? benefitSum(windowBenefits, (day) => discount(day)!) : undefined;
+  const windowMeasures = (weight: (day: number) => number) => {
+    let gross = 0;
+    let tax = 0;
+    for (const e of taxed) {
+      if (!inWindow(e.day)) continue;
+      gross += e.gross * weight(e.day);
+      tax += e.tax * weight(e.day);
+    }
+    const t = benefitSum(windowBenefits, weight);
+    return { m: measures(gross, tax, t), t };
+  };
+  const cashTotals = (m: ReturnType<typeof measures>): CashTotals => ({
+    gross: round2(m.gross), tax: round2(m.tax), premiums: round2(m.premiums),
+    afterTaxComp: round2(m.afterTaxComp), takeHome: round2(m.takeHome),
+  });
+  const nominal = windowMeasures(() => 1);
+  const pv = valuation !== undefined ? windowMeasures((day) => discount(day)!) : undefined;
   const windowTotals: ScenarioResult["window"] = {
     start: fromDays(windowStart),
     end: fromDays(windowEnd),
-    nominal: nominalCash,
-    ...(pvCash ? { presentValue: pvCash } : {}),
-    benefits: { nominal: totals(nominalBenefits), ...(pvBenefits ? { presentValue: totals(pvBenefits) } : {}) },
+    nominal: cashTotals(nominal.m),
+    ...(pv ? { presentValue: cashTotals(pv.m) } : {}),
+    benefits: { nominal: totals(nominal.t), ...(pv ? { presentValue: totals(pv.t) } : {}) },
     totalRewards: {
-      nominal: round2(totalRewards(nominalCash.net, nominalBenefits)),
-      ...(pvCash && pvBenefits ? { presentValue: round2(totalRewards(pvCash.net, pvBenefits)) } : {}),
+      nominal: round2(nominal.m.totalRewards),
+      ...(pv ? { presentValue: round2(pv.m.totalRewards) } : {}),
     },
   };
 
@@ -341,21 +375,13 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   const quotedCash = new Map<number, number>();
   for (const e of cash) quotedCash.set(yearOfPayment(e.day), (quotedCash.get(yearOfPayment(e.day)) ?? 0) + e.gross);
-  const hours = offer.hours;
-  if (hours) {
-    const weekly = hours.weekly[scenario];
-    const weeks = hours.weeksPerYear ?? 50;
-    if (!(weekly > 0 && weekly <= 168)) throw new Error("Weekly hours must be between 0 and 168.");
-    if (!(weeks > 0 && weeks <= 52)) throw new Error("Weeks per year must be between 0 and 52.");
-  }
   const employmentYears: EmploymentYearResult[] = [];
   for (let n = 1; n <= years; n++) {
     const inYear = taxed.filter((e) => e.ey === n);
     const by = sumBy(inYear);
     const tax = inYear.reduce((s, e) => s + e.tax, 0);
-    const net = total(by) - tax;
     const b = benefitSum(benefits.filter((x) => x.ey === n));
-    const rewards = totalRewards(net, b);
+    const m = measures(total(by), tax, b);
     // Hours: weekly x weeks, prorated by the share of the year you're employed.
     const yearDays = anniversaries[n] - anniversaries[n - 1];
     const employedDays = Math.max(0, Math.min(workEnd, anniversaries[n]) - anniversaries[n - 1]);
@@ -366,7 +392,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
       end: fromDays(anniversaries[n]),
       gross: rounded(by),
       tax: round2(tax),
-      net: round2(net),
+      afterTaxComp: round2(m.afterTaxComp),
+      takeHome: round2(m.takeHome),
       quotedTC: round2(rateAt(path, anniversaries[n - 1]) + bonusTarget(n) + (quotedCash.get(n) ?? 0) + (quotedRsu.get(n) ?? 0)),
       retirement: { employee: round2(b.employee401k), employerCredited: round2(b.credited), employerVested: round2(b.retirement) },
       health: {
@@ -374,9 +401,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
         employeeHsa: round2(b.employeeHsa), net: round2(b.healthNet),
       },
       perks: { face: round2(b.perks), preTaxEquivalent: round2(b.preTax) },
-      totalRewards: round2(rewards),
+      totalRewards: round2(m.totalRewards),
       ...(worked !== undefined ? { hours: round2(worked) } : {}),
-      ...(worked ? { hourly: { cash: round2(net / worked), totalRewards: round2(rewards / worked) } } : {}),
+      ...(worked ? { hourly: { afterTaxComp: round2(m.afterTaxComp / worked), totalRewards: round2(m.totalRewards / worked) } } : {}),
     });
   }
 
@@ -466,19 +493,19 @@ export function leaveDateSweep(
     const years = Math.max(options.years ?? 5, Math.ceil(m / 12));
     const r = projectScenario({ ...offer, leaveDate }, household, { ...options, years });
     const paid = r.events.filter((e) => e.component !== "clawback").reduce((s, e) => s + e.gross, 0);
-    const netKept = r.events.reduce((s, e) => s + e.net, 0);
     const sumOf = (kinds: string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
+    const afterTaxCompKept = r.events.reduce((s, e) => s + e.afterTax, 0) - sumOf(["premium"]);
     const retirementVested = r.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0);
-    const healthNet = sumOf(["premium", "outOfPocket"]) - sumOf(["employerHsa"]);
     return {
       months: m,
       leaveDate,
       paid: round2(paid),
       clawbackOwed: round2(r.leave!.clawbacks.reduce((s, c) => s + c.owed, 0)),
-      netKept: round2(netKept),
+      afterTaxCompKept: round2(afterTaxCompKept),
       unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
       retirementVested: round2(retirementVested),
-      totalRewardsKept: round2(netKept + retirementVested + sumOf(["section127", "commuter"]) - healthNet),
+      totalRewardsKept: round2(afterTaxCompKept + retirementVested + sumOf(["section127", "commuter", "employerHsa"])
+        - sumOf(["outOfPocket"])),
     };
   });
 }

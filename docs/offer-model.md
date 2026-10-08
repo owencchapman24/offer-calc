@@ -163,9 +163,19 @@ Default: none.
 - **Hours:** weekly hours by scenario × weeks a year (default 50), prorated for a
   partial year. The hourly rate is after-tax dollars per hour, on cash only and on total
   rewards.
-- **Total rewards:** cash net + vested employer retirement + perks − net health cost,
-  nominal and PV. `compareOffers` shows it next to cash-only. `breakeven` takes
-  `basis: "cash" | "totalRewards"`.
+- **Cash measures (revised after slice 5):**
+  - **After-tax comp** (the cash-only basis) = gross − tax − your health premiums.
+    Premiums are a cost of the plan, not compensation.
+  - **Take-home** = after-tax comp − your 401(k) deferrals − your HSA contributions:
+    what reaches your bank account.
+- **Total rewards:** after-tax comp + vested employer retirement + perks − out-of-pocket
+  + employer HSA, nominal and PV. `compareOffers` shows it next to after-tax comp.
+  `breakeven` takes `basis: "cash"` (after-tax comp) or `"totalRewards"`.
+- **Vesting service:** `vestingService` is `"elapsedTime"` (default) or
+  `"planYearHours"`. Under the second, each calendar plan year with 1,000+ hours (from
+  `offer.hours`) counts, credited on the day the 1,000th hour is worked, even if you leave
+  before the year ends (29 CFR 2530.200b-1). At 80 hours a week, A's 3-year cliff vests on
+  2028-04-01 this way, against 2029-07-12 under elapsed time.
 - **Federal limits:** 402(g), HSA, Section 127 and 132(f) are engine parameters with
   sources, indexed in projected years.
 

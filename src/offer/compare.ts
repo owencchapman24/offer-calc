@@ -55,7 +55,7 @@ export function breakeven(
   const basis = options.basis ?? "cash";
   const pv = (o: OfferInput) => {
     const w = projectScenario(o, household, { ...options, scenario: "base", window }).window;
-    return basis === "cash" ? w.presentValue!.net : w.totalRewards.presentValue!;
+    return basis === "cash" ? w.presentValue!.afterTaxComp : w.totalRewards.presentValue!;
   };
   const from = field === "salary" ? offerB.salary.annual : offerB.cashAwards?.[0]?.amount ?? 0;
   const adjusted = (d: number): OfferInput => {

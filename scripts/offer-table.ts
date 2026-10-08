@@ -134,23 +134,26 @@ function benefitLine(o: OfferInput): string {
 
 function benefitTable(r: ScenarioResult): string {
   return table(
-    ["Year", "Your 401k", "Employer 401k", "Health net", "Perks", "Cash net", "Total rewards", "Hours", "$/hr cash", "$/hr total"],
+    ["Year", "After-tax comp", "+ Employer 401k", "- Out-of-pocket", "+ Employer HSA", "+ Perks", "= Total rewards",
+      "Hours", "Comp/hr", "Total/hr"],
     r.employmentYears.map((y) => [
-      String(y.year), $(y.retirement.employee),
+      String(y.year), $(y.afterTaxComp),
       y.retirement.employerVested === y.retirement.employerCredited ? $(y.retirement.employerVested)
         : `${$(y.retirement.employerVested)} of ${$(y.retirement.employerCredited)}`,
-      $(-y.health.net), $(y.perks.face), $(y.net), $(y.totalRewards), $(y.hours ?? 0),
-      y.hourly ? y.hourly.cash.toFixed(2) : "-", y.hourly ? y.hourly.totalRewards.toFixed(2) : "-",
+      $(y.health.outOfPocket), $(y.health.employerHsa), $(y.perks.face), $(y.totalRewards), $(y.hours ?? 0),
+      y.hourly ? y.hourly.afterTaxComp.toFixed(2) : "-", y.hourly ? y.hourly.totalRewards.toFixed(2) : "-",
     ]),
   );
 }
 
 function offerTable(r: ScenarioResult): string {
   return table(
-    ["Year", "Dates", "Salary", "Bonus", "Sign-on", "RSU", "Gross", "Tax", "Net", "Tax rate", "Quoted TC"],
+    ["Year", "Dates", "Salary", "Bonus", "Sign-on", "RSU", "Gross", "- Tax", "- Premiums", "= After-tax comp",
+      "- Your 401k+HSA", "= Take-home", "Quoted TC"],
     r.employmentYears.map((y) => [
       String(y.year), `${y.start} to ${lastDay(y.end)}`, $(y.gross.salary), $(y.gross.bonus), $(y.gross.cash),
-      $(y.gross.rsu), $(y.gross.total), $(y.tax), $(y.net), pct(y.tax / y.gross.total), $(y.quotedTC),
+      $(y.gross.rsu), $(y.gross.total), $(y.tax), $(y.health.premiums), $(y.afterTaxComp),
+      $(y.retirement.employee + y.health.employeeHsa), $(y.takeHome), $(y.quotedTC),
     ]),
     2,
   );
@@ -169,40 +172,40 @@ const out: string[] = [
 ];
 offers.forEach((o, i) => {
   out.push("", o.label, describe(o), "", "Employment years, cash (base scenario):", offerTable(base[i]),
-    "", "Benefits, total rewards and hours (base scenario; health net shown as a negative, i.e. a cost):",
+    "", "Total rewards and hours (base scenario):",
     benefitTable(base[i]));
   for (const w of comparison.projections[i].warnings) out.push(`   ! ${w}`);
 });
 
 const short = (o: OfferInput) => o.label.slice(0, 1);
-const sideRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.map((r) => $(r.employmentYears[i].net))]);
-sideRows.push(["Total", ...base.map((r) => $(r.employmentYears.reduce((s, y) => s + y.net, 0)))]);
-out.push("", "Side by side, net after tax by employment year (base scenario):",
-  table(["Year", ...offers.map((o) => `${short(o)} net`)], sideRows));
+const sideRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.map((r) => $(r.employmentYears[i].afterTaxComp))]);
+sideRows.push(["Total", ...base.map((r) => $(r.employmentYears.reduce((s, y) => s + y.afterTaxComp, 0)))]);
+out.push("", "Side by side, after-tax comp (gross - tax - premiums) by employment year (base scenario):",
+  table(["Year", ...offers.map((o) => `${short(o)} comp`)], sideRows));
 
 const hourlyRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.flatMap((r) => {
   const h = r.employmentYears[i].hourly;
-  return h ? [h.cash.toFixed(2), h.totalRewards.toFixed(2)] : ["-", "-"];
+  return h ? [h.afterTaxComp.toFixed(2), h.totalRewards.toFixed(2)] : ["-", "-"];
 })]);
-out.push("", "Effective after-tax hourly rate by employment year (base scenario):",
-  table(["Year", ...offers.flatMap((o) => [`${short(o)} cash/hr`, `${short(o)} total/hr`])], hourlyRows));
+out.push("", "Effective hourly rate by employment year (base scenario): after-tax comp and total rewards per hour worked:",
+  table(["Year", ...offers.flatMap((o) => [`${short(o)} comp/hr`, `${short(o)} total/hr`])], hourlyRows));
 
 const scenarios = ["bear", "base", "bull"] as const;
 const windowText = `the shared window ${comparison.window.start} to ${lastDay(comparison.window.end)}`;
 out.push("",
   `Base scenario over ${windowText}; PV at ${comparison.discountRate * 100}% as of ${valuationDate}:`,
-  table(["Offer", "Cash nominal", "Cash PV", "+ Retirement PV", "+ Perks PV", "- Health PV", "Total rewards nominal", "Total rewards PV"],
+  table(["Offer", "After-tax comp nominal", "After-tax comp PV", "+ Retirement PV", "+ Perks PV", "- OOP net of employer HSA PV", "Total rewards nominal", "Total rewards PV"],
     comparison.projections.map((p, i) => {
       const w = p.scenarios.base.window;
       const b = w.benefits.presentValue!;
-      return [short(offers[i]), $(w.nominal.net), $(w.presentValue!.net), $(b.retirement), $(b.perks), $(b.healthNet),
+      return [short(offers[i]), $(w.nominal.afterTaxComp), $(w.presentValue!.afterTaxComp), $(b.retirement), $(b.perks), $(b.healthNet - w.presentValue!.premiums),
         $(w.totalRewards.nominal), $(w.totalRewards.presentValue!)];
     })),
-  "", "Present value by scenario, cash only vs total rewards:",
-  table(["Offer", ...scenarios.flatMap((s) => [`${s} cash PV`, `${s} total PV`])],
+  "", "Present value by scenario, after-tax comp vs total rewards:",
+  table(["Offer", ...scenarios.flatMap((s) => [`${s} comp PV`, `${s} total PV`])],
     comparison.projections.map((p, i) => [short(offers[i]), ...scenarios.flatMap((s) => {
       const w = p.scenarios[s].window;
-      return [$(w.presentValue!.net), $(w.totalRewards.presentValue!)];
+      return [$(w.presentValue!.afterTaxComp), $(w.totalRewards.presentValue!)];
     })])));
 
 out.push("", "Breakeven: starting salary B or C would need to tie A in base-scenario PV over the window "
@@ -210,7 +213,7 @@ out.push("", "Breakeven: starting salary B or C would need to tie A in base-scen
 for (const other of [offers[1], offers[2]]) {
   for (const basis of ["cash", "totalRewards"] as const) {
     const r = breakeven(offers[0], other, "salary", household, { inflation, valuationDate, horizonYears: 5, basis });
-    out.push(`   ${short(other)}, ${basis === "cash" ? "cash only    " : "total rewards"}: $${$(r.from)} -> $${$(r.to)} `
+    out.push(`   ${short(other)}, ${basis === "cash" ? "after-tax comp" : "total rewards "}: $${$(r.from)} -> $${$(r.to)} `
       + `(+$${$(r.increase)}, +${pct(r.increase / r.from)}); target PV $${$(r.targetPV)}`);
   }
 }
@@ -219,11 +222,11 @@ const sweepMonths = [3, 6, 9, 11, 12, 13, 18, 24, 36, 48];
 const sweeps = offers.map((o) => leaveDateSweep(o, household, sweepMonths, { inflation }));
 const withEquity = offers.map((o) => (o.equity?.grants.length ?? 0) > 0);
 const sweepHead = ["Months", "Last day", ...offers.flatMap((o, i) =>
-  [`${short(o)} kept`, `${short(o)} repays`, ...(withEquity[i] ? [`${short(o)} unvested`] : [])])];
+  [`${short(o)} comp kept`, `${short(o)} repays`, ...(withEquity[i] ? [`${short(o)} unvested`] : [])])];
 const sweepRows = sweepMonths.map((m, j) => [String(m), sweeps[0][j].leaveDate, ...sweeps.flatMap((s, i) => [
-  $(s[j].netKept), s[j].clawbackOwed ? $(s[j].clawbackOwed) : "-", ...(withEquity[i] ? [$(s[j].unvestedRsuForfeited)] : []),
+  $(s[j].afterTaxCompKept), s[j].clawbackOwed ? $(s[j].clawbackOwed) : "-", ...(withEquity[i] ? [$(s[j].unvestedRsuForfeited)] : []),
 ])]);
-out.push("", "If you leave after N months (base scenario): net kept after tax and clawbacks, nominal.",
+out.push("", "If you leave after N months (base scenario): after-tax comp kept, after clawbacks, nominal.",
   "Last day = start + N months - 1 day. Repays = sign-on clawback owed. Unvested = RSUs forfeited, at grant value.",
   table(sweepHead, sweepRows, 2));
 const trRows = sweepMonths.map((m, j) => [String(m), sweeps[0][j].leaveDate,
