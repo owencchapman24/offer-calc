@@ -6,7 +6,9 @@ import { Lead } from "./Lead";
 import { Ledger } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Missing, toHousehold, toOfferInput } from "./model";
 import { type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
+import type { WorkContext } from "./metrics";
 import { localToday } from "./text";
+import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
 import { verdict } from "./verdict";
 
@@ -51,6 +53,7 @@ export function App() {
     offers: complete.map((x) => x.offer),
     household: toHousehold(session.household, wagesYear),
     stays: [...new Set([...STAYS, stayYears])].sort((a, b) => a - b),
+    stayYears,
     valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   } : null;
   // Rent estimates come from the worker, which holds the HUD and BEA tables.
@@ -67,8 +70,13 @@ export function App() {
     if (x.offer.startDate < today) notes.push(`Offer ${x.o.letter} starts before today, so its present value counts pay already received.`);
   }
   const sample = session.offers.some((o) => o.sample !== null);
+  const work: WorkContext = {
+    today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
+    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters } } : {}),
+  };
 
   return (
+    <WorkProvider ctx={work}>
     <div className="page">
       <header className="masthead">
         <div className="brand">
@@ -83,7 +91,7 @@ export function App() {
       <main className="workpaper">
         <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />
         <div className="results">
-          <Lead view={view} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
+          <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
             sample={sample} dispatch={dispatch} />
         </div>
       </main>
@@ -106,5 +114,6 @@ export function App() {
         </p>
       </footer>
     </div>
+    </WorkProvider>
   );
 }

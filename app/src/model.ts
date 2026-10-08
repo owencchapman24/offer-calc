@@ -177,5 +177,20 @@ export function sampleOffers(today: string): AppOffer[] {
 
 export const SAMPLE_HOUSEHOLD_SAVINGS = SAMPLE_HOUSEHOLD.costOfLiving?.savingsRate ?? 0;
 
+/** A sample's detailed inputs that quick mode doesn't show: the "Also counted" row. */
+export function alsoCounted(o: AppOffer): string[] {
+  const b = o.base;
+  if (!b) return [];
+  const out: string[] = [];
+  if (b.salary.raise || b.salary.promotions?.length) out.push(b.salary.promotions?.length ? "promotion" : "raises");
+  if (b.cashAwards?.length) out.push("sign-on");
+  if (b.equity) out.push("RSUs");
+  if (b.retirement) out.push("401(k)");
+  if (b.health) out.push("health");
+  if (b.perks) out.push("perks");
+  if (b.hours) out.push(`${b.hours.weekly.base} hrs/week`);
+  return out;
+}
+
 /** States a city can be in, for the residence-state picker. */
 export const statesFor = (area: string | null) => statesOf(area);

@@ -1,4 +1,4 @@
-import type { Basis, HorizonRow, HorizonSweep, Lead } from "../../src/offer/types";
+import type { Basis, HorizonRow, HorizonSweep, Lead, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
 
 // Turns the engine's horizon sweep into what the lead schedule shows. Pure: no React, no formatting.
@@ -76,6 +76,40 @@ export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, st
       years: r.years, lead: withLetters(r.leads[chosen.basis], letters), current: r.years === stayYears,
     })),
   };
+}
+
+/** One "extra hours" line in the lead schedule (docs/ui-design.md §4.2). */
+export interface ExtraHoursLine {
+  more: Letter;
+  fewer: Letter;
+  hoursPerYear: number;
+  /** The basis it's stated on: the selected one, or what per hour divides. */
+  basis: ValueBasis;
+  /** `more` minus `fewer`, a year, nominal; negative is more hours for less pay. */
+  gapPerYear: number;
+  /** What each extra hour pays; null when they pay less. */
+  perExtraHour: number | null;
+  /** When they pay less: the first pipeline step where they do pay, against `more`'s average there. */
+  lower: { basis: ValueBasis; perExtraHour: number; average: number } | null;
+}
+
+/** Pay per extra hour for the lead's winner against each other offer whose hours differ enough. */
+export function extraHoursView(view: VerdictView, letters: Letter[]): ExtraHoursLine[] {
+  const { row, lead } = view;
+  if (!lead || !row.hours) return [];
+  const hours = row.hours;
+  const basis: ValueBasis = view.basis === "perHour" ? view.perHourOf : view.basis;
+  const order: ValueBasis[] = ["cash", "totalRewards", "colAdjustedTotal"];
+  return row.extraHours.filter((p) => p.more === lead.winner || p.fewer === lead.winner).flatMap((p) => {
+    const gap = p.gapPerYear[basis];
+    if (gap === undefined) return [];
+    const rate = p.perExtraHour[basis] ?? null;
+    const lowerBasis = rate === null ? order.slice(0, order.indexOf(basis)).find((b) => p.perExtraHour[b] !== undefined) : undefined;
+    return [{
+      more: letters[p.more], fewer: letters[p.fewer], hoursPerYear: p.hoursPerYear, basis, gapPerYear: gap, perExtraHour: rate,
+      lower: lowerBasis ? { basis: lowerBasis, perExtraHour: p.perExtraHour[lowerBasis]!, average: row.nominal[lowerBasis]![p.more] / hours[p.more] } : null,
+    }];
+  });
 }
 
 /** Where the lead changes hands along the pipeline, in words. */

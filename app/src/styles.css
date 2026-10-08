@@ -178,8 +178,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .note { font-size: 14px; color: var(--graphite); }
 .note.error { color: var(--warning); }
 
-.verdict, .ranks, .stays, .pipeline { transition: opacity 120ms; }
-.is-updating .verdict, .is-updating .ranks, .is-updating .stays, .is-updating .pipeline { opacity: 0.6; }
+.verdict, .ranks, .stays, .pipeline, .extra { transition: opacity 120ms; }
+.is-updating .verdict, .is-updating .ranks, .is-updating .stays, .is-updating .pipeline, .is-updating .extra { opacity: 0.6; }
 
 .verdict-lede { margin: 0; font-size: 19px; }
 .hero { margin: 2px 0; font-size: clamp(40px, 5vw, 56px); line-height: 1.1; font-weight: 650; letter-spacing: -0.01em; }
@@ -214,12 +214,19 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--rule); }
 .step {
   position: relative; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left;
-  padding: 10px 12px; background: var(--sheet); border: none; border-left: 1px solid var(--rule); cursor: pointer; min-height: 84px;
+  padding: 10px 12px; background: var(--sheet); border-left: 1px solid var(--rule); min-height: 84px;
 }
 .step:first-child { border-left: none; }
-.step:not(:last-child)::after { content: "→"; position: absolute; right: -7px; top: 10px; color: var(--muted); background: var(--sheet); font-size: 13px; z-index: 1; }
+.step:not(:last-child)::after { content: "→"; position: absolute; right: -7px; top: 10px; color: var(--muted); background: var(--sheet); font-size: 13px; z-index: 2; }
 .step.is-selected { background: var(--band); box-shadow: inset 0 0 0 2px var(--ink); }
-.step:disabled { cursor: not-allowed; color: var(--muted); }
+.step.is-off { color: var(--muted); }
+/* The step's button stretches over the whole step (so a click anywhere selects it); its tickmark sits above. */
+.step-select { border: none; background: none; padding: 0; text-align: left; cursor: pointer; }
+.step-select::after { content: ""; position: absolute; inset: 0; }
+.step-select:disabled { cursor: not-allowed; }
+.step-select:focus-visible { outline: none; }
+.step:has(.step-select:focus-visible) { outline: 2px solid var(--ink); outline-offset: -4px; }
+.step .tick-btn { z-index: 1; }
 .step-name { font-size: 13px; font-weight: 700; }
 .step-lead { font-variant-numeric: tabular-nums; font-size: 15px; }
 .step-per { display: block; font-size: 12px; color: var(--muted); }
@@ -230,6 +237,56 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .tick { display: inline-block; margin-left: 0.18em; font-size: 0.72em; font-weight: 700; color: var(--graphite); transform: translateY(-0.35em) rotate(-6deg); font-family: var(--mono); }
 .hero .tick { font-size: 18px; transform: translateY(-1.1em) rotate(-6deg); }
+
+/* A tickmark is a button: a 24px hit target from its ::before, graphite until hovered or open. */
+.tick-btn { position: relative; border: none; background: none; padding: 0 1px; line-height: 1; cursor: pointer; }
+.tick-btn::before { content: ""; position: absolute; inset: -7px -7px; }
+.tick-btn:hover, .tick-btn.is-open { color: var(--ink); }
+.tick-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+/* The highlighter wash: on a figure whose tickmark is hovered, focused or open, and on everything an open derivation uses. */
+.fig, .trace { transition: background-color 120ms, box-shadow 120ms; }
+.fig:has(> .tick-btn:hover), .fig:has(> .tick-btn:focus-visible), .fig:has(> .tick-btn.is-open), .fig.is-traced {
+  background: var(--highlighter); box-shadow: 0 0 0 3px var(--highlighter);
+}
+.trace.is-traced { background: var(--highlighter); }
+.about-label { display: inline-flex; align-items: baseline; gap: 2px; }
+.about-field.trace { display: flex; flex-direction: column; gap: 4px; min-width: 180px; padding: 2px 4px; margin: -2px -4px; }
+
+/* ---- show the work: the popover ------------------------------------------------------------- */
+
+.work {
+  position: absolute; z-index: 50; background: var(--sheet); color: var(--ink); border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--rule); padding: 12px 16px 14px; font-size: 14px; line-height: 1.5;
+}
+.work-head { display: flex; align-items: flex-start; gap: 12px; }
+.work-head h3 { margin: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; outline: none; }
+.work-kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
+.work-title { font-size: 16px; font-weight: 700; }
+.work-close { border: none; background: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 2px 6px; color: var(--graphite); }
+.work-close:hover { color: var(--ink); }
+.work-back { margin-top: 6px; font-size: 13px; }
+.work-scope { margin: 4px 0 10px; font-size: 13px; color: var(--graphite); }
+.work-lines { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.work-lines td, .work-lines th { padding: 3px 4px; vertical-align: baseline; }
+/* 16px bold: at 13px the font's ÷ closes up into a +. */
+.work-op { width: 1.3em; color: var(--graphite); text-align: center; font-family: var(--sans); font-size: 16px; font-weight: 700; line-height: 1; }
+.work-label { text-align: left; font-weight: 400; }
+.work-gloss { color: var(--graphite); font-family: var(--sans); font-size: 12px; }
+.work-value { text-align: right; white-space: nowrap; padding-right: 0 !important; }
+.work-lines .tick { min-width: 1em; text-align: left; }
+.rule-single > * { border-top: 1px solid var(--ink); }
+.rule-double > * { border-top: 3px double var(--ink); font-weight: 700; }
+.work-note { margin: 8px 0 0; font-size: 13.5px; color: var(--graphite); }
+.work-ties { margin: 8px 0 0; font-size: 13px; color: var(--graphite); }
+.work-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--graphite); }
+
+/* ---- lead schedule additions ------------------------------------------------------------------ */
+
+.subtitle { margin: 6px 0 0; font-size: 14px; color: var(--graphite); }
+.extra { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.extra-title { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
+.extra-line { margin: 6px 0 0; font-size: 14.5px; font-variant-numeric: tabular-nums; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); }
 .legend-title { font-weight: 700; color: var(--graphite); }
 .legend .tick { transform: none; margin: 0 2px 0 0; font-size: 13px; }
@@ -268,6 +325,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
   .step:nth-child(n + 3) { border-top: 1px solid var(--rule); }
   .step:nth-child(2)::after { display: none; }
   .stays-row { grid-template-columns: 72px repeat(auto-fit, minmax(0, 1fr)); }
+  /* Show the work becomes a bottom sheet. */
+  .work {
+    position: fixed; left: 0 !important; right: 0; bottom: 0; top: auto !important; width: auto !important;
+    max-height: 75vh; overflow-y: auto; border-width: 1.5px 0 0; box-shadow: 0 -4px 0 var(--rule);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
