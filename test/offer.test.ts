@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  byYear, convenienceRuleWarning, projectScenario, VESTING_PRESETS, type Household, type OfferInput,
+  byYear, convenienceRuleWarning, leaveDateSweep, projectScenario, VESTING_PRESETS, type Household, type OfferInput,
 } from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
@@ -57,7 +57,7 @@ describe("worked example (golden)", () => {
     // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, total: 186_169.35 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, total: 186_169.35 });
   });
   it("quoted year-1 TC is $205,000: $150k + $15k target bonus + $30k sign-on + 5% of $200k RSUs", () => {
     expect(ey1.quotedTC).toBe(205_000);
@@ -70,9 +70,9 @@ describe("worked example (golden)", () => {
   });
   it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $166,169.35 with the first $10,000 vest", () => {
     expect(r.calendarYears[0].offerGross)
-      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, total: 91_693.55 });
+      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, total: 91_693.55 });
     expect(r.calendarYears[1].offerGross)
-      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, total: 166_169.35 });
+      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, total: 166_169.35 });
   });
   it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
     // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
@@ -273,6 +273,115 @@ describe("RSUs in the projection", () => {
     expect(rsus(projectScenario(g, single)).map((e) => [e.date, e.gross])).toEqual([["2027-03-01", 6_000], ["2029-03-01", 6_000]]);
     const bad = { ...g, equity: { grants: [{ ...g.equity!.grants[0], schedule: { tranches: [{ month: 6, fraction: 0.9 }] } }] } };
     expect(() => projectScenario(bad, single)).toThrow(/sum to 1/);
+  });
+});
+
+describe("leave date and clawbacks", () => {
+  // Worked example with a 12-month prorated (by completed month) gross clawback on the sign-on.
+  // Start 2026-08-03; sign-on $30,000 paid 2026-09-02; window ends 2027-08-03.
+  const withClawback: OfferInput = {
+    ...worked,
+    cashAwards: [{ ...worked.cashAwards![0], clawback: { months: 12, kind: "prorated" } }],
+  };
+  const clawback = (c: NonNullable<NonNullable<OfferInput["cashAwards"]>[0]["clawback"]>): OfferInput =>
+    ({ ...withClawback, cashAwards: [{ ...worked.cashAwards![0], clawback: c }] });
+  const leaving = (leaveDate: string, offer: OfferInput = withClawback) => projectScenario({ ...offer, leaveDate }, single);
+  const sum = (r: ReturnType<typeof projectScenario>, c: string) =>
+    r.events.filter((e) => e.component === c).reduce((s, e) => s + e.gross, 0);
+
+  it("RSU edge: leaving the day before a vest forfeits it; leaving on the vest day keeps it", () => {
+    const before = leaving("2027-08-14");
+    expect(sum(before, "rsu")).toBe(0);
+    expect(before.leave!.unvestedRsuForfeited).toBe(200_000);
+    const on = leaving("2027-08-15");
+    expect(sum(on, "rsu")).toBe(10_000);
+    expect(on.leave!.unvestedRsuForfeited).toBe(190_000);
+  });
+  it("bonus edge: leaving the day before the payout forfeits it; on the payout day it pays", () => {
+    const before = leaving("2027-03-14");
+    expect(sum(before, "bonus")).toBe(0);
+    expect(before.warnings.some((w) => w.includes("forfeits the bonus for 2026-01-01 to 2026-12-31"))).toBe(true);
+    expect(sum(leaving("2027-03-15"), "bonus")).toBe(6_169.35);
+  });
+  it("prorated-bonus alternative: earned bonuses still pay, the leave period is prorated", () => {
+    // 2026: 6,169.35 on 2027-03-15. 2027 so far: Jan + Feb + 14/31 of Mar = 30,645.16 x 10% = 3,064.52.
+    const r = leaving("2027-03-14", { ...withClawback, bonus: { ...worked.bonus!, mustBeEmployedOnPayDate: false } });
+    expect(r.events.filter((e) => e.component === "bonus").map((e) => [e.date, e.gross]))
+      .toEqual([["2027-03-15", 6_169.35], ["2028-03-15", 3_064.52]]);
+  });
+  it("salary stops on the leave date (inclusive)", () => {
+    // Aug 3-Dec 1 2026: 12,500 x 29/31 + 3 x 12,500 + 12,500 x 1/31 = 49,596.77.
+    expect(leaving("2026-12-01").calendarYears[0].offerGross.salary).toBe(49_596.77);
+    expect(leaving("2026-12-01").employmentYears[1].gross.total).toBe(0);
+  });
+  it("window edge: the window's last day clears it; the day before owes 1/12, under the 1341 threshold", () => {
+    expect(leaving("2027-08-02").leave!.clawbacks).toEqual([]);
+    const c = leaving("2027-08-01").leave!.clawbacks[0];
+    expect(c).toMatchObject({ fraction: 1 / 12, owed: 2_500, treatment: "no relief ($3,000 or less)", taxRelief: 0, netCost: 2_500 });
+  });
+  it("window edge, full kind: the day before owes all $30,000; 1341 credit $6,119.35 (crosses into 12%)", () => {
+    // 2026 federal with the sign-on: taxable 75,593.548 -> 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
+    // Without $30,000: taxable 45,593.548 -> 1,240 + 12% x 33,193.548 = 5,223.23. Credit 6,119.35.
+    expect(leaving("2027-08-02", clawback({ months: 12, kind: "full" })).leave!.clawbacks).toEqual([]);
+    expect(leaving("2027-08-01", clawback({ months: 12, kind: "full" })).leave!.clawbacks[0])
+      .toMatchObject({ owed: 30_000, treatment: "IRC 1341 credit", taxRelief: 6_119.35, netCost: 23_880.65 });
+  });
+  it("window edge, day proration: one unworked day owes $30,000 / 365", () => {
+    expect(leaving("2027-08-01", clawback({ months: 12, kind: "prorated", per: "day" })).leave!.clawbacks[0].owed).toBe(82.19);
+  });
+  it("design §10: leave after 6 months owes $15,000; 1341 recovers 22% = $3,300; FICA isn't refunded", () => {
+    const r = leaving("2027-02-02");
+    expect(r.leave!.clawbacks[0]).toMatchObject({
+      paidOn: "2026-09-02", repaidOn: "2027-02-02", fraction: 0.5, owed: 15_000,
+      treatment: "IRC 1341 credit", taxRelief: 3_300, netCost: 11_700,
+    });
+    expect(r.calendarYears.find((c) => c.year === 2027)!.priorYearRepayments).toEqual({ repaid: 15_000, relief: 3_300 });
+    expect(r.calendarYears[0].offerGross.cash).toBe(30_000); // 2026 wages (and FICA) stay
+    expect(r.warnings.some((w) => w.includes("FICA withheld on it isn't automatically refunded"))).toBe(true);
+  });
+  it("same-year repayment reverses the wages: owes $22,500, gets back $5,730.92 of tax (hand-checked)", () => {
+    // Leave 2026-12-01: 3 completed months -> owes 9/12 x 30,000 = 22,500, reversing 2026 wages.
+    // 2026 wages 49,596.77 + 30,000 - 22,500 = 57,096.77. TX tax: federal 1,240 + 12% x 28,596.77
+    // = 4,671.61, FICA 4,367.90 -> 9,039.52. Without the reversal (79,596.77): 8,681.29 + 6,089.15
+    // = 14,770.44. Relief 5,730.92.
+    const r = leaving("2026-12-01");
+    expect(r.calendarYears[0].offerGross).toMatchObject({ cash: 30_000, clawback: -22_500, total: 57_096.77 });
+    expect(r.calendarYears[0].offerTax).toBe(9_039.52);
+    expect(r.leave!.clawbacks[0]).toMatchObject({
+      owed: 22_500, treatment: "same-year wage reversal", taxRelief: 5_730.92, netCost: 16_769.08,
+    });
+  });
+  it("net-basis repayment: same year costs the same as gross; a later year repays the after-tax share", () => {
+    const net = clawback({ months: 12, kind: "prorated", repay: "net" });
+    expect(leaving("2026-12-01", net).leave!.clawbacks[0]).toMatchObject({ owed: 16_769.08, netCost: 16_769.08 });
+    const later = leaving("2027-02-02", net).leave!.clawbacks[0];
+    expect(later.owed).toBeCloseTo(15_000 * (1 - 18_357.14 / (150_000 / 12 * (29 / 31 + 4) + 30_000)), 1);
+    expect(later.taxRelief).toBeCloseTo(0.22 * later.owed, 1);
+  });
+  it("refreshers aren't granted after the leave date", () => {
+    const g: OfferInput = {
+      ...withClawback,
+      equity: { ...worked.equity!, refreshers: { value: { bear: 20_000, base: 20_000, bull: 20_000 },
+        firstAfterMonths: 12, everyMonths: 12, schedule: VESTING_PRESETS.annual } },
+    };
+    // The first refresher is granted 2027-08-03.
+    expect(leaving("2027-08-02", g).leave!.unvestedRsuForfeited).toBe(200_000);
+    expect(leaving("2027-08-03", g).leave!.unvestedRsuForfeited).toBe(220_000);
+  });
+  it("reconciles: payments' tax = calendar-year offer tax less prior-year 1341 relief", () => {
+    const r = leaving("2027-02-02");
+    const eventTax = r.events.reduce((s, e) => s + e.tax, 0);
+    const yearTax = r.calendarYears.reduce((s, c) => s + c.offerTax - c.priorYearRepayments.relief, 0);
+    expect(eventTax).toBeCloseTo(yearTax, 0);
+  });
+  it("leaveDateSweep: month 11 owes $2,500, month 12 clears the window, month 13 adds the first vest", () => {
+    const rows = leaveDateSweep(withClawback, single, [6, 11, 12, 13]);
+    expect(rows.map((r) => r.leaveDate)).toEqual(["2027-02-02", "2027-07-02", "2027-08-02", "2027-09-02"]);
+    expect(rows.map((r) => r.clawbackOwed)).toEqual([15_000, 2_500, 0, 0]);
+    expect(rows.map((r) => r.unvestedRsuForfeited)).toEqual([200_000, 200_000, 200_000, 190_000]);
+    expect(rows[2].paid).toBe(186_169.35); // exactly the first 12 months
+    const kept = rows.map((r) => r.netKept);
+    expect(kept).toEqual([...kept].sort((a, b) => a - b));
   });
 });
 

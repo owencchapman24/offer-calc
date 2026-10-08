@@ -73,15 +73,20 @@ export interface GrantInstance {
 /** Nominal (unsnapped) vest day of each tranche. */
 export const nominalVestDays = (g: GrantInstance) => g.schedule.tranches.map((t) => addMonths(g.vestStartDay, t.month));
 
+/** Actual vest day of each tranche, after any snapping to the company vest calendar. */
+export const vestDays = (g: GrantInstance) => nominalVestDays(g)
+  .map((d) => (g.schedule.vestDates ? snapToVestDate(d, g.schedule.vestDates) : d));
+
 /**
  * One event per tranche vesting before `until`, valued at vest: fraction x grant value x
  * (1 + growth)^(years from grant to vest). Vested RSUs are W-2 wages at that value.
  */
 export function rsuEvents(g: GrantInstance, growth: number, until: number): RawEvent[] {
   const nominal = nominalVestDays(g);
+  const actual = vestDays(g);
   const n = g.schedule.tranches.length;
   return g.schedule.tranches.flatMap((t, i) => {
-    const day = g.schedule.vestDates ? snapToVestDate(nominal[i], g.schedule.vestDates) : nominal[i];
+    const day = actual[i];
     if (day >= until) return [];
     const factor = (1 + growth) ** ((day - g.grantDay) / 365.25);
     const moved = day !== nominal[i] ? ` (nominal ${fromDays(nominal[i])})` : "";

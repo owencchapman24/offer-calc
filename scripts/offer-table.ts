@@ -1,6 +1,9 @@
 // Prints a year-by-year table for two sample offers so results can be eyeballed before a UI exists.
 // Usage: npm run offers. The sample inputs are illustrative, not market data.
-import { projectScenario, VESTING_PRESETS, type Household, type OfferInput, type ScenarioResult } from "../src/offer/index";
+import {
+  leaveDateSweep, projectScenario, VESTING_PRESETS,
+  type Household, type OfferInput, type ScenarioResult, type VestingSchedule,
+} from "../src/offer/index";
 
 const household: Household = { filingStatus: "single" };
 const inflation = 0.025;
@@ -13,10 +16,7 @@ const offers: OfferInput[] = [
     startDate: "2026-07-13",
     salary: { annual: 110_000 },
     bonus: { basis: "percentOfSalary", amount: { bear: 0.5, base: 0.7, bull: 0.9 }, payOn: { month: 1, day: 31 } },
-    cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 } }],
-    equity: {
-      grants: [{ kind: "rsu", label: "New-hire RSUs", value: 40_000, schedule: VESTING_PRESETS.annual }],
-    },
+    cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 }, clawback: { months: 12, kind: "full" } }],
   },
   {
     label: "B. Charlotte corporate finance analyst",
@@ -28,7 +28,29 @@ const offers: OfferInput[] = [
       basis: "percentOfSalary", amount: { bear: 0.05, base: 0.1, bull: 0.12 },
       payOn: { month: 3, day: 15 }, cutoff: { month: 10, day: 1 },
     },
-    cashAwards: [{ label: "Sign-on", amount: 5_000, paidOn: { daysAfterStart: 30 } }],
+    cashAwards: [{ label: "Sign-on", amount: 5_000, paidOn: { daysAfterStart: 30 }, clawback: { months: 12, kind: "prorated" } }],
+  },
+  {
+    label: "C. Seattle public tech company, finance",
+    residence: { state: "WA" },
+    employerState: "WA",
+    startDate: "2026-07-13",
+    salary: { annual: 105_000 },
+    bonus: {
+      basis: "percentOfSalary", amount: { bear: 0.1, base: 0.15, bull: 0.2 },
+      payOn: { month: 3, day: 15 }, cutoff: { month: 10, day: 1 },
+    },
+    cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 }, clawback: { months: 12, kind: "prorated" } }],
+    equity: {
+      grants: [{
+        kind: "rsu", label: "New-hire RSUs", value: 120_000,
+        schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      }],
+      refreshers: {
+        value: { bear: 10_000, base: 25_000, bull: 40_000 }, firstAfterMonths: 12, everyMonths: 12,
+        schedule: { ...VESTING_PRESETS.standard, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      },
+    },
   },
 ];
 
@@ -49,12 +71,27 @@ function describe(o: OfferInput): string {
     ? `${b.amount.bear * 100}/${b.amount.base * 100}/${b.amount.bull * 100}% of salary earned (bear/base/bull)`
     : `$${$(b.amount.base)}`;
   const where = o.residence.locality?.kind === "nyc" ? `${o.residence.state} (NYC)` : o.residence.state;
+  const byYearPct = (s: VestingSchedule) => {
+    const pcts: number[] = [];
+    for (const t of s.tranches) {
+      const y = Math.max(0, Math.ceil(t.month / 12) - 1);
+      pcts[y] = (pcts[y] ?? 0) + t.fraction * 100;
+    }
+    return `${Array.from(pcts, (p) => +(p ?? 0).toFixed(1)).join("/")}% by year`;
+  };
   const grants = o.equity?.grants ?? [];
+  const r = o.equity?.refreshers;
   const rsu = grants.length
-    ? `; RSUs ${grants.map((g) => `$${$(g.value)} vesting ${g.schedule.tranches.map((t) => `${+(t.fraction * 100).toFixed(2)}%@${t.month}mo`).join(", ")}`).join(" + ")}`
+    ? `; RSUs ${grants.map((g) => `$${$(g.value)} (${byYearPct(g.schedule)})`).join(" + ")}`
+      + (r ? `; refreshers $${$(r.value.bear)}/$${$(r.value.base)}/$${$(r.value.bull)} a year (${byYearPct(r.schedule)})` : "")
     : "; no RSUs";
+  const signOn = o.cashAwards?.[0];
+  const claw = signOn?.clawback
+    ? (signOn.clawback.kind === "full" ? `, repaid in full if you leave within ${signOn.clawback.months} months`
+      : `, prorated clawback over ${signOn.clawback.months} months`)
+    : "";
   return `   Lives in ${where}, employer in ${o.employerState}, starts ${o.startDate}. Salary $${$(o.salary.annual)}; `
-    + `bonus ${bonus}; sign-on $${$(o.cashAwards?.[0]?.amount ?? 0)}${rsu}.`;
+    + `bonus ${bonus};\n   sign-on $${$(signOn?.amount ?? 0)}${claw}${rsu}.`;
 }
 
 function offerTables(r: ScenarioResult): string {
@@ -79,7 +116,7 @@ function offerTables(r: ScenarioResult): string {
 
 const base = offers.map((o) => projectScenario(o, household, { inflation }));
 const out: string[] = [
-  "Offer comparison: slices 1-2 (salary, bonus, sign-on, RSUs; no raises or leave date yet)",
+  "Offer comparison: slices 1-3 (salary, bonus, sign-on, RSUs, leave date and clawbacks; no raises yet)",
   `Household: single, no other wages. Tax law after 2026 projected at ${inflation * 100}% inflation.`,
   "Sample inputs are illustrative, not market data.",
 ];
@@ -88,19 +125,28 @@ offers.forEach((o, i) => {
   for (const w of base[i].warnings) out.push(`   ! ${w}`);
 });
 
-const [a, b] = base;
-const diffRows = a.employmentYears.map((ya, i) => {
-  const yb = b.employmentYears[i];
-  return [String(ya.year), $(ya.net), $(yb.net), $(ya.net - yb.net), $((ya.net - yb.net) / 12)];
-});
+const short = (o: OfferInput) => o.label.slice(0, 1);
 const sum = (r: ScenarioResult) => r.employmentYears.reduce((s, y) => s + y.net, 0);
-diffRows.push(["Total", $(sum(a)), $(sum(b)), $(sum(a) - sum(b)), ""]);
+const sideRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.map((r) => $(r.employmentYears[i].net))]);
+sideRows.push(["Total", ...base.map((r) => $(sum(r)))]);
 out.push("", "Side by side, net after tax (base scenario):",
-  table(["Year", "A net", "B net", "A - B", "per month"], diffRows));
+  table(["Year", ...offers.map((o) => `${short(o)} net`)], sideRows));
 
 const scenarios = (["bear", "base", "bull"] as const);
 const totals = offers.map((o) => scenarios.map((s) => sum(projectScenario(o, household, { inflation, scenario: s }))));
 out.push("", "5-year net by scenario:",
-  table(["Offer", ...scenarios], offers.map((o, i) => [o.label.slice(0, 2), ...totals[i].map($)])));
+  table(["Offer", ...scenarios], offers.map((o, i) => [short(o), ...totals[i].map($)])));
+
+const sweepMonths = [3, 6, 9, 11, 12, 13, 18, 24, 36, 48];
+const sweeps = offers.map((o) => leaveDateSweep(o, household, sweepMonths, { inflation }));
+const withEquity = offers.map((o) => (o.equity?.grants.length ?? 0) > 0);
+const sweepHead = ["Months", "Last day", ...offers.flatMap((o, i) =>
+  [`${short(o)} kept`, `${short(o)} repays`, ...(withEquity[i] ? [`${short(o)} unvested`] : [])])];
+const sweepRows = sweepMonths.map((m, j) => [String(m), sweeps[0][j].leaveDate, ...sweeps.flatMap((s, i) => [
+  $(s[j].netKept), s[j].clawbackOwed ? $(s[j].clawbackOwed) : "-", ...(withEquity[i] ? [$(s[j].unvestedRsuForfeited)] : []),
+])]);
+out.push("", "If you leave after N months (base scenario): net kept after tax and clawbacks, nominal.",
+  "Last day = start + N months - 1 day. Repays = sign-on clawback owed. Unvested = RSUs forfeited, at grant value.",
+  table(sweepHead, sweepRows, 2));
 
 console.log(out.join("\n"));

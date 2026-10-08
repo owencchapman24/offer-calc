@@ -1,7 +1,7 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
 
-// Offer model types (docs/offer-model.md §12b). Slices 1-2: salary, bonus, cash awards, RSUs,
-// one scenario at a time. Leave date/clawbacks, raises and multi-scenario totals come later.
+// Offer model types (docs/offer-model.md §12b). Slices 1-3: salary, bonus, cash awards, RSUs,
+// leave date and clawbacks, one scenario at a time. Raises and multi-scenario totals come later.
 
 // ---- shared -----------------------------------------------------------------
 /** Civil date "YYYY-MM-DD". Date math is on calendar days (UTC), never local time. */
@@ -21,6 +21,13 @@ export interface OfferInput {
   /** Where the employer is. Drives the convenience-of-employer warning; not taxed. */
   employerState: string;
   startDate: ISODate;
+  /**
+   * Your last day of work (inclusive). Cuts off every stream: salary stops, unvested RSU
+   * tranches and ungranted refreshers are forfeited, unpaid bonuses follow
+   * `bonus.mustBeEmployedOnPayDate`, unpaid cash awards are never paid, and clawbacks trigger.
+   * Omit to stay through the horizon. Assumes a voluntary exit.
+   */
+  leaveDate?: ISODate;
   salary: Salary;
   bonus?: AnnualBonus;
   /** Sign-on, year-2 sign-on, relocation: anything paid as a lump of cash. */
@@ -83,12 +90,33 @@ export interface AnnualBonus {
   cutoff?: MonthDay;
   /** First payout at the base (target) amount in every scenario. */
   firstPayoutGuaranteed?: boolean;
+  /**
+   * Default true: a bonus not paid by your leave date is forfeited. false: the period you
+   * leave in pays a prorated bonus (salary earned to the leave date), and every earned bonus
+   * still pays on its usual date.
+   */
+  mustBeEmployedOnPayDate?: boolean;
 }
 
 export interface CashAward {
   label: string;
   amount: number;
   paidOn: ISODate | { daysAfterStart: number };
+  clawback?: Clawback;
+}
+
+/** Repayment owed if you leave before working through the window. */
+export interface Clawback {
+  /** Window length. You're clear once your leave date is the day before clock start + months, or later. */
+  months: number;
+  /** "full": owe it all if you leave inside the window. "prorated": owe the unworked share. */
+  kind: "full" | "prorated";
+  /** Proration unit. Default "month": only completed months count as worked. */
+  per?: "month" | "day";
+  /** Clock start. Default "start" (your start date); "payment" suits later installments. */
+  from?: "start" | "payment";
+  /** Default "gross": you repay the full amount though you received it net of withholding. */
+  repay?: "gross" | "net";
 }
 
 /** About you, not the job: shared by every offer being compared. */
@@ -110,7 +138,7 @@ export interface ProjectionOptions {
 }
 
 // ---- outputs ------------------------------------------------------------------
-export type Component = "salary" | "bonus" | "cash" | "rsu";
+export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback";
 export type ByComponent = Record<Component, number> & { total: number };
 
 /** One dated payment: the unit of "show the work". Money is rounded to cents. */
@@ -141,6 +169,11 @@ export interface CalendarYearResult {
   /** (1 + inflation)^(year - 2026); 1 in 2026. */
   indexFactor: number;
   projectedLaw: boolean;
+  /**
+   * Clawbacks of earlier years' payments repaid this year. Not wages, so they're outside
+   * offerGross/offerTax; `relief` is the IRC 1341 federal credit claimed for them.
+   */
+  priorYearRepayments: { repaid: number; relief: number };
 }
 
 export interface EmploymentYearResult {
@@ -157,12 +190,51 @@ export interface EmploymentYearResult {
   quotedTC: number;
 }
 
+export interface ClawbackResult {
+  award: string;
+  paidOn: ISODate;
+  repaidOn: ISODate;
+  /** Share of the award clawed back (1 = all of it). */
+  fraction: number;
+  basis: "gross" | "net";
+  /** Cash you hand back. */
+  owed: number;
+  treatment: "same-year wage reversal" | "IRC 1341 credit" | "no relief ($3,000 or less)";
+  /** Tax you get back: the reversed year's tax (same year) or the federal 1341 credit (later year). */
+  taxRelief: number;
+  /** What leaving costs you: owed - taxRelief (for same-year net repayment, the employer keeps the withholding). */
+  netCost: number;
+}
+
+export interface LeaveResult {
+  leaveDate: ISODate;
+  /** RSU tranches granted by the leave date but not vested by it, at grant value. */
+  unvestedRsuForfeited: number;
+  clawbacks: ClawbackResult[];
+}
+
+/** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
+export interface LeaveSweepRow {
+  months: number;
+  /** start + months - 1 day: you work exactly `months` months. */
+  leaveDate: ISODate;
+  /** Salary, bonus, cash and vested RSUs paid, before tax and clawbacks. */
+  paid: number;
+  /** Cash handed back under clawbacks. */
+  clawbackOwed: number;
+  /** After tax and clawbacks, nominal. */
+  netKept: number;
+  unvestedRsuForfeited: number;
+}
+
 export interface ScenarioResult {
   label: string;
   scenario: Scenario;
   events: CompEvent[];
   calendarYears: CalendarYearResult[];
   employmentYears: EmploymentYearResult[];
+  /** Present when the offer has a leave date. */
+  leave?: LeaveResult;
   /** Input-specific, plain language. */
   warnings: string[];
   /** Assumptions behind these numbers, for the methodology page. */
