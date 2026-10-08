@@ -3,3 +3,5 @@ grid_ts.json
 oracle_report.json
 __pycache__/
 .venv/
+dist/
+.vercel/
