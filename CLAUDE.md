@@ -22,14 +22,21 @@ methodology page matter more than features.
   `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
 - `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
   Seattle tech finance. Inputs are illustrative, not market data.
-- **Design docs:** `docs/offer-model.md` (approved rev 3, updated per slice). Its §12
-  types were the pre-build proposal; `src/offer/types.ts` is authoritative.
+- **Design docs:**
+  - `docs/offer-model.md`: approved rev 3, updated per slice. Its §12 types were the
+    pre-build proposal; `src/offer/types.ts` is authoritative.
+  - `docs/ui-design.md`: UI design, approved rev 2 (2026-10-08). Audit tickmarks are the
+    signature element; the default basis is "After rent, at U.S. prices".
 
 ## Next steps
-1. **UI design doc** (`docs/ui-design.md`) for review before any UI code. Roadmap item 6:
-   - React/TS, client-side only, no login, live-updating, inline input help.
-   - No misleading defaults (NN/g calculator guidelines).
-   - A methodology page drawn from `assumptions[]` and the design doc.
+1. **Engine prerequisites for the UI** (`docs/ui-design.md` §11, items 1-5). Hand-check
+   each, then show timings before any UI code:
+   - profile and cache, `paramsForYear` first, then choose main thread or Web Worker;
+   - `breakeven` returns "already ahead by $X" instead of throwing;
+   - `nextCliff`;
+   - `withholdingShortfall`;
+   - `horizonSweep`, the "winner if you stay N years" row.
+2. **UI slices** per `docs/ui-design.md` §12.
 
 ## Commands
 - `npm test`: unit tests. `npm run typecheck`: `tsc -p .` (src and test, no Node types)
@@ -267,7 +274,8 @@ methodology page matter more than features.
 ## Roadmap (remaining)
 Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
 
-2. (Next) UI design doc, then the UI (item 6 below).
+2. (Next) UI: the design is approved (`docs/ui-design.md`); next are the engine
+   prerequisites, then the UI (item 6 below).
 3. Time: commute cost (IRS 76c/mi includes depreciation — offer a variable-cost option),
    remote-work valuation default ~5% of pay (editable). Weekly hours and effective hourly
    rate are done.
@@ -281,3 +289,7 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
    misleading defaults, per NN/g calculator guidelines) and a methodology page.
 7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
    step, and the after-tax value of staying until it (built on `leaveDateSweep`).
+8. HUD Fair Market Rents by metro as the rent-estimate anchor. These are 40th-percentile
+   rents for recent movers, a better anchor than the ACS median.
+   - `npm run fetch-fmr`, plus a HUD area ↔ BEA metro crosswalk.
+   - Deferred in UI design review (2026-10-08).
