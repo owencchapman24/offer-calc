@@ -1,4 +1,5 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
+import type { Bedrooms, RentEstimate } from "../col/rent";
 
 // Offer model types (docs/offer-model.md §12b). projectScenario runs one scenario;
 // projectOffer runs bear/base/bull together; compareOffers puts offers on one window.
@@ -44,7 +45,11 @@ export interface OfferInput {
 export interface OfferCostOfLiving {
   /** BEA GeoFIPS code of the metro area or state-nonmetro portion, e.g. "35620"; see findRppAreas(). */
   area: string;
-  /** Your expected rent there when you move in. If omitted, derived from the household reference rent and the housing RPPs. */
+  /**
+   * Your expected rent there when you move in. If omitted, it's estimated: HUD's Fair Market Rent for the
+   * metro (household `fmrBedrooms`, default 1), or for areas without one, an anchor rent scaled by the
+   * housing RPPs.
+   */
   monthlyRent?: number;
   /** Annual rent increase, applied at each lease anniversary (your start date), e.g. 0.04. Default: the inflation option. */
   rentGrowth?: number;
@@ -234,8 +239,13 @@ export interface HouseholdCostOfLiving {
   reference?: string;
   /** Planned savings as a fraction of take-home pay (beyond your 401(k), already out). Default 0. */
   savingsRate?: number;
-  /** Your monthly rent in the reference location; used to derive rent where an offer gives none. */
+  /**
+   * Your monthly rent in the reference location: the anchor for BEA-derived rent estimates, used only for
+   * areas without a HUD Fair Market Rent. Default: the U.S. median gross rent (ACS 2024), at U.S. prices.
+   */
   referenceMonthlyRent?: number;
+  /** Bedrooms for HUD Fair Market Rent estimates: 0 (studio) to 4. Default 1. */
+  fmrBedrooms?: Bedrooms;
 }
 
 export interface ProjectionOptions {
@@ -334,7 +344,8 @@ export type Assumption =
   | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number } }
   | { code: "costOfLiving"; params: { rppVintage: { dataYear: number; release: string }; savingsRate: number; reference: string;
       referenceNonHousing: number; areaNonHousing: number; factor: number; nonHousingFormula: string } }
-  | { code: "rent"; params: { monthlyRent: number; source: "input" | "derived"; growth: number; growthSource: "input" | "inflation" } }
+  | { code: "rent"; params: { monthlyRent: number; source: "input" | "fmr" | "derived"; estimate?: RentEstimate; growth: number;
+      growthSource: "input" | "inflation" } }
   | { code: "colAdjustedTotal"; params: NoParams }
   | { code: "withholding"; params: NoParams };
 export type ByComponent = Record<Component, number> & { total: number };
@@ -451,7 +462,10 @@ export interface CostOfLivingInfo {
   nonHousingFactor: number;
   /** Rent in the first lease year, which starts on your start date. */
   monthlyRent: number;
-  rentSource: "input" | "derived";
+  /** Entered, HUD's Fair Market Rent, or derived from an anchor rent and the housing RPPs. */
+  rentSource: "input" | "fmr" | "derived";
+  /** How an estimated rent was found. Absent when you entered it. */
+  rentEstimate?: RentEstimate;
   /** Annual increase at each lease anniversary. */
   rentGrowth: number;
   rentGrowthSource: "input" | "inflation";

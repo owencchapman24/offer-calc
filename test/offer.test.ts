@@ -9,6 +9,7 @@ import { describeSchedule, formatWarning } from "../src/format/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
+import { estimateRent, FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 
 const single: Household = { filingStatus: "single" };
 
@@ -705,12 +706,37 @@ describe("cost of living (BEA RPPs)", () => {
     const b = projectScenario({ ...clt, costOfLiving: undefined }, saver, { years: 1 }).employmentYears[0];
     expect([a.gross, a.tax, a.takeHome]).toEqual([b.gross, b.tax, b.takeHome]);
   });
-  it("rent can be derived from the housing RPPs: $1,500 reference rent -> $1,455.37 in Charlotte", () => {
-    // 1,500 x 97.635 / 100.629
-    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
-      { filingStatus: "single", costOfLiving: { referenceMonthlyRent: 1_500 } }, { years: 1 });
-    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_455.37, rentSource: "derived" });
-    expect(() => projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 })).toThrow(/monthlyRent/);
+  it("rent left blank defaults to HUD's FY2027 Fair Market Rent for the metro: Charlotte $1,640 (1 bedroom)", () => {
+    // HUD FY27_FMRs.xlsx, Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area: studio 1,574, 1 bedroom 1,640.
+    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 });
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_640, rentSource: "fmr",
+      rentEstimate: { source: "fmr", hudArea: "METRO16740M16740", bedrooms: 1, fiscalYear: 2027 } });
+    expect(r.employmentYears[0].costOfLiving!.rent).toBe(12 * 1_640);
+    const studio = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
+      { filingStatus: "single", costOfLiving: { fmrBedrooms: 0 } }, { years: 1 });
+    expect(studio.costOfLiving!.monthlyRent).toBe(1_574);
+    // An entered rent always wins.
+    expect(projectScenario(clt, single, { years: 1 }).costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input" });
+  });
+  it("HUD FMR areas for the sample metros: the area with most of the metro's people, in your state when it spans states", () => {
+    // New York metro: seven FMR areas; New York, NY HMFA (9.9M people) for NY, Newark (2.1M, the largest
+    // NJ area) for an NJ resident. Seattle metro: Seattle-Bellevue (3.1M) over Tacoma (0.9M).
+    expect(estimateRent("35620", "NY")).toMatchObject({ monthlyRent: 2_729, hudAreaName: "New York, NY HUD Metro FMR Area" });
+    expect(estimateRent("35620", "NJ")).toMatchObject({ monthlyRent: 1_850, hudAreaName: "Newark, NJ HUD Metro FMR Area" });
+    expect(estimateRent("42660", "WA")).toMatchObject({ monthlyRent: 2_180, hudAreaName: "Seattle-Bellevue, WA HUD Metro FMR Area" });
+    expect(estimateRent("42660", "WA", { bedrooms: 0 }).monthlyRent).toBe(2_091);
+    // Charlotte's main FMR area includes York County, SC, so it's the largest one for an SC resident too.
+    expect(fmrArea("16740", "SC")!.name).toBe("Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area");
+  });
+  it("areas without an FMR fall back to BEA housing prices: NC nonmetro $881.08 from the U.S. median (hand-checked)", () => {
+    // Every BEA metro has an FMR area; state nonmetro portions don't. U.S. median gross rent 1,487 (ACS 2024,
+    // B25064) x NC nonmetro housing 59.625 / U.S. housing 100.629 = 881.08.
+    expect(estimateRent("37999", "NC")).toMatchObject({ source: "derived", anchorRent: 1_487, anchorArea: "00000",
+      monthlyRent: expect.closeTo(881.08, 2) });
+    // With your own rent at a reference location: 1,500 in Charlotte (housing 97.635) -> 1,500 x 59.625 / 97.635.
+    expect(estimateRent("37999", "NC", { anchorRent: 1_500, anchorArea: "16740" }).monthlyRent).toBeCloseTo(916.04, 2);
+    expect(US_MEDIAN_GROSS_RENT).toBe(1_487);
+    expect(FMR).toMatchObject({ fiscalYear: 2027, effective: "2026-10-01" });
   });
   it("with Charlotte as the reference, the factor is 1 and dollars stay local", () => {
     const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });

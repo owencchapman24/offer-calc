@@ -7,6 +7,7 @@ import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEve
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
 import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
+import { estimateRent, type RentEstimate } from "../col/rent";
 import type {
   Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
   CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
@@ -345,15 +346,18 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const ref = rppArea(hc.reference ?? NATIONAL);
     const savingsRate = hc.savingsRate ?? 0;
     if (!(savingsRate >= 0 && savingsRate < 1)) throw new Error("savingsRate must be at least 0 and below 1.");
+    // No rent entered: HUD's Fair Market Rent for the metro, or for areas without one, an anchor rent
+    // (yours at the reference location, else the U.S. median) scaled by the housing RPPs.
     let monthlyRent = offer.costOfLiving.monthlyRent;
-    let rentSource: CostOfLivingInfo["rentSource"] = "input";
+    let rentEstimate: RentEstimate | undefined;
     if (monthlyRent === undefined) {
-      if (hc.referenceMonthlyRent === undefined) {
-        throw new Error(`Give "${offer.label}" a monthlyRent, or the household a referenceMonthlyRent to derive it from.`);
-      }
-      monthlyRent = hc.referenceMonthlyRent * (area.housing / ref.housing); // scaled by the housing (rents) RPPs
-      rentSource = "derived";
+      rentEstimate = estimateRent(area.code, offer.residence.state, {
+        bedrooms: hc.fmrBedrooms ?? 1,
+        ...(hc.referenceMonthlyRent !== undefined ? { anchorRent: hc.referenceMonthlyRent, anchorArea: ref.code } : {}),
+      });
+      monthlyRent = rentEstimate.monthlyRent;
     }
+    const rentSource: CostOfLivingInfo["rentSource"] = rentEstimate?.source ?? "input";
     if (!(monthlyRent >= 0)) throw new Error("Rent can't be negative.");
     const rentGrowth = offer.costOfLiving.rentGrowth ?? inflation;
     if (!(rentGrowth > -1)) throw new Error("Rent growth must be greater than -100%.");
@@ -379,7 +383,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     col = {
       info: {
         area: used(area), reference: used(ref), nonHousingFactor: nonHousingRpp(ref) / nonHousingRpp(area),
-        monthlyRent: round2(monthlyRent), rentSource, rentGrowth,
+        monthlyRent: round2(monthlyRent), rentSource, ...(rentEstimate ? { rentEstimate } : {}), rentGrowth,
         rentGrowthSource: offer.costOfLiving.rentGrowth !== undefined ? "input" : "inflation",
         savingsRate, rppVintage: { dataYear: RPP.dataYear, release: RPP.vintage },
       },
@@ -551,7 +555,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     assumptions.push({ code: "costOfLiving", params: { rppVintage: c.rppVintage, savingsRate: c.savingsRate,
       reference: c.reference.name, referenceNonHousing: c.reference.nonHousing, areaNonHousing: c.area.nonHousing,
       factor: c.nonHousingFactor, nonHousingFormula: RPP.nonHousing.formula } });
-    assumptions.push({ code: "rent", params: { monthlyRent: c.monthlyRent, source: c.rentSource, growth: c.rentGrowth,
+    assumptions.push({ code: "rent", params: { monthlyRent: c.monthlyRent, source: c.rentSource,
+      ...(c.rentEstimate ? { estimate: c.rentEstimate } : {}), growth: c.rentGrowth,
       growthSource: c.rentGrowthSource } });
     assumptions.push({ code: "colAdjustedTotal", params: {} });
   }

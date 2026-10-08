@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inflateRawSync } from "node:zlib";
+import { unzip } from "./lib/zip";
 
 const FILES = {
   MARPP: "https://apps.bea.gov/regional/zip/MARPP.zip",
@@ -20,33 +20,6 @@ const FILES = {
 const HOUSING_WEIGHT = 0.16;
 const COMPONENTS = ["allItems", "goods", "housing", "utilities", "otherServices"] as const;
 const OUT = fileURLToPath(new URL("../src/col/rpp.json", import.meta.url));
-
-/** Minimal zip reader: central directory, then stored or deflated entries. */
-function unzip(buf: Buffer): Map<string, Buffer> {
-  let eocd = buf.length - 22;
-  while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
-  if (eocd < 0) throw new Error("Not a zip file.");
-  const entries = buf.readUInt16LE(eocd + 10);
-  let p = buf.readUInt32LE(eocd + 16);
-  const out = new Map<string, Buffer>();
-  for (let i = 0; i < entries; i++) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error("Bad zip central directory.");
-    const method = buf.readUInt16LE(p + 10);
-    const size = buf.readUInt32LE(p + 20);
-    const nameLen = buf.readUInt16LE(p + 28);
-    const extraLen = buf.readUInt16LE(p + 30);
-    const commentLen = buf.readUInt16LE(p + 32);
-    const local = buf.readUInt32LE(p + 42);
-    const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
-    const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-    const raw = buf.subarray(start, start + size);
-    if (method === 0) out.set(name, raw);
-    else if (method === 8) out.set(name, inflateRawSync(raw));
-    else throw new Error(`Unsupported zip compression method ${method} for ${name}.`);
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return out;
-}
 
 /** Splits one CSV line on commas outside double quotes; trims spaces and quotes. */
 function parseLine(line: string): string[] {

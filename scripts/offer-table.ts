@@ -5,6 +5,8 @@ import {
 } from "../src/offer/index";
 import { describeSchedule, formatWarning, rppVintage } from "../src/format/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
+import { rppArea } from "../src/col/index";
+import { FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 
 const household = SAMPLE_HOUSEHOLD;
 const offers = SAMPLE_OFFERS;
@@ -158,6 +160,16 @@ out.push("", `Cost of living: ${rppVintage(colInfo[0].rppVintage)}`,
       return [short(o), c.area.name.replace(/ \(Metropolitan Statistical Area\)$/, ""), c.area.allItems.toFixed(1),
         c.area.housing.toFixed(1), c.area.nonHousing.toFixed(1), c.nonHousingFactor.toFixed(4), `$${$(c.monthlyRent)}`,
         `${pct(c.rentGrowth)}${c.rentGrowthSource === "inflation" ? " (inflation)" : ""}`];
+    }), 2));
+
+// What the app would estimate if rent were left blank: HUD's FMR first; BEA housing prices only as a fallback.
+out.push("", `Rent estimates if left blank (the samples' rents are entered): HUD FY${FMR.fiscalYear} Fair Market Rent `
+  + `vs. the BEA-derived fallback (U.S. median gross rent $${$(US_MEDIAN_GROSS_RENT)}, ACS 2024, x housing RPP ratio):`,
+  table(["Offer", "HUD FMR area", "Studio", "1 bedroom", "BEA-derived", "Entered"],
+    offers.map((o, i) => {
+      const a = fmrArea(o.costOfLiving!.area, o.residence.state)!;
+      const derived = US_MEDIAN_GROSS_RENT * colInfo[i].area.housing / rppArea("00000").housing;
+      return [short(o), a.name, `$${$(a.fmr[0])}`, `$${$(a.fmr[1])}`, `$${$(derived)}`, `$${$(colInfo[i].monthlyRent)}`];
     }), 2));
 
 out.push("", "COL-adjusted total, U.S. dollars, by employment year (base scenario). Spending money is local; saved money isn't:",

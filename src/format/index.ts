@@ -3,6 +3,7 @@ import type {
   SalaryChangeReason, VestingSchedule,
 } from "../offer/types";
 import type { TaxWarning } from "../tax/types";
+import type { RentEstimate } from "../col/rent";
 
 // Words for the engine's numbers and codes. The engine (src/tax, src/offer, src/col) never formats
 // text; this module does, for the UI and the scripts. English, U.S. conventions.
@@ -205,7 +206,7 @@ export function formatAssumption(a: Assumption): string {
     }
     case "rent": {
       const p = a.params;
-      return `Rent: ${usd(p.monthlyRent)} a month (${p.source === "input" ? "as entered" : "derived from the housing RPPs"}) `
+      return `Rent: ${usd(p.monthlyRent)} a month (${rentSource(p.source, p.estimate)}) `
         + `from your start date, rising ${pct(p.growth, 2)} a year at each lease anniversary`
         + `${p.growthSource === "inflation" ? " (the inflation rate)" : ""}; paid only while employed there.`;
     }
@@ -221,6 +222,16 @@ export function formatAssumption(a: Assumption): string {
 }
 
 export const rppVintage = (v: { dataYear: number; release: string }) => `${v.dataYear} RPPs. ${v.release}`;
+
+const BEDROOMS = ["studio", "1 bedroom", "2 bedrooms", "3 bedrooms", "4 bedrooms"];
+
+/** Where a rent came from: "as entered", "HUD FY2027 Fair Market Rent, 1 bedroom, New York, NY HUD Metro FMR Area". */
+export function rentSource(source: "input" | "fmr" | "derived", estimate?: RentEstimate): string {
+  if (source === "input" || !estimate) return source === "derived" ? "derived from the housing RPPs" : "as entered";
+  return estimate.source === "fmr"
+    ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${BEDROOMS[estimate.bedrooms]}, ${estimate.hudAreaName}`
+    : `derived from the housing RPPs: ${usd(estimate.anchorRent)} x ${estimate.housingRatio.toFixed(4)}`;
+}
 
 // ---- vesting schedules ------------------------------------------------------------------------
 
