@@ -84,16 +84,26 @@ come from the same events, so they reconcile exactly.
 
 **Cash awards** (sign-on, year-2 sign-on, relocation). Each payment has a date and optional
 clawback terms:
-- **Terms:** `steps` (e.g. 100% owed before 12 months, 50% before 24) or `prorated` (owe
-  the unworked share, by day or by month).
-- **Clock:** starts at your start date or at the payment date.
+- **Terms (as built in slice 3):** a window of `months` and a kind. `full` means you owe
+  it all if you leave inside the window. `prorated` means you owe the unworked share:
+  by completed months (the default, so leaving after 6 of 12 months owes half), or
+  by day.
+- **The window's edge:** you're clear if your last day is the day before clock start +
+  `months`, or later. So a 12-month window from 2026-08-03 is cleared by leaving on
+  2027-08-02.
+- **Clock:** starts at your start date (default) or at the payment date.
 - **Repayment basis:** defaults to **gross** (decision 6), the usual contract term, even
   though you received the payment net of withholding.
 - **Monthly installments:** one entry per installment. The UI can generate them.
 
 **Clawback tax relief (v1):**
 - **Same calendar year as the payment:** the wages are reversed, so income tax and FICA
-  come back.
+  come back. The relief is that year's tax with the payment minus with it reversed, so
+  it's exact. Repaying net costs the same as repaying gross here: you hand back the
+  after-tax share and the employer keeps the withholding it reclaims.
+- **Later year, net basis:** you repay the after-tax share, taking the payment year's
+  average offer rate as the tax on it, and 1341 applies to the amount repaid. This is an
+  approximation; employer practice varies.
 - **Later year, over $3,000:** IRC §1341 relief using the credit method: re-run the
   earlier year's federal tax without the repaid amount; the difference is the relief.
 - **Later year, $3,000 or less:** no relief. Miscellaneous itemized deductions are gone
@@ -128,15 +138,21 @@ Default: none.
 | Stream | At the leave date |
 |---|---|
 | Salary | Accrues through the leave date, then stops |
-| Bonus | Forfeited unless paid on or before the leave date (`mustBeEmployedOnPayDate`, default true) |
+| Bonus | Forfeited unless paid on or before the leave date (`mustBeEmployedOnPayDate`, default true). With `false`, every earned bonus still pays on its usual date, and the period you leave in is prorated to the leave date |
 | RSUs | Tranches vesting after the leave date are forfeited; later refreshers are never granted |
 | Cash awards | Unpaid installments are never paid; each paid award's clawback is evaluated at the leave date |
 | 401(k) match (roadmap 2) | The unvested employer match is forfeited per the plan's vesting schedule |
 
 Omit it to stay through the window. It assumes a voluntary exit; layoffs and severance
-aren't modeled. Clawbacks are often waived when you're laid off. Separately, the
-**clawback exposure curve** shows what leaving on each month-end would cost, without you
-having to pick a date.
+aren't modeled. Clawbacks are often waived when you're laid off.
+
+**Leave-date sweep (slice 3).** `leaveDateSweep(offer, household, months[])` answers "what
+do I keep if I leave after N months" without you picking a date. For each N, the last day
+is start + N months − 1 day. Each row gives pay received, clawback owed, net kept after
+tax and clawbacks, and unvested RSUs forfeited. It replaces the planned month-by-month
+exposure curve and shows the vest cliffs, bonus payout dates and clawback steps in one
+table. `ScenarioResult.leave` holds the detail for one leave date: each clawback's owed
+amount, its tax treatment, relief and net cost.
 
 ## 5. Scenarios: bear / base / bull
 

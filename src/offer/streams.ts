@@ -12,6 +12,8 @@ export interface RawEvent {
   gross: number;
   /** Accrued pay (salary): the first day it covers. Its employment year follows this day. */
   accruedFrom?: number;
+  /** Not wages (a repayment of an earlier year's pay): left out of the year's taxable wages; carries its own tax effect. */
+  nonWage?: { tax: number };
 }
 
 /** "$150,000" or "$62,054.79" */
@@ -62,6 +64,8 @@ export function salaryEvents(annual: number, from: number, to: number, anniversa
  * Annual bonus. Each 12-month performance period pays on the first `payOn` after it ends.
  * percentOfSalary applies to salary earned in the period, so a partial first period prorates
  * itself; fixed amounts prorate by days employed. A start on/after `cutoff` skips that period.
+ * With a leave date, unpaid bonuses are forfeited, or (mustBeEmployedOnPayDate: false) the
+ * leave period is prorated to the leave date and still pays on its usual date.
  */
 export function bonusEvents(
   bonus: AnnualBonus,
@@ -70,17 +74,25 @@ export function bonusEvents(
   until: number,
   earned: (from: number, to: number) => number,
   warnings: string[],
+  leave?: number,
 ): RawEvent[] {
   const periodStart = bonus.periodStart ?? { month: 1, day: 1 };
+  const mustBeEmployed = bonus.mustBeEmployedOnPayDate ?? true;
   let year = yearOfDay(start);
   if (dayIn(year, periodStart) > start) year -= 1; // the period containing the start date
   const out: RawEvent[] = [];
   for (let first = true; ; first = false, year++) {
     const from = dayIn(year, periodStart);
     const to = dayIn(year + 1, periodStart);
+    if (leave !== undefined && from > leave) break; // periods after you leave earn nothing
     const payDay = nextOccurrence(bonus.payOn, to);
     if (payDay >= until) break;
     const period = `${fromDays(from)} to ${fromDays(to - 1)}`;
+    if (leave !== undefined && payDay > leave && mustBeEmployed) {
+      warnings.push(`Leaving on ${fromDays(leave)} forfeits the bonus for ${period}: it pays ${fromDays(payDay)} `
+        + "and requires being employed on the payout date.");
+      continue;
+    }
     if (first && bonus.cutoff) {
       let cutoff = dayIn(year, bonus.cutoff);
       if (cutoff < from) cutoff = dayIn(year + 1, bonus.cutoff);
@@ -92,17 +104,19 @@ export function bonusEvents(
     }
     const rate = first && bonus.firstPayoutGuaranteed ? bonus.amount.base : bonus.amount[scenario];
     const workedFrom = Math.max(from, start);
+    const workedTo = leave !== undefined ? Math.min(to, leave + 1) : to;
     let gross: number;
     let formula: string;
     if (bonus.basis === "percentOfSalary") {
-      const base = earned(workedFrom, to);
+      const base = earned(workedFrom, workedTo);
       gross = rate * base;
       formula = `${pct(rate)} x ${usd(Math.round(base * 100) / 100)} salary earned in the period`;
     } else {
-      gross = (rate * (to - workedFrom)) / (to - from);
-      formula = `${usd(rate)} x ${to - workedFrom}/${to - from} days employed`;
+      gross = (rate * (workedTo - workedFrom)) / (to - from);
+      formula = `${usd(rate)} x ${workedTo - workedFrom}/${to - from} days employed`;
     }
-    out.push({ day: payDay, component: "bonus", label: `Bonus for ${period}`, formula, gross });
+    const prorated = workedTo < to ? " (prorated to leave date)" : "";
+    out.push({ day: payDay, component: "bonus", label: `Bonus for ${period}${prorated}`, formula, gross });
   }
   return out;
 }
