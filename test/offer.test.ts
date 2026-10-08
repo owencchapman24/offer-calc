@@ -6,6 +6,7 @@ import {
 } from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
+import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
 
 const single: Household = { filingStatus: "single" };
 
@@ -389,7 +390,7 @@ describe("leave date and clawbacks", () => {
     expect(rows.map((r) => r.clawbackOwed)).toEqual([15_000, 2_500, 0, 0]);
     expect(rows.map((r) => r.unvestedRsuForfeited)).toEqual([200_000, 200_000, 200_000, 190_000]);
     expect(rows[2].paid).toBe(186_169.35); // exactly the first 12 months
-    const kept = rows.map((r) => r.netKept);
+    const kept = rows.map((r) => r.afterTaxCompKept);
     expect(kept).toEqual([...kept].sort((a, b) => a - b));
   });
 });
@@ -454,19 +455,19 @@ describe("present value and comparisons", () => {
     // 365 days = 0.99932 years; 9,235 x 1.05^-(365/365.25) = 9,235 x 0.952413 = 8,795.53.
     const r = projectScenario(tx({ startDate: "2026-07-01", salary: { annual: 0 },
       cashAwards: [{ label: "One", amount: 10_000, paidOn: "2027-07-01" }] }), single, valued);
-    expect(r.window.nominal).toEqual({ gross: 10_000, tax: 765, net: 9_235 });
-    expect(r.window.presentValue!.net).toBe(8_795.53);
+    expect(r.window.nominal).toEqual({ gross: 10_000, tax: 765, premiums: 0, afterTaxComp: 9_235, takeHome: 9_235 });
+    expect(r.window.presentValue!.afterTaxComp).toBe(8_795.53);
     expect(r.events.find((e) => e.component === "cash")!.discountFactor).toBeCloseTo(1.05 ** (-365 / 365.25), 12);
   });
   it("a 0% discount rate gives PV = nominal; the default window is the employment-year horizon", () => {
     const r = projectScenario(worked, single, { ...valued, discountRate: 0 });
     expect(r.window.presentValue).toEqual(r.window.nominal);
-    expect(r.window.nominal.net).toBeCloseTo(r.employmentYears.reduce((s, y) => s + y.net, 0), 1);
-    expect(projectScenario(worked, single, valued).window.presentValue!.net).toBeLessThan(r.window.nominal.net);
+    expect(r.window.nominal.afterTaxComp).toBeCloseTo(r.employmentYears.reduce((s, y) => s + y.afterTaxComp, 0), 1);
+    expect(projectScenario(worked, single, valued).window.presentValue!.afterTaxComp).toBeLessThan(r.window.nominal.afterTaxComp);
   });
   it("projectOffer runs bear/base/bull together", () => {
     const p = projectOffer(worked, single, valued);
-    const net = (s: "bear" | "base" | "bull") => p.scenarios[s].window.nominal.net;
+    const net = (s: "bear" | "base" | "bull") => p.scenarios[s].window.nominal.afterTaxComp;
     expect(net("bear")).toBeLessThan(net("base"));
     expect(net("base")).toBeLessThan(net("bull"));
   });
@@ -491,7 +492,7 @@ describe("present value and comparisons", () => {
     const ca = tx({ residence: { state: "CA" }, employerState: "CA" });
     const r = breakeven(tx({}), ca, "salary", single, valued);
     expect(r.increase).toBeGreaterThan(5_000);
-    const pv = (o: OfferInput) => projectScenario(o, single, { ...valued, scenario: "base" }).window.presentValue!.net;
+    const pv = (o: OfferInput) => projectScenario(o, single, { ...valued, scenario: "base" }).window.presentValue!.afterTaxComp;
     expect(pv({ ...ca, salary: { annual: r.to } })).toBeCloseTo(r.targetPV, 0);
   });
   it("breakeven is negative when B is already ahead", () => {
@@ -506,24 +507,25 @@ describe("401(k), health, perks and hours", () => {
   const oneYear = (o: OfferInput) => projectScenario(o, single, { years: 1 }).employmentYears[0];
   const match50to6 = { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] };
 
-  it("everything together, hand-checked: tax $19,144.20, cash $80,855.80, total rewards $81,655.80, $35.94/$36.29 an hour", () => {
+  it("everything together, hand-checked: tax $19,144.20, after-tax comp $79,655.80, take-home $73,655.80, total rewards $81,655.80", () => {
     // Wages 100,000; pre-tax 401(k) 6,000; premium 1,200 via section 125.
     // Federal: AGI 92,800, taxable 76,700 -> 1,240 + 4,560 + 22% x 26,300 = 11,586.
     // FICA on 98,800 (401(k) doesn't lower it; the premium does): 6,125.60 + 1,432.60 = 7,558.20. Tax 19,144.20.
-    // Cash net = 100,000 - 19,144.20 = 80,855.80 (your deferral is still yours).
-    // Total rewards = 80,855.80 + 3,000 match - (1,200 premium + 1,500 OOP - 500 employer HSA) = 81,655.80.
-    // Hours 45 x 50 = 2,250: 80,855.80 / 2,250 = 35.94; 81,655.80 / 2,250 = 36.29.
+    // After-tax comp = 100,000 - 19,144.20 - 1,200 premium = 79,655.80. Take-home = - 6,000 deferral = 73,655.80.
+    // Total rewards = 79,655.80 + 3,000 match - 1,500 OOP + 500 employer HSA = 81,655.80.
+    // Hours 45 x 50 = 2,250: 79,655.80 / 2,250 = 35.40; 81,655.80 / 2,250 = 36.29.
     const y = oneYear({
       ...jan, retirement: match50to6, hours: { weekly: all(45) },
       health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 },
     });
     expect(y.tax).toBe(19_144.2);
-    expect(y.net).toBe(80_855.8);
+    expect(y.afterTaxComp).toBe(79_655.8);
+    expect(y.takeHome).toBe(73_655.8);
     expect(y.retirement).toEqual({ employee: 6_000, employerCredited: 3_000, employerVested: 3_000 });
     expect(y.health).toEqual({ premiums: 1_200, outOfPocket: 1_500, employerHsa: 500, employeeHsa: 0, net: 2_200 });
     expect(y.totalRewards).toBe(81_655.8);
     expect(y.hours).toBe(2_250);
-    expect(y.hourly).toEqual({ cash: 35.94, totalRewards: 36.29 });
+    expect(y.hourly).toEqual({ afterTaxComp: 35.4, totalRewards: 36.29 });
   });
   it("expected out-of-pocket is capped at the out-of-pocket max", () => {
     const y = oneYear({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 9_000 }, oopMax: 4_000 } });
@@ -587,7 +589,7 @@ describe("401(k), health, perks and hours", () => {
   it("hours prorate when you leave mid-year: 45 x 50 x 181/365 = 1,115.75", () => {
     const y = projectScenario({ ...jan, hours: { weekly: all(45) }, leaveDate: "2026-06-30" }, single, { years: 1 }).employmentYears[0];
     expect(y.hours).toBe(1_115.75);
-    expect(y.hourly!.cash).toBeCloseTo(y.net / 1_115.75, 2);
+    expect(y.hourly!.afterTaxComp).toBeCloseTo(y.afterTaxComp / 1_115.75, 2);
   });
   it("breakeven on total rewards adds the match, grossed up, to the cash breakeven", () => {
     // A defers 6% pre-tax with a 3% match; B has no plan. Cash: B needs Delta x (1 - 29.65%) = 22% x 6,000
@@ -599,9 +601,97 @@ describe("401(k), health, perks and hours", () => {
     expect(tr).toMatchObject({ basis: "totalRewards" });
     expect(tr.increase).toBeCloseTo(6_140.72, 1);
   });
+  it("premiums are a cost on the cash basis: a $1,200 pre-tax premium needs exactly $1,200 more salary", () => {
+    // Pre-tax, the premium saves P x marginal in tax, so after-tax comp falls by P x (1 - m); a raise
+    // of D adds D x (1 - m). Tie at D = P.
+    const withPremium = { ...jan, health: { premium: 1_200, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0 } };
+    expect(breakeven(jan, withPremium, "salary", single, { valuationDate: "2026-01-01" }).increase).toBeCloseTo(1_200, 0);
+  });
+  it("take-home also nets out your HSA contributions", () => {
+    const y = oneYear({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0, employeeHsa: 2_000 } });
+    expect(y.takeHome).toBeCloseTo(y.afterTaxComp - 2_000, 2);
+  });
+
+  // A at 80 hours a week, 50 weeks: 4,000 hours a year, accruing evenly.
+  const hoursA: OfferInput = { ...cliffA, hours: { weekly: all(80) } };
+  const planYear: OfferInput = { ...hoursA, retirement: { ...hoursA.retirement!, vestingService: "planYearHours" } };
+  it("plan-year hours: A vests on 2028-04-01, when 2028 reaches 1,000 hours (hand-checked)", () => {
+    // 2026 (Jul 13-Dec 31): 4,000 x 172/365 = 1,885 hours. 2027: 4,000. 2028 is a leap year:
+    // 4,000 x 91/366 = 994.5 hours through Mar 31, 1,005.5 through Apr 1. The 3rd year is credited
+    // on Apr 1 even though 2028 hasn't ended (29 CFR 2530.200b-1), so the 3-year cliff vests then.
+    // Match credited by then: 3% x (9,166.67 x (19/31 + 20 + 1/30) = 189,257.17) = 5,677.72.
+    expect(vestedAt(planYear, "2028-03-31").vested).toBe(0);
+    expect(vestedAt(planYear, "2028-04-01")).toEqual({ vested: expect.closeTo(5_677.72, 1), forfeited: 0 });
+  });
+  it("the same leave dates under elapsed time: nothing vests until the day before the 3rd anniversary", () => {
+    expect(vestedAt(hoursA, "2028-04-01").vested).toBe(0);
+    expect(vestedAt(hoursA, "2029-07-11").vested).toBe(0);
+    expect(vestedAt(hoursA, "2029-07-12").vested).toBeCloseTo(9_900, 2);
+  });
+  it("plan-year hours needs hours, and part-time years under 1,000 hours don't count", () => {
+    expect(() => projectScenario({ ...cliffA, retirement: { ...cliffA.retirement!, vestingService: "planYearHours" } }, single)).toThrow(/hours/);
+    // 19 hours x 50 weeks = 950 a year: never a year of service.
+    expect(vestedAt({ ...planYear, hours: { weekly: all(19) } }, "2031-07-12").vested).toBe(0);
+  });
   it("leaveDateSweep reports vested retirement money: the cliff shows at 36 months", () => {
     const rows = leaveDateSweep(cliffA, single, [35, 36]);
     expect(rows.map((r) => Math.round(r.retirementVested))).toEqual([0, 9_900]);
+  });
+});
+
+describe("cost of living (BEA RPPs)", () => {
+  it("baked data: 2024 RPPs, U.S. all items = 100, the sample metros present", () => {
+    expect(RPP.dataYear).toBe(2024);
+    expect(RPP.vintage).toMatch(/February 19, 2026/);
+    expect(rppArea("00000").allItems).toBe(100);
+    expect(Object.keys(RPP.areas).length).toBeGreaterThan(500);
+    expect(rppArea("35620").name).toMatch(/^New York-Newark-Jersey City/);
+    expect(findRppAreas("charlotte-concord")).toEqual([expect.objectContaining({ code: "16740", kind: "msa" })]);
+    expect(() => rppArea("99999")).toThrow(/Unknown BEA RPP area/);
+  });
+  it("non-housing RPP backs housing out at BEA's 16% weight: U.S. 99.8802, Charlotte 97.2933", () => {
+    // (100 - 0.16 x 100.629) / 0.84 and (97.348 - 0.16 x 97.635) / 0.84.
+    expect(nonHousingRpp(rppArea("00000"))).toBeCloseTo(99.88019, 4);
+    expect(nonHousingRpp(rppArea("16740"))).toBeCloseTo(97.29333, 4);
+  });
+
+  const clt: OfferInput = {
+    label: "CLT", residence: { state: "NC" }, employerState: "NC", startDate: "2026-01-01", salary: { annual: 100_000 },
+    costOfLiving: { area: "16740", monthlyRent: 1_700 },
+  };
+  const saver: Household = { filingStatus: "single", costOfLiving: { savingsRate: 0.1 } };
+
+  it("Charlotte end to end, hand-checked: $47,728.86 left after savings and rent = $48,997.88 in U.S. dollars", () => {
+    // Tax: federal 13,170 + FICA 7,650 + NC 3.99% x (100,000 - 12,750) = 3,481.275 -> 24,301.275
+    // (floating point rounds the half cent down: 24,301.27). Take-home 75,698.725.
+    // Savings 10% = 7,569.87; rent 12 x 1,700 = 20,400; non-housing 47,728.85 (local dollars).
+    // Factor = U.S. non-housing 99.8802 / Charlotte 97.2933 = 1.026588 -> 48,997.88 U.S. dollars.
+    const r = projectScenario(clt, saver, { years: 1 });
+    const y = r.employmentYears[0];
+    expect(y.tax).toBe(24_301.27);
+    expect(y.takeHome).toBe(75_698.73);
+    expect(y.costOfLiving).toEqual({ savings: 7_569.87, rent: 20_400, nonHousingLocal: 47_728.86, discretionaryReference: 48_997.88 });
+    expect(r.costOfLiving!.nonHousingFactor).toBeCloseTo(99.88019 / 97.29333, 6);
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input", savingsRate: 0.1,
+      area: { code: "16740", nonHousing: 97.293 }, reference: { code: "00000", nonHousing: 99.88 } });
+    expect(r.window.costOfLiving!.nominal).toBe(48_997.88);
+  });
+  it("gross pay is never adjusted: the same offer without cost of living has identical pay and tax", () => {
+    const a = projectScenario(clt, saver, { years: 1 }).employmentYears[0];
+    const b = projectScenario({ ...clt, costOfLiving: undefined }, saver, { years: 1 }).employmentYears[0];
+    expect([a.gross, a.tax, a.takeHome]).toEqual([b.gross, b.tax, b.takeHome]);
+  });
+  it("rent can be derived from the housing RPPs: $1,500 reference rent -> $1,455.37 in Charlotte", () => {
+    // 1,500 x 97.635 / 100.629
+    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
+      { filingStatus: "single", costOfLiving: { referenceMonthlyRent: 1_500 } }, { years: 1 });
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_455.37, rentSource: "derived" });
+    expect(() => projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 })).toThrow(/monthlyRent/);
+  });
+  it("with Charlotte as the reference, the factor is 1 and dollars stay local", () => {
+    const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });
+    expect(r.costOfLiving!.nonHousingFactor).toBe(1);
+    expect(r.employmentYears[0].costOfLiving!.discretionaryReference).toBe(r.employmentYears[0].costOfLiving!.nonHousingLocal);
   });
 });
 

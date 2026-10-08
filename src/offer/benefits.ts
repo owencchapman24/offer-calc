@@ -91,7 +91,7 @@ export function vestedFraction(v: Retirement["vesting"], completedYears: number)
 // ---- monthly accruals: health and perks -------------------------------------------------
 
 /** [from, to) split at month starts and anniversaries, with each piece's share of its month. */
-function monthlyPieces(from: number, to: number, anniversaries: number[]) {
+export function monthlyPieces(from: number, to: number, anniversaries: number[]) {
   const out: Array<{ a: number; b: number; share: number }> = [];
   for (let a = from; a < to;) {
     const b = Math.min(to, nextMonthStart(a), anniversaries.find((d) => d > a) ?? Infinity);

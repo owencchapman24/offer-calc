@@ -163,11 +163,52 @@ Default: none.
 - **Hours:** weekly hours by scenario × weeks a year (default 50), prorated for a
   partial year. The hourly rate is after-tax dollars per hour, on cash only and on total
   rewards.
-- **Total rewards:** cash net + vested employer retirement + perks − net health cost,
-  nominal and PV. `compareOffers` shows it next to cash-only. `breakeven` takes
-  `basis: "cash" | "totalRewards"`.
+- **Cash measures (revised after slice 5):**
+  - **After-tax comp** (the cash-only basis) = gross − tax − your health premiums.
+    Premiums are a cost of the plan, not compensation.
+  - **Take-home** = after-tax comp − your 401(k) deferrals − your HSA contributions:
+    what reaches your bank account.
+- **Total rewards:** after-tax comp + vested employer retirement + perks − out-of-pocket
+  + employer HSA, nominal and PV. `compareOffers` shows it next to after-tax comp.
+  `breakeven` takes `basis: "cash"` (after-tax comp) or `"totalRewards"`.
+- **Vesting service:** `vestingService` is `"elapsedTime"` (default) or
+  `"planYearHours"`. Under the second, each calendar plan year with 1,000+ hours (from
+  `offer.hours`) counts, credited on the day the 1,000th hour is worked, even if you leave
+  before the year ends (29 CFR 2530.200b-1). At 80 hours a week, A's 3-year cliff vests on
+  2028-04-01 this way, against 2029-07-12 under elapsed time.
 - **Federal limits:** 402(g), HSA, Section 127 and 132(f) are engine parameters with
   sources, indexed in projected years.
+
+**Cost of living (slice 6, roadmap item 3).**
+
+- **Data:** BEA Regional Price Parities, baked into `src/col/rpp.json` by
+  `npm run fetch-rpp`; the app never fetches at runtime.
+  - **Coverage:** 2024 RPPs (released February 19, 2026) for 387 metro areas, every
+    state, and each state's metro and nonmetro portions.
+  - **Components:** all items, goods, housing (rents), utilities and other services.
+  - **Scale:** U.S. all items = 100. The components are price levels on the same scale,
+    so the U.S. row itself isn't 100 on each component (housing 100.629). Every
+    comparison therefore uses ratios to a reference row.
+- **Method:** gross salary is never adjusted.
+  - Start from take-home pay, which already excludes your 401(k).
+  - Subtract planned savings (household `savingsRate`).
+  - Subtract rent: the offer's `monthlyRent`, or the household's reference rent ×
+    housing RPP ratio.
+  - What's left is non-housing spending in local dollars. Multiply it by reference
+    non-housing RPP ÷ area non-housing RPP to get **discretionary income after rent, in
+    reference-location dollars**.
+- **Non-housing RPP:** (all items − 0.16 × housing) ÷ 0.84. 16% is housing rents' share of
+  BEA's PCE-based weights (BEA, *Survey of Current Business*, March 2022). As a
+  cross-check, the fixed weights that best reproduce BEA's all-items index put housing at
+  0.187. BEA weights each region differently, so a single national weight is an
+  approximation.
+- **Reference:** default is the U.S. row ("00000"); the user can pick their current city.
+- **Output:**
+  - `ScenarioResult.costOfLiving`: the area, the reference, the RPPs used, the factor,
+    the rent and the vintage.
+  - Per employment year: savings, rent, local non-housing and discretionary
+    (reference $).
+  - Window totals: nominal and PV.
 
 ## 4. Leave date
 

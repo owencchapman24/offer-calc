@@ -37,6 +37,15 @@ export interface OfferInput {
   health?: Health;
   perks?: Perks;
   hours?: Hours;
+  /** Where you'd live, for cost-of-living comparisons (BEA Regional Price Parities). */
+  costOfLiving?: OfferCostOfLiving;
+}
+
+export interface OfferCostOfLiving {
+  /** BEA GeoFIPS code of the metro area or state-nonmetro portion, e.g. "35620"; see findRppAreas(). */
+  area: string;
+  /** Your expected rent there. If omitted, derived from the household reference rent and the housing RPPs. */
+  monthlyRent?: number;
 }
 
 /** 401(k): your deferrals, the employer's match and non-elective money, and its vesting. */
@@ -55,6 +64,13 @@ export interface Retirement {
   match?: Array<{ upToPct: number; rate: number }>;
   /** Employer non-elective contribution as a fraction of eligible pay, whatever you defer. */
   nonElectivePct?: number;
+  /**
+   * How years of vesting service are counted. "elapsedTime" (default): a year completes when you
+   * work through the day before each anniversary. "planYearHours": each calendar plan year in
+   * which you reach 1,000 hours (from offer.hours) counts, credited the day you reach them, even
+   * if you leave before the year ends (29 CFR 2530.200b-1).
+   */
+  vestingService?: "elapsedTime" | "planYearHours";
   /** Vesting of employer money by completed years of service at the leave date. Default immediate. */
   vesting?:
     | { kind: "immediate" }
@@ -208,6 +224,16 @@ export interface Household {
   spouseWages?: Record<number, number>;
   /** Which expected out-of-pocket level applies to every offer's health plan. Default "medium". */
   healthUsage?: "low" | "medium" | "high";
+  costOfLiving?: HouseholdCostOfLiving;
+}
+
+export interface HouseholdCostOfLiving {
+  /** Reference location whose dollars results are expressed in. BEA GeoFIPS; default "00000" (U.S.). */
+  reference?: string;
+  /** Planned savings as a fraction of take-home pay (beyond your 401(k), already out). Default 0. */
+  savingsRate?: number;
+  /** Your monthly rent in the reference location; used to derive rent where an offer gives none. */
+  referenceMonthlyRent?: number;
 }
 
 export interface ProjectionOptions {
@@ -245,7 +271,8 @@ export interface CompEvent {
   /** 1-based. Above `years` means after the reported horizon (kept so its year is taxed in full). */
   employmentYear: number;
   tax: number;
-  net: number;
+  /** gross - this payment's share of tax. Before premiums and payroll deductions. */
+  afterTax: number;
   /** Inside the totals window. */
   inWindow: boolean;
   /** (1 + discountRate)^-((date - valuationDate) / 365.25), when a valuation date is given. */
@@ -273,7 +300,14 @@ export interface BenefitEvent {
   discountFactor?: number;
 }
 
-export interface Money { gross: number; tax: number; net: number }
+/**
+ * Cash measures:
+ * - afterTaxComp ("after-tax comp", the cash-only basis): gross - tax - your health premiums.
+ *   Premiums are a cost of the job's health plan, not compensation.
+ * - takeHome: what reaches your bank account. afterTaxComp - your 401(k) deferrals - your HSA
+ *   contributions (still your money, just not spendable now).
+ */
+export interface CashTotals { gross: number; tax: number; premiums: number; afterTaxComp: number; takeHome: number }
 
 /** Non-cash value: vested employer retirement money and perks, less the net health cost. */
 export interface BenefitTotals {
@@ -289,13 +323,30 @@ export interface WindowTotals {
   start: ISODate;
   /** Exclusive. */
   end: ISODate;
-  /** Cash only: pay less tax. */
-  nominal: Money;
-  /** Each event discounted by its cash date. Present when a valuation date is given. */
-  presentValue?: Money;
+  /** Cash only. */
+  nominal: CashTotals;
+  /** Each flow discounted by its date. Present when a valuation date is given. */
+  presentValue?: CashTotals;
   benefits: { nominal: BenefitTotals; presentValue?: BenefitTotals };
-  /** Cash net + retirement + perks - health net. */
+  /** After-tax comp + vested retirement + perks - out-of-pocket + employer HSA (= gross - tax + retirement + perks - health net). */
   totalRewards: { nominal: number; presentValue?: number };
+  /** Discretionary income after rent, in reference-location dollars. Present with costOfLiving. */
+  costOfLiving?: { nominal: number; presentValue?: number };
+}
+
+export interface RppUsed { code: string; name: string; allItems: number; housing: number; nonHousing: number }
+
+/** How the cost-of-living adjustment was made for one offer. */
+export interface CostOfLivingInfo {
+  area: RppUsed;
+  reference: RppUsed;
+  /** Reference non-housing RPP / area non-housing RPP: multiplies local non-housing dollars. */
+  nonHousingFactor: number;
+  monthlyRent: number;
+  rentSource: "input" | "derived";
+  savingsRate: number;
+  /** BEA data year and release note. */
+  rppVintage: string;
 }
 
 export interface CalendarYearResult {
@@ -324,7 +375,10 @@ export interface EmploymentYearResult {
   end: ISODate;
   gross: ByComponent;
   tax: number;
-  net: number;
+  /** gross - tax - your health premiums: the cash-only basis. */
+  afterTaxComp: number;
+  /** afterTaxComp - your 401(k) deferrals - your HSA contributions: what reaches your bank account. */
+  takeHome: number;
   /** Offer-letter view: salary rate at year start + target bonus on it + cash awards paid
    *  in the year + new-hire RSU tranches nominally due in the year, at grant value. No
    *  proration, payout lag, vest-date snapping, price growth or refreshers. */
@@ -332,12 +386,17 @@ export interface EmploymentYearResult {
   retirement: { employee: number; employerCredited: number; employerVested: number };
   health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
   perks: { face: number; preTaxEquivalent: number };
-  /** Cash net + vested employer retirement + perks - health net. */
+  /** After-tax comp + vested employer retirement + perks - out-of-pocket + employer HSA. */
   totalRewards: number;
   /** Hours worked in the year (prorated if employment covers part of it). Present when hours are given. */
   hours?: number;
-  /** After-tax dollars per hour worked. */
-  hourly?: { cash: number; totalRewards: number };
+  /** Dollars per hour worked, on after-tax comp and on total rewards. */
+  hourly?: { afterTaxComp: number; totalRewards: number };
+  /**
+   * Take-home - savings - rent = non-housing spending in local dollars, then deflated by the
+   * non-housing RPP: discretionary income after rent, in reference-location dollars.
+   */
+  costOfLiving?: { savings: number; rent: number; nonHousingLocal: number; discretionaryReference: number };
 }
 
 export interface ClawbackResult {
@@ -374,12 +433,12 @@ export interface LeaveSweepRow {
   paid: number;
   /** Cash handed back under clawbacks. */
   clawbackOwed: number;
-  /** After tax and clawbacks, nominal. */
-  netKept: number;
+  /** After-tax comp kept: pay after tax and clawbacks, less premiums. Nominal. */
+  afterTaxCompKept: number;
   unvestedRsuForfeited: number;
   /** Employer 401(k) money vested at the leave date. */
   retirementVested: number;
-  /** netKept + retirementVested + perks - health net. */
+  /** afterTaxCompKept + retirementVested + perks - out-of-pocket + employer HSA. */
   totalRewardsKept: number;
 }
 
@@ -395,6 +454,8 @@ export interface ScenarioResult {
   window: WindowTotals;
   /** Present when the offer has a leave date. */
   leave?: LeaveResult;
+  /** Present when the offer has costOfLiving. */
+  costOfLiving?: CostOfLivingInfo;
   /** Input-specific, plain language. */
   warnings: string[];
   /** Assumptions behind these numbers, for the methodology page. */
