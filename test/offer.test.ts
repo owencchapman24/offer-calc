@@ -43,29 +43,31 @@ describe("worked example (golden)", () => {
   const r = projectScenario(worked, single);
   const ey1 = r.employmentYears[0];
 
-  it("first 12 months: $186,205.48 = $150,000 salary + $6,205.48 prorated bonus + $30,000 sign-on", () => {
+  it("first 12 months: $186,169.35 = $150,000 salary + $6,169.35 prorated bonus + $30,000 sign-on", () => {
+    // Salary by month: Aug 2026 29/31 + Sep-Jul (11 months) + Aug 2027 2/31 = 12 months x $12,500.
+    // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_205.48, cash: 30_000, total: 186_205.48 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, total: 186_169.35 });
   });
   it("quoted year-1 TC is $195,000 until RSUs land in slice 2 ($205,000 with them)", () => {
     expect(ey1.quotedTC).toBe(195_000);
   });
-  it("sign-on pays 2026-09-02; the 2026 bonus pays 2027-03-15 on 151/365 of salary", () => {
+  it("sign-on pays 2026-09-02; the 2026 bonus pays 2027-03-15 on 2026's salary", () => {
     const signOn = r.events.find((e) => e.component === "cash")!;
     expect(signOn).toMatchObject({ date: "2026-09-02", gross: 30_000, calendarYear: 2026, employmentYear: 1 });
     const bonus = r.events.find((e) => e.component === "bonus")!;
-    expect(bonus).toMatchObject({ date: "2027-03-15", gross: 6_205.48, calendarYear: 2027, employmentYear: 1 });
+    expect(bonus).toMatchObject({ date: "2027-03-15", gross: 6_169.35, calendarYear: 2027, employmentYear: 1 });
   });
-  it("calendar years: 2026 = $92,054.79 (partial year), 2027 = $156,205.48", () => {
-    expect(r.calendarYears[0].offerGross).toEqual({ salary: 62_054.79, bonus: 0, cash: 30_000, total: 92_054.79 });
-    expect(r.calendarYears[1].offerGross).toEqual({ salary: 150_000, bonus: 6_205.48, cash: 0, total: 156_205.48 });
+  it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $156,169.35", () => {
+    expect(r.calendarYears[0].offerGross).toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, total: 91_693.55 });
+    expect(r.calendarYears[1].offerGross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, total: 156_169.35 });
   });
-  it("2026 offer tax in TX is $18,464.25 (hand-checked)", () => {
-    // Federal: taxable 92,054.79 - 16,100 = 75,954.79; 1,240 + 4,560 + 22% x 25,554.79 = 11,422.05.
-    // FICA: 6.2% + 1.45% of 92,054.79 = 5,707.40 + 1,334.79. Total (unrounded parts) 18,464.25.
+  it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
+    // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
+    // FICA: 6.2% + 1.45% of 91,693.548 = 5,685.00 + 1,329.56. Total (unrounded parts) 18,357.14.
     // Without the offer (no other wages) the household owes 0.
-    expect(r.calendarYears[0].offerTax).toBe(18_464.25);
+    expect(r.calendarYears[0].offerTax).toBe(18_357.14);
     expect(r.calendarYears[0].withoutOffer.result.totalTax).toBe(0);
   });
   it("later calendar years use projected law at the default 2.5% inflation", () => {
@@ -81,20 +83,21 @@ describe("worked example (golden)", () => {
     const inHorizon = r.events.filter((e) => e.employmentYear <= 5).reduce((s, e) => s + e.tax, 0);
     expect(r.employmentYears.reduce((s, y) => s + y.tax, 0)).toBeCloseTo(inHorizon, 0);
   });
-  it("a full calendar year of salary is exactly the annual rate, leap years included", () => {
+  it("a full calendar year and a full employment year of salary are exactly the annual rate, leap years included", () => {
     expect(r.calendarYears.find((c) => c.year === 2028)!.offerGross.salary).toBe(150_000);
+    expect(r.employmentYears.map((y) => y.gross.salary)).toEqual([150_000, 150_000, 150_000, 150_000, 150_000]);
   });
 });
 
 describe("incremental tax", () => {
-  it("a job-switcher's 2026 offer is taxed on top of $60k of earlier wages: $27,249.34 (hand-checked)", () => {
-    // With: 152,054.79 wages. Federal: taxable 135,954.79; 1,240 + 4,560 + 12,166 + 24% x 30,254.79
-    //   = 25,227.15. SS 9,427.40, Medicare 2,204.79. Total 36,859.34.
+  it("a job-switcher's 2026 offer is taxed on top of $60k of earlier wages: $27,135.01 (hand-checked)", () => {
+    // With: 151,693.548 wages. Federal: taxable 135,593.548; 1,240 + 4,560 + 12,166 + 24% x 29,893.548
+    //   = 25,140.45. SS 9,405.00, Medicare 2,199.56. Total 36,745.01.
     // Without: 60,000. Federal 1,240 + 12% x 31,500 = 5,020; SS 3,720; Medicare 870. Total 9,610.
     const r = projectScenario(worked, { filingStatus: "single", otherWages: { 2026: 60_000 } });
-    expect(r.calendarYears[0].withOffer.result.totalTax).toBe(36_859.34);
+    expect(r.calendarYears[0].withOffer.result.totalTax).toBe(36_745.01);
     expect(r.calendarYears[0].withoutOffer.result.totalTax).toBe(9_610);
-    expect(r.calendarYears[0].offerTax).toBe(27_249.34);
+    expect(r.calendarYears[0].offerTax).toBe(27_135.01);
     expect(r.calendarYears[1].offerTax).toBe(projectScenario(worked, single).calendarYears[1].offerTax);
   });
   it("joint filers: the offer's tax is measured on top of the spouse's wages", () => {
@@ -102,7 +105,8 @@ describe("incremental tax", () => {
     const r = projectScenario(worked, hh);
     const tax = (wages: number) => computeTaxes(
       { year: 2026, filingStatus: "joint", wages, spouseWages: 80_000, state: "TX" }, paramsForYear(2026)).totalTax;
-    expect(r.calendarYears[0].offerTax).toBeCloseTo(tax(92_054.79452) - tax(0), 1);
+    const offerWages = 150_000 / 12 * (29 / 31) + 4 * 12_500 + 30_000;
+    expect(r.calendarYears[0].offerTax).toBeCloseTo(tax(offerWages) - tax(0), 1);
   });
 });
 
@@ -118,10 +122,10 @@ describe("bonus timing and proration", () => {
     expect(b[0]).toMatchObject({ date: "2028-03-15", gross: 15_000, employmentYear: 2 });
     expect(r.warnings.some((w) => w.includes("Oct 1 bonus cutoff"))).toBe(true);
   });
-  it("fiscal-year period (Jul 1, paid Sep 15): first bonus 2027-09-15 on 332/365 of salary, in year 2", () => {
-    // Aug 3 2026 - Jun 30 2027 = 151 + 181 days: 10% x 150,000 x 332/365 = 13,643.84.
+  it("fiscal-year period (Jul 1, paid Sep 15): first bonus 2027-09-15, in year 2", () => {
+    // Aug 3 2026 - Jun 30 2027 = 29/31 of August + 10 months: 10% x 12,500 x 10.9355 = 13,669.35.
     const b = bonuses(withBonus({ periodStart: { month: 7, day: 1 }, payOn: { month: 9, day: 15 }, cutoff: undefined }));
-    expect(b[0]).toMatchObject({ date: "2027-09-15", gross: 13_643.84, employmentYear: 2 });
+    expect(b[0]).toMatchObject({ date: "2027-09-15", gross: 13_669.35, employmentYear: 2 });
   });
   it("fixed bonus prorates by days employed: $20,000 x 151/365 = $8,273.97", () => {
     const b = bonuses(withBonus({ basis: "fixed", amount: { bear: 20_000, base: 20_000, bull: 20_000 } }));
@@ -129,9 +133,9 @@ describe("bonus timing and proration", () => {
     expect(b[1].gross).toBe(20_000);
   });
   it("scenarios pick the bonus rate; a guaranteed first payout stays at base", () => {
-    expect(bonuses(withBonus({}), "bear")[0].gross).toBe(3_102.74); // 5% x 62,054.79
+    expect(bonuses(withBonus({}), "bear")[0].gross).toBe(3_084.68); // 5% x 61,693.55
     const g = bonuses(withBonus({ firstPayoutGuaranteed: true }), "bear");
-    expect(g[0].gross).toBe(6_205.48);
+    expect(g[0].gross).toBe(6_169.35);
     expect(g[1].gross).toBe(7_500);
   });
 });

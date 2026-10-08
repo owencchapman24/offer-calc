@@ -24,6 +24,10 @@ deduction); payroll caps at the SS wage base in CO, CT, DE, ME, MA, OR, WA
 (`"ssWageBase"`). ID is held flat: its IRC conformity is static, updated by annual bill.
 There's deliberately no default inflation in the engine.
 
+`src/offer/` is the offer model (docs/offer-model.md), built in slices. Each slice gets
+hand-checked tests and merges to main when green. `npm run offers` prints a year-by-year
+table for two sample offers.
+
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
   table are marked `OVERRIDE:` with the bill/statute.

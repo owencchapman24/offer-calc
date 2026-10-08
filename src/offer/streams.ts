@@ -1,4 +1,4 @@
-import { dayIn, daysInYear, formatMonthDay, fromDays, jan1, nextMonthStart, nextOccurrence, toDays, yearOfDay } from "./dates";
+import { dayIn, daysInMonth, formatMonthDay, fromDays, nextMonthStart, nextOccurrence, toDays, yearOfDay } from "./dates";
 import type { AnnualBonus, CashAward, Component, Scenario } from "./types";
 
 // Each stream turns part of an offer into dated payments (unrounded). Days are day numbers;
@@ -19,13 +19,19 @@ export const usd = (x: number) =>
   `$${x.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(x) ? 0 : 2, maximumFractionDigits: 2 })}`;
 const pct = (x: number) => `${+(x * 100).toFixed(4)}%`;
 
-/** Salary earned on [from, to): each day earns annual / (days in its calendar year). */
+/**
+ * Salary accrues by calendar month: 1/12 of the annual rate per month, and a partial month
+ * earns its share by days (days worked / days in that month). Salaried payroll pays a month as
+ * a month, so a full calendar year sums to the annual rate and leap years don't change it.
+ */
+const salaryFor = (annual: number, a: number, b: number) => (annual / 12) * ((b - a) / daysInMonth(a));
+
+/** Salary earned on [from, to). */
 export function salaryEarned(annual: number, from: number, to: number): number {
   let sum = 0;
   for (let a = from; a < to;) {
-    const year = yearOfDay(a);
-    const b = Math.min(to, jan1(year + 1));
-    sum += (annual * (b - a)) / daysInYear(year);
+    const b = Math.min(to, nextMonthStart(a));
+    sum += salaryFor(annual, a, b);
     a = b;
   }
   return sum;
@@ -37,13 +43,14 @@ export function salaryEvents(annual: number, from: number, to: number, anniversa
   for (let a = from; a < to;) {
     const nextAnniversary = anniversaries.find((d) => d > a) ?? Infinity;
     const b = Math.min(to, nextMonthStart(a), nextAnniversary);
-    const year = yearOfDay(a);
+    const days = b - a;
+    const month = daysInMonth(a);
     out.push({
       day: b - 1,
       component: "salary",
       label: `Salary ${fromDays(a)} to ${fromDays(b - 1)}`,
-      formula: `${usd(annual)} x ${b - a}/${daysInYear(year)}`,
-      gross: (annual * (b - a)) / daysInYear(year),
+      formula: days === month ? `${usd(annual)} / 12` : `${usd(annual)} / 12 x ${days}/${month} days`,
+      gross: salaryFor(annual, a, b),
       accruedFrom: a,
     });
     a = b;

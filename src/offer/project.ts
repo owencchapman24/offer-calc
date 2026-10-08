@@ -130,7 +130,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
 
   const assumptions = [
     "Each payment is taxed in the calendar year it's paid (cash basis).",
-    "Salary accrues by day: annual rate x days worked / days in that calendar year.",
+    "Salary accrues by calendar month (1/12 of the annual rate); a partial month by days worked / days in the month.",
     "The offer's tax is household tax with the offer minus without it, per calendar year, "
       + "spread over that year's payments in proportion to their size.",
     `Taxed as a full-year resident of ${offer.residence.state}${offer.residence.locality && offer.residence.locality.kind !== "none" ? ` (${offer.residence.locality.kind})` : ""}.`,

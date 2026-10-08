@@ -29,6 +29,12 @@ export function nextMonthStart(day: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) / DAY_MS;
 }
 
+/** Number of days in the month containing `day`. */
+export function daysInMonth(day: number): number {
+  const d = new Date(day * DAY_MS);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
 export function checkMonthDay(md: MonthDay): void {
   const ok = Number.isInteger(md.month) && md.month >= 1 && md.month <= 12
     && Number.isInteger(md.day) && md.day >= 1 && md.day <= 31;

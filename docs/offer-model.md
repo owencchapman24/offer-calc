@@ -41,9 +41,14 @@ come from the same events, so they reconcile exactly.
 
 - **Cash basis.** Each event is taxed in the calendar year it's paid or vests. A 2026
   bonus paid in March 2027 is 2027 income.
-- **Salary accrues by day.** In calendar year Y it's the annual rate × days worked ÷ days
-  in Y. It's emitted as one event per month, split at anniversaries, raises and
-  promotions. A full calendar year sums exactly to the annual rate.
+- **Salary accrues by calendar month** (changed in review after slice 1; rev 3 accrued by
+  day). Each calendar month earns 1/12 of the annual rate, and a partial month earns its
+  share by days worked ÷ days in that month. That's how salaried payroll treats a month,
+  and it keeps leap years from changing anyone's salary. A full calendar year sums exactly
+  to the annual rate, and so does a 12-month employment year. The one exception is a year
+  that starts in February and crosses a leap day, which is off by about 1% of a month's
+  pay. Salary is emitted as one event per month, split at anniversaries, raises and
+  promotions.
 - **Employment year n** is `[start + (n-1) years, start + n years)` for accrued salary.
   Discrete events dated exactly on an anniversary count toward the year just ended
   (decision 1). A vest that a company calendar moves past the anniversary is the next
@@ -316,19 +321,19 @@ Base scenario, first two years:
 
 | Date | Event | Gross | Cal. yr | Emp. yr |
 |---|---|---:|:-:|:-:|
-| 2026-08-03 → 12-31 | Salary, 151 days | 62,054.79 | 2026 | 1 |
+| 2026-08-03 → 12-31 | Salary: 29/31 of August + 4 months at $12,500 | 61,693.55 | 2026 | 1 |
 | 2026-09-02 | Sign-on | 30,000.00 | 2026 | 1 |
-| 2027-01-01 → 08-02 | Salary, 214 days | 87,945.21 | 2027 | 1 |
-| 2027-03-15 | 2026 bonus: 10% × 62,054.79 | 6,205.48 | 2027 | 1 |
-| 2027-08-03 → 12-31 | Salary, 151 days | 62,054.79 | 2027 | 2 |
+| 2027-01-01 → 08-02 | Salary: 7 months + 2/31 of August | 88,306.45 | 2027 | 1 |
+| 2027-03-15 | 2026 bonus: 10% × 61,693.55 | 6,169.35 | 2027 | 1 |
+| 2027-08-03 → 12-31 | Salary: 29/31 of August + 4 months | 61,693.55 | 2027 | 2 |
 | 2027-08-15 | RSU 5% (nominal 08-03, moved to the company vest date) | 10,000.00 | 2027 | 2 |
 
-- **Employment year 1:** $186,205.48 gross. The recruiter-style "year-1 TC" is $205,000.
-  Actual first-12-month pay is **$18,794.52 (9.2%) lower**: the bonus is prorated and the
+- **Employment year 1:** $186,169.35 gross. The recruiter-style "year-1 TC" is $205,000.
+  Actual first-12-month pay is **$18,830.65 (9.2%) lower**: the bonus is prorated and the
   cliff vest lands 12 days into year 2. (The vest is on 08-15, not the anniversary, so
   decision 1 doesn't pull it back into year 1.)
-- **Calendar years:** 2026 = $92,054.79 (partial year, taxable income $75,954.79, 22%
-  bracket). 2027 = $166,205.48.
+- **Calendar years:** 2026 = $91,693.55 (partial year, taxable income $75,593.55, 22%
+  bracket; offer tax $18,357.14). 2027 = $166,169.35.
 - **Clawback with a leave date of 2027-02-02** (6 months): you owe $15,000 gross. It was
   paid in 2026 and repaid in 2027, so §1341 recovers 22% federal = $3,300. FICA ($1,147.50)
   and state aren't recovered, so the net cost is $11,700.
