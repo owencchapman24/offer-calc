@@ -153,6 +153,8 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
 
 const reason = (r: SalaryChangeReason) => (r.kind === "merit" ? `${pct(r.rate)} merit raise` : `+${pct(r.stepUp)} promotion`);
 
+const LOCALITY = { nyc: "New York City", philadelphia: "Philadelphia", flat: "its local wage tax" } as const;
+
 export function formatAssumption(a: Assumption): string {
   switch (a.code) {
     case "cashBasis": return "Each payment is taxed in the calendar year it's paid (cash basis).";
@@ -161,7 +163,7 @@ export function formatAssumption(a: Assumption): string {
     case "incrementalTax":
       return "The offer's tax is household tax with the offer minus without it, per calendar year, spread over that "
         + "year's payments in proportion to their size.";
-    case "residence": return `Taxed as a full-year resident of ${a.params.state}${a.params.locality ? ` (${a.params.locality})` : ""}.`;
+    case "residence": return `Taxed as a full-year resident of ${a.params.state}${a.params.locality ? ` and ${LOCALITY[a.params.locality]}` : ""}.`;
     case "projectedLaw":
       return `Tax years after 2026 are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed, `
         + "state law held at 2026 except statutory indexing (CA) and federal links.";
