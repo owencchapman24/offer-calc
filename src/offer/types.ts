@@ -508,15 +508,24 @@ export interface Comparison {
   projections: OfferProjection[];
 }
 
-export interface BreakevenResult {
+/**
+ * "tie": `increase` is the change to B's starting salary (or first sign-on) that ties A. It's
+ * negative when B is already ahead and could give some up. "alreadyAhead": B leads even at a $0
+ * salary (or sign-on), so no change ties; `increase` and `to` are null.
+ */
+export type BreakevenResult = BreakevenCommon & (
+  | { outcome: "tie"; increase: number; to: number }
+  | { outcome: "alreadyAhead"; increase: null; to: null }
+);
+
+interface BreakevenCommon {
   field: "salary" | "signOn";
   /** What's being tied: after-tax comp, total rewards, or the COL-adjusted total (needs costOfLiving on both offers). */
   basis: "cash" | "totalRewards" | "colAdjustedTotal";
-  /** Change to B's starting salary (or first sign-on) that ties A; negative if B is already ahead. */
-  increase: number;
-  /** B's value before and after the change. */
+  /** B's starting salary (or first sign-on) as entered. */
   from: number;
-  to: number;
+  /** B's base-scenario present value minus A's, as entered, on this basis: positive when B is already ahead. */
+  aheadBy: number;
   /** A's base-scenario present value over the shared window, on this basis: the target. */
   targetPV: number;
   window: { start: ISODate; end: ISODate };

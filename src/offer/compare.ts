@@ -46,7 +46,8 @@ export function compareOffers(
  * present value over their shared window, on after-tax comp (default), total rewards or the
  * COL-adjusted total. Found by bisection to the cent; PV rises with pay, since tax takes less
  * than all of each extra dollar. Raises, percent-of-salary bonuses and 401(k) amounts scale with
- * the new salary.
+ * the new salary. If B leads even at a $0 salary (or sign-on), the outcome is "alreadyAhead"
+ * rather than an error; `aheadBy` always gives B's lead as entered.
  */
 export function breakeven(
   offerA: OfferInput, offerB: OfferInput, field: "salary" | "signOn", household: Household,
@@ -75,11 +76,16 @@ export function breakeven(
   };
   const target = pv(offerA);
   const gap = (d: number) => pv(adjusted(d)) - target;
+  const aheadBy = gap(0);
+  const common = {
+    field, basis, from, aheadBy, targetPV: target,
+    window: { start: window.start, end: fromDays(addMonths(toDays(window.start), 12 * window.years)) },
+  };
 
   // Bracket the root, then bisect. B can't go below a $0 salary or sign-on.
   let lo = 0;
   let hi = 0;
-  if (gap(0) < 0) {
+  if (aheadBy < 0) {
     hi = 10_000;
     while (gap(hi) < 0) {
       lo = hi;
@@ -90,7 +96,7 @@ export function breakeven(
     lo = -Math.min(from, 10_000);
     while (gap(lo) > 0) {
       hi = lo;
-      if (lo === -from) throw new Error(`B ties or beats A even at a $0 ${field === "salary" ? "salary" : "sign-on"}.`);
+      if (lo === -from) return { ...common, outcome: "alreadyAhead", increase: null, to: null };
       lo = Math.max(-from, lo * 2);
     }
   }
@@ -99,8 +105,5 @@ export function breakeven(
     if (gap(mid) < 0) lo = mid; else hi = mid;
   }
   const increase = round2((lo + hi) / 2);
-  return {
-    field, basis, increase, from, to: round2(from + increase), targetPV: target,
-    window: { start: window.start, end: fromDays(addMonths(toDays(window.start), 12 * window.years)) },
-  };
+  return { ...common, outcome: "tie", increase, to: round2(from + increase) };
 }

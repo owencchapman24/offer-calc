@@ -493,10 +493,26 @@ describe("present value and comparisons", () => {
     const r = breakeven(tx({}), ca, "salary", single, valued);
     expect(r.increase).toBeGreaterThan(5_000);
     const pv = (o: OfferInput) => projectScenario(o, single, { ...valued, scenario: "base" }).window.presentValue!.afterTaxComp;
-    expect(pv({ ...ca, salary: { annual: r.to } })).toBeCloseTo(r.targetPV, 0);
+    expect(pv({ ...ca, salary: { annual: r.to! } })).toBeCloseTo(r.targetPV, 0);
   });
   it("breakeven is negative when B is already ahead", () => {
     expect(breakeven(tx({}), tx({ salary: { annual: 110_000 } }), "salary", single, valued).increase).toBeCloseTo(-10_000, 1);
+  });
+  it("already ahead even at a $0 sign-on: an outcome, not an error, with B's lead (hand-checked)", () => {
+    // TX, calendar 2026, 0% discount so PV = nominal. A: $100,000. B: $110,000 + a $5,000 sign-on.
+    // B's extra $15,000 is all in the 22% bracket (taxable 98,900 < 105,700): 15,000 x (1 - 22% - 7.65%)
+    // = 10,552.50 ahead. Even at a $0 sign-on B leads by 10,000 x 0.7035, so no sign-on ties.
+    const jan = (o: Partial<OfferInput>) => tx({ startDate: "2026-01-01", ...o });
+    const opts = { valuationDate: "2026-01-01", discountRate: 0, horizonYears: 1, years: 1 };
+    const B = jan({ salary: { annual: 110_000 }, cashAwards: [{ label: "Sign-on", amount: 5_000, paidOn: "2026-01-01" }] });
+    const r = breakeven(jan({}), B, "signOn", single, opts);
+    expect(r).toMatchObject({ outcome: "alreadyAhead", increase: null, to: null, from: 5_000 });
+    expect(r.aheadBy).toBeCloseTo(10_552.5, 2);
+    // Salary can still tie, by giving up $15,000: $95,000 + $5,000 = A's $100,000.
+    const s = breakeven(jan({}), B, "salary", single, opts);
+    expect(s).toMatchObject({ outcome: "tie", from: 110_000 });
+    expect(s.increase).toBeCloseTo(-15_000, 1);
+    expect(s.aheadBy).toBeCloseTo(10_552.5, 2);
   });
 });
 
