@@ -1,4 +1,4 @@
-import type { Basis, HorizonRow, HorizonSweep, Lead } from "../../src/offer/types";
+import type { Basis, HorizonRow, HorizonSweep, Lead, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
 
 // Turns the engine's horizon sweep into what the lead schedule shows. Pure: no React, no formatting.
@@ -8,8 +8,21 @@ export const PIPELINE: Array<{ basis: Basis; step: string; title: string; phrase
   { basis: "totalRewards", step: "+ Benefits", title: "Total rewards", phrase: "in total rewards", counted: "once benefits are counted" },
   { basis: "colAdjustedTotal", step: "− Rent & prices", title: "After rent, at U.S. prices", phrase: "after rent, at U.S. prices",
     counted: "once rent and prices are counted" },
-  { basis: "perHour", step: "÷ Hours", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
+  // "Per hour", not "÷ Hours": at 13px the font's ÷ reads as +.
+  { basis: "perHour", step: "Per hour", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
 ];
+
+/** The rank list's caption: what the totals are, over how long, in which dollars. */
+export function totalsCaption(basis: Basis, years: number, perHourOf: "colAdjustedTotal" | "totalRewards"): string {
+  const stay = `${years}-year`;
+  switch (basis) {
+    case "cash": return `${stay} total after tax, in today's dollars, present value`;
+    case "totalRewards": return `${stay} total rewards, in today's dollars, present value`;
+    case "colAdjustedTotal": return `${stay} total after rent, in today's U.S.-average dollars, present value`;
+    case "perHour": return `Per hour worked over ${years} ${years === 1 ? "year" : "years"}, ${
+      perHourOf === "colAdjustedTotal" ? "after rent, in U.S.-average dollars" : "in total rewards"}, nominal`;
+  }
+}
 
 export interface StepView {
   basis: Basis;
@@ -23,6 +36,8 @@ export interface StepView {
 export interface VerdictView {
   row: HorizonRow;
   basis: Basis;
+  /** What the per-hour step divides by hours. */
+  perHourOf: HorizonSweep["perHourOf"];
   lead: StepView["lead"];
   /** Offers by value on the selected basis, highest first. */
   ranks: Array<{ letter: Letter; value: number }>;
@@ -52,6 +67,7 @@ export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, st
   return {
     row,
     basis: chosen.basis,
+    perHourOf: sweep.perHourOf,
     lead: chosen.lead,
     ranks: values.map((value, i) => ({ letter: letters[i], value })).sort((a, b) => b.value - a.value),
     steps,
@@ -60,6 +76,40 @@ export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, st
       years: r.years, lead: withLetters(r.leads[chosen.basis], letters), current: r.years === stayYears,
     })),
   };
+}
+
+/** One "extra hours" line in the lead schedule (docs/ui-design.md §4.2). */
+export interface ExtraHoursLine {
+  more: Letter;
+  fewer: Letter;
+  hoursPerYear: number;
+  /** The basis it's stated on: the selected one, or what per hour divides. */
+  basis: ValueBasis;
+  /** `more` minus `fewer`, a year, nominal; negative is more hours for less pay. */
+  gapPerYear: number;
+  /** What each extra hour pays; null when they pay less. */
+  perExtraHour: number | null;
+  /** When they pay less: the first pipeline step where they do pay, against `more`'s average there. */
+  lower: { basis: ValueBasis; perExtraHour: number; average: number } | null;
+}
+
+/** Pay per extra hour for the lead's winner against each other offer whose hours differ enough. */
+export function extraHoursView(view: VerdictView, letters: Letter[]): ExtraHoursLine[] {
+  const { row, lead } = view;
+  if (!lead || !row.hours) return [];
+  const hours = row.hours;
+  const basis: ValueBasis = view.basis === "perHour" ? view.perHourOf : view.basis;
+  const order: ValueBasis[] = ["cash", "totalRewards", "colAdjustedTotal"];
+  return row.extraHours.filter((p) => p.more === lead.winner || p.fewer === lead.winner).flatMap((p) => {
+    const gap = p.gapPerYear[basis];
+    if (gap === undefined) return [];
+    const rate = p.perExtraHour[basis] ?? null;
+    const lowerBasis = rate === null ? order.slice(0, order.indexOf(basis)).find((b) => p.perExtraHour[b] !== undefined) : undefined;
+    return [{
+      more: letters[p.more], fewer: letters[p.fewer], hoursPerYear: p.hoursPerYear, basis, gapPerYear: gap, perExtraHour: rate,
+      lower: lowerBasis ? { basis: lowerBasis, perExtraHour: p.perExtraHour[lowerBasis]!, average: row.nominal[lowerBasis]![p.more] / hours[p.more] } : null,
+    }];
+  });
 }
 
 /** Where the lead changes hands along the pipeline, in words. */

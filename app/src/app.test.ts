@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { horizonSweep } from "../../src/offer/compare";
-import { type AppOffer, blankOffer, sampleOffers, shiftYears, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
+import { type AppOffer, blankOffer, firstYear, sampleOffers, shiftYears, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
 import { type KeyValueStore, initialSession, loadSession, reducer, saveSession, STORAGE_KEY } from "./session";
 import { localToday, parseMoney, parsePercent } from "./text";
-import { disagreement, type StepView, verdict } from "./verdict";
+import { disagreement, type StepView, totalsCaption, verdict } from "./verdict";
 
 const TODAY = "2026-10-08";
 
@@ -48,9 +48,14 @@ describe("quick fields to the engine's input", () => {
     const ny = toOfferInput(a);
     expect("offer" in ny && ny.offer.residence).toEqual({ state: "NY", locality: { kind: "nyc" } });
   });
-  it("other wages go to this calendar year", () => {
-    expect(toHousehold({ ...DEFAULT_HOUSEHOLD, otherWagesThisYear: 12_000 }, 2026).otherWages).toEqual({ 2026: 12_000 });
-    expect(toHousehold(DEFAULT_HOUSEHOLD, 2026).otherWages).toBeUndefined();
+  it("other wages go to the earliest start date's calendar year, or this year before any start date", () => {
+    expect(toHousehold({ ...DEFAULT_HOUSEHOLD, otherWagesThisYear: 12_000 }, 2027).otherWages).toEqual({ 2027: 12_000 });
+    expect(toHousehold(DEFAULT_HOUSEHOLD, 2027).otherWages).toBeUndefined();
+    const [a, b] = sampleOffers(TODAY); // both start 2027-07-13
+    expect(firstYear([a, b], TODAY)).toBe(2027);
+    const earlier: AppOffer = { ...b, quick: { ...b.quick, startDate: "2026-12-01" } };
+    expect(firstYear([a, earlier], TODAY)).toBe(2026);
+    expect(firstYear([blankOffer("A"), blankOffer("B")], TODAY)).toBe(2026);
   });
 });
 
@@ -110,6 +115,11 @@ describe("verdict", () => {
     const w = verdict(horizonSweep(noHours, household, [4], opts), ["A", "B", "C"], "perHour", 4)!;
     expect(w.steps.find((s) => s.basis === "perHour")!.unavailable).toMatch(/hours/);
     expect(w.basis).toBe("cash"); // the chosen basis can't be shown, so the first available one is
+  });
+  it("the rank list says what its totals are: the stay, the basis, the dollars", () => {
+    expect(totalsCaption("colAdjustedTotal", 4, "colAdjustedTotal")).toBe("4-year total after rent, in today's U.S.-average dollars, present value");
+    expect(totalsCaption("cash", 2, "colAdjustedTotal")).toBe("2-year total after tax, in today's dollars, present value");
+    expect(totalsCaption("perHour", 1, "totalRewards")).toBe("Per hour worked over 1 year, in total rewards, nominal");
   });
 });
 

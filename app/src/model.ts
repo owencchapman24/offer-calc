@@ -43,7 +43,10 @@ export interface AppHousehold {
   filingStatus: FilingStatus;
   /** "How long do you expect to stay?": the comparison window. */
   stayYears: number;
-  /** Your wages from another job this calendar year (for the first year's tax). */
+  /**
+   * Your wages from another job in the calendar year the offers start (for the first year's tax).
+   * The name is older than that rule; it's kept so saved sessions still load.
+   */
   otherWagesThisYear: number;
 }
 
@@ -98,12 +101,18 @@ function quickBonus(b: QuickBonus, base: AnnualBonus | undefined): AnnualBonus |
 
 const scale = (s: ByScenario, f: number): ByScenario => ({ bear: s.bear * f, base: s.base * f, bull: s.bull * f });
 
-export function toHousehold(h: AppHousehold, thisYear: number): Household {
+/** The calendar year other wages belong to: the earliest start date's, or this year until a start date is entered. */
+export function firstYear(offers: AppOffer[], today: string): number {
+  const starts = offers.flatMap((o) => (o.quick.startDate ? [o.quick.startDate] : [])).sort();
+  return Number((starts[0] ?? today).slice(0, 4));
+}
+
+export function toHousehold(h: AppHousehold, year: number): Household {
   return {
     filingStatus: h.filingStatus,
     healthUsage: "medium",
     costOfLiving: { reference: ASSUMPTIONS.reference, savingsRate: 0 },
-    ...(h.otherWagesThisYear > 0 ? { otherWages: { [thisYear]: h.otherWagesThisYear } } : {}),
+    ...(h.otherWagesThisYear > 0 ? { otherWages: { [year]: h.otherWagesThisYear } } : {}),
   };
 }
 
@@ -167,6 +176,21 @@ export function sampleOffers(today: string): AppOffer[] {
 }
 
 export const SAMPLE_HOUSEHOLD_SAVINGS = SAMPLE_HOUSEHOLD.costOfLiving?.savingsRate ?? 0;
+
+/** A sample's detailed inputs that quick mode doesn't show: the "Also counted" row. */
+export function alsoCounted(o: AppOffer): string[] {
+  const b = o.base;
+  if (!b) return [];
+  const out: string[] = [];
+  if (b.salary.raise || b.salary.promotions?.length) out.push(b.salary.promotions?.length ? "promotion" : "raises");
+  if (b.cashAwards?.length) out.push("sign-on");
+  if (b.equity) out.push("RSUs");
+  if (b.retirement) out.push("401(k)");
+  if (b.health) out.push("health");
+  if (b.perks) out.push("perks");
+  if (b.hours) out.push(`${b.hours.weekly.base} hrs/week`);
+  return out;
+}
 
 /** States a city can be in, for the residence-state picker. */
 export const statesFor = (area: string | null) => statesOf(area);

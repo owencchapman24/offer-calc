@@ -8,8 +8,14 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export const dollars = (x: number) => `${x < 0 ? "−" : ""}$${DOLLARS.format(Math.abs(Math.round(x)))}`;
 /** "1,234" with no sign or symbol, for tables whose unit is in the header. */
 export const figure = (x: number) => DOLLARS.format(Math.round(x));
+/** "1,234" or "−1,234" (a true minus sign), for derivations where a figure can go either way. */
+export const signed = (x: number) => `${Math.round(x) < 0 ? "−" : ""}${DOLLARS.format(Math.abs(Math.round(x)))}`;
 /** "$19.47" */
-export const cents = (x: number) => `$${CENTS.format(x)}`;
+export const cents = (x: number) => `${x < 0 ? "−" : ""}$${CENTS.format(Math.abs(x))}`;
+/** A rate as a percent: 0.05 -> "5%", 0.025 -> "2.5%". */
+export const percent = (x: number) => `${+(x * 100).toFixed(2)}%`;
+/** "45 hours", "9,000 hours" */
+export const hours = (x: number) => `${DOLLARS.format(Math.round(x))} ${Math.round(x) === 1 ? "hour" : "hours"}`;
 /** "Jul 13, 2027" */
 export function longDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);

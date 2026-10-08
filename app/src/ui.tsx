@@ -5,7 +5,7 @@ import { figure, parseMoney, parsePercent } from "./text";
 
 export type TickKind = "recomputed" | "footed" | "crossFooted" | "traced" | "default" | "estimate";
 
-const TICKS: Record<TickKind, { mark: string; name: string }> = {
+export const TICKS: Record<TickKind, { mark: string; name: string }> = {
   recomputed: { mark: "✓", name: "Recomputed" },
   footed: { mark: "^", name: "Footed" },
   crossFooted: { mark: "<", name: "Cross-footed" },
@@ -14,10 +14,7 @@ const TICKS: Record<TickKind, { mark: string; name: string }> = {
   estimate: { mark: "E", name: "Estimate" },
 };
 
-/**
- * An audit tickmark after a figure. In this slice it's a mark with a tooltip; opening the figure's
- * derivation (Show the work) comes with the methodology slice (docs/ui-design.md §9.1).
- */
+/** A tickmark that opens nothing: for the legend. Figures use TickButton (Work.tsx), which opens their derivation. */
 export function Tick({ kind, note }: { kind: TickKind; note?: string }) {
   const t = TICKS[kind];
   return <span className={`tick tick-${kind}`} title={note ? `${t.name}: ${note}` : t.name} aria-hidden="true">{t.mark}</span>;
@@ -56,8 +53,8 @@ export function Help({ hint, children }: { hint: string; children: ReactNode }) 
  * A money field: accepts "110k", "110,000" or "$110000" while typing; shows "110,000" otherwise.
  * Blank is null. `placeholder` shows an estimate when the field is blank.
  */
-export function MoneyInput({ value, onChange, label, placeholder, invalidNote = "Enter an amount like 110000 or 110k." }: {
-  value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string; invalidNote?: string;
+export function MoneyInput({ id, value, onChange, label, placeholder, invalidNote = "Enter an amount like 110000 or 110k." }: {
+  id?: string; value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string; invalidNote?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (value === null ? "" : figure(value));
@@ -66,7 +63,7 @@ export function MoneyInput({ value, onChange, label, placeholder, invalidNote = 
   return (
     <span className="money">
       <span className="unit" aria-hidden="true">$</span>
-      <input aria-label={label} inputMode="decimal" value={shown} placeholder={placeholder} aria-invalid={invalid || undefined}
+      <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder={placeholder} aria-invalid={invalid || undefined}
         onFocus={() => setDraft(shown)} /* keep the text as shown, so a select-all-and-type replaces it cleanly */
         onChange={(e) => {
           setDraft(e.target.value);
@@ -79,14 +76,14 @@ export function MoneyInput({ value, onChange, label, placeholder, invalidNote = 
   );
 }
 
-export function PercentInput({ value, onChange, label }: { value: number | null; onChange: (v: number | null) => void; label: string }) {
+export function PercentInput({ id, value, onChange, label }: { id?: string; value: number | null; onChange: (v: number | null) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (value === null ? "" : String(value));
   const parsed = draft === null ? value : parsePercent(draft);
   const invalid = parsed !== null && Number.isNaN(parsed);
   return (
     <span className="money">
-      <input aria-label={label} inputMode="decimal" value={shown} placeholder="0" aria-invalid={invalid || undefined}
+      <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder="0" aria-invalid={invalid || undefined}
         onFocus={() => setDraft(shown)}
         onChange={(e) => {
           setDraft(e.target.value);

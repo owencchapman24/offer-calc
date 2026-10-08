@@ -1,8 +1,8 @@
 import { addMonths, fromDays, toDays } from "./dates";
 import { projectScenario } from "./project";
 import type {
-  Basis, BreakevenResult, Comparison, HorizonRow, HorizonSweep, Household, ISODate, Lead, OfferInput, OfferProjection,
-  Scenario, ValuedOptions,
+  Basis, BreakevenResult, Comparison, ExtraHours, HorizonRow, HorizonSweep, Household, ISODate, Lead, OfferInput, OfferProjection,
+  Scenario, ValuedOptions, ValueBasis,
 } from "./types";
 
 const SCENARIOS: Scenario[] = ["bear", "base", "bull"];
@@ -19,13 +19,63 @@ export const CLOSE_CALL_SHARE = 0.03;
 export function monthlyEquivalent(
   pv: number, window: { start: ISODate; years: number }, valuationDate: ISODate, discountRate = 0.05,
 ): number {
+  return pv / annuityFactor(window, valuationDate, discountRate);
+}
+
+/** The present value at `valuationDate` of $1 paid on the last day of each month of the window. */
+export function annuityFactor(window: { start: ISODate; years: number }, valuationDate: ISODate, discountRate = 0.05): number {
   const start = toDays(window.start);
   const valuation = toDays(valuationDate);
   let factor = 0;
   for (let k = 1; k <= 12 * window.years; k++) {
     factor += (1 + discountRate) ** (-(addMonths(start, k) - 1 - valuation) / 365.25);
   }
-  return pv / factor;
+  return factor;
+}
+
+/** The terms annuityFactor sums: each month's last day, its days from the valuation date, and its discount factor. */
+export function annuityTerms(
+  window: { start: ISODate; years: number }, valuationDate: ISODate, discountRate = 0.05,
+): Array<{ date: ISODate; days: number; factor: number }> {
+  const start = toDays(window.start);
+  const valuation = toDays(valuationDate);
+  return Array.from({ length: 12 * window.years }, (_, i) => {
+    const day = addMonths(start, i + 1) - 1;
+    return { date: fromDays(day), days: day - valuation, factor: (1 + discountRate) ** (-(day - valuation) / 365.25) };
+  });
+}
+
+/** Pay per extra hour shows when two offers' scheduled hours differ by at least 2 a week over a 50-week year. */
+export const EXTRA_HOURS_MIN = 100;
+
+/**
+ * What the extra hours pay, for every pair of offers whose scheduled hours (weekly x weeks, base
+ * scenario) differ by EXTRA_HOURS_MIN or more a year: the gap in each dollar basis over the window,
+ * nominal, divided by the gap in hours worked there (docs/ui-design.md §4.2). A pair whose window
+ * hours don't differ in the same direction (a much later start) is left out.
+ */
+export function extraHours(
+  offers: OfferInput[], nominal: Partial<Record<ValueBasis, number[]>>, hours: number[], years: number,
+): ExtraHours[] {
+  const scheduled = offers.map((o) => (o.hours ? o.hours.weekly.base * (o.hours.weeksPerYear ?? 50) : 0));
+  const out: ExtraHours[] = [];
+  for (let i = 0; i < offers.length; i++) {
+    for (let j = i + 1; j < offers.length; j++) {
+      if (Math.abs(scheduled[i] - scheduled[j]) < EXTRA_HOURS_MIN) continue;
+      const [more, fewer] = scheduled[i] > scheduled[j] ? [i, j] : [j, i];
+      const extra = hours[more] - hours[fewer];
+      if (!(extra > 0)) continue;
+      const gapPerYear: ExtraHours["gapPerYear"] = {};
+      const perExtraHour: ExtraHours["perExtraHour"] = {};
+      for (const [basis, v] of Object.entries(nominal) as Array<[ValueBasis, number[]]>) {
+        const gap = v[more] - v[fewer];
+        gapPerYear[basis] = round2(gap / years);
+        if (gap > 0) perExtraHour[basis] = round2(gap / extra);
+      }
+      out.push({ more, fewer, hoursPerYear: round2(extra / years), gapPerYear, perExtraHour });
+    }
+  }
+  return out;
 }
 
 /** One offer under bear, base and bull together. */
@@ -159,6 +209,7 @@ export function horizonSweep(
       ...(allCol ? { colAdjustedTotal: w.map((x) => x.costOfLiving!.presentValue!.total) } : {}),
       ...(allHours ? { perHour: w.map((x) => x.perHour?.[perHourOf] ?? 0) } : {}),
     };
+    const factor = annuityFactor(window, options.valuationDate, discountRate);
     const leads: Partial<Record<Basis, Lead>> = {};
     for (const [basis, v] of Object.entries(values) as Array<[Basis, number[]]>) {
       const order = v.map((_, i) => i).sort((a, b) => v[b] - v[a] || a - b);
@@ -167,11 +218,21 @@ export function horizonSweep(
       const share = v[winner] !== 0 ? margin / Math.abs(v[winner]) : 0;
       leads[basis] = {
         winner, runnerUp, margin: round2(margin),
-        ...(basis === "perHour" ? {} : { perMonth: round2(monthlyEquivalent(margin, window, options.valuationDate, discountRate)) }),
+        ...(basis === "perHour" ? {} : { perMonth: round2(margin / factor) }),
         share, closeCall: share < CLOSE_CALL_SHARE,
       };
     }
-    return { years, window: { start, end: fromDays(addMonths(toDays(start), 12 * years)) }, values, leads };
+    const nominal: HorizonRow["nominal"] = {
+      cash: w.map((x) => x.nominal.afterTaxComp),
+      totalRewards: w.map((x) => x.totalRewards.nominal),
+      ...(allCol ? { colAdjustedTotal: w.map((x) => x.costOfLiving!.nominal.total) } : {}),
+    };
+    const hours = allHours ? w.map((x) => x.hours ?? 0) : undefined;
+    return {
+      years, window: { start, end: fromDays(addMonths(toDays(start), 12 * years)) }, values, leads, nominal,
+      ...(hours ? { hours } : {}), annuityFactor: factor,
+      extraHours: hours ? extraHours(offers, nominal, hours, years) : [],
+    };
   });
   return { labels: offers.map((o) => o.label), valuationDate: options.valuationDate, discountRate, perHourOf, rows };
 }

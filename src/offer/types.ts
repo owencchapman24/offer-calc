@@ -508,6 +508,8 @@ export interface EmploymentYearResult {
    *  in the year + new-hire RSU tranches nominally due in the year, at grant value. No
    *  proration, payout lag, vest-date snapping, price growth or refreshers. */
   quotedTC: number;
+  /** quotedTC by component, so the offer letter can be bridged to what's paid, line by line. Sums to quotedTC. */
+  quoted: { salary: number; bonus: number; cash: number; rsu: number };
   retirement: { employee: number; employerCredited: number; employerVested: number };
   health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
   perks: { face: number; preTaxEquivalent: number };
@@ -686,6 +688,36 @@ export interface HorizonRow {
    */
   values: Partial<Record<Basis, number[]>>;
   leads: Partial<Record<Basis, Lead>>;
+  /** Each offer's nominal value over the window on the dollar bases: what perHour divides by `hours`. */
+  nominal: Partial<Record<ValueBasis, number[]>>;
+  /** Each offer's hours worked in the window. Present when every offer has hours. */
+  hours?: number[];
+  /**
+   * Present value at the valuation date of $1 paid at the end of each month of the window, discounted
+   * like every event: a lead's perMonth = margin / annuityFactor.
+   */
+  annuityFactor: number;
+  /** Every pair of offers whose scheduled hours differ by EXTRA_HOURS_MIN or more a year. Empty without hours. */
+  extraHours: ExtraHours[];
+}
+
+/** The pipeline's dollar bases: every basis but perHour. */
+export type ValueBasis = Exclude<Basis, "perHour">;
+
+/**
+ * What one offer's extra hours pay, against another offer, over the window. Nominal, like per hour:
+ * the gap in value divided by the gap in hours worked.
+ */
+export interface ExtraHours {
+  /** The offer asking more hours, and the one it's compared with: indexes in the order passed. */
+  more: number;
+  fewer: number;
+  /** Extra hours a year: the gap in window hours / the stay in years. */
+  hoursPerYear: number;
+  /** `more`'s value minus `fewer`'s, a year (the window's nominal gap / the stay in years). Negative: more hours for less pay. */
+  gapPerYear: Partial<Record<ValueBasis, number>>;
+  /** The gap / the extra hours, on each basis where `more` pays more: what each extra hour pays. */
+  perExtraHour: Partial<Record<ValueBasis, number>>;
 }
 
 export interface HorizonSweep {

@@ -1,11 +1,12 @@
-import { type CSSProperties, type Dispatch, type ReactNode, useState } from "react";
+import { type CSSProperties, type Dispatch, type ReactNode, useRef, useState } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
-import { type AppOffer, type Missing, NYC_METRO, type QuickBonus, statesFor } from "./model";
+import { alsoCounted, type AppOffer, type Missing, NYC_METRO, type QuickBonus, statesFor } from "./model";
 import type { Action } from "./session";
-import { dollars, figure } from "./text";
-import { Help, MoneyInput, PercentInput, Stamp, Tick } from "./ui";
+import { dollars } from "./text";
+import { Help, MoneyInput, PercentInput, Stamp } from "./ui";
+import { TickButton, Trace, useRovingTicks } from "./Tickmarks";
 
 // Quick mode: offers are columns, fields are rows, so A's salary sits beside B's (docs/ui-design.md §3.2).
 
@@ -16,11 +17,19 @@ export function Ledger({ offers, missing, rents, dispatch }: {
   offers: AppOffer[]; missing: Map<string, Missing[]>; rents: Record<string, RentEstimate>; dispatch: Dispatch<Action>;
 }) {
   const set = (o: AppOffer, patch: Partial<AppOffer["quick"]>) => dispatch({ type: "offer", id: o.id, patch });
+  const ref = useRef<HTMLElement>(null);
+  useRovingTicks(ref);
   return (
-    <section className="ledger-wrap" aria-labelledby="offers-title">
+    <section ref={ref} className="ledger-wrap" aria-labelledby="offers-title">
       <div className="ledger-head">
         <h2 id="offers-title" className="strip-title">Offers</h2>
-        <span className="mode">Quick mode</span>
+        <div className="mode">
+          <div className="segmented" role="group" aria-label="Input mode">
+            <button type="button" className="is-on" aria-pressed="true">Quick</button>
+            <button type="button" disabled aria-describedby="mode-note">Detailed</button>
+          </div>
+          <span id="mode-note" className="mode-note">Detailed mode is coming soon.</span>
+        </div>
       </div>
       <datalist id="cities">{CITIES.map((c) => <option key={c.code} value={c.name} />)}</datalist>
       <div className="ledger" style={{ "--cols": offers.length } as CSSProperties}>
@@ -51,9 +60,9 @@ export function Ledger({ offers, missing, rents, dispatch }: {
           calendar month, so a July start earns about half of it in its first calendar year.
         </Help>}>
           {offers.map((o) => (
-            <div key={o.id} className="cell">
-              <MoneyInput label={`Offer ${o.letter} salary`} value={o.quick.salary} onChange={(v) => set(o, { salary: v })} />
-            </div>
+            <Trace key={o.id} id={`in.${o.letter}.salary`} className="cell">
+              <MoneyInput id={`in-${o.letter}-salary`} label={`Offer ${o.letter} salary`} value={o.quick.salary} onChange={(v) => set(o, { salary: v })} />
+            </Trace>
           ))}
         </Row>
 
@@ -61,22 +70,24 @@ export function Ledger({ offers, missing, rents, dispatch }: {
           The target from your offer, as a % of salary or dollars a year; leave it blank for none. It's paid each March for
           the prior calendar year (the common pattern), so a July start gets a partial first bonus about eight months later.
         </Help>}>
-          {offers.map((o) => <div key={o.id} className="cell"><BonusField offer={o} set={(b) => set(o, { bonus: b })} /></div>)}
+          {offers.map((o) => (
+            <Trace key={o.id} id={`in.${o.letter}.bonus`} className="cell"><BonusField offer={o} set={(b) => set(o, { bonus: b })} /></Trace>
+          ))}
         </Row>
 
         <Row label="City" help={<Help hint="Where you'd live, not the office.">
           We tax you as a resident of this state (and New York City, if you say so) and price your spending with this
           metro's price level (BEA Regional Price Parities). If you'd commute across a state line, pick where you'd live.
         </Help>}>
-          {offers.map((o) => <div key={o.id} className="cell"><CityField offer={o} set={(p) => set(o, p)} /></div>)}
+          {offers.map((o) => <Trace key={o.id} id={`in.${o.letter}.city`} className="cell"><CityField offer={o} set={(p) => set(o, p)} /></Trace>)}
         </Row>
 
         <Row label="Start date">
           {offers.map((o) => (
-            <div key={o.id} className="cell">
-              <input type="date" aria-label={`Offer ${o.letter} start date`} value={o.quick.startDate ?? ""} min="2026-01-01"
+            <Trace key={o.id} id={`in.${o.letter}.start`} className="cell">
+              <input id={`in-${o.letter}-start`} type="date" aria-label={`Offer ${o.letter} start date`} value={o.quick.startDate ?? ""} min="2026-01-01"
                 onChange={(e) => set(o, { startDate: e.target.value || null })} />
-            </div>
+            </Trace>
           ))}
         </Row>
 
@@ -85,17 +96,19 @@ export function Ledger({ offers, missing, rents, dispatch }: {
           metro (the 40th percentile, utilities included). City-center rents usually run higher, so enter yours if you know it.
         </Help>}>
           {offers.map((o) => (
-            <div key={o.id} className="cell">
+            <Trace key={o.id} id={`in.${o.letter}.rent`} className="cell">
               <RentField offer={o} set={(v) => set(o, { rent: v })}
                 estimate={o.quick.area && o.quick.state ? rents[rentKey(o.quick.area, o.quick.state)] ?? null : null} />
-            </div>
+            </Trace>
           ))}
         </Row>
 
         {offers.some((o) => o.base) && (
-          <Row label="Also counted">
+          <Row label="Also counted" help={<div className="help"><span className="hint">
+            Sample inputs quick mode doesn't show. They still count; detailed mode (coming soon) will let you edit them.
+          </span></div>}>
             {offers.map((o) => (
-              <div key={o.id} className="cell also">{o.base ? alsoCounted(o).join(", ") : "—"}</div>
+              <Trace key={o.id} id={`in.${o.letter}.also`} className="cell also">{o.base ? alsoCounted(o).join(", ") : "—"}</Trace>
             ))}
           </Row>
         )}
@@ -133,14 +146,14 @@ function BonusField({ offer, set }: { offer: AppOffer; set: (b: QuickBonus) => v
   return (
     <div className="bonus">
       {kind === "percent"
-        ? <PercentInput label={`Offer ${offer.letter} bonus, % of salary`} value={value} onChange={(v) => set({ kind, value: v })} />
-        : <MoneyInput label={`Offer ${offer.letter} bonus, dollars a year`} value={value} onChange={(v) => set({ kind, value: v })} />}
+        ? <PercentInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, % of salary`} value={value} onChange={(v) => set({ kind, value: v })} />
+        : <MoneyInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, dollars a year`} value={value} onChange={(v) => set({ kind, value: v })} />}
       <select aria-label={`Offer ${offer.letter} bonus basis`} value={kind}
         onChange={(e) => set({ kind: e.target.value as "percent" | "amount", value: null })}>
         <option value="percent">of salary</option>
         <option value="amount">a year</option>
       </select>
-      {!base && <span className="sub">paid each March<Tick kind="default" note="paid each March 15 for the prior calendar year" /></span>}
+      {!base && <span className="sub">paid each March<TickButton id={`in.${offer.letter}.bonusTiming`} label="the bonus paid each March" /></span>}
     </div>
   );
 }
@@ -156,10 +169,10 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
       {q.area && !editing ? (
         <span className="city-name">
           {current}{" "}
-          <button type="button" className="link" onClick={() => setEditing(true)} aria-label={`Change offer ${offer.letter} city`}>Change</button>
+          <button id={`in-${offer.letter}-city`} type="button" className="link" onClick={() => setEditing(true)} aria-label={`Change offer ${offer.letter} city`}>Change</button>
         </span>
       ) : (
-        <input list="cities" aria-label={`Offer ${offer.letter} city`} placeholder="Search a metro area" value={draft ?? current}
+        <input id={`in-${offer.letter}-city`} list="cities" aria-label={`Offer ${offer.letter} city`} placeholder="Search a metro area" value={draft ?? current}
           autoFocus={editing}
           onFocus={() => setDraft(current)}
           onChange={(e) => {
@@ -191,35 +204,30 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
   );
 }
 
+/**
+ * Rent: left blank, the field shows the estimate as a value with an E tickmark, so it reads as an
+ * estimate rather than as something you entered. Once you enter a rent, a one-line link offers the
+ * estimate back.
+ */
 function RentField({ offer, set, estimate }: { offer: AppOffer; set: (v: number | null) => void; estimate: RentEstimate | null }) {
   const q = offer.quick;
+  const who = estimate?.source === "fmr" ? "HUD" : "BEA";
+  const estimated = q.rent === null && estimate !== null;
   return (
     <div className="rent">
-      <MoneyInput label={`Offer ${offer.letter} rent a month`} value={q.rent} onChange={set}
-        placeholder={estimate ? figure(estimate.monthlyRent) : ""} />
-      {q.rent === null && estimate && (
-        <span className="sub estimate">
-          <Tick kind="estimate" note={estimate.source === "fmr" ? `HUD FY${estimate.fiscalYear} Fair Market Rent, 1 bedroom, ${estimate.hudAreaName}`
-            : "BEA housing prices x the U.S. median gross rent"} />
-          {estimate.source === "fmr" ? "estimate (HUD Fair Market Rent): edit to your actual rent" : "estimate (BEA housing prices): edit to your actual rent"}
-        </span>
-      )}
+      <span className={`rent-value${estimated ? " is-estimate" : ""}`}>
+        <MoneyInput id={`in-${offer.letter}-rent`} label={`Offer ${offer.letter} rent a month${estimated ? `, estimated by ${who}` : ""}`}
+          value={q.rent ?? estimate?.monthlyRent ?? null} onChange={set} />
+        {estimated && <TickButton id={`in.${offer.letter}.rent`} label={`the rent estimate, ${dollars(estimate.monthlyRent)} a month`} />}
+      </span>
+      {estimated && <span className="sub estimate one-line">{who} estimate · edit</span>}
       {q.rent !== null && estimate && (
-        <button type="button" className="link sub" onClick={() => set(null)}>Use the estimate ({dollars(estimate.monthlyRent)})</button>
+        <span className="sub estimate one-line">
+          {who} est. {dollars(estimate.monthlyRent)} ·{" "}
+          <button type="button" className="link" onClick={() => set(null)}
+            aria-label={`Use ${who}'s estimate for offer ${offer.letter}, ${dollars(estimate.monthlyRent)} a month`}>use</button>
+        </span>
       )}
     </div>
   );
-}
-
-function alsoCounted(o: AppOffer): string[] {
-  const b = o.base!;
-  const out: string[] = [];
-  if (b.salary.raise || b.salary.promotions?.length) out.push(b.salary.promotions?.length ? "promotion" : "raises");
-  if (b.cashAwards?.length) out.push("sign-on");
-  if (b.equity) out.push("RSUs");
-  if (b.retirement) out.push("401(k)");
-  if (b.health) out.push("health");
-  if (b.perks) out.push("perks");
-  if (b.hours) out.push(`${b.hours.weekly.base} hrs/week`);
-  return out;
 }

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
-import type { EngineRequest, EngineResponse } from "./protocol";
+import type { EngineRequest, EngineResponse, StayDetail } from "./protocol";
 
 export interface EngineState {
   /** The latest comparison for the current inputs, or the previous one while recomputing. */
   sweep: HorizonSweep | null;
+  /** Your stay's full projections, from the same request as `sweep`. */
+  detail: StayDetail | null;
   /** Rent estimates by `rentKey(area, state)`. */
   rents: Record<string, RentEstimate>;
   updating: boolean;
@@ -23,7 +25,7 @@ const DEBOUNCE_MS = 200;
 export function useEngine(request: Omit<EngineRequest, "gen">): EngineState {
   const worker = useRef<Worker | null>(null);
   const gen = useRef(0);
-  const [state, setState] = useState<EngineState>({ sweep: null, rents: {}, updating: true, error: null, ms: null });
+  const [state, setState] = useState<EngineState>({ sweep: null, detail: null, rents: {}, updating: true, error: null, ms: null });
 
   useEffect(() => {
     const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });
@@ -31,7 +33,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">): EngineState {
       const r = e.data;
       if (r.gen !== gen.current) return; // stale
       setState((s) => r.ok
-        ? { sweep: r.sweep, rents: r.rents, updating: false, error: null, ms: r.sweep ? r.ms : s.ms }
+        ? { sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, ms: r.sweep ? r.ms : s.ms }
         : { ...s, rents: r.rents, updating: false, error: r.error });
     };
     worker.current = w;
