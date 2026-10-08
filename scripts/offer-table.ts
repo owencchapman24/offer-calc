@@ -14,9 +14,6 @@ const offers: OfferInput[] = [
     salary: { annual: 110_000 },
     bonus: { basis: "percentOfSalary", amount: { bear: 0.5, base: 0.7, bull: 0.9 }, payOn: { month: 1, day: 31 } },
     cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 } }],
-    equity: {
-      grants: [{ kind: "rsu", label: "New-hire RSUs", value: 40_000, schedule: VESTING_PRESETS.annual }],
-    },
   },
   {
     label: "B. Charlotte corporate finance analyst",
@@ -29,6 +26,28 @@ const offers: OfferInput[] = [
       payOn: { month: 3, day: 15 }, cutoff: { month: 10, day: 1 },
     },
     cashAwards: [{ label: "Sign-on", amount: 5_000, paidOn: { daysAfterStart: 30 } }],
+  },
+  {
+    label: "C. Seattle public tech company, finance",
+    residence: { state: "WA" },
+    employerState: "WA",
+    startDate: "2026-07-13",
+    salary: { annual: 105_000 },
+    bonus: {
+      basis: "percentOfSalary", amount: { bear: 0.1, base: 0.15, bull: 0.2 },
+      payOn: { month: 3, day: 15 }, cutoff: { month: 10, day: 1 },
+    },
+    cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 } }],
+    equity: {
+      grants: [{
+        kind: "rsu", label: "New-hire RSUs", value: 120_000,
+        schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      }],
+      refreshers: {
+        value: { bear: 10_000, base: 25_000, bull: 40_000 }, firstAfterMonths: 12, everyMonths: 12,
+        schedule: { ...VESTING_PRESETS.standard, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      },
+    },
   },
 ];
 
@@ -88,19 +107,16 @@ offers.forEach((o, i) => {
   for (const w of base[i].warnings) out.push(`   ! ${w}`);
 });
 
-const [a, b] = base;
-const diffRows = a.employmentYears.map((ya, i) => {
-  const yb = b.employmentYears[i];
-  return [String(ya.year), $(ya.net), $(yb.net), $(ya.net - yb.net), $((ya.net - yb.net) / 12)];
-});
+const short = (o: OfferInput) => o.label.slice(0, 1);
 const sum = (r: ScenarioResult) => r.employmentYears.reduce((s, y) => s + y.net, 0);
-diffRows.push(["Total", $(sum(a)), $(sum(b)), $(sum(a) - sum(b)), ""]);
+const sideRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.map((r) => $(r.employmentYears[i].net))]);
+sideRows.push(["Total", ...base.map((r) => $(sum(r)))]);
 out.push("", "Side by side, net after tax (base scenario):",
-  table(["Year", "A net", "B net", "A - B", "per month"], diffRows));
+  table(["Year", ...offers.map((o) => `${short(o)} net`)], sideRows));
 
 const scenarios = (["bear", "base", "bull"] as const);
 const totals = offers.map((o) => scenarios.map((s) => sum(projectScenario(o, household, { inflation, scenario: s }))));
 out.push("", "5-year net by scenario:",
-  table(["Offer", ...scenarios], offers.map((o, i) => [o.label.slice(0, 2), ...totals[i].map($)])));
+  table(["Offer", ...scenarios], offers.map((o, i) => [short(o), ...totals[i].map($)])));
 
 console.log(out.join("\n"));

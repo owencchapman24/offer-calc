@@ -107,6 +107,8 @@ table for two sample offers.
 - Offer model (planned, docs/offer-model.md §9): part-year residency in a relocation year
   (we tax the whole year as a resident of the new state); spouse income is shared across
   offers (can't vary per offer).
+- Private-company equity (stock options, double-trigger RSUs) is out of scope for v1. It
+  defaults to $0 value; an optional scenario value may come later.
 
 ## Roadmap
 1. Offer model on top of the engine: year-by-year cash comp (base, bonus as range,
@@ -124,3 +126,7 @@ table for two sample offers.
    even-swaps for soft factors; show gaps per paycheck to counter distinction bias.
 6. UI (React/TS, client-side only, no login, live-updating, inline input help,
    no misleading defaults — per NN/g calculator guidelines) + methodology page.
+7. Withholding-shortfall warning: employers withhold federal tax on bonuses and RSU vests
+   at the flat 22% supplemental rate (37% above $1M), below the real marginal rate for
+   many offers. Warn and estimate the April balance due. We compute liability, so totals
+   are already right; this is a cash-timing warning.
