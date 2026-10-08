@@ -4,7 +4,7 @@ import { rentKey } from "./protocol";
 import { About } from "./About";
 import { Lead } from "./Lead";
 import { Ledger } from "./Ledger";
-import { ASSUMPTIONS, type Missing, toHousehold, toOfferInput } from "./model";
+import { ASSUMPTIONS, firstYear, type Missing, toHousehold, toOfferInput } from "./model";
 import { type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
 import { localToday } from "./text";
 import { useEngine } from "./useEngine";
@@ -43,12 +43,13 @@ export function App() {
   }, [theme]);
 
   const stayYears = session.household.stayYears;
+  const wagesYear = firstYear(session.offers, today);
   const built = session.offers.map((o) => ({ o, r: toOfferInput(o) }));
   const complete = built.flatMap((x) => ("offer" in x.r ? [{ o: x.o, offer: x.r.offer }] : []));
   const missing = new Map<string, Missing[]>(built.flatMap((x) => ("missing" in x.r ? [[x.o.id, x.r.missing] as [string, Missing[]]] : [])));
   const compare = complete.length >= 2 ? {
     offers: complete.map((x) => x.offer),
-    household: toHousehold(session.household, Number(today.slice(0, 4))),
+    household: toHousehold(session.household, wagesYear),
     stays: [...new Set([...STAYS, stayYears])].sort((a, b) => a - b),
     valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   } : null;
@@ -77,7 +78,7 @@ export function App() {
         <p className="tagline">Job offers compared the way they'd pay out: after tax, after rent and prices, per hour, year by year.</p>
       </header>
 
-      <About session={session} dispatch={dispatch} today={today} />
+      <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
 
       <main className="workpaper">
         <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />

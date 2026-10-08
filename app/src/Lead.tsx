@@ -3,7 +3,7 @@ import type { Basis } from "../../src/offer/types";
 import type { Action } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Stamp, Tick, TickLegend } from "./ui";
-import { PIPELINE, type StepView, type VerdictView } from "./verdict";
+import { PIPELINE, type StepView, totalsCaption, type VerdictView } from "./verdict";
 
 // L · Lead schedule: the verdict, the "winner if you stay" row and the basis pipeline (docs/ui-design.md §4.1-4.2).
 
@@ -39,7 +39,7 @@ export function Lead({ view, stayYears, updating, error, notes, sample, dispatch
 }
 
 function Verdict({ view, stayYears, dispatch }: { view: VerdictView; stayYears: number; dispatch: Dispatch<Action> }) {
-  const { lead, basis, row } = view;
+  const { lead, basis, row, perHourOf } = view;
   const step = PIPELINE.find((p) => p.basis === basis)!;
   const pv = basis !== "perHour";
   return (
@@ -66,15 +66,17 @@ function Verdict({ view, stayYears, dispatch }: { view: VerdictView; stayYears: 
         {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
       </div>
 
-      <ol className="ranks" aria-label={`Offers ranked ${step.phrase}`}>
-        {view.ranks.map((r) => (
-          <li key={r.letter} className={`offer-${r.letter}`}>
-            <span className="key" aria-hidden="true" /><span className="rank-letter">{r.letter}</span>
-            <span className="rank-value">{basis === "perHour" ? cents(r.value) : figure(r.value)}<Tick kind="recomputed" /></span>
-          </li>
-        ))}
-        <li className="rank-unit">{basis === "perHour" ? "$ an hour, nominal" : basis === "colAdjustedTotal" ? "U.S.-avg $, present value" : "present value"}</li>
-      </ol>
+      <div className="ranks">
+        <p className="ranks-caption" id="ranks-caption">{totalsCaption(basis, stayYears, perHourOf)}</p>
+        <ol aria-labelledby="ranks-caption">
+          {view.ranks.map((r) => (
+            <li key={r.letter} className={`offer-${r.letter}`}>
+              <span className="key" aria-hidden="true" /><span className="rank-letter">{r.letter}</span>
+              <span className="rank-value">{basis === "perHour" ? cents(r.value) : figure(r.value)}<Tick kind="recomputed" /></span>
+            </li>
+          ))}
+        </ol>
+      </div>
 
       <div className="stays" role="table" aria-label="Winner if you stay">
         <div role="row" className="stays-row">

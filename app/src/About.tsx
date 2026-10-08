@@ -8,9 +8,10 @@ import { Help, MoneyInput, Tick } from "./ui";
 const FILING: Array<[FilingStatus, string]> = [["single", "Single"], ["joint", "Married, filing jointly"], ["headOfHousehold", "Head of household"]];
 
 /** About you: shared by every offer. */
-export function About({ session, dispatch, today }: { session: Session; dispatch: Dispatch<Action>; today: string }) {
+export function About({ session, dispatch, today, wagesYear }: {
+  session: Session; dispatch: Dispatch<Action>; today: string; /** The earliest start date's calendar year. */ wagesYear: number;
+}) {
   const h = session.household;
-  const thisYear = Number(today.slice(0, 4));
   return (
     <section className="about" aria-labelledby="about-title">
       <h2 id="about-title" className="strip-title">About you</h2>
@@ -34,12 +35,12 @@ export function About({ session, dispatch, today }: { session: Session; dispatch
           </Help>
         </div>
         <div className="about-field">
-          <span className="about-label">Other wages in {thisYear}{h.otherWagesThisYear === 0 && <Tick kind="default" />}</span>
-          <MoneyInput label={`Your wages from another job in ${thisYear}`} value={h.otherWagesThisYear}
+          <span className="about-label">Other wages in {wagesYear}{h.otherWagesThisYear === 0 && <Tick kind="default" />}</span>
+          <MoneyInput label={`Your wages from another job in ${wagesYear}`} value={h.otherWagesThisYear}
             onChange={(v) => dispatch({ type: "household", patch: { otherWagesThisYear: v ?? 0 } })} />
           <Help hint="An internship or the job you're leaving.">
-            Pay you earn this year before the new job starts. It's taxed in the same year, so it changes the new job's
-            first-year tax. Leave it at $0 if there's none.
+            Pay you earn in {wagesYear}, the year the earliest offer starts, before the new job begins. It's taxed in the
+            same year, so it changes the new job's first-year tax. Leave it at $0 if there's none.
           </Help>
         </div>
         <div className="about-field">

@@ -20,7 +20,13 @@ export function Ledger({ offers, missing, rents, dispatch }: {
     <section className="ledger-wrap" aria-labelledby="offers-title">
       <div className="ledger-head">
         <h2 id="offers-title" className="strip-title">Offers</h2>
-        <span className="mode">Quick mode</span>
+        <div className="mode">
+          <div className="segmented" role="group" aria-label="Input mode">
+            <button type="button" className="is-on" aria-pressed="true">Quick</button>
+            <button type="button" disabled aria-describedby="mode-note">Detailed</button>
+          </div>
+          <span id="mode-note" className="mode-note">Detailed mode is coming soon.</span>
+        </div>
       </div>
       <datalist id="cities">{CITIES.map((c) => <option key={c.code} value={c.name} />)}</datalist>
       <div className="ledger" style={{ "--cols": offers.length } as CSSProperties}>
@@ -93,7 +99,9 @@ export function Ledger({ offers, missing, rents, dispatch }: {
         </Row>
 
         {offers.some((o) => o.base) && (
-          <Row label="Also counted">
+          <Row label="Also counted" help={<div className="help"><span className="hint">
+            Sample inputs quick mode doesn't show. They still count; detailed mode (coming soon) will let you edit them.
+          </span></div>}>
             {offers.map((o) => (
               <div key={o.id} className="cell also">{o.base ? alsoCounted(o).join(", ") : "—"}</div>
             ))}
@@ -191,21 +199,31 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
   );
 }
 
+/**
+ * Rent: left blank, the field shows the estimate as a value with an E tickmark, so it reads as an
+ * estimate rather than as something you entered. Once you enter a rent, a one-line link offers the
+ * estimate back.
+ */
 function RentField({ offer, set, estimate }: { offer: AppOffer; set: (v: number | null) => void; estimate: RentEstimate | null }) {
   const q = offer.quick;
+  const who = estimate?.source === "fmr" ? "HUD" : "BEA";
+  const estimated = q.rent === null && estimate !== null;
   return (
     <div className="rent">
-      <MoneyInput label={`Offer ${offer.letter} rent a month`} value={q.rent} onChange={set}
-        placeholder={estimate ? figure(estimate.monthlyRent) : ""} />
-      {q.rent === null && estimate && (
-        <span className="sub estimate">
-          <Tick kind="estimate" note={estimate.source === "fmr" ? `HUD FY${estimate.fiscalYear} Fair Market Rent, 1 bedroom, ${estimate.hudAreaName}`
-            : "BEA housing prices x the U.S. median gross rent"} />
-          {estimate.source === "fmr" ? "estimate (HUD Fair Market Rent): edit to your actual rent" : "estimate (BEA housing prices): edit to your actual rent"}
-        </span>
-      )}
+      <span className={`rent-value${estimated ? " is-estimate" : ""}`}>
+        <MoneyInput label={`Offer ${offer.letter} rent a month${estimated ? `, estimated by ${who}` : ""}`}
+          value={q.rent ?? estimate?.monthlyRent ?? null} onChange={set} />
+        {estimated && <Tick kind="estimate" note={estimate.source === "fmr"
+          ? `HUD FY${estimate.fiscalYear} Fair Market Rent, 1 bedroom, ${estimate.hudAreaName}: edit to your actual rent`
+          : "BEA housing prices x the U.S. median gross rent: edit to your actual rent"} />}
+      </span>
+      {estimated && <span className="sub estimate one-line">{who} estimate · edit</span>}
       {q.rent !== null && estimate && (
-        <button type="button" className="link sub" onClick={() => set(null)}>Use the estimate ({dollars(estimate.monthlyRent)})</button>
+        <span className="sub estimate one-line">
+          {who} est. {dollars(estimate.monthlyRent)} ·{" "}
+          <button type="button" className="link" onClick={() => set(null)}
+            aria-label={`Use ${who}'s estimate for offer ${offer.letter}, ${dollars(estimate.monthlyRent)} a month`}>use</button>
+        </span>
       )}
     </div>
   );

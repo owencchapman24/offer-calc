@@ -8,8 +8,21 @@ export const PIPELINE: Array<{ basis: Basis; step: string; title: string; phrase
   { basis: "totalRewards", step: "+ Benefits", title: "Total rewards", phrase: "in total rewards", counted: "once benefits are counted" },
   { basis: "colAdjustedTotal", step: "− Rent & prices", title: "After rent, at U.S. prices", phrase: "after rent, at U.S. prices",
     counted: "once rent and prices are counted" },
-  { basis: "perHour", step: "÷ Hours", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
+  // "Per hour", not "÷ Hours": at 13px the font's ÷ reads as +.
+  { basis: "perHour", step: "Per hour", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
 ];
+
+/** The rank list's caption: what the totals are, over how long, in which dollars. */
+export function totalsCaption(basis: Basis, years: number, perHourOf: "colAdjustedTotal" | "totalRewards"): string {
+  const stay = `${years}-year`;
+  switch (basis) {
+    case "cash": return `${stay} total after tax, in today's dollars, present value`;
+    case "totalRewards": return `${stay} total rewards, in today's dollars, present value`;
+    case "colAdjustedTotal": return `${stay} total after rent, in today's U.S.-average dollars, present value`;
+    case "perHour": return `Per hour worked over ${years} ${years === 1 ? "year" : "years"}, ${
+      perHourOf === "colAdjustedTotal" ? "after rent, in U.S.-average dollars" : "in total rewards"}, nominal`;
+  }
+}
 
 export interface StepView {
   basis: Basis;
@@ -23,6 +36,8 @@ export interface StepView {
 export interface VerdictView {
   row: HorizonRow;
   basis: Basis;
+  /** What the per-hour step divides by hours. */
+  perHourOf: HorizonSweep["perHourOf"];
   lead: StepView["lead"];
   /** Offers by value on the selected basis, highest first. */
   ranks: Array<{ letter: Letter; value: number }>;
@@ -52,6 +67,7 @@ export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, st
   return {
     row,
     basis: chosen.basis,
+    perHourOf: sweep.perHourOf,
     lead: chosen.lead,
     ranks: values.map((value, i) => ({ letter: letters[i], value })).sort((a, b) => b.value - a.value),
     steps,

@@ -116,7 +116,13 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .ledger-wrap { background: var(--sheet); border: 1px solid var(--rule); }
 .ledger-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px 10px; }
-.mode { font-size: 13px; color: var(--muted); }
+.mode { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.mode-note { font-size: 12.5px; color: var(--muted); }
+.segmented { display: inline-flex; border: 1px solid var(--rule); }
+.segmented button { border: none; background: var(--sheet); padding: 3px 12px; font-size: 13px; border-left: 1px solid var(--rule); cursor: pointer; }
+.segmented button:first-child { border-left: none; }
+.segmented .is-on { background: var(--ink); color: var(--sheet); font-weight: 700; cursor: default; }
+.segmented button:disabled { color: var(--muted); cursor: not-allowed; }
 .ledger { display: grid; grid-template-columns: 124px repeat(var(--cols), minmax(150px, 1fr)); overflow-x: auto; }
 .row { display: contents; }
 .row > * { padding: 10px 12px; border-top: 1px solid var(--rule); }
@@ -146,6 +152,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .check { flex-wrap: nowrap; }
 .check input { width: 16px; height: 16px; flex: none; accent-color: var(--ink); }
 .estimate { color: var(--graphite); }
+.one-line { white-space: nowrap; flex-wrap: nowrap; }
+.rent-value { display: inline-flex; align-items: baseline; }
+.is-estimate input { color: var(--graphite); font-style: italic; }
 .static { font-variant-numeric: tabular-nums; }
 .also { font-size: 13px; color: var(--graphite); }
 .field-error { font-size: 12px; color: var(--warning); width: 100%; }
@@ -180,12 +189,13 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* An offer's letter: ink text, identified by an offer-color underline (text never wears the series color). */
 .who { font-weight: 700; padding: 0 2px; box-shadow: inset 0 -3px 0 var(--offer); }
 
-.ranks { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 12px 0; margin: 16px 0 0; border-top: 1px solid var(--rule); align-items: baseline; }
+.ranks { padding: 12px 0; margin: 16px 0 0; border-top: 1px solid var(--rule); }
+.ranks-caption { margin: 0 0 4px; font-size: 13px; color: var(--graphite); }
+.ranks ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 0; margin: 0; align-items: baseline; }
 .ranks li { display: inline-flex; align-items: baseline; gap: 6px; }
 .key { width: 10px; height: 10px; background: var(--offer); align-self: center; }
 .rank-letter { font-weight: 700; }
 .rank-value { font-variant-numeric: tabular-nums; }
-.rank-unit { color: var(--muted); font-size: 13px; }
 
 .stays { margin: 8px 0 18px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
 .stays-row { display: grid; grid-template-columns: 96px repeat(auto-fit, minmax(0, 1fr)); }
