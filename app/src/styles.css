@@ -67,6 +67,8 @@ body {
 }
 
 button, input, select { font: inherit; color: inherit; }
+/* Links are ink, underlined, like the .link buttons: never the browser's blue, in either theme. */
+a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
