@@ -4,15 +4,21 @@ Compare job offers on what they're actually worth: after federal, state, local a
 taxes, adjusted for cost of living, year by year.
 
 ## Status
-Tax engine complete on enacted 2026 law and validated against [PolicyEngine-US](https://github.com/PolicyEngine/policyengine-us),
-with projected later years (federal indexing, the OBBBA SALT schedule including its 2030
-reversion). Offer model is next: see `docs/offer-model.md` and `CLAUDE.md`.
+- **Tax engine:** complete on enacted 2026 law and validated against
+  [PolicyEngine-US](https://github.com/PolicyEngine/policyengine-us), with projected later
+  years (federal indexing, the OBBBA SALT schedule including its 2030 reversion).
+- **Offer model:** pay, equity, leave dates, scenarios, 401(k), health, cost of living and
+  HUD rent estimates (`docs/offer-model.md`).
+- **UI:** slice 1, quick mode and the lead schedule (`docs/ui-design.md`).
+- **More:** `CLAUDE.md`.
 
 ## Setup
 ```bash
 npm install
-npm test            # unit tests
+npm test            # unit tests (engine and app)
 npm run typecheck
+npm run dev         # the app at http://localhost:5173
+npm run build       # static build in dist/ (deployed on Vercel; see vercel.json)
 ```
 
 ### Optional: validate against PolicyEngine

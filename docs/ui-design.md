@@ -1150,6 +1150,27 @@ all formatting.
 
 ## 12. Build plan
 
+**Done:**
+- **Engine prerequisites** (§11, items 1-5) and the before-UI items: structured engine
+  output, HUD FMRs, the type check.
+- **UI slice 1** (2026-10-08):
+  - Vite, React and TS in `app/`, with the engine in a Web Worker: debounced, stale results
+    dropped. Saved in this browser.
+  - Quick mode for 2-3 offers (salary, bonus, city, start date, rent) and About you
+    (filing status, expected stay, other wages).
+  - The lead schedule: verdict, rank list, basis pipeline, the "if you stay" row, and the
+    disagreement line.
+  - Samples loaded by default, stamped illustrative, and moved to start next July so PV is
+    taken from today.
+
+**Slice 1 versus this design:**
+- **Tickmarks:** they show with their legend but don't open derivations yet (slice 3).
+- **Phones:** the ledger scrolls one offer at a time instead of tabs, and there's no
+  sticky verdict bar yet.
+- **Lead schedule:** the close-call stamp shows; the flip line comes with breakeven
+  (slice 5).
+
+**Slices:**
 1. **Engine prerequisites** (§11, items 1-5), with a review stop and timings.
 2. **Shell:** quick mode, About you, the lead schedule, the if-you-stay row, the pipeline
    toggle, local saving, the samples and the first run. Engine items 6-10 come with it.

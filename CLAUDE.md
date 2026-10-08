@@ -28,8 +28,15 @@ methodology page matter more than features.
     - the engine returns numbers and codes, and `src/format` writes the words;
     - HUD FY2027 Fair Market Rents as the rent estimate;
     - the type check for tabular figures.
-- **Tests:** 141 passing: `test/offer.test.ts` 109, `test/params.test.ts` 22,
-  `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
+- **UI slice 1 (2026-10-08):** the app in `app/`:
+  - Vite and React, with the engine in a Web Worker: debounced, and stale results dropped.
+  - Saved in this browser.
+  - Quick mode for 2-3 offers, About you with the expected stay, and HUD rent estimates.
+  - The lead schedule: verdict, basis pipeline and the "if you stay" row.
+  - The samples are loaded by default and marked illustrative.
+- **Tests:** 156 passing: `test/offer.test.ts` 110, `test/params.test.ts` 22,
+  `test/tax.test.ts` 10, `app/src/app.test.ts` 14. Hand-checked values carry their
+  arithmetic in comments.
   `npm test` also runs `scripts/check-engine.ts`: no text formatting inside the engine.
 - `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
   Seattle tech finance. Inputs are illustrative, not market data.
@@ -40,10 +47,15 @@ methodology page matter more than features.
     signature element; the default basis is "After rent, at U.S. prices".
 
 ## Next steps
-1. **Timing review** (stopped here). The engine prerequisites are done; their timings are
-   in `docs/ui-design.md` §3.4, which recommends a Web Worker. Confirm that before UI code.
-2. **UI slices** per `docs/ui-design.md` §12, starting with slice 2 (the shell). Engine
-   items 6-10 in §11 come with it.
+1. **Slice 1 review** (stopped here). Screenshots and the live URL go to the user. Deploy
+   on Vercel from the private repo:
+   - framework none, `npm ci`, `npm run build`, output `dist/`;
+   - CSP and other headers in `vercel.json`.
+2. **UI slices** per `docs/ui-design.md` §12. Deferred from slice 1:
+   - phone tabs and a sticky verdict bar;
+   - interactive tickmarks (slice 3);
+   - pay per extra hour and the close-call flip line (engine items 6 and 11);
+   - error codes with input paths (item 7).
 
 ## Commands
 - `npm test`: unit tests. `npm run typecheck`: `tsc -p .` (src and test, no Node types)
@@ -51,6 +63,8 @@ methodology page matter more than features.
 - `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
   `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
 - `npm run offers`: sample comparison tables.
+- `npm run dev` / `npm run build` / `npm run preview`: the app (Vite, config in
+  `app/vite.config.ts`), built to `dist/`.
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
   engine changes; the UI's live-update budget depends on them.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
@@ -88,6 +102,15 @@ methodology page matter more than features.
   engine; the UI and the scripts use it.
 - `src/samples.ts`: the three sample offers (illustrative), shared by the table script,
   the benchmark and the UI.
+- `app/`: the UI (React 19, Vite 8; its own `tsconfig.json`).
+  - `src/model.ts`: quick fields ↔ `OfferInput`; the samples, moved to start on or after
+    today.
+  - `src/session.ts`: state, reducer, localStorage.
+  - `src/engine.worker.ts` and `src/useEngine.ts`: `horizonSweep` in a Web Worker,
+    debounced 200 ms, stale generations dropped.
+  - `src/verdict.ts`: the lead schedule's view model.
+  - `About.tsx`, `Ledger.tsx`, `Lead.tsx`, `ui.tsx` (tickmarks, stamps, inputs),
+    `styles.css` (the workpaper tokens).
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
   `offer-table.ts`, `bench.ts`, `check-engine.ts`, `fetch-rpp.ts`, `fetch-fmr.ts`, and
   `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
