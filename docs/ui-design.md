@@ -1175,11 +1175,43 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **First run:** the samples load by default with a "Start with my offers" link, instead
   of the W1 choice screen.
 
+- **UI slice 2, first half** (2026-10-08, at a review stop):
+  - Fixes from the slice-1 review: other wages follow the earliest start's calendar year;
+    the rank list's caption names the total ("4-year total after rent, in today's
+    U.S.-average dollars, present value"); a blank rent shows the estimate as a value with
+    an `E` tickmark, and an entered rent offers it back on one line ("HUD est. $2,729 ·
+    use"); Quick / Detailed is a control, with Detailed marked coming soon.
+  - Tickmarks open Show the work for every figure in the lead schedule and every default
+    or estimate in the inputs (§8, §9.1), with drill-down, tracing, a roving tabindex and
+    Escape. The hero's derivation shows the PV gap, the annuity factor and the monthly
+    figure, and why it isn't the gap ÷ the months.
+  - Pay per extra hour (§4.2, engine item 6). The quoted-TC-by-component engine change for
+    the bridge is in too.
+
+**UI slice 2 (first half) versus this design:**
+- **"Per hour", not "÷ Hours":** at 13 px, Atkinson Hyperlegible Next's ÷ closes up into a +
+  (checked at 1:1 pixels). Operators in derivations are set at 16 px bold for the same
+  reason.
+- **Zeros stay slashed:** Atkinson Hyperlegible Next has no plain-zero alternate (the shipped
+  files have `ccmp`, `frac`, `locl`, `pnum`, `tnum`; the upstream source adds only `aalt`,
+  `sups`, `ordn`, `case`).
+- **Popover placement:** opened from the results on a wide screen, it sits beside them, over
+  the inputs, so the figures it highlights stay in view. Elsewhere it opens under the
+  tickmark; on phones it's a bottom sheet.
+- **Precision in derivations:** the price factor shows 6 decimals and the annuity factor 4
+  (W8a showed 4 and 2), so each line multiplies out to the dollar on a calculator.
+- **Pay per extra hour:** the "against A's average" comparison uses A's average on the same
+  basis as the extra hours (after tax: $34.30 an hour in the app's 2027 samples), not the
+  step-3 average in §4.2's example.
+- **Not yet:** the methodology references in popovers are plain text until the methodology
+  page ships (second half); the `<` mark isn't drawn on figures yet (a popover lists what
+  its figure ties to); the hide-tickmarks setting isn't built.
+
 **UI slices**, numbered as shipped. The engine prerequisites came first and aren't
 numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
    row, the pipeline toggle, local saving and the samples. Engine item 10 came with it.
-2. **Explanations** (next): tickmarks and Show the work, L-1, the bridge and first-use
+2. **Explanations** (in progress; first half done): tickmarks and Show the work, L-1, the bridge and first-use
    note, and methodology v1. Engine item 6 (pay per extra hour) comes with it.
 3. **Detailed mode:** every section, with the help text for each. Engine item 7 (error
    codes with input paths) comes with it.

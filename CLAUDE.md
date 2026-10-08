@@ -17,17 +17,19 @@ methodology page matter more than features.
   - 401(k), health, perks, hours;
   - cost of living (BEA RPPs), the COL-adjusted total, rent growth;
   - `cliffs` / `nextCliff`, `withholdingShortfall`, and `horizonSweep` (window hours,
-    per hour, `monthlyEquivalent`).
+    per hour, `monthlyEquivalent`);
+  - per stay row: nominal values, hours, `annuityFactor` and `extraHours` (pay per extra
+    hour); `annuityTerms`; the offer-letter total by component (`quoted`).
 - **Structured output:** the engine returns numbers and codes. `src/format` writes all the
   words (labels, formulas, warnings, assumptions).
 - **Rent estimates:** HUD FY2027 Fair Market Rents by metro (`npm run fetch-fmr`). A
   BEA-derived fallback, anchored at the ACS 2024 median gross rent ($1,487), covers areas
   without an FMR.
 - **Speed** (`npm run bench`, median of warm runs):
-  - one projection 2.5 ms; `compareOffers` 19 ms; `horizonSweep` (stays of 2-5) 21 ms;
-  - one breakeven 50 ms; a 60-month leave sweep 81 ms.
+  - one projection 2.6 ms; `compareOffers` 20 ms; `horizonSweep` (stays of 2-5) 23 ms;
+  - one breakeven 46 ms; a 60-month leave sweep 81 ms.
 
-**UI: slice 1 is live at https://offer-calc.vercel.app.**
+**UI: slice 1 and the first half of slice 2 are live at https://offer-calc.vercel.app.**
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -37,7 +39,12 @@ methodology page matter more than features.
   - About you, with "How long do you expect to stay?" (default 4 years);
   - HUD rent estimates;
   - the lead schedule: verdict, rank list, basis pipeline, the "if you stay 2-5 years"
-    row and the disagreement line;
+    row, the disagreement line, and pay per extra hour;
+  - **tickmarks that open Show the work** (slice 2, first half): every figure in the lead
+    schedule, and every default or estimate in the inputs. The popover shows the derivation
+    with your values, each part ticked so you can drill down, and lights up the figures it
+    uses. Arrow keys move between tickmarks; Escape closes and returns focus. On phones it's
+    a bottom sheet.
   - light and dark themes.
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo.
@@ -45,13 +52,17 @@ methodology page matter more than features.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 276 / 85 KB. It was 437 / 122 KB before the slim city list.
-  - **Worker:** 232 / 60 KB.
+  - **Main thread:** 309 / 95 KB (276 / 85 KB in slice 1; the derivations and the popover
+    added the rest). It was 437 / 122 KB before the slim city list.
+  - **Worker:** 233 / 61 KB. Per edit it runs `horizonSweep` plus your stay's three full
+    projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 156 passing.
-- `test/offer.test.ts` 110, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `app/src/app.test.ts` 14.
+**Tests:** 173 passing.
+- `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+  `app/src/app.test.ts` 15, `app/src/metrics.test.ts` 12.
+- `metrics.test.ts` renders the schedules (react-dom/server) and fails if any tickmark's
+  figure lacks a tickmark kind, a methodology section or a derivation, drill-downs included.
 - Hand-checked values carry their arithmetic in comments.
 - `npm test` also runs `scripts/check-engine.ts`, the no-formatting-in-the-engine guard.
 
@@ -67,15 +78,20 @@ methodology page matter more than features.
     UI slices as shipped.
 
 ## Next steps
-1. **UI slice 2: Explanations** (`docs/ui-design.md` §8-9, §12).
-   - Tickmarks that open **Show the work**: the derivation with your values, each part
-     ticked, and the figures it uses highlighted on the page.
-   - L-1 by year (chart plus table view).
-   - The bridge from the offer letter, and the first-use note for the after-rent basis.
+1. **UI slice 2: Explanations** (`docs/ui-design.md` §8-9, §12). First half done
+   (tickmarks and Show the work in the lead schedule and inputs; pay per extra hour;
+   the review fixes). It's at a review stop: continue after the user's review.
+   - L-1 by year (chart plus table view), its figures ticked; `<` ties to its table view.
+     No d3: the scale and axis are hand-written.
+   - The bridge from the offer letter (uses `quoted`), and the first-use note for the
+     after-rent basis.
    - Methodology v1 (M-1 to M-13): written sections plus each offer's live
-     `assumptions[]` through `src/format`.
-   - Carried over from slice 1: pay per extra hour in the lead schedule (§11, item 6).
-   - Stop for review with light and dark screenshots of the live site.
+     `assumptions[]` through `src/format`. It must list every data source with its
+     vintage (IRS 2026 parameters, the Tax Foundation table plus each state override and
+     its statute, BEA 2024 RPPs, HUD FY2027 FMRs, Census ACS 2024), the PolicyEngine-US
+     validation results, and the known gaps in plain language. Then the popovers'
+     "Methodology M-x" references become links.
+   - Stop for the final slice-2 review with light and dark screenshots of the live site.
 2. **Later slices**, per §12:
    - 3: detailed mode, plus error codes with input paths (§11, item 7);
    - 4: risk and breakeven, plus the close-call flip line;
@@ -136,14 +152,24 @@ methodology page matter more than features.
   - `src/model.ts`: quick fields ↔ `OfferInput`; the samples, moved to start on or after
     today.
   - `src/session.ts`: state, reducer, localStorage.
-  - `src/engine.worker.ts` and `src/useEngine.ts`: `horizonSweep` and rent estimates in a
-    Web Worker, debounced 200 ms, stale generations dropped.
+  - `src/engine.worker.ts` and `src/useEngine.ts`: the engine in a Web Worker, debounced
+    200 ms, stale generations dropped. `src/compute.ts` is what it computes per request:
+    `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms and
+    rent estimates. Only the worker and tests import it.
   - **Bundles:** only the worker holds the engine and the BEA/HUD tables. The main thread
     imports engine types and `src/col/cities.ts` only. `src/protocol.ts` holds the
-    message types and `rentKey`: never import values from `engine.worker.ts`.
-  - `src/verdict.ts`: the lead schedule's view model.
-  - `About.tsx`, `Ledger.tsx`, `Lead.tsx`, `ui.tsx` (tickmarks, stamps, inputs),
+    message types and `rentKey`: never import values from `engine.worker.ts` or
+    `compute.ts`.
+  - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
+  - `src/metrics.ts`: Show the work. Each figure's metric id maps to a tickmark kind, a
+    methodology section (`src/sections.ts`) and a derivation built from the engine's
+    numbers. Pure; the words for derivations live here, beside `src/format`'s.
+  - `src/Tickmarks.tsx`: `WorkProvider`, `Fig` (a figure and its tickmark), `TickButton`,
+    `Trace` (an input derivations can light up), `useRovingTicks`, and the popover.
+  - `About.tsx`, `Ledger.tsx`, `Lead.tsx`, `ui.tsx` (the tickmark table, stamps, inputs),
     `styles.css` (the workpaper tokens).
+  - Windows: `metrics.ts` and `Tickmarks.tsx` are named apart on purpose; `work.ts` and
+    `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
   `offer-table.ts`, `bench.ts`, `check-engine.ts`, `fetch-rpp.ts`, `fetch-fmr.ts`, and
   `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
