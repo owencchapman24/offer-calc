@@ -172,7 +172,7 @@ const comparison = compareOffers(offers, household, { inflation, valuationDate, 
 const base = comparison.projections.map((p) => p.scenarios.base);
 
 const out: string[] = [
-  "Offer comparison: slices 1-6 (pay, equity, leave date, PV, 401(k), health, perks, hours, cost of living)",
+  "Offer comparison: pay, equity, leave date, PV, 401(k), health, perks, hours, cost of living (COL-adjusted total, rent growth)",
   `Household: single, no other wages, medium health usage. Tax law after 2026 projected at ${inflation * 100}% inflation.`,
   "Sample inputs are illustrative, not market data.",
 ];
@@ -214,44 +214,73 @@ out.push("",
       return [$(w.presentValue!.afterTaxComp), $(w.totalRewards.presentValue!)];
     })])));
 
-out.push("", "Breakeven: starting salary B or C would need to tie A in base-scenario PV over the window "
-  + "(raises, percent-of-salary bonuses and 401(k) amounts scale with it):");
-for (const other of [offers[1], offers[2]]) {
-  for (const basis of ["cash", "totalRewards"] as const) {
-    const r = breakeven(offers[0], other, "salary", household, { inflation, valuationDate, horizonYears: 5, basis });
-    out.push(`   ${short(other)}, ${basis === "cash" ? "after-tax comp" : "total rewards "}: $${$(r.from)} -> $${$(r.to)} `
-      + `(+$${$(r.increase)}, +${pct(r.increase / r.from)}); target PV $${$(r.targetPV)}`);
-  }
-}
-
 // ---- cost of living ------------------------------------------------------------------
 const colInfo = base.map((r) => r.costOfLiving!);
+const savingsRate = household.costOfLiving?.savingsRate ?? 0;
 out.push("", `Cost of living: ${colInfo[0].rppVintage}`,
   `Reference: ${colInfo[0].reference.name} dollars. Non-housing RPP = (all items - 0.16 x housing) / 0.84; `
     + "factor = reference non-housing / area non-housing.",
-  table(["Offer", "Area", "All items", "Housing", "Non-housing", "Factor", "Rent/mo"],
+  "Rent is the first lease year's, from the start date; it rises at each anniversary (default: the inflation input).",
+  table(["Offer", "Area", "All items", "Housing", "Non-housing", "Factor", "Rent/mo", "Rent growth"],
     offers.map((o, i) => {
       const c = colInfo[i];
       return [short(o), c.area.name.replace(/ \(Metropolitan Statistical Area\)$/, ""), c.area.allItems.toFixed(1),
-        c.area.housing.toFixed(1), c.area.nonHousing.toFixed(1), c.nonHousingFactor.toFixed(4), `$${$(c.monthlyRent)}`];
+        c.area.housing.toFixed(1), c.area.nonHousing.toFixed(1), c.nonHousingFactor.toFixed(4), `$${$(c.monthlyRent)}`,
+        `${pct(c.rentGrowth)}${c.rentGrowthSource === "inflation" ? " (inflation)" : ""}`];
     }), 2));
 
-const colRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.flatMap((r) => {
-  const e = r.employmentYears[i];
-  return [$(e.takeHome), $(e.costOfLiving!.rent), $(e.costOfLiving!.discretionaryReference)];
-})]);
-out.push("", "Discretionary income after rent, U.S. dollars, by employment year (base scenario):",
-  "Take-home - rent = local non-housing money, x factor = U.S. dollars.",
-  table(["Year", ...offers.flatMap((o) => [`${short(o)} take-home`, `${short(o)} rent`, `${short(o)} discretionary`])], colRows));
+out.push("", "COL-adjusted total, U.S. dollars, by employment year (base scenario). Spending money is local; saved money isn't:",
+  `   Take-home${savingsRate ? " - savings" : ""} - rent = local non-housing money; x factor = discretionary after rent (U.S. $).`,
+  "   Out-of-pocket health spending comes out of that local money, so it's converted the same way.",
+  `   Face value = your 401(k) + HSA, vested employer 401(k), employer HSA, perks${savingsRate ? ", savings" : ""}: not spent locally, not converted.`,
+  "   COL-adjusted total = discretionary - out-of-pocket + face value. Total rewards shown for comparison.");
+offers.forEach((o, i) => {
+  out.push("", `${o.label}:`, table(
+    ["Year", "Take-home", ...(savingsRate ? ["- Savings"] : []), "- Rent", "= Local non-housing", "Discretionary (U.S. $)",
+      "- Out-of-pocket (U.S. $)", "+ Face value", "= COL-adjusted total", "Total rewards"],
+    base[i].employmentYears.map((y) => {
+      const c = y.costOfLiving!;
+      return [String(y.year), $(y.takeHome), ...(savingsRate ? [$(c.savings)] : []), $(c.rent), $(c.nonHousingLocal),
+        $(c.discretionaryReference), $(c.outOfPocketReference), $(c.faceValue), $(c.total), $(y.totalRewards)];
+    })));
+});
 
-out.push("", `Unadjusted vs cost-of-living-adjusted, base scenario, PV at ${comparison.discountRate * 100}% as of ${valuationDate}:`,
-  table(["Offer", "After-tax comp PV", "Total rewards PV", "Take-home PV", "Discretionary after rent PV (U.S. $)",
-    "Discretionary nominal (U.S. $)"],
+const colSide = base[0].employmentYears.map((y, i) => [String(y.year), ...base.flatMap((r) => {
+  const e = r.employmentYears[i];
+  return [$(e.totalRewards), $(e.costOfLiving!.total)];
+})]);
+colSide.push(["Total", ...base.flatMap((r) => [$(r.employmentYears.reduce((s, y) => s + y.totalRewards, 0)),
+  $(r.employmentYears.reduce((s, y) => s + y.costOfLiving!.total, 0))])]);
+out.push("", "Side by side, total rewards vs COL-adjusted total (U.S. $) by employment year (base scenario):",
+  table(["Year", ...offers.flatMap((o) => [`${short(o)} total rewards`, `${short(o)} COL-adjusted`])], colSide));
+
+out.push("", `Unadjusted vs cost-of-living-adjusted, base scenario over ${windowText}; PV at ${comparison.discountRate * 100}% as of ${valuationDate}:`,
+  table(["Offer", "After-tax comp PV", "Total rewards PV", "Discretionary after rent PV (U.S. $)", "COL-adjusted total nominal",
+    "COL-adjusted total PV"],
     comparison.projections.map((p, i) => {
       const w = p.scenarios.base.window;
-      return [short(offers[i]), $(w.presentValue!.afterTaxComp), $(w.totalRewards.presentValue!), $(w.presentValue!.takeHome),
-        $(w.costOfLiving!.presentValue!), $(w.costOfLiving!.nominal)];
-    })));
+      const c = w.costOfLiving!;
+      return [short(offers[i]), $(w.presentValue!.afterTaxComp), $(w.totalRewards.presentValue!),
+        $(c.presentValue!.discretionaryReference), $(c.nominal.total), $(c.presentValue!.total)];
+    })),
+  "", "COL-adjusted total PV by scenario (U.S. $):",
+  table(["Offer", ...scenarios.map((s) => `${s} PV`)],
+    comparison.projections.map((p, i) => [short(offers[i]),
+      ...scenarios.map((s) => $(p.scenarios[s].window.costOfLiving!.presentValue!.total))])));
+
+out.push("", "Breakeven: starting salary B or C would need to tie A in base-scenario PV over the window "
+  + "(raises, percent-of-salary bonuses and 401(k) amounts scale with it):");
+const basisLabel = { cash: "after-tax comp     ", totalRewards: "total rewards      ", colAdjustedTotal: "COL-adjusted total " };
+const sign = (x: number) => (x < 0 ? "-" : "+");
+for (const other of [offers[1], offers[2]]) {
+  for (const basis of ["cash", "totalRewards", "colAdjustedTotal"] as const) {
+    const r = breakeven(offers[0], other, "salary", household, { inflation, valuationDate, horizonYears: 5, basis });
+    out.push(`   ${short(other)}, ${basisLabel[basis]}: $${$(r.from)} -> $${$(r.to)} `
+      + `(${sign(r.increase)}$${$(Math.abs(r.increase))}, ${sign(r.increase)}${pct(Math.abs(r.increase) / r.from)}); `
+      + `target PV $${$(r.targetPV)}`);
+  }
+}
+out.push("   A negative change means B or C is already ahead on that basis.");
 
 const sweepMonths = [3, 6, 9, 11, 12, 13, 18, 24, 36, 48];
 const sweeps = offers.map((o) => leaveDateSweep(o, household, sweepMonths, { inflation }));
