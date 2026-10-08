@@ -3,11 +3,11 @@ import type { TaxInput, TaxParams } from "../tax/index";
 import { clawbackFraction, SECTION_1341_THRESHOLD } from "./clawback";
 import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
-import { bonusEvents, cashEvents, type RawEvent, salaryEarned, salaryEvents, usd } from "./streams";
+import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath, usd } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
 import type {
   ByComponent, CalendarYearResult, ClawbackResult, CompEvent, Component, EmploymentYearResult, Household,
-  LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
+  LeaveSweepRow, Money, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -36,17 +36,36 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (yearOfDay(start) < 2026) throw new Error("Start dates before 2026 aren't supported: tax data starts in 2026.");
   const leave = offer.leaveDate !== undefined ? toDays(offer.leaveDate) : undefined;
   if (leave !== undefined && leave < start) throw new Error("The leave date can't be before the start date.");
+  const discountRate = options.discountRate ?? 0.05;
+  if (!(discountRate > -1)) throw new Error("The discount rate must be greater than -100%.");
+  const valuation = options.valuationDate !== undefined ? toDays(options.valuationDate) : undefined;
+
+  // Totals window: [start, start + years) unless a shared window is passed in.
+  const windowStart = options.window ? toDays(options.window.start) : start;
+  const windowYears = options.window?.years ?? years;
+  if (!Number.isInteger(windowYears) || windowYears < 1) throw new Error("Window years must be a whole number >= 1.");
+  const windowEnd = addMonths(windowStart, 12 * windowYears);
 
   // anniversaries[n] = start + n years. Employment year n covers [anniversaries[n-1], anniversaries[n]).
-  const anniversaries = Array.from({ length: years + 3 }, (_, n) => addMonths(start, 12 * n));
-  // Simulate to the end of the calendar year holding the horizon's last day, so it's taxed in full.
-  const until = jan1(yearOfDay(anniversaries[years] - 1) + 1);
+  let trackedYears = years;
+  while (addMonths(start, 12 * trackedYears) < windowEnd) trackedYears++;
+  const anniversaries = Array.from({ length: trackedYears + 3 }, (_, n) => addMonths(start, 12 * n));
+  // Simulate to the end of the calendar year holding the last reported day, so it's taxed in full.
+  const until = jan1(yearOfDay(Math.max(anniversaries[years], windowEnd) - 1) + 1);
   // Employment ends after the leave date (inclusive); nothing is earned, vested or granted after it.
   const workEnd = leave !== undefined ? Math.min(until, leave + 1) : until;
+
+  // A payment dated exactly on an anniversary counts toward the year just ended (decision 1),
+  // so a 12-month cliff vest is year-1 pay. Infinity = past the anniversaries we track.
+  const yearOfPayment = (day: number) => {
+    const i = anniversaries.findIndex((d) => d >= day);
+    return i === -1 ? Infinity : Math.max(1, i);
+  };
 
   const warnings: string[] = [];
   const convenience = convenienceRuleWarning(offer.residence.state, offer.employerState);
   if (convenience) warnings.push(convenience);
+  const path = salaryPath(offer.salary, scenario, start, until);
 
   // ---- equity: new-hire grants and refresher grants ----------------------------
   const equity = offer.equity;
@@ -65,12 +84,12 @@ export function projectScenario(offer: OfferInput, household: Household, options
   for (const g of [...grants, ...refreshers]) checkSchedule(g.schedule);
 
   // ---- payments ------------------------------------------------------------------
-  const earned = (from: number, to: number) => salaryEarned(offer.salary.annual, from, to);
+  const earned = (from: number, to: number) => salaryEarned(path, from, to);
   const cash = cashEvents(offer.cashAwards ?? [], start);
   const paidCash = cash.filter((e) => e.day < workEnd);
   const raw: RawEvent[] = [
-    ...salaryEvents(offer.salary.annual, start, workEnd, anniversaries),
-    ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, warnings, leave) : []),
+    ...salaryEvents(path, start, workEnd, anniversaries),
+    ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, yearOfPayment, warnings, leave) : []),
     ...paidCash,
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
   ];
@@ -181,12 +200,6 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   raw.sort((a, b) => a.day - b.day);
 
-  // A payment dated exactly on an anniversary counts toward the year just ended (decision 1),
-  // so a 12-month cliff vest is year-1 pay. Infinity = past the anniversaries we track.
-  const yearOfPayment = (day: number) => {
-    const i = anniversaries.findIndex((d) => d >= day);
-    return i === -1 ? Infinity : Math.max(1, i);
-  };
   // Accrued pay belongs to the year its first day falls in.
   const employmentYear = (e: RawEvent) => e.accruedFrom !== undefined
     ? anniversaries.findIndex((d) => d > e.accruedFrom!)
@@ -197,6 +210,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const tax = e.nonWage ? e.nonWage.tax : e.gross * yearResult(yearOfDay(e.day)).offerTaxRate;
     return { ...e, tax, ey: employmentYear(e) };
   });
+  // Present value: each event's cash discounted from its date to the valuation date.
+  const discount = (day: number) => (valuation === undefined ? undefined : (1 + discountRate) ** (-(day - valuation) / 365.25));
+  const inWindow = (day: number) => day >= windowStart && day < windowEnd;
   const events: CompEvent[] = taxed.map((e) => ({
     date: fromDays(e.day),
     component: e.component,
@@ -207,12 +223,33 @@ export function projectScenario(offer: OfferInput, household: Household, options
     employmentYear: e.ey,
     tax: round2(e.tax),
     net: round2(e.gross - e.tax),
+    inWindow: inWindow(e.day),
+    ...(valuation !== undefined ? { discountFactor: discount(e.day) } : {}),
   }));
+  const money = (weight: (day: number) => number): Money => {
+    const m = { gross: 0, tax: 0, net: 0 };
+    for (const e of taxed) {
+      if (!inWindow(e.day)) continue;
+      const w = weight(e.day);
+      m.gross += e.gross * w;
+      m.tax += e.tax * w;
+      m.net += (e.gross - e.tax) * w;
+    }
+    return { gross: round2(m.gross), tax: round2(m.tax), net: round2(m.net) };
+  };
+  const windowTotals: ScenarioResult["window"] = {
+    start: fromDays(windowStart),
+    end: fromDays(windowEnd),
+    nominal: money(() => 1),
+    ...(valuation !== undefined ? { presentValue: money((day) => discount(day)!) } : {}),
+  };
 
   // ---- employment years ---------------------------------------------------------
-  const bonusTarget = offer.bonus
-    ? (offer.bonus.basis === "percentOfSalary" ? offer.bonus.amount.base * offer.salary.annual : offer.bonus.amount.base)
-    : 0;
+  const bonus = offer.bonus;
+  const bonusTarget = (n: number) => !bonus ? 0
+    : bonus.basis === "percentOfSalary" ? bonus.amount.base * rateAt(path, anniversaries[n - 1])
+    : bonus.basis === "fixed" ? bonus.amount.base
+    : bonus.amounts[Math.min(n, bonus.amounts.length) - 1].base;
   // Quoted RSUs: new-hire tranches by nominal date at grant value (refreshers aren't in an offer letter).
   const quotedRsu = new Map<number, number>();
   for (const g of grants) {
@@ -235,7 +272,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       gross: rounded(by),
       tax: round2(tax),
       net: round2(total(by) - tax),
-      quotedTC: round2(offer.salary.annual + bonusTarget + (quotedCash.get(n) ?? 0) + (quotedRsu.get(n) ?? 0)),
+      quotedTC: round2(rateAt(path, anniversaries[n - 1]) + bonusTarget(n) + (quotedCash.get(n) ?? 0) + (quotedRsu.get(n) ?? 0)),
     });
   }
 
@@ -258,11 +295,21 @@ export function projectScenario(offer: OfferInput, household: Household, options
     `Tax years after 2026 are projected at ${+(inflation * 100).toFixed(2)}% inflation: federal amounts `
       + "indexed, state law held at 2026 except statutory indexing (CA) and federal links.",
   ];
-  if (offer.bonus) {
-    const b = offer.bonus;
-    assumptions.push(b.basis === "percentOfSalary"
-      ? `Bonus: ${+(b.amount[scenario] * 100).toFixed(2)}% of salary earned in each period (${scenario} scenario).`
-      : `Bonus: ${usd(b.amount[scenario])} a year, prorated by days employed (${scenario} scenario).`);
+  if (path.steps.length > 1) {
+    assumptions.push(`Salary changes (${scenario} scenario): `
+      + path.steps.slice(1).map((s) => `${fromDays(s.day)} ${s.why} to ${usd(round2(s.annual))}`).join("; ") + ".");
+  }
+  if (bonus) {
+    assumptions.push(bonus.basis === "percentOfSalary"
+      ? `Bonus: ${+(bonus.amount[scenario] * 100).toFixed(2)}% of salary earned in each period (${scenario} scenario).`
+      : bonus.basis === "fixed"
+        ? `Bonus: ${usd(bonus.amount[scenario])} a year, prorated by days employed (${scenario} scenario).`
+        : `Bonus by employment year: ${bonus.amounts.map((a) => usd(a[scenario])).join(", ")} (last repeats; `
+          + `${scenario} scenario), prorated by days employed.`);
+  }
+  if (valuation !== undefined) {
+    assumptions.push(`Present values discount each payment's after-tax cash from its date to ${fromDays(valuation)} `
+      + `at ${+(discountRate * 100).toFixed(2)}% a year.`);
   }
   if (equity) {
     assumptions.push(`RSUs are W-2 wages at their value on the vest date and are assumed sold at vest; `
@@ -274,7 +321,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
 
   return {
-    label: offer.label, scenario, events, calendarYears, employmentYears,
+    label: offer.label, scenario, events, calendarYears, employmentYears, window: windowTotals,
     ...(leaveResult ? { leave: leaveResult } : {}), warnings, assumptions,
   };
 }

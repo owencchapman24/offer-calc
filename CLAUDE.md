@@ -25,8 +25,14 @@ deduction); payroll caps at the SS wage base in CO, CT, DE, ME, MA, OR, WA
 There's deliberately no default inflation in the engine.
 
 `src/offer/` is the offer model (docs/offer-model.md), built in slices. Each slice gets
-hand-checked tests and merges to main when green. `npm run offers` prints a year-by-year
-table for two sample offers.
+hand-checked tests and merges to main when green. Entry points:
+- `projectScenario`: one scenario.
+- `projectOffer`: bear/base/bull together.
+- `compareOffers`: a shared window, with nominal and PV totals.
+- `breakeven`: the salary or sign-on change that ties two offers.
+- `leaveDateSweep`: what you keep if you leave after N months.
+
+`npm run offers` prints tables for three sample offers.
 
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
@@ -130,3 +136,5 @@ table for two sample offers.
    at the flat 22% supplemental rate (37% above $1M), below the real marginal rate for
    many offers. Warn and estimate the April balance due. We compute liability, so totals
    are already right; this is a cash-timing warning.
+8. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback step,
+   and the after-tax value of staying until it (built on `leaveDateSweep`).

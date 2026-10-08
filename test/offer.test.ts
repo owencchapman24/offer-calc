@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  byYear, convenienceRuleWarning, leaveDateSweep, projectScenario, VESTING_PRESETS, type Household, type OfferInput,
+  breakeven, byYear, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, projectOffer,
+  projectScenario, VESTING_PRESETS, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
@@ -23,7 +24,7 @@ const worked: OfferInput = {
   equity: {
     grants: [{
       kind: "rsu", label: "New-hire grant", value: 200_000,
-      schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      schedule: { ...VESTING_PRESETS.backLoadedSemiannualAfterCliff, vestDates: { months: [2, 5, 8, 11], day: 15 } },
     }],
   },
 };
@@ -123,7 +124,7 @@ describe("incremental tax", () => {
 
 describe("bonus timing and proration", () => {
   const withBonus = (bonus: Partial<NonNullable<OfferInput["bonus"]>>, startDate = "2026-08-03"): OfferInput =>
-    ({ ...worked, startDate, cashAwards: [], bonus: { ...worked.bonus!, ...bonus } });
+    ({ ...worked, startDate, cashAwards: [], bonus: { ...worked.bonus!, ...bonus } as AnnualBonus });
   const bonuses = (offer: OfferInput, scenario: "bear" | "base" | "bull" = "base") =>
     projectScenario(offer, single, { scenario }).events.filter((e) => e.component === "bonus");
 
@@ -188,21 +189,29 @@ describe("residence vs employer state (decision 9)", () => {
 
 describe("vesting schedules", () => {
   it("standard: 25% at a 1-year cliff, then 6.25% quarterly to month 48", () => {
-    const t = VESTING_PRESETS.standard.tranches;
+    const t = VESTING_PRESETS.evenQuarterlyAfterCliff.tranches;
     expect(t[0]).toEqual({ month: 12, fraction: 0.25 });
     expect(t.slice(1)).toEqual([15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48].map((month) => ({ month, fraction: 0.0625 })));
   });
   it("back-loaded 5/15/40/40: 5% at the cliff, 7.5% twice, then 20% every six months", () => {
-    expect(VESTING_PRESETS.backLoaded.tranches.map((t) => [t.month, +t.fraction.toFixed(6)]))
+    expect(VESTING_PRESETS.backLoadedSemiannualAfterCliff.tranches.map((t) => [t.month, +t.fraction.toFixed(6)]))
       .toEqual([[12, 0.05], [18, 0.075], [24, 0.075], [30, 0.2], [36, 0.2], [42, 0.2], [48, 0.2]]);
   });
   it("annual and front-loaded monthly", () => {
-    expect(VESTING_PRESETS.annual.tranches).toEqual([12, 24, 36, 48].map((month) => ({ month, fraction: 0.25 })));
-    const f = VESTING_PRESETS.frontLoaded.tranches;
+    expect(VESTING_PRESETS.evenAnnual.tranches).toEqual([12, 24, 36, 48].map((month) => ({ month, fraction: 0.25 })));
+    const f = VESTING_PRESETS.frontLoadedMonthly.tranches;
     expect(f).toHaveLength(48);
     expect(f[0].month).toBe(1);
     expect(f[0].fraction).toBeCloseTo(0.0275, 12); // 33% / 12
     expect(f.reduce((s, t) => s + t.fraction, 0)).toBeCloseTo(1, 12);
+  });
+  it("labels say the real cadence: only the even 4-year preset is quarterly after year 1", () => {
+    expect(describeSchedule(VESTING_PRESETS.evenQuarterlyAfterCliff)).toBe("25/25/25/25, quarterly after a 1-year cliff");
+    expect(describeSchedule(VESTING_PRESETS.backLoadedSemiannualAfterCliff)).toBe("5/15/40/40, semiannual after a 1-year cliff");
+    expect(describeSchedule(VESTING_PRESETS.evenAnnual)).toBe("25/25/25/25, annual");
+    expect(describeSchedule(VESTING_PRESETS.frontLoadedMonthly)).toBe("33/33/22/12, monthly");
+    expect(describeSchedule(byYear([5, 15, 40, 40], { perYear: 4, cliffMonths: 12 })))
+      .toBe("5/15/40/40, quarterly after a 1-year cliff");
   });
   it("rejects percentages that don't sum to 100 and splits that don't divide the year", () => {
     expect(() => byYear([25, 25, 25], { perYear: 4 })).toThrow(/sum to 100/);
@@ -252,7 +261,7 @@ describe("RSUs in the projection", () => {
       equity: {
         grants: [],
         refreshers: { value: { bear: 10_000, base: 20_000, bull: 30_000 }, firstAfterMonths: 12, everyMonths: 12,
-          schedule: VESTING_PRESETS.annual },
+          schedule: VESTING_PRESETS.evenAnnual },
       },
     };
     const r = projectScenario(g, single);
@@ -362,7 +371,7 @@ describe("leave date and clawbacks", () => {
     const g: OfferInput = {
       ...withClawback,
       equity: { ...worked.equity!, refreshers: { value: { bear: 20_000, base: 20_000, bull: 20_000 },
-        firstAfterMonths: 12, everyMonths: 12, schedule: VESTING_PRESETS.annual } },
+        firstAfterMonths: 12, everyMonths: 12, schedule: VESTING_PRESETS.evenAnnual } },
     };
     // The first refresher is granted 2027-08-03.
     expect(leaving("2027-08-02", g).leave!.unvestedRsuForfeited).toBe(200_000);
@@ -382,6 +391,111 @@ describe("leave date and clawbacks", () => {
     expect(rows[2].paid).toBe(186_169.35); // exactly the first 12 months
     const kept = rows.map((r) => r.netKept);
     expect(kept).toEqual([...kept].sort((a, b) => a - b));
+  });
+});
+
+describe("raises and promotions", () => {
+  const all = (v: number) => ({ bear: v, base: v, bull: v });
+  const plain = (salary: OfferInput["salary"], startDate = "2026-07-13"): OfferInput =>
+    ({ label: "P", residence: { state: "TX" }, employerState: "TX", startDate, salary });
+
+  it("anniversary merit raises compound: 100,000 / 103,000 / 106,090 / 109,272.70 / 112,550.88", () => {
+    const r = projectScenario(plain({ annual: 100_000, raise: all(0.03) }), single);
+    expect(r.employmentYears.map((y) => y.gross.salary)).toEqual([100_000, 103_000, 106_090, 109_272.7, 112_550.88]);
+  });
+  it("Jan 1 raises split the first employment year: $101,596.77 (hand-checked)", () => {
+    // 100,000/12 x (19/31 + 5 months) + 103,000/12 x (6 months + 12/31) = 46,774.19 + 54,822.58.
+    const r = projectScenario(plain({ annual: 100_000, raise: all(0.03), raiseOn: "jan1" }), single);
+    expect(r.employmentYears[0].gross.salary).toBe(101_596.77);
+    expect(r.calendarYears.find((c) => c.year === 2027)!.offerGross.salary).toBe(103_000);
+    expect(r.employmentYears[1].quotedTC).toBe(103_000); // the rate in effect at the year's start
+  });
+  it("a mid-month promotion splits the month by days: 2027 salary $129,516.13 (hand-checked)", () => {
+    // Jan-Feb 20,000 + Mar (10,000 x 15/31 + 11,000 x 16/31 = 10,516.13) + Apr-Dec 9 x 11,000 = 129,516.13.
+    const r = projectScenario(plain({ annual: 120_000, promotions: [{ on: "2027-03-16", stepUp: 0.1 }] }, "2026-08-03"), single);
+    expect(r.calendarYears.find((c) => c.year === 2027)!.offerGross.salary).toBe(129_516.13);
+  });
+  it("promotions can be limited to scenarios; merit raises compound on top of a step-up", () => {
+    const promo = { on: "2029-07-13", stepUp: 0.35, scenarios: ["base", "bull"] as ("base" | "bull")[] };
+    const run = (scenario: "bear" | "base") =>
+      projectScenario(plain({ annual: 100_000, promotions: [promo] }), single, { scenario }).employmentYears.map((y) => y.gross.salary);
+    expect(run("base")).toEqual([100_000, 100_000, 100_000, 135_000, 135_000]);
+    expect(run("bear")).toEqual([100_000, 100_000, 100_000, 100_000, 100_000]);
+    const both = projectScenario(plain({ annual: 100_000, raise: all(0.03), promotions: [promo] }), single);
+    expect(both.employmentYears[3].gross.salary).toBe(147_518.15); // 100,000 x 1.092727 (1.03^3) x 1.35
+  });
+  it("a percent-of-salary bonus picks up raises", () => {
+    const o = { ...plain({ annual: 100_000, raise: all(0.03), raiseOn: "jan1" }),
+      bonus: { basis: "percentOfSalary", amount: all(0.1), payOn: { month: 3, day: 15 } } as AnnualBonus };
+    expect(projectScenario(o, single).events.find((e) => e.date === "2028-03-15")!.gross).toBe(10_300);
+  });
+  it("bonus by employment year: $70k prorated to a July start, then $85k, $100k, and the last repeats", () => {
+    // Calendar periods paid Jan 31; each uses the employment year it ends in. 70,000 x 172/365 = 32,986.30.
+    const o: OfferInput = { ...plain({ annual: 100_000 }), bonus: {
+      basis: "byEmploymentYear", amounts: [all(70_000), all(85_000), { bear: 80_000, base: 100_000, bull: 120_000 }],
+      payOn: { month: 1, day: 31 },
+    } };
+    const b = (scenario: "bear" | "base") =>
+      projectScenario(o, single, { scenario }).events.filter((e) => e.component === "bonus").map((e) => [e.date, e.gross]);
+    expect(b("base")).toEqual([["2027-01-31", 32_986.3], ["2028-01-31", 85_000], ["2029-01-31", 100_000],
+      ["2030-01-31", 100_000], ["2031-01-31", 100_000]]);
+    expect(b("bear")[2]).toEqual(["2029-01-31", 80_000]);
+    expect(projectScenario(o, single).employmentYears[1].quotedTC).toBe(185_000);
+  });
+});
+
+describe("present value and comparisons", () => {
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13", salary: { annual: 100_000 }, ...o });
+  const valued = { valuationDate: "2026-07-01" };
+
+  it("one $10,000 payment a year out in TX: $9,235 after FICA, PV $8,795.53 at 5% (hand-checked)", () => {
+    // 2027 federal tax is 0 (under the standard deduction); FICA 7.65% = 765.
+    // 365 days = 0.99932 years; 9,235 x 1.05^-(365/365.25) = 9,235 x 0.952413 = 8,795.53.
+    const r = projectScenario(tx({ startDate: "2026-07-01", salary: { annual: 0 },
+      cashAwards: [{ label: "One", amount: 10_000, paidOn: "2027-07-01" }] }), single, valued);
+    expect(r.window.nominal).toEqual({ gross: 10_000, tax: 765, net: 9_235 });
+    expect(r.window.presentValue!.net).toBe(8_795.53);
+    expect(r.events.find((e) => e.component === "cash")!.discountFactor).toBeCloseTo(1.05 ** (-365 / 365.25), 12);
+  });
+  it("a 0% discount rate gives PV = nominal; the default window is the employment-year horizon", () => {
+    const r = projectScenario(worked, single, { ...valued, discountRate: 0 });
+    expect(r.window.presentValue).toEqual(r.window.nominal);
+    expect(r.window.nominal.net).toBeCloseTo(r.employmentYears.reduce((s, y) => s + y.net, 0), 1);
+    expect(projectScenario(worked, single, valued).window.presentValue!.net).toBeLessThan(r.window.nominal.net);
+  });
+  it("projectOffer runs bear/base/bull together", () => {
+    const p = projectOffer(worked, single, valued);
+    const net = (s: "bear" | "base" | "bull") => p.scenarios[s].window.nominal.net;
+    expect(net("bear")).toBeLessThan(net("base"));
+    expect(net("base")).toBeLessThan(net("bull"));
+  });
+  it("compareOffers: a start two months later means two months less pay in the shared window", () => {
+    // Window 2026-07-01 to 2031-07-01 = 60 months: A earns 60 x 10,000; B (from 2026-09-01) 58 x 10,000.
+    const c = compareOffers([tx({ startDate: "2026-07-01", salary: { annual: 120_000 } }),
+      tx({ startDate: "2026-09-01", salary: { annual: 120_000 } })], single, valued);
+    expect(c.window).toEqual({ start: "2026-07-01", end: "2031-07-01" });
+    expect(c.projections.map((p) => p.scenarios.base.window.nominal.gross)).toEqual([600_000, 580_000]);
+  });
+  it("breakeven: offers differing only by $10k of salary need exactly $10k (hand-checked)", () => {
+    const r = breakeven(tx({ salary: { annual: 110_000 } }), tx({}), "salary", single, valued);
+    expect(r.increase).toBeCloseTo(10_000, 1);
+    expect(r.to).toBeCloseTo(110_000, 1);
+  });
+  it("breakeven: a $10k smaller sign-on paid the same day needs $10k more sign-on", () => {
+    const signOn = (amount: number) => [{ label: "Sign-on", amount, paidOn: { daysAfterStart: 30 } }];
+    const r = breakeven(tx({ cashAwards: signOn(25_000) }), tx({ cashAwards: signOn(15_000) }), "signOn", single, valued);
+    expect(r.increase).toBeCloseTo(10_000, 1);
+  });
+  it("breakeven: CA needs more salary than TX to tie, and the result does tie in PV", () => {
+    const ca = tx({ residence: { state: "CA" }, employerState: "CA" });
+    const r = breakeven(tx({}), ca, "salary", single, valued);
+    expect(r.increase).toBeGreaterThan(5_000);
+    const pv = (o: OfferInput) => projectScenario(o, single, { ...valued, scenario: "base" }).window.presentValue!.net;
+    expect(pv({ ...ca, salary: { annual: r.to } })).toBeCloseTo(r.targetPV, 0);
+  });
+  it("breakeven is negative when B is already ahead", () => {
+    expect(breakeven(tx({}), tx({ salary: { annual: 110_000 } }), "salary", single, valued).increase).toBeCloseTo(-10_000, 1);
   });
 });
 

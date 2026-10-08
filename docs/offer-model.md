@@ -62,16 +62,19 @@ come from the same events, so they reconcile exactly.
 ## 3. Components
 
 **Salary.**
-- **Raises:** an annual raise %, as a `bear / base / bull` set. Default 0. It applies at
-  each anniversary or at a company review date (`minMonths` covers "hired after the
-  cutoff, no raise this cycle").
-- **Promotions:** optional step-ups, e.g. +12% on 2028-04-01. Annual raises compound
-  from the new salary. Each promotion can be limited to some scenarios, e.g. base and
-  bull only.
+- **Raises (as built in slice 4):** an annual merit %, as a `bear / base / bull` set.
+  Default 0. It takes effect each work anniversary (default) or each Jan 1 after you start
+  (`raiseOn`). A review-date eligibility cutoff isn't modeled yet.
+- **Promotions:** optional step-ups, e.g. +35% on 2029-07-13. Merit raises compound from
+  the new salary, and same-day changes multiply. Each promotion can be limited to some
+  scenarios, e.g. base and bull only. A mid-month change splits that month by days.
 - **Not tied to inflation:** pay growth is separate from tax indexing (decision 4).
 
 **Bonus.**
-- **Amount:** a `bear / base / bull` set, either a % of salary or a fixed dollar amount.
+- **Amount:** a `bear / base / bull` set, either a % of salary, a fixed dollar amount,
+  or a dollar schedule by employment year (`byEmploymentYear`). In the schedule, each
+  period uses the employment year it ends in, the last entry repeats, and amounts
+  prorate by days employed.
 - **Percent of salary:** applies to salary **earned in the performance period**
   (decision 5). That prorates the first year automatically and picks up mid-period
   raises.
@@ -120,8 +123,11 @@ clawback terms:
 - **Vesting:** a schedule is any list of `{ month, fraction }` summing to 1.
   `byYear([25,25,25,25], { perYear: 4, cliffMonths: 12 })` is standard 4-year
   quarterly with a 1-year cliff. `byYear([5,15,40,40], { perYear: 2, cliffMonths: 12 })`
-  is back-loaded semiannual. `VESTING_PRESETS` names four common schedules:
-  `standard`, `annual`, `backLoaded` and `frontLoaded` (33/33/22/12 monthly).
+  is back-loaded semiannual. `VESTING_PRESETS` names four common schedules by split and
+  cadence: `evenQuarterlyAfterCliff`, `evenAnnual`, `backLoadedSemiannualAfterCliff`
+  and `frontLoadedMonthly`. `describeSchedule()` builds the label from the tranches (e.g.
+  "5/15/40/40, semiannual after a 1-year cliff"), so a label can't drift from the
+  schedule. For back-loaded quarterly, use `byYear([5,15,40,40], { perYear: 4, cliffMonths: 12 })`.
 - **Company vest dates:** an optional `vestDates` calendar moves each tranche to the next
   company vest date.
 - **Taxation:** vest-date value is W-2 wages. We assume you sell at vest.
@@ -198,6 +204,14 @@ compute nonresident tax or the resident credit.
   discounted further on top of being shorter in the window.
 - **Tax timing for PV:** tax is discounted at the event's date, as if withheld when paid.
   April true-ups are ignored.
+- **API (slice 4):**
+  - `projectOffer` runs bear/base/bull together.
+  - `compareOffers(offers, household, { valuationDate, horizonYears })` returns each
+    offer's nominal and PV totals per scenario over the shared window.
+  - `breakeven(A, B, "salary" | "signOn", …)` finds, by bisection to the cent, the change
+    to B's starting salary (or first sign-on) that ties A in base-scenario PV. Raises and
+    percent-of-salary bonuses scale with the new salary; a negative result means B is
+    already ahead.
 
 ## 8. Prerequisite: per-year tax parameters (refactor plan)
 
@@ -362,6 +376,10 @@ start date with PV discounted to today (decision 2); federal links only where ve
 (decision 3a); refactor first, on its own branch.
 
 ## 12. Types
+
+These were the proposal reviewed before building. The authoritative versions are now in
+`src/offer/types.ts` and `src/tax/params/index.ts`. They differ in detail: clawback terms,
+the bonus bases, `raiseOn`, and the leave and window results.
 
 ### 12a. Engine additions (`src/tax/params/index.ts`, `StateSpec`)
 
