@@ -179,6 +179,37 @@ Default: none.
 - **Federal limits:** 402(g), HSA, Section 127 and 132(f) are engine parameters with
   sources, indexed in projected years.
 
+**Cost of living (slice 6, roadmap item 3).**
+
+- **Data:** BEA Regional Price Parities, baked into `src/col/rpp.json` by
+  `npm run fetch-rpp`; the app never fetches at runtime.
+  - **Coverage:** 2024 RPPs (released February 19, 2026) for 387 metro areas, every
+    state, and each state's metro and nonmetro portions.
+  - **Components:** all items, goods, housing (rents), utilities and other services.
+  - **Scale:** U.S. all items = 100. The components are price levels on the same scale,
+    so the U.S. row itself isn't 100 on each component (housing 100.629). Every
+    comparison therefore uses ratios to a reference row.
+- **Method:** gross salary is never adjusted.
+  - Start from take-home pay, which already excludes your 401(k).
+  - Subtract planned savings (household `savingsRate`).
+  - Subtract rent: the offer's `monthlyRent`, or the household's reference rent ×
+    housing RPP ratio.
+  - What's left is non-housing spending in local dollars. Multiply it by reference
+    non-housing RPP ÷ area non-housing RPP to get **discretionary income after rent, in
+    reference-location dollars**.
+- **Non-housing RPP:** (all items − 0.16 × housing) ÷ 0.84. 16% is housing rents' share of
+  BEA's PCE-based weights (BEA, *Survey of Current Business*, March 2022). As a
+  cross-check, the fixed weights that best reproduce BEA's all-items index put housing at
+  0.187. BEA weights each region differently, so a single national weight is an
+  approximation.
+- **Reference:** default is the U.S. row ("00000"); the user can pick their current city.
+- **Output:**
+  - `ScenarioResult.costOfLiving`: the area, the reference, the RPPs used, the factor,
+    the rent and the vintage.
+  - Per employment year: savings, rent, local non-housing and discretionary
+    (reference $).
+  - Window totals: nominal and PV.
+
 ## 4. Leave date
 
 `leaveDate` is your last day of work, inclusive. It's the single cut-off for every stream

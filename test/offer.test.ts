@@ -6,6 +6,7 @@ import {
 } from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
+import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
 
 const single: Household = { filingStatus: "single" };
 
@@ -635,6 +636,62 @@ describe("401(k), health, perks and hours", () => {
   it("leaveDateSweep reports vested retirement money: the cliff shows at 36 months", () => {
     const rows = leaveDateSweep(cliffA, single, [35, 36]);
     expect(rows.map((r) => Math.round(r.retirementVested))).toEqual([0, 9_900]);
+  });
+});
+
+describe("cost of living (BEA RPPs)", () => {
+  it("baked data: 2024 RPPs, U.S. all items = 100, the sample metros present", () => {
+    expect(RPP.dataYear).toBe(2024);
+    expect(RPP.vintage).toMatch(/February 19, 2026/);
+    expect(rppArea("00000").allItems).toBe(100);
+    expect(Object.keys(RPP.areas).length).toBeGreaterThan(500);
+    expect(rppArea("35620").name).toMatch(/^New York-Newark-Jersey City/);
+    expect(findRppAreas("charlotte-concord")).toEqual([expect.objectContaining({ code: "16740", kind: "msa" })]);
+    expect(() => rppArea("99999")).toThrow(/Unknown BEA RPP area/);
+  });
+  it("non-housing RPP backs housing out at BEA's 16% weight: U.S. 99.8802, Charlotte 97.2933", () => {
+    // (100 - 0.16 x 100.629) / 0.84 and (97.348 - 0.16 x 97.635) / 0.84.
+    expect(nonHousingRpp(rppArea("00000"))).toBeCloseTo(99.88019, 4);
+    expect(nonHousingRpp(rppArea("16740"))).toBeCloseTo(97.29333, 4);
+  });
+
+  const clt: OfferInput = {
+    label: "CLT", residence: { state: "NC" }, employerState: "NC", startDate: "2026-01-01", salary: { annual: 100_000 },
+    costOfLiving: { area: "16740", monthlyRent: 1_700 },
+  };
+  const saver: Household = { filingStatus: "single", costOfLiving: { savingsRate: 0.1 } };
+
+  it("Charlotte end to end, hand-checked: $47,728.86 left after savings and rent = $48,997.88 in U.S. dollars", () => {
+    // Tax: federal 13,170 + FICA 7,650 + NC 3.99% x (100,000 - 12,750) = 3,481.275 -> 24,301.275
+    // (floating point rounds the half cent down: 24,301.27). Take-home 75,698.725.
+    // Savings 10% = 7,569.87; rent 12 x 1,700 = 20,400; non-housing 47,728.85 (local dollars).
+    // Factor = U.S. non-housing 99.8802 / Charlotte 97.2933 = 1.026588 -> 48,997.88 U.S. dollars.
+    const r = projectScenario(clt, saver, { years: 1 });
+    const y = r.employmentYears[0];
+    expect(y.tax).toBe(24_301.27);
+    expect(y.takeHome).toBe(75_698.73);
+    expect(y.costOfLiving).toEqual({ savings: 7_569.87, rent: 20_400, nonHousingLocal: 47_728.86, discretionaryReference: 48_997.88 });
+    expect(r.costOfLiving!.nonHousingFactor).toBeCloseTo(99.88019 / 97.29333, 6);
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input", savingsRate: 0.1,
+      area: { code: "16740", nonHousing: 97.293 }, reference: { code: "00000", nonHousing: 99.88 } });
+    expect(r.window.costOfLiving!.nominal).toBe(48_997.88);
+  });
+  it("gross pay is never adjusted: the same offer without cost of living has identical pay and tax", () => {
+    const a = projectScenario(clt, saver, { years: 1 }).employmentYears[0];
+    const b = projectScenario({ ...clt, costOfLiving: undefined }, saver, { years: 1 }).employmentYears[0];
+    expect([a.gross, a.tax, a.takeHome]).toEqual([b.gross, b.tax, b.takeHome]);
+  });
+  it("rent can be derived from the housing RPPs: $1,500 reference rent -> $1,455.37 in Charlotte", () => {
+    // 1,500 x 97.635 / 100.629
+    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
+      { filingStatus: "single", costOfLiving: { referenceMonthlyRent: 1_500 } }, { years: 1 });
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_455.37, rentSource: "derived" });
+    expect(() => projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 })).toThrow(/monthlyRent/);
+  });
+  it("with Charlotte as the reference, the factor is 1 and dollars stay local", () => {
+    const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });
+    expect(r.costOfLiving!.nonHousingFactor).toBe(1);
+    expect(r.employmentYears[0].costOfLiving!.discretionaryReference).toBe(r.employmentYears[0].costOfLiving!.nonHousingLocal);
   });
 });
 

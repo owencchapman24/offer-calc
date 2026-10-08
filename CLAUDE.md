@@ -34,6 +34,11 @@ hand-checked tests and merges to main when green. Entry points:
 
 `npm run offers` prints tables for three sample offers.
 
+`src/col/` holds BEA Regional Price Parities (`rpp.json`, 2024 RPPs, released 2026-02-19), baked
+in by `npm run fetch-rpp` with source and vintage recorded. The offer model's
+`costOfLiving` turns take-home minus savings and rent into discretionary income in
+reference-location dollars. Gross pay is never adjusted.
+
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
   table are marked `OVERRIDE:` with the bill/statute.
@@ -126,6 +131,15 @@ hand-checked tests and merges to main when green. Entry points:
     every state's wages. CA and NJ actually tax HSA contributions.
   - **Commuter:** one input for 132(f), capped at $340 a month, though transit and
     parking each have their own $340 limit.
+- Cost of living (slice 6) simplifications:
+  - **Relative prices:** held at the 2024 RPPs for every projected year.
+  - **Non-housing index:** uses one national housing weight (16%), while BEA weights each
+    region differently.
+  - **Rent:** held flat, and paid only while you're employed there.
+  - **Geography:** RPPs are metro-wide; the NYC metro averages Manhattan with its suburbs.
+  - **Savings rate:** defaults to 0.
+  - **Refresh:** re-run `npm run fetch-rpp` when BEA publishes a new vintage
+    (usually December).
 
 ## Roadmap
 1. Offer model on top of the engine: year-by-year cash comp (base, bonus as range,
@@ -135,7 +149,7 @@ hand-checked tests and merges to main when green. Entry points:
 2. (Done in slice 5.) Benefits: 401(k) match x vesting x expected tenure; health plan expected cost
    (premium + OOP scenarios - employer HSA); tax-free perks grossed up at marginal rate
    (Section 127 $5,250, 132(f) $340/mo).
-3. Cost of living: apply BEA Regional Price Parities only to post-tax, post-savings
+3. (Done in slice 6.) Cost of living: apply BEA Regional Price Parities only to post-tax, post-savings
    spending (never gross salary); user rent override.
 4. Time: commute cost (IRS 76c/mi includes depreciation — offer variable-cost option),
    effective hourly rate, remote-work valuation default ~5% of pay (editable).

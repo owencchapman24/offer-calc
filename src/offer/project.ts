@@ -5,10 +5,11 @@ import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath, usd } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
-import { healthFlows, perkFlows, type RawBenefit, retirementFlows, vestedFraction } from "./benefits";
+import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, vestedFraction } from "./benefits";
+import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import type {
   BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
-  EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
+  CostOfLivingInfo, EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -347,6 +348,61 @@ export function projectScenario(offer: OfferInput, household: Household, options
   });
   const nominal = windowMeasures(() => 1);
   const pv = valuation !== undefined ? windowMeasures((day) => discount(day)!) : undefined;
+
+  // ---- cost of living -----------------------------------------------------------------
+  // Never adjust gross pay. Start from take-home, take out planned savings and rent, and express
+  // what's left (non-housing spending) in reference-location dollars via non-housing RPPs.
+  let col: { info: CostOfLivingInfo; flows: Array<{ day: number; ey: number; takeHome: number; rent: number }> } | undefined;
+  if (offer.costOfLiving) {
+    const hc = household.costOfLiving ?? {};
+    const area = rppArea(offer.costOfLiving.area);
+    const ref = rppArea(hc.reference ?? NATIONAL);
+    const savingsRate = hc.savingsRate ?? 0;
+    if (!(savingsRate >= 0 && savingsRate < 1)) throw new Error("savingsRate must be at least 0 and below 1.");
+    let monthlyRent = offer.costOfLiving.monthlyRent;
+    let rentSource: CostOfLivingInfo["rentSource"] = "input";
+    if (monthlyRent === undefined) {
+      if (hc.referenceMonthlyRent === undefined) {
+        throw new Error(`Give "${offer.label}" a monthlyRent, or the household a referenceMonthlyRent to derive it from.`);
+      }
+      monthlyRent = hc.referenceMonthlyRent * (area.housing / ref.housing); // scaled by the housing (rents) RPPs
+      rentSource = "derived";
+    }
+    if (!(monthlyRent >= 0)) throw new Error("Rent can't be negative.");
+    const used = (a: ReturnType<typeof rppArea>) =>
+      ({ code: a.code, name: a.name, allItems: a.allItems, housing: a.housing, nonHousing: Math.round(nonHousingRpp(a) * 1000) / 1000 });
+    const flows: Array<{ day: number; ey: number; takeHome: number; rent: number }> = [];
+    for (const e of taxed) flows.push({ day: e.day, ey: e.ey, takeHome: e.gross - e.tax, rent: 0 });
+    for (const b of benefits) {
+      if (b.kind === "premium" || b.kind === "employee401k" || b.kind === "employeeHsa") {
+        flows.push({ day: b.day, ey: b.ey, takeHome: -b.amount, rent: 0 });
+      }
+    }
+    // Rent is paid monthly while you work there.
+    for (const { a, b, share } of monthlyPieces(start, workEnd, anniversaries)) {
+      flows.push({ day: b - 1, ey: anniversaries.findIndex((d) => d > a), takeHome: 0, rent: monthlyRent * share });
+    }
+    col = {
+      info: {
+        area: used(area), reference: used(ref), nonHousingFactor: nonHousingRpp(ref) / nonHousingRpp(area),
+        monthlyRent: round2(monthlyRent), rentSource, savingsRate, rppVintage: `${RPP.dataYear} RPPs. ${RPP.vintage}`,
+      },
+      flows,
+    };
+  }
+  const colSum = (keep: (f: { day: number; ey: number }) => boolean, weight: (day: number) => number = () => 1) => {
+    let takeHome = 0;
+    let rent = 0;
+    for (const f of col!.flows) {
+      if (!keep(f)) continue;
+      takeHome += f.takeHome * weight(f.day);
+      rent += f.rent * weight(f.day);
+    }
+    const savings = takeHome * col!.info.savingsRate;
+    const nonHousingLocal = takeHome - savings - rent;
+    return { savings, rent, nonHousingLocal, discretionaryReference: nonHousingLocal * col!.info.nonHousingFactor };
+  };
+
   const windowTotals: ScenarioResult["window"] = {
     start: fromDays(windowStart),
     end: fromDays(windowEnd),
@@ -357,6 +413,13 @@ export function projectScenario(offer: OfferInput, household: Household, options
       nominal: round2(nominal.m.totalRewards),
       ...(pv ? { presentValue: round2(pv.m.totalRewards) } : {}),
     },
+    ...(col ? {
+      costOfLiving: {
+        nominal: round2(colSum((f) => inWindow(f.day)).discretionaryReference),
+        ...(valuation !== undefined
+          ? { presentValue: round2(colSum((f) => inWindow(f.day), (day) => discount(day)!).discretionaryReference) } : {}),
+      },
+    } : {}),
   };
 
   // ---- employment years ---------------------------------------------------------
@@ -404,6 +467,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
       totalRewards: round2(m.totalRewards),
       ...(worked !== undefined ? { hours: round2(worked) } : {}),
       ...(worked ? { hourly: { afterTaxComp: round2(m.afterTaxComp / worked), totalRewards: round2(m.totalRewards / worked) } } : {}),
+      ...(col ? (() => {
+        const c = colSum((f) => f.ey === n);
+        return { costOfLiving: { savings: round2(c.savings), rent: round2(c.rent), nonHousingLocal: round2(c.nonHousingLocal),
+          discretionaryReference: round2(c.discretionaryReference) } };
+      })() : {}),
     });
   }
 
@@ -472,10 +540,18 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (hours) {
     assumptions.push(`Hours: ${hours.weekly[scenario]} a week x ${hours.weeksPerYear ?? 50} weeks a year (${scenario} scenario).`);
   }
+  if (col) {
+    const c = col.info;
+    assumptions.push(`Cost of living (${c.rppVintage}): gross pay is never adjusted. Take-home - ${+(c.savingsRate * 100).toFixed(2)}% `
+      + `savings - rent (${usd(c.monthlyRent)} a month, ${c.rentSource === "input" ? "as entered" : "derived from the housing RPPs"}, `
+      + `held flat while employed) = non-housing spending, converted to ${c.reference.name} dollars by the non-housing RPPs `
+      + `(${c.reference.nonHousing} / ${c.area.nonHousing} = ${c.nonHousingFactor.toFixed(4)}). Non-housing RPP = `
+      + `${RPP.nonHousing.formula}; relative prices are held at ${RPP.dataYear} levels.`);
+  }
 
   return {
     label: offer.label, scenario, events, benefitEvents, calendarYears, employmentYears, window: windowTotals,
-    ...(leaveResult ? { leave: leaveResult } : {}), warnings, assumptions,
+    ...(leaveResult ? { leave: leaveResult } : {}), ...(col ? { costOfLiving: col.info } : {}), warnings, assumptions,
   };
 }
 

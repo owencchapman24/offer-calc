@@ -37,6 +37,15 @@ export interface OfferInput {
   health?: Health;
   perks?: Perks;
   hours?: Hours;
+  /** Where you'd live, for cost-of-living comparisons (BEA Regional Price Parities). */
+  costOfLiving?: OfferCostOfLiving;
+}
+
+export interface OfferCostOfLiving {
+  /** BEA GeoFIPS code of the metro area or state-nonmetro portion, e.g. "35620"; see findRppAreas(). */
+  area: string;
+  /** Your expected rent there. If omitted, derived from the household reference rent and the housing RPPs. */
+  monthlyRent?: number;
 }
 
 /** 401(k): your deferrals, the employer's match and non-elective money, and its vesting. */
@@ -215,6 +224,16 @@ export interface Household {
   spouseWages?: Record<number, number>;
   /** Which expected out-of-pocket level applies to every offer's health plan. Default "medium". */
   healthUsage?: "low" | "medium" | "high";
+  costOfLiving?: HouseholdCostOfLiving;
+}
+
+export interface HouseholdCostOfLiving {
+  /** Reference location whose dollars results are expressed in. BEA GeoFIPS; default "00000" (U.S.). */
+  reference?: string;
+  /** Planned savings as a fraction of take-home pay (beyond your 401(k), already out). Default 0. */
+  savingsRate?: number;
+  /** Your monthly rent in the reference location; used to derive rent where an offer gives none. */
+  referenceMonthlyRent?: number;
 }
 
 export interface ProjectionOptions {
@@ -311,6 +330,23 @@ export interface WindowTotals {
   benefits: { nominal: BenefitTotals; presentValue?: BenefitTotals };
   /** After-tax comp + vested retirement + perks - out-of-pocket + employer HSA (= gross - tax + retirement + perks - health net). */
   totalRewards: { nominal: number; presentValue?: number };
+  /** Discretionary income after rent, in reference-location dollars. Present with costOfLiving. */
+  costOfLiving?: { nominal: number; presentValue?: number };
+}
+
+export interface RppUsed { code: string; name: string; allItems: number; housing: number; nonHousing: number }
+
+/** How the cost-of-living adjustment was made for one offer. */
+export interface CostOfLivingInfo {
+  area: RppUsed;
+  reference: RppUsed;
+  /** Reference non-housing RPP / area non-housing RPP: multiplies local non-housing dollars. */
+  nonHousingFactor: number;
+  monthlyRent: number;
+  rentSource: "input" | "derived";
+  savingsRate: number;
+  /** BEA data year and release note. */
+  rppVintage: string;
 }
 
 export interface CalendarYearResult {
@@ -356,6 +392,11 @@ export interface EmploymentYearResult {
   hours?: number;
   /** Dollars per hour worked, on after-tax comp and on total rewards. */
   hourly?: { afterTaxComp: number; totalRewards: number };
+  /**
+   * Take-home - savings - rent = non-housing spending in local dollars, then deflated by the
+   * non-housing RPP: discretionary income after rent, in reference-location dollars.
+   */
+  costOfLiving?: { savings: number; rent: number; nonHousingLocal: number; discretionaryReference: number };
 }
 
 export interface ClawbackResult {
@@ -413,6 +454,8 @@ export interface ScenarioResult {
   window: WindowTotals;
   /** Present when the offer has a leave date. */
   leave?: LeaveResult;
+  /** Present when the offer has costOfLiving. */
+  costOfLiving?: CostOfLivingInfo;
   /** Input-specific, plain language. */
   warnings: string[];
   /** Assumptions behind these numbers, for the methodology page. */

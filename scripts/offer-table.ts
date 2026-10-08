@@ -5,7 +5,10 @@ import {
   type ByScenario, type Household, type OfferInput, type ScenarioResult,
 } from "../src/offer/index";
 
-const household: Household = { filingStatus: "single", healthUsage: "medium" };
+const household: Household = {
+  filingStatus: "single", healthUsage: "medium",
+  costOfLiving: { reference: "00000", savingsRate: 0 }, // U.S. dollars; no savings beyond the 401(k)
+};
 const sixPctPretax = { contributionPct: 0.06, type: "pretax" as const };
 const inflation = 0.025;
 const all = (v: number): ByScenario => ({ bear: v, base: v, bull: v });
@@ -29,6 +32,7 @@ const offers: OfferInput[] = [
     retirement: { ...sixPctPretax, match: [{ upToPct: 0.06, rate: 0.5 }], vesting: { kind: "cliff", years: 3 } },
     health: { premium: 1_800, outOfPocket: { low: 400, medium: 1_500, high: 4_000 }, oopMax: 4_000 },
     hours: { weekly: all(80) },
+    costOfLiving: { area: "35620", monthlyRent: 3_800 }, // New York metro
   },
   {
     label: "B. Charlotte corporate finance analyst",
@@ -44,6 +48,7 @@ const offers: OfferInput[] = [
     retirement: { ...sixPctPretax, match: [{ upToPct: 0.04, rate: 1 }] },
     health: { premium: 900, outOfPocket: { low: 500, medium: 2_000, high: 5_000 }, oopMax: 5_000, employerHsa: 500 },
     hours: { weekly: all(50) },
+    costOfLiving: { area: "16740", monthlyRent: 1_700 }, // Charlotte metro
   },
   {
     label: "C. Seattle public tech company, finance",
@@ -70,6 +75,7 @@ const offers: OfferInput[] = [
     health: { premium: 1_200, outOfPocket: { low: 400, medium: 1_800, high: 4_500 }, oopMax: 4_500, employerHsa: 1_000 },
     perks: { section127: 5_250 },
     hours: { weekly: all(45) },
+    costOfLiving: { area: "42660", monthlyRent: 2_600 }, // Seattle metro
   },
 ];
 
@@ -166,7 +172,7 @@ const comparison = compareOffers(offers, household, { inflation, valuationDate, 
 const base = comparison.projections.map((p) => p.scenarios.base);
 
 const out: string[] = [
-  "Offer comparison: slices 1-5 (pay, equity, leave date, PV, 401(k), health, perks, hours)",
+  "Offer comparison: slices 1-6 (pay, equity, leave date, PV, 401(k), health, perks, hours, cost of living)",
   `Household: single, no other wages, medium health usage. Tax law after 2026 projected at ${inflation * 100}% inflation.`,
   "Sample inputs are illustrative, not market data.",
 ];
@@ -217,6 +223,35 @@ for (const other of [offers[1], offers[2]]) {
       + `(+$${$(r.increase)}, +${pct(r.increase / r.from)}); target PV $${$(r.targetPV)}`);
   }
 }
+
+// ---- cost of living ------------------------------------------------------------------
+const colInfo = base.map((r) => r.costOfLiving!);
+out.push("", `Cost of living: ${colInfo[0].rppVintage}`,
+  `Reference: ${colInfo[0].reference.name} dollars. Non-housing RPP = (all items - 0.16 x housing) / 0.84; `
+    + "factor = reference non-housing / area non-housing.",
+  table(["Offer", "Area", "All items", "Housing", "Non-housing", "Factor", "Rent/mo"],
+    offers.map((o, i) => {
+      const c = colInfo[i];
+      return [short(o), c.area.name.replace(/ \(Metropolitan Statistical Area\)$/, ""), c.area.allItems.toFixed(1),
+        c.area.housing.toFixed(1), c.area.nonHousing.toFixed(1), c.nonHousingFactor.toFixed(4), `$${$(c.monthlyRent)}`];
+    }), 2));
+
+const colRows = base[0].employmentYears.map((y, i) => [String(y.year), ...base.flatMap((r) => {
+  const e = r.employmentYears[i];
+  return [$(e.takeHome), $(e.costOfLiving!.rent), $(e.costOfLiving!.discretionaryReference)];
+})]);
+out.push("", "Discretionary income after rent, U.S. dollars, by employment year (base scenario):",
+  "Take-home - rent = local non-housing money, x factor = U.S. dollars.",
+  table(["Year", ...offers.flatMap((o) => [`${short(o)} take-home`, `${short(o)} rent`, `${short(o)} discretionary`])], colRows));
+
+out.push("", `Unadjusted vs cost-of-living-adjusted, base scenario, PV at ${comparison.discountRate * 100}% as of ${valuationDate}:`,
+  table(["Offer", "After-tax comp PV", "Total rewards PV", "Take-home PV", "Discretionary after rent PV (U.S. $)",
+    "Discretionary nominal (U.S. $)"],
+    comparison.projections.map((p, i) => {
+      const w = p.scenarios.base.window;
+      return [short(offers[i]), $(w.presentValue!.afterTaxComp), $(w.totalRewards.presentValue!), $(w.presentValue!.takeHome),
+        $(w.costOfLiving!.presentValue!), $(w.costOfLiving!.nominal)];
+    })));
 
 const sweepMonths = [3, 6, 9, 11, 12, 13, 18, 24, 36, 48];
 const sweeps = offers.map((o) => leaveDateSweep(o, household, sweepMonths, { inflation }));

@@ -9,7 +9,8 @@
     "typecheck": "tsc -p . && tsc -p scripts",
     "grid": "tsx scripts/grid.ts > grid_ts.json",
     "oracle": "npm run grid && tsx scripts/run-oracle.ts grid_ts.json",
-    "offers": "tsx scripts/offer-table.ts"
+    "offers": "tsx scripts/offer-table.ts",
+    "fetch-rpp": "tsx scripts/fetch-rpp.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
