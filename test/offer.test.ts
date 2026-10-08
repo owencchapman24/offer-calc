@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
   breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, nextCliff, projectOffer,
-  projectScenario, VESTING_PRESETS, withholdingShortfall, type AnnualBonus, type Household, type OfferInput,
+  projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
@@ -892,6 +892,59 @@ describe("withholding vs liability (roadmap 5)", () => {
     expect(y.withheld.regular).toBe(14_930);
     expect(y.federalIncomeTax).toBe(14_930);
     expect(y.balanceDue).toBe(0);
+  });
+});
+
+describe("stay length: window hours, per month, and the horizon sweep", () => {
+  const all = (v: number) => ({ bear: v, base: v, bull: v });
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 100_000 }, ...o });
+
+  it("per month is the level month-end amount with the same PV (hand-checked factor)", () => {
+    // Month-ends of 2026 are days 30, 58, 89, ..., 364 after Jan 1; each is discounted (1.05)^-(days / 365.25).
+    const days = [30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364];
+    const factor = days.reduce((s, d) => s + 1.05 ** (-d / 365.25), 0);
+    expect(monthlyEquivalent(10_000, { start: "2026-01-01", years: 1 }, "2026-01-01")).toBeCloseTo(10_000 / factor, 9);
+    expect(monthlyEquivalent(12_000, { start: "2026-01-01", years: 2 }, "2026-01-01", 0)).toBeCloseTo(500, 9);
+  });
+  it("window hours tie to the employment years, prorated where the window cuts one (hand-checked)", () => {
+    // Same start: 45 x 50 = 2,250 hours; 79,655.80 / 2,250 = 35.40 an hour, as in the employment-year test.
+    const everything = tx({ retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] }, hours: { weekly: all(45) },
+      health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 } });
+    const w = projectScenario(everything, single, { years: 1 }).window;
+    expect(w.hours).toBe(2_250);
+    expect(w.perHour).toEqual({ afterTaxComp: 35.4, totalRewards: 36.29 });
+    // A July start in a window from Jan 1, 2026 for 2 years: employment year 1 (365 days) is all inside,
+    // 2,000 hours; year 2 runs Jul 1, 2027 to Jul 1, 2028 (366 days) with 184 inside: 2,000 x 184/366.
+    const late = projectScenario(tx({ startDate: "2026-07-01", hours: { weekly: all(40) } }), single,
+      { window: { start: "2026-01-01", years: 2 } }).window;
+    expect(late.hours).toBeCloseTo(2_000 + (2_000 * 184) / 366, 2);
+  });
+  it("the winner flips with the stay: a bigger sign-on wins short stays, a bigger salary wins from 3 years (hand-checked)", () => {
+    // TX, 0% inflation (2027-28 law = 2026's), 0% discount (PV = nominal). A: $110,000. B: $100,000 + $25,000 sign-on.
+    // A a year: tax 15,370 + 8,415 -> 86,215. B in 2026: on 125,000, 5,800 + 22% x 55,300 + 24% x 3,200 = 18,734
+    // + 9,562.50 -> 96,703.50; later years on 100,000: 13,170 + 7,650 -> 79,180.
+    // 1 year: B by 10,488.50 (874.04 a month). 2 years: B by 175,883.50 - 172,430 = 3,453.50 (143.90 a month,
+    // 1.96%: close). 3 years: A by 258,645 - 255,063.50 = 3,581.50 (99.49 a month, 1.38%: close).
+    const A = tx({ salary: { annual: 110_000 } });
+    const B = tx({ cashAwards: [{ label: "Sign-on", amount: 25_000, paidOn: "2026-01-31" }] });
+    const h = horizonSweep([A, B], single, [1, 2, 3], { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 });
+    expect(h.rows.map((r) => r.leads.cash)).toEqual([
+      { winner: 1, runnerUp: 0, margin: 10_488.5, perMonth: 874.04, share: expect.closeTo(10_488.5 / 96_703.5, 9), closeCall: false },
+      { winner: 1, runnerUp: 0, margin: 3_453.5, perMonth: 143.9, share: expect.closeTo(3_453.5 / 175_883.5, 9), closeCall: true },
+      { winner: 0, runnerUp: 1, margin: 3_581.5, perMonth: 99.49, share: expect.closeTo(3_581.5 / 258_645, 9), closeCall: true },
+    ]);
+    expect(h.rows[2].window).toEqual({ start: "2026-01-01", end: "2029-01-01" });
+    expect(h.rows[0].leads.colAdjustedTotal).toBeUndefined(); // no costOfLiving
+    expect(h.rows[0].leads.perHour).toBeUndefined(); // no hours
+  });
+  it("sample offers (illustrative): C leads after rent at U.S. prices at every stay; 5 years is a close call", () => {
+    const h = horizonSweep(SAMPLE_OFFERS, SAMPLE_HOUSEHOLD, [2, 3, 4, 5], { inflation: 0.025, valuationDate: "2026-07-13" });
+    expect(h.perHourOf).toBe("colAdjustedTotal");
+    expect(h.rows.map((r) => [r.leads.colAdjustedTotal!.winner, Math.round(r.leads.colAdjustedTotal!.perMonth!), r.leads.colAdjustedTotal!.closeCall]))
+      .toEqual([[2, 722, false], [2, 665, false], [2, 487, false], [2, 155, true]]);
+    expect(h.rows.map((r) => Math.round(r.leads.cash!.perMonth!))).toEqual([1_376, 1_177, 1_373, 1_733]);
+    expect(h.rows[2].values.perHour).toEqual([21.85, 21.66, 41.32]);
   });
 });
 

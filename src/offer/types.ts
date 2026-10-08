@@ -334,6 +334,10 @@ export interface WindowTotals {
   totalRewards: { nominal: number; presentValue?: number };
   /** Discretionary income after rent and the COL-adjusted total, in reference-location dollars. Present with costOfLiving. */
   costOfLiving?: { nominal: CostOfLivingTotals; presentValue?: CostOfLivingTotals };
+  /** Hours worked inside the window (each employment year's hours, prorated to its days in the window). Present with hours. */
+  hours?: number;
+  /** Nominal dollars per hour worked inside the window, on each basis. Present when hours are worked in the window. */
+  perHour?: { afterTaxComp: number; totalRewards: number; colAdjustedTotal?: number };
 }
 
 /**
@@ -554,6 +558,49 @@ export interface Comparison {
   valuationDate: ISODate;
   discountRate: number;
   projections: OfferProjection[];
+}
+
+/**
+ * A comparison basis: after-tax comp ("cash"), total rewards, the COL-adjusted total, or dollars
+ * per hour worked (the last step of the pipeline).
+ */
+export type Basis = "cash" | "totalRewards" | "colAdjustedTotal" | "perHour";
+
+/** Who leads on one basis, and by how much. Offers are indexes in the order passed. */
+export interface Lead {
+  winner: number;
+  runnerUp: number;
+  /** Winner minus runner-up: present-value dollars, or dollars per hour for "perHour". */
+  margin: number;
+  /** The margin as a level monthly amount over the window with the same present value. PV bases only. */
+  perMonth?: number;
+  /** Margin as a share of the winner's value. */
+  share: number;
+  /** The lead is under the close-call threshold (3%). */
+  closeCall: boolean;
+}
+
+/** One stay length in horizonSweep. */
+export interface HorizonRow {
+  /** Stay length: the comparison window is [earliest start, + years). */
+  years: number;
+  window: { start: ISODate; end: ISODate };
+  /**
+   * Each offer's base-scenario value, in the order passed: present value for cash, totalRewards and
+   * colAdjustedTotal; nominal dollars per hour worked for perHour. A basis is absent when an offer
+   * lacks its inputs (costOfLiving; hours).
+   */
+  values: Partial<Record<Basis, number[]>>;
+  leads: Partial<Record<Basis, Lead>>;
+}
+
+export interface HorizonSweep {
+  labels: string[];
+  valuationDate: ISODate;
+  discountRate: number;
+  /** What perHour divides by hours: the COL-adjusted total when every offer has costOfLiving, else total rewards. */
+  perHourOf: "colAdjustedTotal" | "totalRewards";
+  rows: HorizonRow[];
 }
 
 /**

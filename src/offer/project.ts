@@ -413,6 +413,19 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const colRounded = (c: CostOfLivingTotals) =>
     Object.fromEntries(Object.entries(c).map(([key, v]) => [key, round2(v)])) as unknown as CostOfLivingTotals;
 
+  // Hours worked inside the window: each employment year's hours (weekly x weeks, prorated by days
+  // employed) counted only for its days in the window, so they tie to the employment-year figures.
+  let windowHours = 0;
+  if (hours) {
+    const perYear = hours.weekly[scenario] * (hours.weeksPerYear ?? 50);
+    for (let n = 1; n < anniversaries.length && anniversaries[n - 1] < windowEnd; n++) {
+      const from = Math.max(anniversaries[n - 1], windowStart);
+      const to = Math.min(anniversaries[n], windowEnd, workEnd);
+      if (to > from) windowHours += (perYear * (to - from)) / (anniversaries[n] - anniversaries[n - 1]);
+    }
+  }
+  const colNominal = col ? colSum((f) => inWindow(f.day)) : undefined;
+
   const windowTotals: ScenarioResult["window"] = {
     start: fromDays(windowStart),
     end: fromDays(windowEnd),
@@ -423,10 +436,18 @@ export function projectScenario(offer: OfferInput, household: Household, options
       nominal: round2(nominal.m.totalRewards),
       ...(pv ? { presentValue: round2(pv.m.totalRewards) } : {}),
     },
-    ...(col ? {
+    ...(colNominal ? {
       costOfLiving: {
-        nominal: colRounded(colSum((f) => inWindow(f.day))),
+        nominal: colRounded(colNominal),
         ...(valuation !== undefined ? { presentValue: colRounded(colSum((f) => inWindow(f.day), (day) => discount(day)!)) } : {}),
+      },
+    } : {}),
+    ...(hours ? { hours: round2(windowHours) } : {}),
+    ...(windowHours > 0 ? {
+      perHour: {
+        afterTaxComp: round2(nominal.m.afterTaxComp / windowHours),
+        totalRewards: round2(nominal.m.totalRewards / windowHours),
+        ...(colNominal ? { colAdjustedTotal: round2(colNominal.total / windowHours) } : {}),
       },
     } : {}),
   };
