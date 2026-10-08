@@ -8,7 +8,7 @@ import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { describeSchedule, formatWarning } from "../src/format/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
-import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
+import { areaStates, cityOptions, findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
 import { estimateRent, FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 
 const single: Household = { filingStatus: "single" };
@@ -670,6 +670,16 @@ describe("cost of living (BEA RPPs)", () => {
     expect(rppArea("35620").name).toMatch(/^New York-Newark-Jersey City/);
     expect(findRppAreas("charlotte-concord")).toEqual([expect.objectContaining({ code: "16740", kind: "msa" })]);
     expect(() => rppArea("99999")).toThrow(/Unknown BEA RPP area/);
+  });
+  it("city picker: every metro and each state's area outside metros, with the states each lies in", () => {
+    expect(areaStates("35620")).toEqual(["NY", "NJ"]);
+    expect(areaStates("16740")).toEqual(["NC", "SC"]);
+    expect(areaStates("14860")).toEqual(["CT"]); // BEA names this one without parentheses
+    expect(areaStates("37999")).toEqual(["NC"]);
+    const options = cityOptions();
+    expect(options.filter((o) => rppArea(o.code).kind === "msa")).toHaveLength(387);
+    expect(options).toContainEqual({ code: "37999", name: "North Carolina, outside metro areas", states: ["NC"] });
+    expect(options.every((o) => o.states.length > 0)).toBe(true);
   });
   it("non-housing RPP backs housing out at BEA's 16% weight: U.S. 99.8802, Charlotte 97.2933", () => {
     // (100 - 0.16 x 100.629) / 0.84 and (97.348 - 0.16 x 97.635) / 0.84.

@@ -55,3 +55,37 @@ export function findRppAreas(query: string): Array<{ code: string; name: string;
     .filter(([, a]) => a.name.toLowerCase().includes(q))
     .map(([code, a]) => ({ code, name: a.name, kind: a.kind }));
 }
+
+const STATE_CODES: Record<string, string> = {
+  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA", Colorado: "CO", Connecticut: "CT",
+  Delaware: "DE", "District of Columbia": "DC", Florida: "FL", Georgia: "GA", Hawaii: "HI", Idaho: "ID", Illinois: "IL",
+  Indiana: "IN", Iowa: "IA", Kansas: "KS", Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD",
+  Massachusetts: "MA", Michigan: "MI", Minnesota: "MN", Mississippi: "MS", Missouri: "MO", Montana: "MT",
+  Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+  "North Carolina": "NC", "North Dakota": "ND", Ohio: "OH", Oklahoma: "OK", Oregon: "OR", Pennsylvania: "PA",
+  "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT",
+  Vermont: "VT", Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI", Wyoming: "WY",
+};
+
+/** States an area lies in, from BEA's name: "NY-NJ" for the New York metro, the state for a state portion. */
+export function areaStates(code: string): string[] {
+  const a = rppArea(code);
+  if (a.kind === "msa") return a.name.match(/, ([A-Z]{2}(?:-[A-Z]{2})*) \(?Metropolitan Statistical Area\)?$/)?.[1].split("-") ?? [];
+  const st = STATE_CODES[a.name.replace(/ \((?:Non)?[Mm]etropolitan Portion\)$/, "")];
+  return st ? [st] : [];
+}
+
+/** Places a job could be: every metro area, and each state's area outside metros. */
+export function cityOptions(): Array<{ code: string; name: string; states: string[] }> {
+  return Object.entries(RPP.areas)
+    .filter(([, a]) => (a.kind === "msa" || a.kind === "stateNonmetro") && a.allItems > 0 && a.housing > 0)
+    .map(([code, a]) => ({
+      code,
+      name: a.kind === "msa"
+        ? a.name.replace(/ \(?Metropolitan Statistical Area\)?$/, "")
+        : `${a.name.replace(/ \(Nonmetropolitan Portion\)$/, "")}, outside metro areas`,
+      states: areaStates(code),
+    }))
+    .filter((o) => o.states.length > 0)
+    .sort((x, y) => x.name.localeCompare(y.name));
+}
