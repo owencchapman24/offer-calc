@@ -1,6 +1,6 @@
 // Prints a year-by-year table for two sample offers so results can be eyeballed before a UI exists.
 // Usage: npm run offers. The sample inputs are illustrative, not market data.
-import { projectScenario, type Household, type OfferInput, type ScenarioResult } from "../src/offer/index";
+import { projectScenario, VESTING_PRESETS, type Household, type OfferInput, type ScenarioResult } from "../src/offer/index";
 
 const household: Household = { filingStatus: "single" };
 const inflation = 0.025;
@@ -14,6 +14,9 @@ const offers: OfferInput[] = [
     salary: { annual: 110_000 },
     bonus: { basis: "percentOfSalary", amount: { bear: 0.5, base: 0.7, bull: 0.9 }, payOn: { month: 1, day: 31 } },
     cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 } }],
+    equity: {
+      grants: [{ kind: "rsu", label: "New-hire RSUs", value: 40_000, schedule: VESTING_PRESETS.annual }],
+    },
   },
   {
     label: "B. Charlotte corporate finance analyst",
@@ -46,16 +49,20 @@ function describe(o: OfferInput): string {
     ? `${b.amount.bear * 100}/${b.amount.base * 100}/${b.amount.bull * 100}% of salary earned (bear/base/bull)`
     : `$${$(b.amount.base)}`;
   const where = o.residence.locality?.kind === "nyc" ? `${o.residence.state} (NYC)` : o.residence.state;
+  const grants = o.equity?.grants ?? [];
+  const rsu = grants.length
+    ? `; RSUs ${grants.map((g) => `$${$(g.value)} vesting ${g.schedule.tranches.map((t) => `${+(t.fraction * 100).toFixed(2)}%@${t.month}mo`).join(", ")}`).join(" + ")}`
+    : "; no RSUs";
   return `   Lives in ${where}, employer in ${o.employerState}, starts ${o.startDate}. Salary $${$(o.salary.annual)}; `
-    + `bonus ${bonus}; sign-on $${$(o.cashAwards?.[0]?.amount ?? 0)}.`;
+    + `bonus ${bonus}; sign-on $${$(o.cashAwards?.[0]?.amount ?? 0)}${rsu}.`;
 }
 
 function offerTables(r: ScenarioResult): string {
   const ey = table(
-    ["Year", "Dates", "Salary", "Bonus", "Sign-on", "Gross", "Tax", "Net", "Tax rate", "Quoted TC"],
+    ["Year", "Dates", "Salary", "Bonus", "Sign-on", "RSU", "Gross", "Tax", "Net", "Tax rate", "Quoted TC"],
     r.employmentYears.map((y) => [
       String(y.year), `${y.start} to ${lastDay(y.end)}`, $(y.gross.salary), $(y.gross.bonus), $(y.gross.cash),
-      $(y.gross.total), $(y.tax), $(y.net), pct(y.tax / y.gross.total), $(y.quotedTC),
+      $(y.gross.rsu), $(y.gross.total), $(y.tax), $(y.net), pct(y.tax / y.gross.total), $(y.quotedTC),
     ]),
     2,
   );
@@ -72,7 +79,7 @@ function offerTables(r: ScenarioResult): string {
 
 const base = offers.map((o) => projectScenario(o, household, { inflation }));
 const out: string[] = [
-  "Offer comparison: slice 1 (salary, bonus, sign-on; no RSUs, raises or leave date yet)",
+  "Offer comparison: slices 1-2 (salary, bonus, sign-on, RSUs; no raises or leave date yet)",
   `Household: single, no other wages. Tax law after 2026 projected at ${inflation * 100}% inflation.`,
   "Sample inputs are illustrative, not market data.",
 ];

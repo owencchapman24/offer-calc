@@ -110,7 +110,8 @@ clawback terms:
 - **Vesting:** a schedule is any list of `{ month, fraction }` summing to 1.
   `byYear([25,25,25,25], { perYear: 4, cliffMonths: 12 })` is standard 4-year
   quarterly with a 1-year cliff. `byYear([5,15,40,40], { perYear: 2, cliffMonths: 12 })`
-  is back-loaded semiannual.
+  is back-loaded semiannual. `VESTING_PRESETS` names four common schedules:
+  `standard`, `annual`, `backLoaded` and `frontLoaded` (33/33/22/12 monthly).
 - **Company vest dates:** an optional `vestDates` calendar moves each tranche to the next
   company vest date.
 - **Taxation:** vest-date value is W-2 wages. We assume you sell at vest.
@@ -582,7 +583,8 @@ export interface EmploymentYearResult {
   tax: number;
   net: number;
   /** Offer-letter view: salary rate at year start + target bonus on it + cash awards
-   *  + RSU tranches nominally in months (12(n-1), 12n], no price growth. */
+   *  + new-hire RSU tranches nominally in months (12(n-1), 12n], no price growth.
+   *  Refreshers are excluded: they aren't in an offer letter. */
   quotedTC: number;
 }
 
