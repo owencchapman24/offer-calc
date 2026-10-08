@@ -5,9 +5,10 @@ import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath, usd } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
+import { healthFlows, perkFlows, type RawBenefit, retirementFlows, vestedFraction } from "./benefits";
 import type {
-  ByComponent, CalendarYearResult, ClawbackResult, CompEvent, Component, EmploymentYearResult, Household,
-  LeaveSweepRow, Money, OfferInput, ProjectionOptions, ScenarioResult,
+  BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, ClawbackResult, CompEvent, Component,
+  EmploymentYearResult, Household, LeaveSweepRow, Money, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -120,17 +121,42 @@ export function projectScenario(offer: OfferInput, household: Household, options
     });
   }
 
-  // ---- calendar years: incremental tax --------------------------------------
+  // ---- tax parameters for every year we simulate --------------------------------
   const firstYear = Math.min(yearOfDay(start), ...raw.map((e) => yearOfDay(e.day)));
   const lastYear = yearOfDay(until - 1);
   const paramsByYear = new Map<number, TaxParams>();
+  for (let year = firstYear; year <= lastYear; year++) paramsByYear.set(year, paramsForYear(year, { inflation }));
+  const federal = (day: number) => paramsByYear.get(yearOfDay(day))?.federal ?? paramsByYear.get(lastYear)!.federal;
+
+  // ---- benefits: 401(k), health, perks (flows while employed) ----------------------
+  const benefitRaw: RawBenefit[] = [];
+  let pretaxByYear = new Map<number, number>();
+  let section125ByYear = new Map<number, number>();
+  if (offer.retirement) {
+    const r = retirementFlows(offer.retirement, raw, (y) => federal(jan1(y)).k401Limit, warnings);
+    benefitRaw.push(...r.flows);
+    pretaxByYear = r.pretaxByYear;
+  }
+  if (offer.health) {
+    const coverage = offer.health.coverage ?? "self";
+    const h = healthFlows(offer.health, household.healthUsage ?? "medium", start, workEnd, anniversaries,
+      (y) => federal(jan1(y)).hsaLimit[coverage], warnings);
+    benefitRaw.push(...h.flows);
+    section125ByYear = h.section125ByYear;
+  }
+  if (offer.perks) {
+    benefitRaw.push(...perkFlows(offer.perks, start, workEnd, anniversaries, (y) => ({
+      section127: federal(jan1(y)).section127Limit, commuterMonthly: federal(jan1(y)).commuterMonthlyLimit,
+    }), warnings));
+  }
+
+  // ---- calendar years: incremental tax --------------------------------------
   const calendarYears: CalendarYearResult[] = [];
   for (let year = firstYear; year <= lastYear; year++) {
     const inYear = raw.filter((e) => yearOfDay(e.day) === year);
     const by = sumBy(inYear);
     const offerGross = total(by);
-    const params = paramsForYear(year, { inflation });
-    paramsByYear.set(year, params);
+    const params = paramsByYear.get(year)!;
     const joint = household.filingStatus === "joint";
     const base: Omit<TaxInput, "wages"> = {
       year, filingStatus: household.filingStatus, state: offer.residence.state, locality: offer.residence.locality,
@@ -138,7 +164,12 @@ export function projectScenario(offer: OfferInput, household: Household, options
     };
     const other = household.otherWages?.[year] ?? 0;
     const withoutInput: TaxInput = { ...base, wages: other };
-    const withInput: TaxInput = { ...base, wages: other + offerGross };
+    // The offer's pre-tax 401(k) deferrals and cafeteria-plan amounts (premiums, your HSA) lower its taxable wages.
+    const withInput: TaxInput = {
+      ...base, wages: other + offerGross,
+      ...(pretaxByYear.has(year) ? { pretax401k: pretaxByYear.get(year)! } : {}),
+      ...(section125ByYear.has(year) ? { section125: section125ByYear.get(year)! } : {}),
+    };
     const without = computeTaxes(withoutInput, params);
     const withOffer = computeTaxes(withInput, params);
     const offerTax = withOffer.totalTax - without.totalTax;
@@ -237,11 +268,61 @@ export function projectScenario(offer: OfferInput, household: Household, options
     }
     return { gross: round2(m.gross), tax: round2(m.tax), net: round2(m.net) };
   };
+  // ---- benefit events --------------------------------------------------------------
+  // Employer 401(k) money vests by completed years of service at the leave date (or the
+  // window's last day if you stay): a year is complete once you work through the day before
+  // its anniversary. The vested share applies to the whole employer balance.
+  const vestingDay = leave ?? windowEnd - 1;
+  const completedYears = anniversaries.filter((d, n) => n >= 1 && d <= vestingDay + 1).length;
+  const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
+  const isPerk = (k: string) => k === "section127" || k === "commuter";
+  const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
+    ...b,
+    ey: b.accruedFrom !== undefined ? anniversaries.findIndex((d) => d > b.accruedFrom!) : yearOfPayment(b.day),
+    vested: b.kind === "employer401k" ? b.amount * vestedShare : 0,
+    // A tax-free perk is worth a pre-tax raise of amount / (1 - marginal rate) that year.
+    preTax: isPerk(b.kind) ? b.amount / (1 - yearResult(yearOfDay(b.day)).withOffer.result.marginalRate) : 0,
+  }));
+  const benefitEvents: BenefitEvent[] = benefits.map((b) => ({
+    date: fromDays(b.day), kind: b.kind, label: b.label, formula: b.formula, amount: round2(b.amount),
+    ...(b.kind === "employer401k" ? { vested: round2(b.vested) } : {}),
+    ...(isPerk(b.kind) ? { preTaxEquivalent: round2(b.preTax) } : {}),
+    calendarYear: yearOfDay(b.day), employmentYear: b.ey, inWindow: inWindow(b.day),
+    ...(valuation !== undefined ? { discountFactor: discount(b.day) } : {}),
+  }));
+  const benefitSum = (list: typeof benefits, weight: (day: number) => number = () => 1) => {
+    const t = { retirement: 0, perks: 0, healthNet: 0, preTax: 0, employee401k: 0, credited: 0, premiums: 0, oop: 0, employerHsa: 0, employeeHsa: 0 };
+    for (const b of list) {
+      const w = weight(b.day);
+      if (b.kind === "employer401k") { t.retirement += b.vested * w; t.credited += b.amount * w; }
+      else if (isPerk(b.kind)) { t.perks += b.amount * w; t.preTax += b.preTax * w; }
+      else if (b.kind === "premium") t.premiums += b.amount * w;
+      else if (b.kind === "outOfPocket") t.oop += b.amount * w;
+      else if (b.kind === "employerHsa") t.employerHsa += b.amount * w;
+      else if (b.kind === "employeeHsa") t.employeeHsa += b.amount * w;
+      else if (b.kind === "employee401k") t.employee401k += b.amount * w;
+    }
+    t.healthNet = t.premiums + t.oop - t.employerHsa;
+    return t;
+  };
+  const totals = (t: ReturnType<typeof benefitSum>): BenefitTotals =>
+    ({ retirement: round2(t.retirement), perks: round2(t.perks), healthNet: round2(t.healthNet) });
+  const totalRewards = (cashNet: number, t: ReturnType<typeof benefitSum>) => cashNet + t.retirement + t.perks - t.healthNet;
+  const windowBenefits = benefits.filter((b) => inWindow(b.day));
+  const nominalCash = money(() => 1);
+  const nominalBenefits = benefitSum(windowBenefits);
+  const pvCash = valuation !== undefined ? money((day) => discount(day)!) : undefined;
+  const pvBenefits = valuation !== undefined ? benefitSum(windowBenefits, (day) => discount(day)!) : undefined;
   const windowTotals: ScenarioResult["window"] = {
     start: fromDays(windowStart),
     end: fromDays(windowEnd),
-    nominal: money(() => 1),
-    ...(valuation !== undefined ? { presentValue: money((day) => discount(day)!) } : {}),
+    nominal: nominalCash,
+    ...(pvCash ? { presentValue: pvCash } : {}),
+    benefits: { nominal: totals(nominalBenefits), ...(pvBenefits ? { presentValue: totals(pvBenefits) } : {}) },
+    totalRewards: {
+      nominal: round2(totalRewards(nominalCash.net, nominalBenefits)),
+      ...(pvCash && pvBenefits ? { presentValue: round2(totalRewards(pvCash.net, pvBenefits)) } : {}),
+    },
   };
 
   // ---- employment years ---------------------------------------------------------
@@ -260,19 +341,42 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   const quotedCash = new Map<number, number>();
   for (const e of cash) quotedCash.set(yearOfPayment(e.day), (quotedCash.get(yearOfPayment(e.day)) ?? 0) + e.gross);
+  const hours = offer.hours;
+  if (hours) {
+    const weekly = hours.weekly[scenario];
+    const weeks = hours.weeksPerYear ?? 50;
+    if (!(weekly > 0 && weekly <= 168)) throw new Error("Weekly hours must be between 0 and 168.");
+    if (!(weeks > 0 && weeks <= 52)) throw new Error("Weeks per year must be between 0 and 52.");
+  }
   const employmentYears: EmploymentYearResult[] = [];
   for (let n = 1; n <= years; n++) {
     const inYear = taxed.filter((e) => e.ey === n);
     const by = sumBy(inYear);
     const tax = inYear.reduce((s, e) => s + e.tax, 0);
+    const net = total(by) - tax;
+    const b = benefitSum(benefits.filter((x) => x.ey === n));
+    const rewards = totalRewards(net, b);
+    // Hours: weekly x weeks, prorated by the share of the year you're employed.
+    const yearDays = anniversaries[n] - anniversaries[n - 1];
+    const employedDays = Math.max(0, Math.min(workEnd, anniversaries[n]) - anniversaries[n - 1]);
+    const worked = hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) * (employedDays / yearDays) : undefined;
     employmentYears.push({
       year: n,
       start: fromDays(anniversaries[n - 1]),
       end: fromDays(anniversaries[n]),
       gross: rounded(by),
       tax: round2(tax),
-      net: round2(total(by) - tax),
+      net: round2(net),
       quotedTC: round2(rateAt(path, anniversaries[n - 1]) + bonusTarget(n) + (quotedCash.get(n) ?? 0) + (quotedRsu.get(n) ?? 0)),
+      retirement: { employee: round2(b.employee401k), employerCredited: round2(b.credited), employerVested: round2(b.retirement) },
+      health: {
+        premiums: round2(b.premiums), outOfPocket: round2(b.oop), employerHsa: round2(b.employerHsa),
+        employeeHsa: round2(b.employeeHsa), net: round2(b.healthNet),
+      },
+      perks: { face: round2(b.perks), preTaxEquivalent: round2(b.preTax) },
+      totalRewards: round2(rewards),
+      ...(worked !== undefined ? { hours: round2(worked) } : {}),
+      ...(worked ? { hourly: { cash: round2(net / worked), totalRewards: round2(rewards / worked) } } : {}),
     });
   }
 
@@ -283,7 +387,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
     for (const g of [...grants, ...refreshers]) {
       vestDays(g).forEach((day, i) => { if (day > leave) unvested += g.value * g.schedule.tranches[i].fraction; });
     }
-    leaveResult = { leaveDate: fromDays(leave), unvestedRsuForfeited: round2(unvested), clawbacks };
+    const credited = benefits.filter((b) => b.kind === "employer401k").reduce((s, b) => s + b.amount, 0);
+    leaveResult = {
+      leaveDate: fromDays(leave), unvestedRsuForfeited: round2(unvested), clawbacks,
+      retirementForfeited: round2(credited * (1 - vestedShare)),
+    };
   }
 
   const assumptions = [
@@ -319,9 +427,27 @@ export function projectScenario(offer: OfferInput, household: Household, options
     assumptions.push(`Leave date ${fromDays(leave)} is your last day of work (voluntary exit): salary stops, `
       + "unvested RSUs are forfeited, and clawbacks are repaid that day.");
   }
+  if (offer.retirement) {
+    const r = offer.retirement;
+    assumptions.push(`401(k): ${+(r.contributionPct * 100).toFixed(2)}% ${r.type ?? "pretax"} deferral of `
+      + `${r.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, capped at the 402(g) limit; the match follows `
+      + `each paycheck's deferral (no true-up). Employer money ${vestedShare === 1 ? "is fully vested" : `is ${+(vestedShare * 100).toFixed(1)}% vested`} `
+      + `after ${completedYears} completed years. Your deferrals count as yours at face value (deferred tax on `
+      + "withdrawal and investment growth aren't modeled).");
+  }
+  if (offer.health) {
+    assumptions.push(`Health: premiums and your HSA contributions are pre-tax (section 125); net health cost = premiums `
+      + `+ expected out-of-pocket (${household.healthUsage ?? "medium"} usage, capped at the out-of-pocket max) - employer HSA. Held flat each year.`);
+  }
+  if (offer.perks) {
+    assumptions.push("Perks are tax-free and counted at face value; the pre-tax equivalent is face / (1 - that year's marginal rate).");
+  }
+  if (hours) {
+    assumptions.push(`Hours: ${hours.weekly[scenario]} a week x ${hours.weeksPerYear ?? 50} weeks a year (${scenario} scenario).`);
+  }
 
   return {
-    label: offer.label, scenario, events, calendarYears, employmentYears, window: windowTotals,
+    label: offer.label, scenario, events, benefitEvents, calendarYears, employmentYears, window: windowTotals,
     ...(leaveResult ? { leave: leaveResult } : {}), warnings, assumptions,
   };
 }
@@ -340,13 +466,19 @@ export function leaveDateSweep(
     const years = Math.max(options.years ?? 5, Math.ceil(m / 12));
     const r = projectScenario({ ...offer, leaveDate }, household, { ...options, years });
     const paid = r.events.filter((e) => e.component !== "clawback").reduce((s, e) => s + e.gross, 0);
+    const netKept = r.events.reduce((s, e) => s + e.net, 0);
+    const sumOf = (kinds: string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
+    const retirementVested = r.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0);
+    const healthNet = sumOf(["premium", "outOfPocket"]) - sumOf(["employerHsa"]);
     return {
       months: m,
       leaveDate,
       paid: round2(paid),
       clawbackOwed: round2(r.leave!.clawbacks.reduce((s, c) => s + c.owed, 0)),
-      netKept: round2(r.events.reduce((s, e) => s + e.net, 0)),
+      netKept: round2(netKept),
       unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
+      retirementVested: round2(retirementVested),
+      totalRewardsKept: round2(netKept + retirementVested + sumOf(["section127", "commuter"]) - healthNet),
     };
   });
 }

@@ -115,13 +115,24 @@ hand-checked tests and merges to main when green. Entry points:
   offers (can't vary per offer).
 - Private-company equity (stock options, double-trigger RSUs) is out of scope for v1. It
   defaults to $0 value; an optional scenario value may come later.
+- Benefits (slice 5) simplifications:
+  - **401(k):** deferrals at another employer in the same year don't count toward the
+    402(g) cap; no catch-up contributions; no 415(c) check. Pre-tax deferrals are counted
+    at face value (no tax on withdrawal, no investment growth). Vesting uses elapsed-time
+    service, not 1,000-hour years.
+  - **Health:** costs are held flat (no medical inflation) and accrue monthly. The HSA
+    limit isn't prorated for partial-year eligibility.
+  - **State conformity:** the engine excludes section 125 amounts (premiums, HSA) from
+    every state's wages. CA and NJ actually tax HSA contributions.
+  - **Commuter:** one input for 132(f), capped at $340 a month, though transit and
+    parking each have their own $340 limit.
 
 ## Roadmap
 1. Offer model on top of the engine: year-by-year cash comp (base, bonus as range,
    sign-on with clawback exposure, RSU vesting incl. back-loaded schedules, refreshers),
    calendar-year vs employment-year split (partial first year for new grads).
    Approved design: `docs/offer-model.md` (rev 3). Prerequisite: per-year tax params (§8).
-2. Benefits: 401(k) match x vesting x expected tenure; health plan expected cost
+2. (Done in slice 5.) Benefits: 401(k) match x vesting x expected tenure; health plan expected cost
    (premium + OOP scenarios - employer HSA); tax-free perks grossed up at marginal rate
    (Section 127 $5,250, 132(f) $340/mo).
 3. Cost of living: apply BEA Regional Price Parities only to post-tax, post-savings

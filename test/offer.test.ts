@@ -499,6 +499,112 @@ describe("present value and comparisons", () => {
   });
 });
 
+describe("401(k), health, perks and hours", () => {
+  const all = (v: number) => ({ bear: v, base: v, bull: v });
+  // TX, a calendar-year job (start 2026-01-01, one employment year = calendar 2026).
+  const jan: OfferInput = { label: "J", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 100_000 } };
+  const oneYear = (o: OfferInput) => projectScenario(o, single, { years: 1 }).employmentYears[0];
+  const match50to6 = { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] };
+
+  it("everything together, hand-checked: tax $19,144.20, cash $80,855.80, total rewards $81,655.80, $35.94/$36.29 an hour", () => {
+    // Wages 100,000; pre-tax 401(k) 6,000; premium 1,200 via section 125.
+    // Federal: AGI 92,800, taxable 76,700 -> 1,240 + 4,560 + 22% x 26,300 = 11,586.
+    // FICA on 98,800 (401(k) doesn't lower it; the premium does): 6,125.60 + 1,432.60 = 7,558.20. Tax 19,144.20.
+    // Cash net = 100,000 - 19,144.20 = 80,855.80 (your deferral is still yours).
+    // Total rewards = 80,855.80 + 3,000 match - (1,200 premium + 1,500 OOP - 500 employer HSA) = 81,655.80.
+    // Hours 45 x 50 = 2,250: 80,855.80 / 2,250 = 35.94; 81,655.80 / 2,250 = 36.29.
+    const y = oneYear({
+      ...jan, retirement: match50to6, hours: { weekly: all(45) },
+      health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 },
+    });
+    expect(y.tax).toBe(19_144.2);
+    expect(y.net).toBe(80_855.8);
+    expect(y.retirement).toEqual({ employee: 6_000, employerCredited: 3_000, employerVested: 3_000 });
+    expect(y.health).toEqual({ premiums: 1_200, outOfPocket: 1_500, employerHsa: 500, employeeHsa: 0, net: 2_200 });
+    expect(y.totalRewards).toBe(81_655.8);
+    expect(y.hours).toBe(2_250);
+    expect(y.hourly).toEqual({ cash: 35.94, totalRewards: 36.29 });
+  });
+  it("expected out-of-pocket is capped at the out-of-pocket max", () => {
+    const y = oneYear({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 9_000 }, oopMax: 4_000 } });
+    expect(y.health.outOfPocket).toBe(0);
+    const high = projectScenario({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 9_000 }, oopMax: 4_000 } },
+      { ...single, healthUsage: "high" }, { years: 1 }).employmentYears[0];
+    expect(high.health.outOfPocket).toBe(4_000);
+  });
+
+  const cliffA: OfferInput = {
+    label: "A", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13", salary: { annual: 110_000 },
+    retirement: { ...match50to6, vesting: { kind: "cliff", years: 3 } },
+  };
+  const vestedAt = (o: OfferInput, leaveDate: string) => {
+    const r = projectScenario({ ...o, leaveDate }, single);
+    return { vested: r.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0), forfeited: r.leave!.retirementForfeited };
+  };
+  it("3-year cliff: leaving the day before the 3rd anniversary vests $9,900; a day earlier forfeits $9,891.13", () => {
+    // Match = 50% x 6% = 3% of salary. 36 months x $9,166.67 x 3% = 9,900. Leaving 2029-07-11 loses
+    // one day of July: 9,900 - 3% x 9,166.67 x 1/31 = 9,891.13, and only 2 years are complete.
+    expect(vestedAt(cliffA, "2029-07-12")).toEqual({ vested: expect.closeTo(9_900, 2), forfeited: 0 });
+    expect(vestedAt(cliffA, "2029-07-11")).toEqual({ vested: 0, forfeited: 9_891.13 });
+  });
+  it("graded vesting: 20% after 2 years, 40% after 3, by completed years at the leave date", () => {
+    const graded: OfferInput = { ...cliffA, retirement: { ...match50to6, vesting: { kind: "graded",
+      steps: [{ years: 2, pct: 0.2 }, { years: 3, pct: 0.4 }, { years: 4, pct: 0.6 }, { years: 5, pct: 0.8 }, { years: 6, pct: 1 }] } } };
+    expect(vestedAt(graded, "2029-07-12").vested).toBeCloseTo(3_960, 2); // 40% x 9,900
+    expect(vestedAt(graded, "2028-07-12").vested).toBeCloseTo(1_320, 2); // 20% x 6,600 (24 months)
+    expect(vestedAt(graded, "2028-07-11").vested).toBe(0); // 1 year complete
+  });
+  it("staying through the window counts the vested share at its end; a 5-year window clears a 3-year cliff", () => {
+    const r = projectScenario(cliffA, single);
+    expect(r.employmentYears[0].retirement.employerVested).toBe(r.employmentYears[0].retirement.employerCredited);
+    const short = projectScenario(cliffA, single, { years: 2 });
+    expect(short.employmentYears[0].retirement.employerVested).toBe(0);
+  });
+  it("402(g) cap: $600k at 6% stops deferring in September, so the per-paycheck match stops too", () => {
+    // $50,000 a month x 6% = 3,000; Jan-Aug 24,000, Sep 500 to reach 24,500. Match (100% of 3% + 50%
+    // of the next 2%): 4% x 50,000 = 2,000 x 8 = 16,000, plus 1% x 50,000 = 500 in Sep = 16,500.
+    const y = oneYear({ ...jan, salary: { annual: 600_000 },
+      retirement: { contributionPct: 0.06, match: [{ upToPct: 0.03, rate: 1 }, { upToPct: 0.05, rate: 0.5 }] } });
+    expect(y.retirement).toEqual({ employee: 24_500, employerCredited: 16_500, employerVested: 16_500 });
+  });
+  it("Roth deferrals don't lower taxable wages; pre-tax ones do", () => {
+    const tax = (type: "pretax" | "roth") => oneYear({ ...jan, retirement: { contributionPct: 0.06, type } }).tax;
+    expect(tax("roth") - tax("pretax")).toBeCloseTo(0.22 * 6_000, 1);
+  });
+  it("HSA: yours are capped at the limit less the employer's $1,000: $3,400 in 2026", () => {
+    const r = projectScenario({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0,
+      employeeHsa: 4_000, employerHsa: 1_000 } }, single, { years: 1 });
+    expect(r.employmentYears[0].health).toMatchObject({ employeeHsa: 3_400, employerHsa: 1_000, net: -1_000 });
+    expect(r.calendarYears[0].withOffer.input.section125).toBeCloseTo(3_400, 6);
+  });
+  it("perks: capped at $5,250 and $340/month, worth face / (1 - 29.65%) pre-tax", () => {
+    // TX at $100k: 22% federal + 7.65% FICA marginal. 5,250 + 12 x 340 = 9,330; 9,330 / 0.7035 = 13,262.26.
+    const r = projectScenario({ ...jan, perks: { section127: 6_000, commuterMonthly: 400 } }, single, { years: 1 });
+    expect(r.calendarYears[0].withOffer.result.marginalRate).toBeCloseTo(0.2965, 10);
+    expect(r.employmentYears[0].perks).toEqual({ face: 9_330, preTaxEquivalent: 13_262.26 });
+    expect(r.warnings).toHaveLength(2);
+  });
+  it("hours prorate when you leave mid-year: 45 x 50 x 181/365 = 1,115.75", () => {
+    const y = projectScenario({ ...jan, hours: { weekly: all(45) }, leaveDate: "2026-06-30" }, single, { years: 1 }).employmentYears[0];
+    expect(y.hours).toBe(1_115.75);
+    expect(y.hourly!.cash).toBeCloseTo(y.net / 1_115.75, 2);
+  });
+  it("breakeven on total rewards adds the match, grossed up, to the cash breakeven", () => {
+    // A defers 6% pre-tax with a 3% match; B has no plan. Cash: B needs Delta x (1 - 29.65%) = 22% x 6,000
+    // -> 1,876.33 a year. Total rewards adds 3,000 / 0.7035 = 4,264.39 -> 6,140.72.
+    const A = { ...jan, retirement: match50to6 };
+    const opts = { valuationDate: "2026-01-01" };
+    expect(breakeven(A, jan, "salary", single, opts).increase).toBeCloseTo(1_876.33, 1);
+    const tr = breakeven(A, jan, "salary", single, { ...opts, basis: "totalRewards" });
+    expect(tr).toMatchObject({ basis: "totalRewards" });
+    expect(tr.increase).toBeCloseTo(6_140.72, 1);
+  });
+  it("leaveDateSweep reports vested retirement money: the cliff shows at 36 months", () => {
+    const rows = leaveDateSweep(cliffA, single, [35, 36]);
+    expect(rows.map((r) => Math.round(r.retirementVested))).toEqual([0, 9_900]);
+  });
+});
+
 describe("input validation", () => {
   it("rejects start dates before 2026 and bad horizons", () => {
     expect(() => projectScenario({ ...worked, startDate: "2025-12-01" }, single)).toThrow(/2026/);
