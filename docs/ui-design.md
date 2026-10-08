@@ -199,13 +199,30 @@ tickmark.
 ### 3.4 Live updating
 
 - **When:** edits apply as you type (debounced 200 ms), not on blur.
-- **Measured costs on the samples, before any optimization:**
-  - one projection: about 40 ms
-  - `compareOffers` (3 offers × 3 scenarios): about 0.4 s
-  - one breakeven (bisection): about 0.8 s
-  - a 60-month leave sweep: about 1 s per offer
-- **Profile and cache first, then decide.** §11 does that before choosing between the main
-  thread and a Web Worker. Either way the work is staged:
+- **Measured** (`npm run bench`; sample offers, Node, median of warm runs; 2026-10-08):
+
+  | Case | Before | After |
+  |---|---:|---:|
+  | One projection (offer C) | 35.8 ms | 3.4 ms |
+  | `compareOffers` (3 offers × 3 scenarios) | 264 ms | 24 ms |
+  | `horizonSweep` (3 offers, stays of 2-5 years) | n/a | 29 ms |
+  | One breakeven (bisection, COL basis) | 747 ms | 58 ms |
+  | 60-month leave sweep, one offer | 989 ms | 103 ms |
+  | `nextCliff` / `cliffs` / `withholdingShortfall`, one offer | n/a | 6 / 5 / 3 ms |
+
+  - **Where the time went:** profiling showed tax was about 2% of a projection and
+    `paramsForYear` 0.5%. The params cache (built first, as planned) changed nothing
+    measurable.
+  - **The real cost:** formatting the "show the work" formula strings, and converting day
+    numbers to dates. Reusing number formatters and memoizing the date conversions gave the
+    10× speedup.
+- **Engine in a Web Worker** (recommended at the timing review).
+  - **Every edit** costs `compareOffers` plus `horizonSweep`, about 53 ms on a desktop. That's
+    at the 50 ms long-task threshold already, and phones run several times slower.
+  - **Breakeven and the leave sweep** add 60-300 ms when those schedules are open.
+  - **In a worker,** typing stays at frame rate and stale requests can be dropped.
+
+  The work is staged:
   1. `compareOffers` and the if-you-stay row on every edit. They feed the lead schedule,
      L-1 and L-2.
   2. Breakeven for the selected basis only, when L-3 is on screen.
@@ -1063,9 +1080,8 @@ font requests.
 
 - **Stack:** React 19 and TypeScript on Vite, in a new `app/` folder that imports the engine
   from `src/`. Client-side only: no backend, no login. `src/` stays pure and DOM-free.
-- **Engine on the main thread or in a Web Worker:** decided after §11's profiling. If it
-  moves to a worker, it uses postMessage or Comlink, with the staged, cancellable requests
-  from §3.4.
+- **Engine in a Web Worker** (§3.4's timings), via postMessage or Comlink, with the staged,
+  cancellable requests from §3.4.
 - **State:** one serializable `Session` object:
   `{ schemaVersion, household, offers[], ui: { basis, mode, pricesIn, … }, sample flags }`.
   It's managed with `useReducer` plus context. Immutable state makes undo/redo cheap, and
@@ -1106,11 +1122,11 @@ font requests.
 
 ## 11. Engine work
 
-**Prerequisites:** build these now, before any UI code. Each one is hand-checked.
+**Prerequisites:** all five were built and hand-checked on 2026-10-08, before any UI code.
 
 | # | Item | For |
 |---|---|---|
-| 1 | Profile `projectScenario`; cache `paramsForYear` first. Report timings before choosing main thread or Web Worker. | §3.4 |
+| 1 | Profile `projectScenario`; cache `paramsForYear` first. Report timings before choosing main thread or Web Worker. Done: §3.4. | §3.4 |
 | 2 | `breakeven` returns "already ahead by $X" instead of throwing | L-3 |
 | 3 | `nextCliff` (roadmap item 7): each offer's cliffs (bonus payouts, vests, cash awards, clawback steps, 401(k) vesting) and the after-tax value of staying until the next one | L-4 |
 | 4 | `withholdingShortfall` (roadmap item 5): federal withholding (percentage method on salary, 22% / 37% supplemental) vs the offer's federal income tax, per year, with the April balance | L-5 |
@@ -1122,7 +1138,7 @@ font requests.
 |---|---|---|
 | 6 | Pay per extra hour (needs item 5's window hours) | Lead schedule |
 | 7 | Error codes with input paths instead of message-only throws | Inline validation |
-| 8 | Samples moved to `src/samples.ts`, shared by the table script and the app | §7 |
+| 8 | Samples moved to `src/samples.ts`, shared by the table script and the app. Done with item 1. | §7 |
 | 9 | Rent anchor area: the household's current rent can be paid somewhere other than the price reference; the ACS median as the default anchor | Rent estimate |
 | 10 | City picker data: metro → states, the NYC locality, multi-state prompts (`findRppAreas` exists) | Quick mode |
 | 11 | (Optional) Rent flip: the rent change that ties, closed form, since the total is linear in rent | Close calls |

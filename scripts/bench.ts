@@ -1,6 +1,8 @@
 // Engine timings on the sample offers, for the UI's live-update budget (docs/ui-design.md §3.4).
 // Usage: npm run bench. Each case is warmed up, then timed; the median run is reported.
-import { breakeven, compareOffers, leaveDateSweep, projectScenario } from "../src/offer/index";
+import {
+  breakeven, cliffs, compareOffers, horizonSweep, leaveDateSweep, nextCliff, projectScenario, withholdingShortfall,
+} from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD as household, SAMPLE_OFFERS as offers } from "../src/samples";
 
 const valuationDate = "2026-07-13";
@@ -29,6 +31,11 @@ const cases = [
     breakeven(offers[0], offers[1], "salary", household, { ...opts, horizonYears: 4, basis: "colAdjustedTotal" })),
   time("leaveDateSweep, offer C, months 1-60", 3, () =>
     leaveDateSweep(offers[2], household, Array.from({ length: 60 }, (_, i) => i + 1), { inflation: 0.025 })),
+  time("horizonSweep, 3 offers, stays of 2-5 years", 10, () =>
+    horizonSweep(offers, household, [2, 3, 4, 5], opts)),
+  time("cliffs, offer A (incl. 401(k) vesting scan)", 10, () => cliffs(offers[0], household, opts)),
+  time("nextCliff, offer A from 2027-01-12", 10, () => nextCliff(offers[0], household, "2027-01-12", opts)),
+  time("withholdingShortfall, offer C", 20, () => withholdingShortfall(offers[2], household, opts)),
 ];
 
 const w = Math.max(...cases.map((c) => c.label.length));

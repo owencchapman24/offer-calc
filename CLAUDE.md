@@ -5,7 +5,7 @@ gross comp -> after-tax -> location-adjusted -> per hour of your life, year by y
 and show the work. Portfolio piece for analyst-track roles, so correctness and a clear
 methodology page matter more than features.
 
-## Status (2026-10-07)
+## Status (2026-10-08)
 - **Tax engine** (`src/tax/`): done and validated against PolicyEngine-US for 2026, with
   projected later years (`paramsForYear`).
 - **Offer model** (`src/offer/`): slices 1-6 done, merged to main and pushed:
@@ -18,7 +18,13 @@ methodology page matter more than features.
     take-home as the cash measures, plan-year-hours vesting.
   - **After slice 6:** the COL-adjusted total (per year, window nominal and PV, a third
     breakeven basis) and rent growth.
-- **Tests:** 124 passing: `test/offer.test.ts` 93, `test/params.test.ts` 21,
+  - **UI engine prerequisites (2026-10-08):**
+    - profiling and caching: a projection is 10× faster;
+    - `breakeven` outcomes;
+    - `cliffs` / `nextCliff`;
+    - `withholdingShortfall`;
+    - `horizonSweep` with window hours, per hour and `monthlyEquivalent`.
+- **Tests:** 139 passing: `test/offer.test.ts` 107, `test/params.test.ts` 22,
   `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
 - `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
   Seattle tech finance. Inputs are illustrative, not market data.
@@ -29,14 +35,10 @@ methodology page matter more than features.
     signature element; the default basis is "After rent, at U.S. prices".
 
 ## Next steps
-1. **Engine prerequisites for the UI** (`docs/ui-design.md` §11, items 1-5). Hand-check
-   each, then show timings before any UI code:
-   - profile and cache, `paramsForYear` first, then choose main thread or Web Worker;
-   - `breakeven` returns "already ahead by $X" instead of throwing;
-   - `nextCliff`;
-   - `withholdingShortfall`;
-   - `horizonSweep`, the "winner if you stay N years" row.
-2. **UI slices** per `docs/ui-design.md` §12.
+1. **Timing review** (stopped here). The engine prerequisites are done; their timings are
+   in `docs/ui-design.md` §3.4, which recommends a Web Worker. Confirm that before UI code.
+2. **UI slices** per `docs/ui-design.md` §12, starting with slice 2 (the shell). Engine
+   items 6-10 in §11 come with it.
 
 ## Commands
 - `npm test`: unit tests. `npm run typecheck`: `tsc -p .` (src and test, no Node types)
@@ -44,6 +46,8 @@ methodology page matter more than features.
 - `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
   `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
 - `npm run offers`: sample comparison tables.
+- `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
+  engine changes; the UI's live-update budget depends on them.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
 
@@ -54,18 +58,23 @@ methodology page matter more than features.
   - `federal.ts`, `state.ts`, `local.ts`.
 - `src/offer/`
   - `types.ts`.
-  - `project.ts`: `projectScenario`, `leaveDateSweep`.
-  - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`.
+  - `project.ts`: `projectScenario`, `leaveDateSweep`, `keptIfLeaving`.
+  - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`, `horizonSweep`,
+    `monthlyEquivalent`.
+  - `cliffs.ts`: `cliffs`, `nextCliff`.
+  - `withholding.ts`: `withholdingShortfall`.
   - `streams.ts`: salary path, bonus, cash.
   - `vesting.ts`: `byYear`, presets, snapping, refreshers.
   - `clawback.ts`.
   - `benefits.ts`: 401(k), health, perks, monthly pieces.
   - `location.ts`: convenience-rule warning.
-  - `dates.ts`: civil dates as day numbers, UTC.
+  - `dates.ts`: civil dates as day numbers, UTC. `fromDays` and `yearOfDay` are memoized.
 - `src/col/`: `rpp.json` (BEA data, source and vintage inside), `nonHousingRpp`,
   `rppArea`, `findRppAreas`.
+- `src/samples.ts`: the three sample offers (illustrative), shared by the table script,
+  the benchmark and the UI.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
-  `offer-table.ts`, `fetch-rpp.ts`.
+  `offer-table.ts`, `bench.ts`, `fetch-rpp.ts`.
 
 ## Working agreements
 - **Branches:** one branch per slice. Merge to main with `--no-ff` when green (tests,
@@ -128,7 +137,16 @@ methodology page matter more than features.
 - **Comparison window:** earliest start + horizon (default 5 years), so a later start
   counts as lost pay.
 - **Breakeven:** bisection to the cent on base-scenario PV, on after-tax comp, total
-  rewards or the COL-adjusted total.
+  rewards or the COL-adjusted total. "alreadyAhead" (B leads even at $0) is an outcome,
+  not an error; `aheadBy` is always given.
+- **Stay length (UI horizon):** a stay of N years is the comparison window, not a leave
+  date. Pay after it isn't counted, and its last calendar year is taxed as though you kept
+  earning through December. Clawbacks from leaving belong to the leave-date sweep.
+- **Per month:** a PV gap restated as the level month-end amount over the window with the
+  same PV (`monthlyEquivalent`). A lead under 3% of the leader's value is a close call.
+- **Cliffs:** dated by the first last day that keeps them, by the leave-date rules.
+  `cliffValue` taxes payments at that year's average offer rate in the stay-until-the-cliff
+  projection, like every payment.
 - **Quoted TC:** the offer-letter view. It excludes refreshers, proration, payout lag and
   vest snapping.
 
@@ -249,8 +267,10 @@ methodology page matter more than features.
 - **Equity:** private-company equity (options, double-trigger RSUs) is out of scope for
   v1 and valued at $0. RSUs are assumed sold at vest; post-vest price moves aren't
   modeled.
-- **Cash timing:** withholding isn't modeled, since we compute liability. The 22%
-  supplemental-rate shortfall warning is roadmap item 5.
+- **Cash timing:** totals are liability. `withholdingShortfall` estimates federal income
+  tax withholding only. Not modeled:
+  - state withholding, and withholding at other jobs or a spouse's job;
+  - W-4 adjustments, pay frequency other than monthly, and safe-harbor rules.
 - **401(k):**
   - no catch-up contributions, no 415(c) check
   - pre-tax deferrals at face value: no tax on withdrawal, no investment growth
@@ -284,11 +304,12 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
 5. Withholding-shortfall warning: employers withhold federal tax on bonuses and RSU vests
    at the flat 22% supplemental rate (37% above $1M), below the real marginal rate for
    many offers. Warn and estimate the April balance due. Totals are already right; this
-   is a cash-timing warning.
+   is a cash-timing warning. Engine done (`withholdingShortfall`); the UI shows it in L-5.
 6. UI (React/TS, client-side only, no login, live-updating, inline input help, no
    misleading defaults, per NN/g calculator guidelines) and a methodology page.
 7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
-   step, and the after-tax value of staying until it (built on `leaveDateSweep`).
+   step, and the after-tax value of staying until it. Engine done (`cliffs`,
+   `nextCliff`); the UI shows it in L-4.
 8. HUD Fair Market Rents by metro as the rent-estimate anchor. These are 40th-percentile
    rents for recent movers, a better anchor than the ACS median.
    - `npm run fetch-fmr`, plus a HUD area ↔ BEA metro crosswalk.
