@@ -1,6 +1,6 @@
 import { daysInMonth, jan1, nextMonthStart, yearOfDay } from "./dates";
-import { type RawEvent, usd } from "./streams";
-import type { BenefitKind, Health, Perks, Retirement } from "./types";
+import type { RawEvent } from "./streams";
+import type { BenefitDetail, BenefitKind, Health, OfferWarning, Perks, Retirement } from "./types";
 
 // Benefit flows: 401(k) money, health costs and tax-free perks. They aren't wages; the 401(k)
 // pre-tax deferrals and the cafeteria-plan amounts lower taxable wages, which the caller passes
@@ -9,15 +9,12 @@ import type { BenefitKind, Health, Perks, Retirement } from "./types";
 export interface RawBenefit {
   day: number;
   kind: BenefitKind;
-  label: string;
-  formula: string;
+  detail: BenefitDetail;
   amount: number;
   /** Accrued monthly flows: the first day covered (employment year follows it). */
   accruedFrom?: number;
 }
 
-const pct = (x: number) => `${+(x * 100).toFixed(4)}%`;
-const round2 = (x: number) => Math.round(x * 100) / 100;
 const add = (m: Map<number, number>, k: number, v: number) => m.set(k, (m.get(k) ?? 0) + v);
 
 // ---- 401(k) ------------------------------------------------------------------------------
@@ -28,7 +25,7 @@ const add = (m: Map<number, number>, k: number, v: number) => m.set(k, (m.get(k)
  * paycheck (no year-end true-up), so hitting the limit early loses match.
  */
 export function retirementFlows(
-  ret: Retirement, pay: RawEvent[], limitFor: (year: number) => number, warnings: string[],
+  ret: Retirement, pay: RawEvent[], limitFor: (year: number) => number, warnings: OfferWarning[],
 ): { flows: RawBenefit[]; pretaxByYear: Map<number, number> } {
   if (!(ret.contributionPct >= 0 && ret.contributionPct <= 1)) throw new Error("401(k) contributionPct must be between 0 and 1.");
   const tiers = ret.match ?? [];
@@ -52,16 +49,14 @@ export function retirementFlows(
     const deferral = Math.max(0, Math.min(wanted, limit - (deferred.get(year) ?? 0)));
     if (deferral < wanted && !cappedYears.has(year)) {
       cappedYears.add(year);
-      warnings.push(`Your ${year} 401(k) deferrals reach the 402(g) limit of ${usd(round2(limit))} before year-end: `
-        + "deferrals and any match stop for the rest of that year (no true-up assumed).");
+      warnings.push({ code: "k401Cap", params: { year, limit } });
     }
     add(deferred, year, deferral);
     if (type === "pretax") add(pretaxByYear, year, deferral);
     const from = e.accruedFrom !== undefined ? { accruedFrom: e.accruedFrom } : {};
     if (deferral > 0) {
-      flows.push({ day: e.day, kind: "employee401k", label: `Your 401(k) deferral (${type})`,
-        formula: `${pct(ret.contributionPct)} x ${usd(round2(e.gross))}${deferral < wanted ? ", capped at the 402(g) limit" : ""}`,
-        amount: deferral, ...from });
+      flows.push({ day: e.day, kind: "employee401k", amount: deferral, ...from,
+        detail: { kind: "deferral", type, rate: ret.contributionPct, pay: e.gross, capped: deferral < wanted } });
     }
     const rate = e.gross > 0 ? deferral / e.gross : 0;
     let match = 0;
@@ -72,8 +67,8 @@ export function retirementFlows(
     }
     const employer = (match + (ret.nonElectivePct ?? 0)) * e.gross;
     if (employer > 0) {
-      flows.push({ day: e.day, kind: "employer401k", label: "Employer 401(k) contribution",
-        formula: `${pct(match + (ret.nonElectivePct ?? 0))} of ${usd(round2(e.gross))}`, amount: employer, ...from });
+      flows.push({ day: e.day, kind: "employer401k", amount: employer, ...from,
+        detail: { kind: "employerContribution", rate: match + (ret.nonElectivePct ?? 0), pay: e.gross } });
     }
   }
   return { flows, pretaxByYear };
@@ -129,7 +124,7 @@ export function monthlyPieces(from: number, to: number, anniversaries: number[])
  */
 export function healthFlows(
   h: Health, usage: "low" | "medium" | "high", from: number, to: number, anniversaries: number[],
-  hsaLimitFor: (year: number) => number, warnings: string[],
+  hsaLimitFor: (year: number) => number, warnings: OfferWarning[],
 ): { flows: RawBenefit[]; section125ByYear: Map<number, number> } {
   for (const v of [h.premium, h.oopMax, h.employeeHsa ?? 0, h.employerHsa ?? 0, h.outOfPocket[usage]]) {
     if (!(v >= 0)) throw new Error("Health amounts can't be negative.");
@@ -146,23 +141,24 @@ export function healthFlows(
   for (const { a, b, share } of pieces) {
     const year = yearOfDay(a);
     const piece = (annual: number) => (annual / 12) * share;
-    const of = (annual: number) => `${usd(annual)} / 12${share < 1 ? ` x ${b - a}/${daysInMonth(a)} days` : ""}`;
-    const push = (kind: BenefitKind, label: string, annual: number, amount = piece(annual), note = "") => {
-      if (amount > 0) flows.push({ day: b - 1, kind, label, formula: of(annual) + note, amount, accruedFrom: a });
+    const push = (kind: BenefitKind, annual: number, amount = piece(annual), extra: { capped?: boolean; usage?: typeof usage } = {}) => {
+      if (amount > 0) {
+        flows.push({ day: b - 1, kind, amount, accruedFrom: a,
+          detail: { kind: "accrual", annual, days: b - a, daysInMonth: daysInMonth(a), capped: extra.capped ?? false,
+            ...(extra.usage ? { usage: extra.usage } : {}) } });
+      }
     };
-    push("premium", "Health premium (pre-tax)", h.premium);
-    push("outOfPocket", `Expected out-of-pocket (${usage} usage)`, oop);
-    push("employerHsa", "Employer HSA contribution", h.employerHsa ?? 0);
+    push("premium", h.premium);
+    push("outOfPocket", oop, piece(oop), { usage });
+    push("employerHsa", h.employerHsa ?? 0);
     const limit = hsaLimitFor(year);
     const room = Math.max(0, limit - (employerByYear.get(year) ?? 0) - (hsaSoFar.get(year) ?? 0));
     const employeeHsa = Math.min(piece(h.employeeHsa ?? 0), room);
     if (employeeHsa < piece(h.employeeHsa ?? 0) && !warned.has(year)) {
       warned.add(year);
-      warnings.push(`HSA contributions in ${year} reach the ${usd(round2(limit))} limit (yours plus your employer's); `
-        + "yours are capped there.");
+      warnings.push({ code: "hsaCap", params: { year, limit } });
     }
-    push("employeeHsa", "Your HSA contribution (pre-tax)", h.employeeHsa ?? 0, employeeHsa,
-      employeeHsa < piece(h.employeeHsa ?? 0) ? ", capped at the HSA limit" : "");
+    push("employeeHsa", h.employeeHsa ?? 0, employeeHsa, { capped: employeeHsa < piece(h.employeeHsa ?? 0) });
     add(hsaSoFar, year, employeeHsa); // your contributions so far this year
     add(section125ByYear, year, piece(h.premium) + employeeHsa);
   }
@@ -172,13 +168,13 @@ export function healthFlows(
 /** Tax-free perks by month while employed, each capped at its limit for the year. */
 export function perkFlows(
   p: Perks, from: number, to: number, anniversaries: number[],
-  limitsFor: (year: number) => { section127: number; commuterMonthly: number }, warnings: string[],
+  limitsFor: (year: number) => { section127: number; commuterMonthly: number }, warnings: OfferWarning[],
 ): RawBenefit[] {
   if (!((p.section127 ?? 0) >= 0) || !((p.commuterMonthly ?? 0) >= 0)) throw new Error("Perk amounts can't be negative.");
   const flows: RawBenefit[] = [];
   const s127SoFar = new Map<number, number>();
   const warned = new Set<string>();
-  const warnOnce = (key: string, text: string) => { if (!warned.has(key)) { warned.add(key); warnings.push(text); } };
+  const warnOnce = (key: string, w: OfferWarning) => { if (!warned.has(key)) { warned.add(key); warnings.push(w); } };
   for (const { a, b, share } of monthlyPieces(from, to, anniversaries)) {
     const year = yearOfDay(a);
     const limits = limitsFor(year);
@@ -186,22 +182,21 @@ export function perkFlows(
       const wanted = (p.section127 / 12) * share;
       const amount = Math.min(wanted, Math.max(0, limits.section127 - (s127SoFar.get(year) ?? 0)));
       if (p.section127 > limits.section127) {
-        warnOnce(`127-${year}`, `Section 127 help above ${usd(round2(limits.section127))} in ${year} is taxable; only the limit is counted.`);
+        warnOnce(`127-${year}`, { code: "section127Cap", params: { year, limit: limits.section127 } });
       }
       add(s127SoFar, year, amount);
       if (amount > 0) {
-        flows.push({ day: b - 1, kind: "section127", label: "Section 127 education / student loan help (tax-free)",
-          formula: `${usd(p.section127)} / 12${share < 1 ? ` x ${b - a}/${daysInMonth(a)} days` : ""}`, amount, accruedFrom: a });
+        flows.push({ day: b - 1, kind: "section127", amount, accruedFrom: a,
+          detail: { kind: "accrual", annual: p.section127, days: b - a, daysInMonth: daysInMonth(a), capped: amount < wanted } });
       }
     }
     if (p.commuterMonthly) {
       const monthly = Math.min(p.commuterMonthly, limits.commuterMonthly);
       if (p.commuterMonthly > limits.commuterMonthly) {
-        warnOnce(`132-${year}`, `Commuter benefits above ${usd(round2(limits.commuterMonthly))} a month in ${year} are taxable; only the limit is counted.`);
+        warnOnce(`132-${year}`, { code: "commuterCap", params: { year, monthlyLimit: limits.commuterMonthly } });
       }
-      flows.push({ day: b - 1, kind: "commuter", label: "132(f) commuter benefit (tax-free)",
-        formula: `${usd(round2(monthly))} a month${share < 1 ? ` x ${b - a}/${daysInMonth(a)} days` : ""}`,
-        amount: monthly * share, accruedFrom: a });
+      flows.push({ day: b - 1, kind: "commuter", amount: monthly * share, accruedFrom: a,
+        detail: { kind: "monthly", monthly, days: b - a, daysInMonth: daysInMonth(a) } });
     }
   }
   return flows;

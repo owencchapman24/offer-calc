@@ -33,7 +33,11 @@ export function projectOffer(offer: OfferInput, household: Household, options: V
   const scenarios = Object.fromEntries(
     SCENARIOS.map((scenario) => [scenario, projectScenario(offer, household, { ...options, scenario })]),
   ) as OfferProjection["scenarios"];
-  const warnings = [...new Set(SCENARIOS.flatMap((s) => scenarios[s].warnings))];
+  const seen = new Set<string>();
+  const warnings = SCENARIOS.flatMap((s) => scenarios[s].warnings).filter((w) => {
+    const key = JSON.stringify(w);
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
   return { label: offer.label, scenarios, warnings };
 }
 

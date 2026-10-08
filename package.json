@@ -5,13 +5,14 @@
   "type": "module",
   "description": "Job offer comparison calculator: correct after-tax, location-adjusted, year-by-year comparisons.",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && tsx scripts/check-engine.ts",
     "typecheck": "tsc -p . && tsc -p scripts",
     "grid": "tsx scripts/grid.ts > grid_ts.json",
     "oracle": "npm run grid && tsx scripts/run-oracle.ts grid_ts.json",
     "offers": "tsx scripts/offer-table.ts",
     "bench": "tsx scripts/bench.ts",
-    "fetch-rpp": "tsx scripts/fetch-rpp.ts"
+    "fetch-rpp": "tsx scripts/fetch-rpp.ts",
+    "fetch-fmr": "tsx scripts/fetch-fmr.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

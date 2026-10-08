@@ -194,8 +194,12 @@ after slice 6's review).**
 - **Method:** gross salary is never adjusted.
   - Start from take-home pay, which already excludes your 401(k).
   - Subtract planned savings (household `savingsRate`).
-  - Subtract rent: the offer's `monthlyRent`, or the household's reference rent ×
-    housing RPP ratio.
+  - Subtract rent: the offer's `monthlyRent`. Left blank, it's estimated:
+    - **HUD's FY2027 Fair Market Rent** for the metro: 1 bedroom by default, for the FMR
+      area holding most of the metro's people (in your residence state if any is).
+    - **Otherwise** (areas without an FMR): an anchor rent × the housing RPP ratio. The
+      anchor is the household's reference rent, else the U.S. median gross rent, $1,487
+      (ACS 2024).
   - What's left is non-housing spending in local dollars. Multiply it by reference
     non-housing RPP ÷ area non-housing RPP to get **discretionary income after rent, in
     reference-location dollars**.

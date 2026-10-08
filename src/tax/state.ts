@@ -1,7 +1,7 @@
 import type { TaxParams } from "./params";
 import type { PayrollComponent, StateSpec } from "./params/states2026";
 import { applySchedule, bandIndex, clamp0 } from "./schedule";
-import type { FilingStatus, Schedule } from "./types";
+import type { FilingStatus, Schedule, TaxWarning } from "./types";
 
 export interface StateContext {
   status: FilingStatus;
@@ -22,7 +22,7 @@ export interface StateTaxOutput {
   taxableIncome: number;
   tax: number;
   payrollTax: number;
-  warnings: string[];
+  warnings: TaxWarning[];
 }
 
 const steps = (excess: number, step: number) => (excess > 0 ? Math.ceil(excess / step) : 0);
@@ -35,7 +35,7 @@ export function stateTax(
 ): StateTaxOutput {
   const spec: StateSpec | undefined = params.states[code];
   if (!spec) throw new Error(`Unknown state code: ${code}`);
-  const warnings: string[] = [...(spec.notes ?? [])];
+  const warnings: TaxWarning[] = (spec.notes ?? []).map((note) => ({ code: "stateNote", params: { state: code, note } }));
 
   // Payroll taxes apply per worker; callers pass each person's wages.
   const cap = (c: PayrollComponent) =>
@@ -48,7 +48,7 @@ export function stateTax(
   const joint = ctx.status === "joint";
   const i = joint ? 1 : 0;
   if (ctx.status === "headOfHousehold") {
-    warnings.push("Head of household: state tax uses single-filer brackets and deductions (approximation).");
+    warnings.push({ code: "headOfHouseholdState", params: {} });
   }
   const sched: Schedule = (joint ? spec.joint : spec.single)!;
   const agi = spec.taxes401kDeferrals ? ctx.federalAGI + ctx.pretax401k : ctx.federalAGI;
@@ -197,7 +197,7 @@ export function stateTax(
         tax += Math.min(3_150, Math.min(2_700, 90 * steps(agi - 200_000, 5_000)) + 50 * steps(agi - 500_000, 5_000));
       }
       if (agi < (joint ? 130_000 : 65_000)) {
-        warnings.push("Connecticut personal tax credit (1-75% by income) not modeled; tax may be slightly overstated.");
+        warnings.push({ code: "ctPersonalCredit", params: {} });
       }
       break;
     }

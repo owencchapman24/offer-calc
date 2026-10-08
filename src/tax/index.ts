@@ -71,15 +71,11 @@ function computeOnce(input: TaxInput, params: TaxParams): Omit<TaxResult, "margi
   const best = itm.incomeTaxes < std.incomeTaxes ? itm : std;
 
   const warnings = [...best.state.warnings, ...best.local.warnings];
-  if (best.itemized) warnings.push(`Itemizing beats the standard deduction here (SALT and other deductions total $${Math.round(best.deduction).toLocaleString()}).`);
+  if (best.itemized) warnings.push({ code: "itemizing", params: { deduction: best.deduction } });
   const k401Limit = params.federal.k401Limit;
-  if (k401 > k401Limit) {
-    warnings.push(`401(k) deferral exceeds the ${params.year} limit of $${k401Limit.toLocaleString("en-US")}.`);
-  }
-  if (federalAGI > 400_000) warnings.push("Alternative minimum tax is not modeled; check AMT above roughly $400k of income.");
-  if (params.projected) {
-    warnings.push(`${params.year} tax law is projected from 2026: federal amounts indexed for inflation, state and local law held at 2026.`);
-  }
+  if (k401 > k401Limit) warnings.push({ code: "k401OverLimit", params: { year: params.year, limit: k401Limit } });
+  if (federalAGI > 400_000) warnings.push({ code: "amtNotModeled", params: {} });
+  if (params.projected) warnings.push({ code: "projectedLaw", params: { year: params.year } });
 
   const totalTax = best.fed.tax + fica.socialSecurity + fica.medicare + fica.additionalMedicare
     + best.state.tax + best.state.payrollTax + best.local.tax;

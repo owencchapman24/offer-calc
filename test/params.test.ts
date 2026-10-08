@@ -121,7 +121,7 @@ describe("projected years (federal indexed, state held at 2026)", () => {
     // 1,271 + 0.12 x 38,950 + 0.22 x 31,837.50 = 12,949.25
     const r = computeTaxes({ year: 2027, filingStatus: "single", wages: 100_000, state: "TX" }, at(2027, 0.025));
     expect(r.federalIncomeTax).toBe(12_949.25);
-    expect(r.warnings.some((w) => w.includes("2027 tax law is projected"))).toBe(true);
+    expect(r.warnings).toContainEqual({ code: "projectedLaw", params: { year: 2027 } });
   });
   it("2030 SALT reversion: a $250k NYC single filer who itemizes in 2026 takes the standard deduction", () => {
     const input = { filingStatus: "single", wages: 250_000, state: "NY", locality: { kind: "nyc" } } as const;

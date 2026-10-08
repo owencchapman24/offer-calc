@@ -3,13 +3,14 @@ import type { TaxInput, TaxParams } from "../tax/index";
 import { clawbackFraction, SECTION_1341_THRESHOLD } from "./clawback";
 import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
-import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath, usd } from "./streams";
+import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
 import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
+import { estimateRent, type RentEstimate } from "../col/rent";
 import type {
-  BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
-  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
+  Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
+  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -64,7 +65,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     return i === -1 ? Infinity : Math.max(1, i);
   };
 
-  const warnings: string[] = [];
+  const warnings: OfferWarning[] = [];
   const convenience = convenienceRuleWarning(offer.residence.state, offer.employerState);
   if (convenience) warnings.push(convenience);
   const path = salaryPath(offer.salary, scenario, start, until);
@@ -76,7 +77,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const grants: GrantInstance[] = (equity?.grants ?? []).map((g) => {
     if (!(g.value >= 0)) throw new Error(`Grant "${g.label}" needs a non-negative value.`);
     return {
-      label: g.label, value: g.value, schedule: g.schedule,
+      grant: { kind: "grant", label: g.label }, value: g.value, schedule: g.schedule,
       grantDay: g.grantDate ? toDays(g.grantDate) : start,
       vestStartDay: g.vestStart ? toDays(g.vestStart) : start,
     };
@@ -115,8 +116,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
       if (p.sameYear) {
         raw.push({
           day: leave, component: "clawback", gross: -fraction * award.amount,
-          label: `${award.label} clawback (reverses ${yearOfDay(leave)} wages)`,
-          formula: `-${usd(award.amount)} x ${+(fraction * 100).toFixed(4)}%`,
+          detail: { kind: "clawback", award: award.label, amount: award.amount, fraction, basis: p.basis, sameYear: true,
+            paidYear: yearOfDay(paidDay), repaidYear: yearOfDay(leave) },
         });
       }
     });
@@ -198,30 +199,28 @@ export function projectScenario(offer: OfferInput, household: Household, options
       const taxRelief = undone.totalTax - cy.withOffer.result.totalTax;
       // Net repayment: you hand back the after-tax share and the employer keeps the reclaimed withholding.
       const owed = p.basis === "gross" ? g : g - taxRelief;
-      return result(p, owed, "same-year wage reversal", taxRelief, g - taxRelief);
+      return result(p, owed, "sameYearReversal", taxRelief, g - taxRelief);
     }
     // Repaid in a later year: the payment year's wages (and FICA) stay. Federal relief only, via the
     // IRC 1341 credit: the payment year's federal income tax recomputed without the repaid amount.
     const cy = yearResult(yearOfDay(p.paidDay));
     const owed = p.basis === "gross" ? g : g * (1 - cy.offerTaxRate);
     let taxRelief = 0;
-    let treatment: ClawbackResult["treatment"] = "no relief ($3,000 or less)";
+    let treatment: ClawbackResult["treatment"] = "noRelief";
     if (owed > SECTION_1341_THRESHOLD) {
       const reduced = computeTaxes({ ...cy.withOffer.input, wages: cy.withOffer.input.wages - owed }, paramsByYear.get(cy.year)!);
       taxRelief = cy.withOffer.result.federalIncomeTax - reduced.federalIncomeTax;
-      treatment = "IRC 1341 credit";
+      treatment = "irc1341Credit";
     }
     const repaidIn = yearResult(yearOfDay(leave!));
     repaidIn.priorYearRepayments.repaid = round2(repaidIn.priorYearRepayments.repaid + owed);
     repaidIn.priorYearRepayments.relief = round2(repaidIn.priorYearRepayments.relief + taxRelief);
     raw.push({
       day: leave!, component: "clawback", gross: -owed, nonWage: { tax: -taxRelief },
-      label: `${p.label} clawback (repays ${yearOfDay(p.paidDay)} pay)`,
-      formula: `-${usd(p.amount)} x ${+(p.fraction * 100).toFixed(4)}%${p.basis === "net" ? " after tax" : ""}`,
+      detail: { kind: "clawback", award: p.label, amount: p.amount, fraction: p.fraction, basis: p.basis, sameYear: false,
+        paidYear: yearOfDay(p.paidDay), repaidYear: yearOfDay(leave!) },
     });
-    warnings.push(`Repaying ${p.label} in ${yearOfDay(leave!)} for pay received in ${yearOfDay(p.paidDay)}: the `
-      + "FICA withheld on it isn't automatically refunded (your employer may return it on a corrected W-2c). "
-      + "This projection assumes you don't get it back, and gives no state relief.");
+    warnings.push({ code: "clawbackFica", params: { award: p.label, paidYear: yearOfDay(p.paidDay), repaidYear: yearOfDay(leave!) } });
     return result(p, owed, treatment, taxRelief, owed - taxRelief);
   });
   function result(p: Pending, owed: number, treatment: ClawbackResult["treatment"], taxRelief: number, netCost: number): ClawbackResult {
@@ -248,8 +247,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const events: CompEvent[] = taxed.map((e) => ({
     date: fromDays(e.day),
     component: e.component,
-    label: e.label,
-    formula: e.formula,
+    detail: e.detail,
     gross: round2(e.gross),
     calendarYear: yearOfDay(e.day),
     employmentYear: e.ey,
@@ -283,7 +281,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     preTax: isPerk(b.kind) ? b.amount / (1 - yearResult(yearOfDay(b.day)).withOffer.result.marginalRate) : 0,
   }));
   const benefitEvents: BenefitEvent[] = benefits.map((b) => ({
-    date: fromDays(b.day), kind: b.kind, label: b.label, formula: b.formula, amount: round2(b.amount),
+    date: fromDays(b.day), kind: b.kind, detail: b.detail, amount: round2(b.amount),
     ...(b.kind === "employer401k" ? { vested: round2(b.vested) } : {}),
     ...(isPerk(b.kind) ? { preTaxEquivalent: round2(b.preTax) } : {}),
     calendarYear: yearOfDay(b.day), employmentYear: b.ey, inWindow: inWindow(b.day),
@@ -348,15 +346,18 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const ref = rppArea(hc.reference ?? NATIONAL);
     const savingsRate = hc.savingsRate ?? 0;
     if (!(savingsRate >= 0 && savingsRate < 1)) throw new Error("savingsRate must be at least 0 and below 1.");
+    // No rent entered: HUD's Fair Market Rent for the metro, or for areas without one, an anchor rent
+    // (yours at the reference location, else the U.S. median) scaled by the housing RPPs.
     let monthlyRent = offer.costOfLiving.monthlyRent;
-    let rentSource: CostOfLivingInfo["rentSource"] = "input";
+    let rentEstimate: RentEstimate | undefined;
     if (monthlyRent === undefined) {
-      if (hc.referenceMonthlyRent === undefined) {
-        throw new Error(`Give "${offer.label}" a monthlyRent, or the household a referenceMonthlyRent to derive it from.`);
-      }
-      monthlyRent = hc.referenceMonthlyRent * (area.housing / ref.housing); // scaled by the housing (rents) RPPs
-      rentSource = "derived";
+      rentEstimate = estimateRent(area.code, offer.residence.state, {
+        bedrooms: hc.fmrBedrooms ?? 1,
+        ...(hc.referenceMonthlyRent !== undefined ? { anchorRent: hc.referenceMonthlyRent, anchorArea: ref.code } : {}),
+      });
+      monthlyRent = rentEstimate.monthlyRent;
     }
+    const rentSource: CostOfLivingInfo["rentSource"] = rentEstimate?.source ?? "input";
     if (!(monthlyRent >= 0)) throw new Error("Rent can't be negative.");
     const rentGrowth = offer.costOfLiving.rentGrowth ?? inflation;
     if (!(rentGrowth > -1)) throw new Error("Rent growth must be greater than -100%.");
@@ -382,9 +383,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
     col = {
       info: {
         area: used(area), reference: used(ref), nonHousingFactor: nonHousingRpp(ref) / nonHousingRpp(area),
-        monthlyRent: round2(monthlyRent), rentSource, rentGrowth,
+        monthlyRent: round2(monthlyRent), rentSource, ...(rentEstimate ? { rentEstimate } : {}), rentGrowth,
         rentGrowthSource: offer.costOfLiving.rentGrowth !== undefined ? "input" : "inflation",
-        savingsRate, rppVintage: `${RPP.dataYear} RPPs. ${RPP.vintage}`,
+        savingsRate, rppVintage: { dataYear: RPP.dataYear, release: RPP.vintage },
       },
       flows,
     };
@@ -515,69 +516,49 @@ export function projectScenario(offer: OfferInput, household: Household, options
     };
   }
 
-  const assumptions = [
-    "Each payment is taxed in the calendar year it's paid (cash basis).",
-    "Salary accrues by calendar month (1/12 of the annual rate); a partial month by days worked / days in the month.",
-    "The offer's tax is household tax with the offer minus without it, per calendar year, "
-      + "spread over that year's payments in proportion to their size.",
-    `Taxed as a full-year resident of ${offer.residence.state}${offer.residence.locality && offer.residence.locality.kind !== "none" ? ` (${offer.residence.locality.kind})` : ""}.`,
-    `Tax years after 2026 are projected at ${+(inflation * 100).toFixed(2)}% inflation: federal amounts `
-      + "indexed, state law held at 2026 except statutory indexing (CA) and federal links.",
+  const locality = offer.residence.locality && offer.residence.locality.kind !== "none" ? offer.residence.locality.kind : undefined;
+  const assumptions: Assumption[] = [
+    { code: "cashBasis", params: {} },
+    { code: "monthlyAccrual", params: {} },
+    { code: "incrementalTax", params: {} },
+    { code: "residence", params: { state: offer.residence.state, ...(locality ? { locality } : {}) } },
+    { code: "projectedLaw", params: { inflation } },
   ];
   if (path.steps.length > 1) {
-    assumptions.push(`Salary changes (${scenario} scenario): `
-      + path.steps.slice(1).map((s) => `${fromDays(s.day)} ${s.why} to ${usd(round2(s.annual))}`).join("; ") + ".");
+    assumptions.push({ code: "salaryChanges", params: { scenario,
+      changes: path.steps.slice(1).map((s) => ({ date: fromDays(s.day), annual: s.annual, reasons: s.reasons })) } });
   }
   if (bonus) {
     assumptions.push(bonus.basis === "percentOfSalary"
-      ? `Bonus: ${+(bonus.amount[scenario] * 100).toFixed(2)}% of salary earned in each period (${scenario} scenario).`
+      ? { code: "bonus", params: { scenario, basis: "percentOfSalary", rate: bonus.amount[scenario] } }
       : bonus.basis === "fixed"
-        ? `Bonus: ${usd(bonus.amount[scenario])} a year, prorated by days employed (${scenario} scenario).`
-        : `Bonus by employment year: ${bonus.amounts.map((a) => usd(a[scenario])).join(", ")} (last repeats; `
-          + `${scenario} scenario), prorated by days employed.`);
+        ? { code: "bonus", params: { scenario, basis: "fixed", amount: bonus.amount[scenario] } }
+        : { code: "bonus", params: { scenario, basis: "byEmploymentYear", amounts: bonus.amounts.map((a) => a[scenario]) } });
   }
   if (valuation !== undefined) {
-    assumptions.push(`Present values discount each payment's after-tax cash from its date to ${fromDays(valuation)} `
-      + `at ${+(discountRate * 100).toFixed(2)}% a year.`);
+    assumptions.push({ code: "presentValue", params: { valuationDate: fromDays(valuation), discountRate } });
   }
-  if (equity) {
-    assumptions.push(`RSUs are W-2 wages at their value on the vest date and are assumed sold at vest; `
-      + `share price grows ${+(growth * 100).toFixed(2)}% a year from each grant date (${scenario} scenario).`);
-  }
-  if (leave !== undefined) {
-    assumptions.push(`Leave date ${fromDays(leave)} is your last day of work (voluntary exit): salary stops, `
-      + "unvested RSUs are forfeited, and clawbacks are repaid that day.");
-  }
+  if (equity) assumptions.push({ code: "rsu", params: { scenario, priceGrowth: growth } });
+  if (leave !== undefined) assumptions.push({ code: "leaveDate", params: { leaveDate: fromDays(leave) } });
   if (offer.retirement) {
     const r = offer.retirement;
-    assumptions.push(`401(k): ${+(r.contributionPct * 100).toFixed(2)}% ${r.type ?? "pretax"} deferral of `
-      + `${r.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, capped at the 402(g) limit; the match follows `
-      + `each paycheck's deferral (no true-up). Employer money ${vestedShare === 1 ? "is fully vested" : `is ${+(vestedShare * 100).toFixed(1)}% vested`} `
-      + `after ${completedYears} completed years. Your deferrals count as yours at face value (deferred tax on `
-      + "withdrawal and investment growth aren't modeled).");
+    assumptions.push({ code: "retirement", params: { contributionPct: r.contributionPct, type: r.type ?? "pretax",
+      eligiblePay: r.eligiblePay ?? "salary", vestedShare, completedYears } });
   }
-  if (offer.health) {
-    assumptions.push(`Health: premiums and your HSA contributions are pre-tax (section 125); net health cost = premiums `
-      + `+ expected out-of-pocket (${household.healthUsage ?? "medium"} usage, capped at the out-of-pocket max) - employer HSA. Held flat each year.`);
-  }
-  if (offer.perks) {
-    assumptions.push("Perks are tax-free and counted at face value; the pre-tax equivalent is face / (1 - that year's marginal rate).");
-  }
+  if (offer.health) assumptions.push({ code: "health", params: { usage: household.healthUsage ?? "medium" } });
+  if (offer.perks) assumptions.push({ code: "perks", params: {} });
   if (hours) {
-    assumptions.push(`Hours: ${hours.weekly[scenario]} a week x ${hours.weeksPerYear ?? 50} weeks a year (${scenario} scenario).`);
+    assumptions.push({ code: "hours", params: { scenario, weekly: hours.weekly[scenario], weeksPerYear: hours.weeksPerYear ?? 50 } });
   }
   if (col) {
     const c = col.info;
-    assumptions.push(`Cost of living (${c.rppVintage}): gross pay is never adjusted. Take-home - ${+(c.savingsRate * 100).toFixed(2)}% `
-      + `savings - rent = non-housing spending, converted to ${c.reference.name} dollars by the non-housing RPPs `
-      + `(${c.reference.nonHousing} / ${c.area.nonHousing} = ${c.nonHousingFactor.toFixed(4)}). Non-housing RPP = `
-      + `${RPP.nonHousing.formula}; relative prices are held at ${RPP.dataYear} levels.`);
-    assumptions.push(`Rent: ${usd(c.monthlyRent)} a month (${c.rentSource === "input" ? "as entered" : "derived from the housing RPPs"}) `
-      + `from your start date, rising ${+(c.rentGrowth * 100).toFixed(2)}% a year at each lease anniversary`
-      + `${c.rentGrowthSource === "inflation" ? " (the inflation rate)" : ""}; paid only while employed there.`);
-    assumptions.push("COL-adjusted total = discretionary income after rent - expected out-of-pocket health spending (local, so "
-      + "converted the same way) + money not spent locally, at face value: planned savings, your 401(k) and HSA contributions, "
-      + "vested employer 401(k), employer HSA and perks.");
+    assumptions.push({ code: "costOfLiving", params: { rppVintage: c.rppVintage, savingsRate: c.savingsRate,
+      reference: c.reference.name, referenceNonHousing: c.reference.nonHousing, areaNonHousing: c.area.nonHousing,
+      factor: c.nonHousingFactor, nonHousingFormula: RPP.nonHousing.formula } });
+    assumptions.push({ code: "rent", params: { monthlyRent: c.monthlyRent, source: c.rentSource,
+      ...(c.rentEstimate ? { estimate: c.rentEstimate } : {}), growth: c.rentGrowth,
+      growthSource: c.rentGrowthSource } });
+    assumptions.push({ code: "colAdjustedTotal", params: {} });
   }
 
   return {

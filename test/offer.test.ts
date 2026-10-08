@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, nextCliff, projectOffer,
+  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, leaveDateSweep, nextCliff, projectOffer,
   projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
+import { describeSchedule, formatWarning } from "../src/format/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
+import { estimateRent, FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 
 const single: Household = { filingStatus: "single" };
 
@@ -134,7 +136,7 @@ describe("bonus timing and proration", () => {
     const r = projectScenario(withBonus({}, "2026-10-15"), single);
     const b = r.events.filter((e) => e.component === "bonus");
     expect(b[0]).toMatchObject({ date: "2028-03-15", gross: 15_000, employmentYear: 2 });
-    expect(r.warnings.some((w) => w.includes("Oct 1 bonus cutoff"))).toBe(true);
+    expect(r.warnings).toContainEqual({ code: "bonusCutoff", params: expect.objectContaining({ cutoff: { month: 10, day: 1 } }) });
   });
   it("fiscal-year period (Jul 1, paid Sep 15): first bonus 2027-09-15, in year 2", () => {
     // Aug 3 2026 - Jun 30 2027 = 29/31 of August + 10 months: 10% x 12,500 x 10.9355 = 13,669.35.
@@ -165,7 +167,8 @@ describe("employment-year boundaries (decision 1)", () => {
   });
   it("salary accrued on the anniversary day itself belongs to the new year", () => {
     const r = projectScenario({ ...worked, bonus: undefined, cashAwards: [] }, single);
-    const anniversaryMonth = r.events.find((e) => e.label === "Salary 2027-08-03 to 2027-08-31")!;
+    const anniversaryMonth = r.events.find((e) => e.detail.kind === "salary" && e.detail.from === "2027-08-03")!;
+    expect(anniversaryMonth.detail).toMatchObject({ to: "2027-08-31", days: 29, daysInMonth: 31 });
     expect(anniversaryMonth.employmentYear).toBe(2);
     expect(r.employmentYears[0].gross.salary).toBe(150_000);
   });
@@ -173,7 +176,8 @@ describe("employment-year boundaries (decision 1)", () => {
 
 describe("residence vs employer state (decision 9)", () => {
   it("warns when the employer state has a convenience-of-employer rule", () => {
-    expect(convenienceRuleWarning("NJ", "NY")).toMatch(/convenience-of-employer/);
+    expect(convenienceRuleWarning("NJ", "NY")).toEqual({ code: "convenienceRule", params: { residenceState: "NJ", employerState: "NY" } });
+    expect(formatWarning(convenienceRuleWarning("NJ", "NY")!)).toMatch(/convenience-of-employer/);
     expect(convenienceRuleWarning("PA", "DE")).toBeDefined();
   });
   it("CT and NJ apply it only to residents of states that have one", () => {
@@ -185,7 +189,7 @@ describe("residence vs employer state (decision 9)", () => {
   });
   it("flows into the projection's warnings", () => {
     const r = projectScenario({ ...worked, residence: { state: "NJ" }, employerState: "NY" }, single);
-    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings).toEqual([{ code: "convenienceRule", params: { residenceState: "NJ", employerState: "NY" } }]);
   });
 });
 
@@ -236,7 +240,7 @@ describe("RSUs in the projection", () => {
       ["2027-08-15", 10_000, 2], ["2028-02-15", 15_000, 2], ["2028-08-15", 15_000, 3], ["2029-02-15", 40_000, 3],
       ["2029-08-15", 40_000, 4], ["2030-02-15", 40_000, 4], ["2030-08-15", 40_000, 5],
     ]);
-    expect(rsus(r)[0].label).toContain("nominal 2027-08-03");
+    expect(rsus(r)[0].detail).toMatchObject({ kind: "rsu", tranche: 1, nominalDate: "2027-08-03" });
     expect(r.employmentYears.map((y) => y.gross.rsu)).toEqual([0, 25_000, 55_000, 80_000, 40_000]);
   });
   it("quoted TC counts new-hire tranches by nominal year at grant value", () => {
@@ -311,7 +315,8 @@ describe("leave date and clawbacks", () => {
   it("bonus edge: leaving the day before the payout forfeits it; on the payout day it pays", () => {
     const before = leaving("2027-03-14");
     expect(sum(before, "bonus")).toBe(0);
-    expect(before.warnings.some((w) => w.includes("forfeits the bonus for 2026-01-01 to 2026-12-31"))).toBe(true);
+    expect(before.warnings).toContainEqual({ code: "bonusForfeited",
+      params: expect.objectContaining({ periodFrom: "2026-01-01", periodTo: "2026-12-31" }) });
     expect(sum(leaving("2027-03-15"), "bonus")).toBe(6_169.35);
   });
   it("prorated-bonus alternative: earned bonuses still pay, the leave period is prorated", () => {
@@ -328,14 +333,14 @@ describe("leave date and clawbacks", () => {
   it("window edge: the window's last day clears it; the day before owes 1/12, under the 1341 threshold", () => {
     expect(leaving("2027-08-02").leave!.clawbacks).toEqual([]);
     const c = leaving("2027-08-01").leave!.clawbacks[0];
-    expect(c).toMatchObject({ fraction: 1 / 12, owed: 2_500, treatment: "no relief ($3,000 or less)", taxRelief: 0, netCost: 2_500 });
+    expect(c).toMatchObject({ fraction: 1 / 12, owed: 2_500, treatment: "noRelief", taxRelief: 0, netCost: 2_500 });
   });
   it("window edge, full kind: the day before owes all $30,000; 1341 credit $6,119.35 (crosses into 12%)", () => {
     // 2026 federal with the sign-on: taxable 75,593.548 -> 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
     // Without $30,000: taxable 45,593.548 -> 1,240 + 12% x 33,193.548 = 5,223.23. Credit 6,119.35.
     expect(leaving("2027-08-02", clawback({ months: 12, kind: "full" })).leave!.clawbacks).toEqual([]);
     expect(leaving("2027-08-01", clawback({ months: 12, kind: "full" })).leave!.clawbacks[0])
-      .toMatchObject({ owed: 30_000, treatment: "IRC 1341 credit", taxRelief: 6_119.35, netCost: 23_880.65 });
+      .toMatchObject({ owed: 30_000, treatment: "irc1341Credit", taxRelief: 6_119.35, netCost: 23_880.65 });
   });
   it("window edge, day proration: one unworked day owes $30,000 / 365", () => {
     expect(leaving("2027-08-01", clawback({ months: 12, kind: "prorated", per: "day" })).leave!.clawbacks[0].owed).toBe(82.19);
@@ -344,11 +349,11 @@ describe("leave date and clawbacks", () => {
     const r = leaving("2027-02-02");
     expect(r.leave!.clawbacks[0]).toMatchObject({
       paidOn: "2026-09-02", repaidOn: "2027-02-02", fraction: 0.5, owed: 15_000,
-      treatment: "IRC 1341 credit", taxRelief: 3_300, netCost: 11_700,
+      treatment: "irc1341Credit", taxRelief: 3_300, netCost: 11_700,
     });
     expect(r.calendarYears.find((c) => c.year === 2027)!.priorYearRepayments).toEqual({ repaid: 15_000, relief: 3_300 });
     expect(r.calendarYears[0].offerGross.cash).toBe(30_000); // 2026 wages (and FICA) stay
-    expect(r.warnings.some((w) => w.includes("FICA withheld on it isn't automatically refunded"))).toBe(true);
+    expect(r.warnings).toContainEqual({ code: "clawbackFica", params: { award: "Sign-on", paidYear: 2026, repaidYear: 2027 } });
   });
   it("same-year repayment reverses the wages: owes $22,500, gets back $5,730.92 of tax (hand-checked)", () => {
     // Leave 2026-12-01: 3 completed months -> owes 9/12 x 30,000 = 22,500, reversing 2026 wages.
@@ -359,7 +364,7 @@ describe("leave date and clawbacks", () => {
     expect(r.calendarYears[0].offerGross).toMatchObject({ cash: 30_000, clawback: -22_500, total: 57_096.77 });
     expect(r.calendarYears[0].offerTax).toBe(9_039.52);
     expect(r.leave!.clawbacks[0]).toMatchObject({
-      owed: 22_500, treatment: "same-year wage reversal", taxRelief: 5_730.92, netCost: 16_769.08,
+      owed: 22_500, treatment: "sameYearReversal", taxRelief: 5_730.92, netCost: 16_769.08,
     });
   });
   it("net-basis repayment: same year costs the same as gross; a later year repays the after-tax share", () => {
@@ -701,12 +706,37 @@ describe("cost of living (BEA RPPs)", () => {
     const b = projectScenario({ ...clt, costOfLiving: undefined }, saver, { years: 1 }).employmentYears[0];
     expect([a.gross, a.tax, a.takeHome]).toEqual([b.gross, b.tax, b.takeHome]);
   });
-  it("rent can be derived from the housing RPPs: $1,500 reference rent -> $1,455.37 in Charlotte", () => {
-    // 1,500 x 97.635 / 100.629
-    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
-      { filingStatus: "single", costOfLiving: { referenceMonthlyRent: 1_500 } }, { years: 1 });
-    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_455.37, rentSource: "derived" });
-    expect(() => projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 })).toThrow(/monthlyRent/);
+  it("rent left blank defaults to HUD's FY2027 Fair Market Rent for the metro: Charlotte $1,640 (1 bedroom)", () => {
+    // HUD FY27_FMRs.xlsx, Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area: studio 1,574, 1 bedroom 1,640.
+    const r = projectScenario({ ...clt, costOfLiving: { area: "16740" } }, single, { years: 1 });
+    expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_640, rentSource: "fmr",
+      rentEstimate: { source: "fmr", hudArea: "METRO16740M16740", bedrooms: 1, fiscalYear: 2027 } });
+    expect(r.employmentYears[0].costOfLiving!.rent).toBe(12 * 1_640);
+    const studio = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
+      { filingStatus: "single", costOfLiving: { fmrBedrooms: 0 } }, { years: 1 });
+    expect(studio.costOfLiving!.monthlyRent).toBe(1_574);
+    // An entered rent always wins.
+    expect(projectScenario(clt, single, { years: 1 }).costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input" });
+  });
+  it("HUD FMR areas for the sample metros: the area with most of the metro's people, in your state when it spans states", () => {
+    // New York metro: seven FMR areas; New York, NY HMFA (9.9M people) for NY, Newark (2.1M, the largest
+    // NJ area) for an NJ resident. Seattle metro: Seattle-Bellevue (3.1M) over Tacoma (0.9M).
+    expect(estimateRent("35620", "NY")).toMatchObject({ monthlyRent: 2_729, hudAreaName: "New York, NY HUD Metro FMR Area" });
+    expect(estimateRent("35620", "NJ")).toMatchObject({ monthlyRent: 1_850, hudAreaName: "Newark, NJ HUD Metro FMR Area" });
+    expect(estimateRent("42660", "WA")).toMatchObject({ monthlyRent: 2_180, hudAreaName: "Seattle-Bellevue, WA HUD Metro FMR Area" });
+    expect(estimateRent("42660", "WA", { bedrooms: 0 }).monthlyRent).toBe(2_091);
+    // Charlotte's main FMR area includes York County, SC, so it's the largest one for an SC resident too.
+    expect(fmrArea("16740", "SC")!.name).toBe("Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area");
+  });
+  it("areas without an FMR fall back to BEA housing prices: NC nonmetro $881.08 from the U.S. median (hand-checked)", () => {
+    // Every BEA metro has an FMR area; state nonmetro portions don't. U.S. median gross rent 1,487 (ACS 2024,
+    // B25064) x NC nonmetro housing 59.625 / U.S. housing 100.629 = 881.08.
+    expect(estimateRent("37999", "NC")).toMatchObject({ source: "derived", anchorRent: 1_487, anchorArea: "00000",
+      monthlyRent: expect.closeTo(881.08, 2) });
+    // With your own rent at a reference location: 1,500 in Charlotte (housing 97.635) -> 1,500 x 59.625 / 97.635.
+    expect(estimateRent("37999", "NC", { anchorRent: 1_500, anchorArea: "16740" }).monthlyRent).toBeCloseTo(916.04, 2);
+    expect(US_MEDIAN_GROSS_RENT).toBe(1_487);
+    expect(FMR).toMatchObject({ fiscalYear: 2027, effective: "2026-10-01" });
   });
   it("with Charlotte as the reference, the factor is 1 and dollars stay local", () => {
     const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });
@@ -880,7 +910,8 @@ describe("withholding vs liability (roadmap 5)", () => {
       withheld: { regular: 24_734, supplemental: 11_000, total: 35_734 }, balanceDue: 1_000 });
     const w = withholdingShortfall(o, single, { years: 1 }).warnings;
     expect(w).toHaveLength(1);
-    expect(w[0]).toMatch(/\$1,000 short.*22% supplemental.*April 2027/);
+    expect(w).toEqual([{ code: "withholdingShortfall", params: { year: 2026, balanceDue: expect.closeTo(1_000, 6), supplemental: true } }]);
+    expect(formatWarning(w[0])).toMatch(/\$1,000 short.*22% supplemental.*April 2027/);
   });
   it("supplemental pay over $1 million is withheld at 37%: $1.2M -> 220,000 + 74,000", () => {
     const o = tx({ salary: { annual: 100_000 }, cashAwards: [{ label: "Award", amount: 1_200_000, paidOn: "2026-06-30" }] });

@@ -24,8 +24,13 @@ methodology page matter more than features.
     - `cliffs` / `nextCliff`;
     - `withholdingShortfall`;
     - `horizonSweep` with window hours, per hour and `monthlyEquivalent`.
-- **Tests:** 139 passing: `test/offer.test.ts` 107, `test/params.test.ts` 22,
+  - **Before UI code (2026-10-08):**
+    - the engine returns numbers and codes, and `src/format` writes the words;
+    - HUD FY2027 Fair Market Rents as the rent estimate;
+    - the type check for tabular figures.
+- **Tests:** 141 passing: `test/offer.test.ts` 109, `test/params.test.ts` 22,
   `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
+  `npm test` also runs `scripts/check-engine.ts`: no text formatting inside the engine.
 - `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
   Seattle tech finance. Inputs are illustrative, not market data.
 - **Design docs:**
@@ -50,6 +55,10 @@ methodology page matter more than features.
   engine changes; the UI's live-update budget depends on them.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
+- `npm run fetch-fmr [-- <FY>]`: re-download HUD Fair Market Rents into
+  `src/col/fmr.json`. Default FY 2027. HUD publishes each fiscal year's FMRs in August or
+  September, effective October 1. HUD USER needs a browser User-Agent, which the script
+  sends.
 
 ## Code map
 - `src/tax/`
@@ -69,12 +78,19 @@ methodology page matter more than features.
   - `benefits.ts`: 401(k), health, perks, monthly pieces.
   - `location.ts`: convenience-rule warning.
   - `dates.ts`: civil dates as day numbers, UTC. `fromDays` and `yearOfDay` are memoized.
-- `src/col/`: `rpp.json` (BEA data, source and vintage inside), `nonHousingRpp`,
-  `rppArea`, `findRppAreas`.
+- `src/col/`
+  - `rpp.json` (BEA data, source and vintage inside): `nonHousingRpp`, `rppArea`,
+    `findRppAreas`.
+  - `fmr.json` (HUD FY2027 FMRs, metro areas, source inside): `rent.ts` has `fmrArea`,
+    `estimateRent` and `US_MEDIAN_GROSS_RENT`.
+- `src/format/`: words for the engine's numbers and codes: event and benefit labels and
+  formulas, warnings, assumptions, `usd`, `pct`, `describeSchedule`. Not part of the
+  engine; the UI and the scripts use it.
 - `src/samples.ts`: the three sample offers (illustrative), shared by the table script,
   the benchmark and the UI.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
-  `offer-table.ts`, `bench.ts`, `fetch-rpp.ts`.
+  `offer-table.ts`, `bench.ts`, `check-engine.ts`, `fetch-rpp.ts`, `fetch-fmr.ts`, and
+  `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 
 ## Working agreements
 - **Branches:** one branch per slice. Merge to main with `--no-ff` when green (tests,
@@ -95,6 +111,9 @@ methodology page matter more than features.
 - Round only at output (`round2`); internal sums stay unrounded.
 - Pure functions, no I/O in `src/`. The engine must run client-side in the browser.
   "Today" is always passed in (`valuationDate`), never read from the clock.
+- The engine (`src/tax`, `src/offer`, `src/col`) returns numbers and codes, never
+  formatted text. Events carry a `detail`; warnings and assumptions are `{ code, params }`.
+  New text goes in `src/format`, and `npm test` enforces this.
 - Engine functions take `TaxParams` as an argument; never import `*_2026` constants into
   `federal.ts`/`state.ts`/`local.ts`. Hardcoded thresholds in `state.ts` specials are
   2026 law; wrap them in `ix()` only if the state sets `indexed.specialThresholds`.
@@ -185,9 +204,17 @@ methodology page matter more than features.
   0.187 but fits poorly, so the published weight wins.
 - **Scale:** RPP components are on the U.S. all-items scale (U.S. housing = 100.629, not
   100). Always use ratios to a reference row (default U.S. "00000").
-- **Rent:** the user's rent per offer, or the household reference rent x the housing RPP
-  ratio. It's the first lease year's rent; the lease starts on the start date and rent
-  rises by `rentGrowth` (per offer, default the inflation input) at each anniversary.
+- **Rent:** the rent you enter per offer. Left blank, it's estimated:
+  - **HUD's Fair Market Rent** for the metro, 1 bedroom by default (household
+    `fmrBedrooms`, 0-4). Big metros span several FMR areas; the estimate takes the one
+    holding most of the metro's 2024 population, in your residence state if any is.
+    Every BEA metro has one.
+  - **Only where there's no FMR** (BEA state nonmetro portions): an anchor rent × the
+    housing RPP ratio. The anchor is the household reference rent, else the U.S. median
+    gross rent, $1,487 (ACS 2024 1-year, B25064, checked on data.census.gov).
+  - **Lease timing:** it's the first lease year's rent. The lease starts on the start date,
+    and rent rises by `rentGrowth` (per offer, default the inflation input) at each
+    anniversary.
 - **COL-adjusted total:** spending money is local; saved money isn't.
   - **Converted:** discretionary after rent, minus expected out-of-pocket health
     spending, both through the non-housing factor.
@@ -288,6 +315,11 @@ methodology page matter more than features.
     money buys local transit.
   - **Geography:** RPPs are metro-wide; the NYC metro averages Manhattan with its
     suburbs.
+  - **FMR estimates:**
+    - 40th-percentile gross rents (utilities included) across the FMR area. City-center
+      rents for new grads usually run higher, which is why the UI labels it an estimate
+      to edit.
+    - An FMR area is a county group; we don't pick sub-areas within it.
 - **Layoffs:** a layoff, severance, or clawbacks waived on a layoff aren't modeled. The
   leave date assumes a voluntary exit.
 
@@ -310,7 +342,5 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
 7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
    step, and the after-tax value of staying until it. Engine done (`cliffs`,
    `nextCliff`); the UI shows it in L-4.
-8. HUD Fair Market Rents by metro as the rent-estimate anchor. These are 40th-percentile
-   rents for recent movers, a better anchor than the ACS median.
-   - `npm run fetch-fmr`, plus a HUD area ↔ BEA metro crosswalk.
-   - Deferred in UI design review (2026-10-08).
+8. HUD Fair Market Rents by metro as the rent estimate. Done (2026-10-08): `npm run
+   fetch-fmr`, FY2027, matched to BEA metros by CBSA code.

@@ -1,9 +1,12 @@
 // Prints a year-by-year table for sample offers so results can be eyeballed before a UI exists.
 // Usage: npm run offers. The sample inputs are illustrative, not market data.
 import {
-  breakeven, compareOffers, describeSchedule, leaveDateSweep, type OfferInput, type ScenarioResult,
+  breakeven, compareOffers, leaveDateSweep, type OfferInput, type ScenarioResult,
 } from "../src/offer/index";
+import { describeSchedule, formatWarning, rppVintage } from "../src/format/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
+import { rppArea } from "../src/col/index";
+import { FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 
 const household = SAMPLE_HOUSEHOLD;
 const offers = SAMPLE_OFFERS;
@@ -110,7 +113,7 @@ offers.forEach((o, i) => {
   out.push("", o.label, describe(o), "", "Employment years, cash (base scenario):", offerTable(base[i]),
     "", "Total rewards and hours (base scenario):",
     benefitTable(base[i]));
-  for (const w of comparison.projections[i].warnings) out.push(`   ! ${w}`);
+  for (const w of comparison.projections[i].warnings) out.push(`   ! ${formatWarning(w)}`);
 });
 
 const short = (o: OfferInput) => o.label.slice(0, 1);
@@ -147,7 +150,7 @@ out.push("",
 // ---- cost of living ------------------------------------------------------------------
 const colInfo = base.map((r) => r.costOfLiving!);
 const savingsRate = household.costOfLiving?.savingsRate ?? 0;
-out.push("", `Cost of living: ${colInfo[0].rppVintage}`,
+out.push("", `Cost of living: ${rppVintage(colInfo[0].rppVintage)}`,
   `Reference: ${colInfo[0].reference.name} dollars. Non-housing RPP = (all items - 0.16 x housing) / 0.84; `
     + "factor = reference non-housing / area non-housing.",
   "Rent is the first lease year's, from the start date; it rises at each anniversary (default: the inflation input).",
@@ -157,6 +160,16 @@ out.push("", `Cost of living: ${colInfo[0].rppVintage}`,
       return [short(o), c.area.name.replace(/ \(Metropolitan Statistical Area\)$/, ""), c.area.allItems.toFixed(1),
         c.area.housing.toFixed(1), c.area.nonHousing.toFixed(1), c.nonHousingFactor.toFixed(4), `$${$(c.monthlyRent)}`,
         `${pct(c.rentGrowth)}${c.rentGrowthSource === "inflation" ? " (inflation)" : ""}`];
+    }), 2));
+
+// What the app would estimate if rent were left blank: HUD's FMR first; BEA housing prices only as a fallback.
+out.push("", `Rent estimates if left blank (the samples' rents are entered): HUD FY${FMR.fiscalYear} Fair Market Rent `
+  + `vs. the BEA-derived fallback (U.S. median gross rent $${$(US_MEDIAN_GROSS_RENT)}, ACS 2024, x housing RPP ratio):`,
+  table(["Offer", "HUD FMR area", "Studio", "1 bedroom", "BEA-derived", "Entered"],
+    offers.map((o, i) => {
+      const a = fmrArea(o.costOfLiving!.area, o.residence.state)!;
+      const derived = US_MEDIAN_GROSS_RENT * colInfo[i].area.housing / rppArea("00000").housing;
+      return [short(o), a.name, `$${$(a.fmr[0])}`, `$${$(a.fmr[1])}`, `$${$(derived)}`, `$${$(colInfo[i].monthlyRent)}`];
     }), 2));
 
 out.push("", "COL-adjusted total, U.S. dollars, by employment year (base scenario). Spending money is local; saved money isn't:",
