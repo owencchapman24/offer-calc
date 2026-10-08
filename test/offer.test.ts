@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
   breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, nextCliff, projectOffer,
-  projectScenario, VESTING_PRESETS, type AnnualBonus, type Household, type OfferInput,
+  projectScenario, VESTING_PRESETS, withholdingShortfall, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
@@ -857,6 +857,41 @@ describe("cliffs and the next cliff (roadmap 7)", () => {
     expect(r.next).toMatchObject({ date: "2027-01-31", daysAway: 19, cliffs: [{ kind: "bonus", amount: 32_986.3 }] });
     expect(Math.round(r.next!.valueOfStaying.afterTaxComp)).toBe(29_970);
     expect(Math.round(r.next!.cliffValue)).toBe(26_057);
+  });
+});
+
+describe("withholding vs liability (roadmap 5)", () => {
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 120_000 }, ...o });
+  const y2026 = (o: OfferInput) => withholdingShortfall(o, single, { years: 1 }).years.find((y) => y.year === 2026)!;
+
+  it("a July start is over-withheld: $8,785 withheld on $5,020 of tax, a $3,765 refund (hand-checked)", () => {
+    // Each $10,000 month is withheld as if it were $120,000 a year: tax on 103,900 = 1,240 + 4,560
+    // + 22% x 53,500 = 17,570, / 12 = 1,464.17, x 6 months = 8,785. Owed on 60,000: taxable 43,900
+    // -> 1,240 + 12% x 31,500 = 5,020.
+    const y = y2026(tx({ startDate: "2026-07-01" }));
+    expect(y).toEqual({ year: 2026, federalIncomeTax: 5_020, withheld: { regular: 8_785, supplemental: 0, total: 8_785 }, balanceDue: -3_765 });
+  });
+  it("a $50,000 sign-on in the 24% bracket, withheld at 22%: $1,000 due in April (hand-checked)", () => {
+    // Owed on 200,000: taxable 183,900 -> 5,800 + 22% x 55,300 + 24% x 78,200 = 36,734. Salary alone:
+    // taxable 133,900 -> 24,734 withheld. Sign-on: 22% x 50,000 = 11,000. Due: 2% x 50,000 = 1,000.
+    const o = tx({ salary: { annual: 150_000 }, cashAwards: [{ label: "Sign-on", amount: 50_000, paidOn: "2026-06-30" }] });
+    expect(y2026(o)).toEqual({ year: 2026, federalIncomeTax: 36_734,
+      withheld: { regular: 24_734, supplemental: 11_000, total: 35_734 }, balanceDue: 1_000 });
+    const w = withholdingShortfall(o, single, { years: 1 }).warnings;
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/\$1,000 short.*22% supplemental.*April 2027/);
+  });
+  it("supplemental pay over $1 million is withheld at 37%: $1.2M -> 220,000 + 74,000", () => {
+    const o = tx({ salary: { annual: 100_000 }, cashAwards: [{ label: "Award", amount: 1_200_000, paidOn: "2026-06-30" }] });
+    expect(y2026(o).withheld.supplemental).toBe(294_000);
+  });
+  it("pre-tax 401(k) deferrals lower salary withholding the way they lower the tax: nothing due", () => {
+    // 10% deferred: $9,000 a month taxable -> 108,000 a year -> tax on 91,900 = 5,800 + 22% x 41,500 = 14,930.
+    const y = y2026(tx({ retirement: { contributionPct: 0.1 } }));
+    expect(y.withheld.regular).toBe(14_930);
+    expect(y.federalIncomeTax).toBe(14_930);
+    expect(y.balanceDue).toBe(0);
   });
 });
 

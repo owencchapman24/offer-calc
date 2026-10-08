@@ -483,6 +483,25 @@ export interface NextCliffResult {
   };
 }
 
+/** One calendar year of withholdingShortfall. Federal income tax only. */
+export interface WithholdingYear {
+  year: number;
+  /** The offer's federal income tax: household tax with the offer minus without it. */
+  federalIncomeTax: number;
+  /** Estimated federal withholding: salary by the percentage method; bonuses, RSU vests and cash awards at supplemental rates. */
+  withheld: { regular: number; supplemental: number; total: number };
+  /** federalIncomeTax - withheld.total: owed the next April if positive, refunded if negative. */
+  balanceDue: number;
+}
+
+export interface WithholdingResult {
+  years: WithholdingYear[];
+  /** Plain language, for years whose balance due reaches $1,000. */
+  warnings: string[];
+  /** How withholding was estimated, for the methodology page. */
+  assumptions: string[];
+}
+
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
 export interface LeaveSweepRow {
   months: number;
