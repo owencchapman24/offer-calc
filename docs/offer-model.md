@@ -258,6 +258,29 @@ exposure curve and shows the vest cliffs, bonus payout dates and clawback steps 
 table. `ScenarioResult.leave` holds the detail for one leave date: each clawback's owed
 amount, its tax treatment, relief and net cost.
 
+**Cliffs and the next cliff (roadmap 7, built 2026-10-08).** `cliffs(offer, household)`
+lists the dates where your last day starts to matter. Each is dated by the first last day
+that keeps it, under the same rules as a leave date:
+- **Bonus payouts:** when you must be employed on the pay date, the default.
+- **RSU vests and cash-award payments.**
+- **Clawback steps and the window's end:** a step lands when you work through the day before
+  a window month completes. Per-day proration shrinks daily, so it has no cliffs.
+- **401(k) vesting steps:** found by scanning last days with the projection's own service
+  rule (elapsed time or plan-year hours).
+
+`nextCliff(offer, household, leaveDate)` gives the first cliff after a leave date and what
+staying until it is worth, nominal:
+- **Value of staying:** after-tax comp kept and total rewards kept, if you leave on the cliff
+  date instead.
+- **`cliffValue`:** the cliffs' own part of that value.
+  - Payments count after tax, at that year's average offer rate in the stay-until-the-cliff
+    projection.
+  - A clawback counts as the repayment no longer owed, net of tax relief.
+  - 401(k) money counts as the amount that vests.
+  - The rest is pay for the extra days.
+
+`keptIfLeaving` is the per-leave-date calculation behind both and `leaveDateSweep`.
+
 ## 5. Scenarios: bear / base / bull
 
 These are **joint scenarios**, not percentiles. "Bear" sets every uncertain input to its
@@ -282,6 +305,28 @@ applies a convenience-of-employer rule and differs from the residence state, we 
 remote-work wages may also be taxed there. The rule states are NY, DE, NE and PA; CT and NJ
 apply it only to residents of states that have one (reciprocity). v1 warns but doesn't
 compute nonresident tax or the resident credit.
+
+**Withholding vs liability (roadmap 5, built 2026-10-08).** Totals are liability: what you
+owe. `withholdingShortfall(offer, household)` estimates what your employer withholds for
+federal income tax, so the difference is due (or refunded) the April after each year. It
+changes no total.
+- **Salary:** monthly payroll under the IRS percentage method (Pub. 15-T, a 2020+ Form W-4
+  with the household's filing status and nothing else). Each month's taxable pay is
+  annualized: 1/12 of the tax, with the standard deduction, on 12 × the month's pay.
+  - **Partial first year:** comes out over-withheld, as in real payroll. A July start at
+    $120,000 has $8,785 withheld against $5,020 owed.
+- **Bonuses, RSU vests and cash awards:** supplemental wages, withheld at 22%, and 37% on the
+  year's supplemental pay over $1 million (Pub. 15 2026 §7). A $50,000 sign-on in the 24%
+  bracket leaves $1,000 due.
+- **Deductions:** pre-tax 401(k) deferrals and cafeteria-plan amounts come out of the pay
+  they're taken from.
+- **Warnings** start at a $1,000 balance due, the estimated-tax penalty threshold (IRC
+  6654(e)(1)).
+- **Out of scope:**
+  - state withholding;
+  - FICA, which is withheld exactly up to the Additional Medicare threshold;
+  - other jobs' and a spouse's withholding;
+  - safe-harbor rules.
 
 ## 7. Comparing offers: common window, nominal and present value
 
@@ -309,7 +354,26 @@ compute nonresident tax or the resident credit.
   - `breakeven(A, B, "salary" | "signOn", …)` finds, by bisection to the cent, the change
     to B's starting salary (or first sign-on) that ties A in base-scenario PV, on after-tax
     comp, total rewards or the COL-adjusted total. Raises and percent-of-salary bonuses
-    scale with the new salary; a negative result means B is already ahead.
+    scale with the new salary.
+    - **A negative increase** means B is already ahead and could give some up.
+    - **`outcome: "alreadyAhead"`** (with `increase` and `to` null) means B leads even at a
+      $0 salary or sign-on. It's a result, not an error.
+    - **`aheadBy`** always gives B's PV lead as entered.
+- **API for the UI (2026-10-08):**
+  - **Window hours:** `WindowTotals.hours` counts each employment year's hours for its days
+    inside the window, so it ties to the yearly figures.
+  - **Per hour:** `WindowTotals.perHour` is nominal dollars per hour worked, on each basis.
+  - **`monthlyEquivalent(pv, window, valuationDate, r)`** restates a PV as the level
+    month-end amount over the window with the same PV, discounted like every event. "$487 a
+    month" uses it.
+  - **`horizonSweep(offers, household, [2, 3, 4, 5], options)`** is the "winner if you stay
+    N years" row. For each stay it gives every offer's base-scenario value on each basis
+    (`Basis`: cash, totalRewards, colAdjustedTotal, perHour), the leader, the margin and its
+    per-month equivalent, and a close-call flag (under 3%, `CLOSE_CALL_SHARE`).
+    - **A stay is the window, not a leave date:** pay after it isn't counted, and its last
+      calendar year is taxed as though you kept earning through December.
+    - **perHour** divides the COL-adjusted total when every offer has cost of living, and
+      total rewards otherwise.
 
 ## 8. Prerequisite: per-year tax parameters (refactor plan)
 
@@ -427,8 +491,7 @@ plumbing, and the oracle catches any 2026 drift.
 - Stock options, private-company/double-trigger RSUs, ESPP.
 - 401(k)/benefits (roadmap 2). They plug into each calendar year's `TaxInput` and use
   `leaveDate`.
-- Withholding and cash-flow timing. We will warn that RSU vests withheld at the 22%
-  supplemental rate likely leave a balance due.
+- Cash-flow timing beyond federal withholding (§6): state withholding, paycheck dates.
 - Pay lag (a late-December paycheck paid in January).
 - Share rounding.
 - Moving states mid-window.

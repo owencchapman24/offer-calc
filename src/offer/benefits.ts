@@ -1,4 +1,4 @@
-import { daysInMonth, nextMonthStart, yearOfDay } from "./dates";
+import { daysInMonth, jan1, nextMonthStart, yearOfDay } from "./dates";
 import { type RawEvent, usd } from "./streams";
 import type { BenefitKind, Health, Perks, Retirement } from "./types";
 
@@ -77,6 +77,27 @@ export function retirementFlows(
     }
   }
   return { flows, pretaxByYear };
+}
+
+/**
+ * Completed years of vesting service if your last day is `vestingDay` (employed until `workEnd`,
+ * exclusive). "elapsedTime": a year completes once you work through the day before its
+ * anniversary. "planYearHours": each calendar plan year with 1,000+ hours counts, credited once the
+ * 1,000th hour is worked; employment on the year's last day isn't required (29 CFR 2530.200b-1).
+ * Hours accrue evenly: `hoursPerYear` x days employed / days in the year.
+ */
+export function serviceYears(
+  method: "elapsedTime" | "planYearHours", hoursPerYear: number | undefined,
+  start: number, workEnd: number, vestingDay: number, anniversaries: number[],
+): number {
+  if (method === "elapsedTime") return anniversaries.filter((d, n) => n >= 1 && d <= vestingDay + 1).length;
+  if (hoursPerYear === undefined) throw new Error("vestingService \"planYearHours\" needs offer.hours.");
+  let years = 0;
+  for (let y = yearOfDay(start); jan1(y) <= vestingDay; y++) {
+    const days = Math.max(0, Math.min(vestingDay + 1, jan1(y + 1), workEnd) - Math.max(start, jan1(y)));
+    if (hoursPerYear * (days / (jan1(y + 1) - jan1(y))) >= 1_000) years++;
+  }
+  return years;
 }
 
 /** Vested share of employer money after `completedYears` of service. */

@@ -334,6 +334,10 @@ export interface WindowTotals {
   totalRewards: { nominal: number; presentValue?: number };
   /** Discretionary income after rent and the COL-adjusted total, in reference-location dollars. Present with costOfLiving. */
   costOfLiving?: { nominal: CostOfLivingTotals; presentValue?: CostOfLivingTotals };
+  /** Hours worked inside the window (each employment year's hours, prorated to its days in the window). Present with hours. */
+  hours?: number;
+  /** Nominal dollars per hour worked inside the window, on each basis. Present when hours are worked in the window. */
+  perHour?: { afterTaxComp: number; totalRewards: number; colAdjustedTotal?: number };
 }
 
 /**
@@ -454,6 +458,54 @@ export interface LeaveResult {
   retirementForfeited: number;
 }
 
+export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest";
+
+/** A date where your last day starts to matter: leave on or after it to keep what it brings. */
+export interface Cliff {
+  /** The first last day that keeps it. */
+  date: ISODate;
+  kind: CliffKind;
+  label: string;
+  /** Gross: the payment or vest, the repayment no longer owed, or the employer 401(k) money that vests. */
+  amount: number;
+}
+
+export interface NextCliffResult {
+  leaveDate: ISODate;
+  /** Null when nothing pays, vests or steps down after the leave date within the projection. */
+  next: null | {
+    date: ISODate;
+    /** Days from the leave date to the cliff. */
+    daysAway: number;
+    /** Everything that lands on that date (a bonus and a vest can share one). */
+    cliffs: Cliff[];
+    /** Leaving on `date` instead of `leaveDate`, nominal: the extra after-tax comp and total rewards kept. */
+    valueOfStaying: { afterTaxComp: number; totalRewards: number };
+    /** The cliffs' own part of that: payments after tax, the clawback no longer owed (net of tax relief), and
+     *  employer 401(k) money that vests. The rest is pay for the extra days. */
+    cliffValue: number;
+  };
+}
+
+/** One calendar year of withholdingShortfall. Federal income tax only. */
+export interface WithholdingYear {
+  year: number;
+  /** The offer's federal income tax: household tax with the offer minus without it. */
+  federalIncomeTax: number;
+  /** Estimated federal withholding: salary by the percentage method; bonuses, RSU vests and cash awards at supplemental rates. */
+  withheld: { regular: number; supplemental: number; total: number };
+  /** federalIncomeTax - withheld.total: owed the next April if positive, refunded if negative. */
+  balanceDue: number;
+}
+
+export interface WithholdingResult {
+  years: WithholdingYear[];
+  /** Plain language, for years whose balance due reaches $1,000. */
+  warnings: string[];
+  /** How withholding was estimated, for the methodology page. */
+  assumptions: string[];
+}
+
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
 export interface LeaveSweepRow {
   months: number;
@@ -508,15 +560,67 @@ export interface Comparison {
   projections: OfferProjection[];
 }
 
-export interface BreakevenResult {
+/**
+ * A comparison basis: after-tax comp ("cash"), total rewards, the COL-adjusted total, or dollars
+ * per hour worked (the last step of the pipeline).
+ */
+export type Basis = "cash" | "totalRewards" | "colAdjustedTotal" | "perHour";
+
+/** Who leads on one basis, and by how much. Offers are indexes in the order passed. */
+export interface Lead {
+  winner: number;
+  runnerUp: number;
+  /** Winner minus runner-up: present-value dollars, or dollars per hour for "perHour". */
+  margin: number;
+  /** The margin as a level monthly amount over the window with the same present value. PV bases only. */
+  perMonth?: number;
+  /** Margin as a share of the winner's value. */
+  share: number;
+  /** The lead is under the close-call threshold (3%). */
+  closeCall: boolean;
+}
+
+/** One stay length in horizonSweep. */
+export interface HorizonRow {
+  /** Stay length: the comparison window is [earliest start, + years). */
+  years: number;
+  window: { start: ISODate; end: ISODate };
+  /**
+   * Each offer's base-scenario value, in the order passed: present value for cash, totalRewards and
+   * colAdjustedTotal; nominal dollars per hour worked for perHour. A basis is absent when an offer
+   * lacks its inputs (costOfLiving; hours).
+   */
+  values: Partial<Record<Basis, number[]>>;
+  leads: Partial<Record<Basis, Lead>>;
+}
+
+export interface HorizonSweep {
+  labels: string[];
+  valuationDate: ISODate;
+  discountRate: number;
+  /** What perHour divides by hours: the COL-adjusted total when every offer has costOfLiving, else total rewards. */
+  perHourOf: "colAdjustedTotal" | "totalRewards";
+  rows: HorizonRow[];
+}
+
+/**
+ * "tie": `increase` is the change to B's starting salary (or first sign-on) that ties A. It's
+ * negative when B is already ahead and could give some up. "alreadyAhead": B leads even at a $0
+ * salary (or sign-on), so no change ties; `increase` and `to` are null.
+ */
+export type BreakevenResult = BreakevenCommon & (
+  | { outcome: "tie"; increase: number; to: number }
+  | { outcome: "alreadyAhead"; increase: null; to: null }
+);
+
+interface BreakevenCommon {
   field: "salary" | "signOn";
   /** What's being tied: after-tax comp, total rewards, or the COL-adjusted total (needs costOfLiving on both offers). */
   basis: "cash" | "totalRewards" | "colAdjustedTotal";
-  /** Change to B's starting salary (or first sign-on) that ties A; negative if B is already ahead. */
-  increase: number;
-  /** B's value before and after the change. */
+  /** B's starting salary (or first sign-on) as entered. */
   from: number;
-  to: number;
+  /** B's base-scenario present value minus A's, as entered, on this basis: positive when B is already ahead. */
+  aheadBy: number;
   /** A's base-scenario present value over the shared window, on this basis: the target. */
   targetPV: number;
   window: { start: ISODate; end: ISODate };

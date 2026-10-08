@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, projectOffer,
-  projectScenario, VESTING_PRESETS, type AnnualBonus, type Household, type OfferInput,
+  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, nextCliff, projectOffer,
+  projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
+import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
@@ -493,10 +494,26 @@ describe("present value and comparisons", () => {
     const r = breakeven(tx({}), ca, "salary", single, valued);
     expect(r.increase).toBeGreaterThan(5_000);
     const pv = (o: OfferInput) => projectScenario(o, single, { ...valued, scenario: "base" }).window.presentValue!.afterTaxComp;
-    expect(pv({ ...ca, salary: { annual: r.to } })).toBeCloseTo(r.targetPV, 0);
+    expect(pv({ ...ca, salary: { annual: r.to! } })).toBeCloseTo(r.targetPV, 0);
   });
   it("breakeven is negative when B is already ahead", () => {
     expect(breakeven(tx({}), tx({ salary: { annual: 110_000 } }), "salary", single, valued).increase).toBeCloseTo(-10_000, 1);
+  });
+  it("already ahead even at a $0 sign-on: an outcome, not an error, with B's lead (hand-checked)", () => {
+    // TX, calendar 2026, 0% discount so PV = nominal. A: $100,000. B: $110,000 + a $5,000 sign-on.
+    // B's extra $15,000 is all in the 22% bracket (taxable 98,900 < 105,700): 15,000 x (1 - 22% - 7.65%)
+    // = 10,552.50 ahead. Even at a $0 sign-on B leads by 10,000 x 0.7035, so no sign-on ties.
+    const jan = (o: Partial<OfferInput>) => tx({ startDate: "2026-01-01", ...o });
+    const opts = { valuationDate: "2026-01-01", discountRate: 0, horizonYears: 1, years: 1 };
+    const B = jan({ salary: { annual: 110_000 }, cashAwards: [{ label: "Sign-on", amount: 5_000, paidOn: "2026-01-01" }] });
+    const r = breakeven(jan({}), B, "signOn", single, opts);
+    expect(r).toMatchObject({ outcome: "alreadyAhead", increase: null, to: null, from: 5_000 });
+    expect(r.aheadBy).toBeCloseTo(10_552.5, 2);
+    // Salary can still tie, by giving up $15,000: $95,000 + $5,000 = A's $100,000.
+    const s = breakeven(jan({}), B, "salary", single, opts);
+    expect(s).toMatchObject({ outcome: "tie", from: 110_000 });
+    expect(s.increase).toBeCloseTo(-15_000, 1);
+    expect(s.aheadBy).toBeCloseTo(10_552.5, 2);
   });
 });
 
@@ -776,6 +793,158 @@ describe("cost of living (BEA RPPs)", () => {
     expect(breakeven(tx("19100", 1_500), tx("35620", 2_000), "salary", single, opts).increase).toBeCloseTo(0, 1);
     expect(() => breakeven(tx("19100", 1_500), { ...tx("35620", 0), costOfLiving: undefined }, "salary", single,
       { ...opts, basis: "colAdjustedTotal" })).toThrow(/costOfLiving/);
+  });
+});
+
+describe("cliffs and the next cliff (roadmap 7)", () => {
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 120_000 }, ...o });
+  const flat = { inflation: 0 }; // 2027 law = 2026 law (bar SALT), so 2027 is hand-checkable
+
+  it("bonus cliff: leaving Mar 1 vs Mar 15, 2027 forfeits a $12,000 bonus; staying is worth $13,434.26 (hand-checked)", () => {
+    // Fixed $12,000 bonus for calendar 2026, paid Mar 15, 2027; you must be employed that day.
+    // Leave Mar 1: 2027 wages 20,000 + 10,000 x 1/31 = 20,322.58; tax 10% x 4,222.58 + 7.65% = 1,976.94.
+    // Leave Mar 15: 20,000 + 10,000 x 15/31 + 12,000 = 36,838.71; tax 1,240 + 12% x 8,338.71 + 7.65% = 5,058.81.
+    // Value of staying = (36,838.71 - 5,058.81) - (20,322.58 - 1,976.94) = 13,434.26. The bonus itself,
+    // at 2027's average offer rate (5,058.81 / 36,838.71): 12,000 x (1 - 13.732%) = 10,352.12.
+    const o = tx({ bonus: { basis: "fixed", amount: { bear: 12_000, base: 12_000, bull: 12_000 }, payOn: { month: 3, day: 15 } } });
+    const r = nextCliff(o, single, "2027-03-01", flat);
+    expect(r.next).toMatchObject({ date: "2027-03-15", daysAway: 14, cliffs: [{ kind: "bonus", amount: 12_000 }] });
+    expect(r.next!.valueOfStaying.afterTaxComp).toBeCloseTo(13_434.26, 1);
+    expect(r.next!.valueOfStaying.totalRewards).toBeCloseTo(13_434.26, 1);
+    expect(r.next!.cliffValue).toBeCloseTo(10_352.12, 1);
+    // The day before vs the day of: on Mar 15 itself the bonus is kept, so the next cliff is a year on.
+    expect(nextCliff(o, single, "2027-03-14", flat).next!.date).toBe("2027-03-15");
+    expect(nextCliff(o, single, "2027-03-15", flat).next!.date).toBe("2028-03-15");
+  });
+
+  // $60,000 salary; a $12,000 sign-on paid on the start date, repaid by uncompleted months over 12.
+  const signOn = tx({ salary: { annual: 60_000 }, cashAwards: [{ label: "Sign-on", amount: 12_000, paidOn: "2026-01-01",
+    clawback: { months: 12, kind: "prorated" } }] });
+  it("prorated clawback: a $1,000 step at each month's end, cleared on Dec 31", () => {
+    const c = cliffs(signOn, single, flat).filter((x) => x.kind.startsWith("clawback"));
+    expect(c.map((x) => x.date).slice(0, 3)).toEqual(["2026-01-31", "2026-02-28", "2026-03-31"]);
+    expect(c).toHaveLength(12);
+    expect(c.every((x) => x.amount === 1_000)).toBe(true);
+    expect(c[11]).toMatchObject({ date: "2026-12-31", kind: "clawbackCleared" });
+  });
+  it("next cliff from Mar 15: the Mar 31 step saves $823.50 net; staying is worth $3,116.73 (hand-checked)", () => {
+    // Same-year repayment reverses wages, so the net cost is the repayment less the tax on it.
+    // Leave Mar 30: owe 10/12 = 10,000; wages 10,000 + 5,000 x 30/31 + 12,000 - 10,000; relief = 10% + 7.65%
+    // of 10,000 (all in the 10% bracket) = 1,765 -> net 8,235. Leave Mar 31: owe 9,000; relief 1,588.50 -> 7,411.50.
+    // Saved: 823.50. Kept: Mar 15 wages 14,419.35, FICA only (under the standard deduction): 13,316.27;
+    // Mar 31 wages 18,000, tax 190 + 1,377: 16,433. Difference 3,116.73.
+    const r = nextCliff(signOn, single, "2026-03-15", flat);
+    expect(r.next).toMatchObject({ date: "2026-03-31", daysAway: 16, cliffs: [{ kind: "clawbackStep", amount: 1_000 }] });
+    expect(r.next!.cliffValue).toBeCloseTo(823.5, 1);
+    expect(r.next!.valueOfStaying.afterTaxComp).toBeCloseTo(3_116.73, 1);
+  });
+  it("401(k) cliff vesting: 2029-07-12 under elapsed time, 2028-04-01 under plan-year hours", () => {
+    // Same plan as the vesting tests above: 3% of $110,000 a year, 3-year cliff.
+    const A: OfferInput = { label: "A", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13",
+      salary: { annual: 110_000 }, retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }], vesting: { kind: "cliff", years: 3 } },
+      hours: { weekly: { bear: 80, base: 80, bull: 80 } } };
+    const vest = (o: OfferInput) => cliffs(o, single).filter((c) => c.kind === "retirementVest");
+    expect(vest(A)).toEqual([expect.objectContaining({ date: "2029-07-12", amount: expect.closeTo(9_900, 1) })]);
+    const planYear = { ...A, retirement: { ...A.retirement!, vestingService: "planYearHours" as const } };
+    expect(vest(planYear)).toEqual([expect.objectContaining({ date: "2028-04-01", amount: expect.closeTo(5_677.72, 1) })]);
+    expect(nextCliff(A, single, "2029-07-12").next).toBeNull();
+  });
+  it("sample A (illustrative): leaving Jan 12, 2027, the first bonus is 19 days away; staying is worth $29,970", () => {
+    // The bonus is taxed at 2027's average offer rate in the stay-until-Jan-31 projection, where 2027
+    // has one month of salary: $26,057 of the $32,986 bonus is kept, more than in a full year there.
+    const r = nextCliff(SAMPLE_OFFERS[0], SAMPLE_HOUSEHOLD, "2027-01-12", { inflation: 0.025 });
+    expect(r.next).toMatchObject({ date: "2027-01-31", daysAway: 19, cliffs: [{ kind: "bonus", amount: 32_986.3 }] });
+    expect(Math.round(r.next!.valueOfStaying.afterTaxComp)).toBe(29_970);
+    expect(Math.round(r.next!.cliffValue)).toBe(26_057);
+  });
+});
+
+describe("withholding vs liability (roadmap 5)", () => {
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 120_000 }, ...o });
+  const y2026 = (o: OfferInput) => withholdingShortfall(o, single, { years: 1 }).years.find((y) => y.year === 2026)!;
+
+  it("a July start is over-withheld: $8,785 withheld on $5,020 of tax, a $3,765 refund (hand-checked)", () => {
+    // Each $10,000 month is withheld as if it were $120,000 a year: tax on 103,900 = 1,240 + 4,560
+    // + 22% x 53,500 = 17,570, / 12 = 1,464.17, x 6 months = 8,785. Owed on 60,000: taxable 43,900
+    // -> 1,240 + 12% x 31,500 = 5,020.
+    const y = y2026(tx({ startDate: "2026-07-01" }));
+    expect(y).toEqual({ year: 2026, federalIncomeTax: 5_020, withheld: { regular: 8_785, supplemental: 0, total: 8_785 }, balanceDue: -3_765 });
+  });
+  it("a $50,000 sign-on in the 24% bracket, withheld at 22%: $1,000 due in April (hand-checked)", () => {
+    // Owed on 200,000: taxable 183,900 -> 5,800 + 22% x 55,300 + 24% x 78,200 = 36,734. Salary alone:
+    // taxable 133,900 -> 24,734 withheld. Sign-on: 22% x 50,000 = 11,000. Due: 2% x 50,000 = 1,000.
+    const o = tx({ salary: { annual: 150_000 }, cashAwards: [{ label: "Sign-on", amount: 50_000, paidOn: "2026-06-30" }] });
+    expect(y2026(o)).toEqual({ year: 2026, federalIncomeTax: 36_734,
+      withheld: { regular: 24_734, supplemental: 11_000, total: 35_734 }, balanceDue: 1_000 });
+    const w = withholdingShortfall(o, single, { years: 1 }).warnings;
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/\$1,000 short.*22% supplemental.*April 2027/);
+  });
+  it("supplemental pay over $1 million is withheld at 37%: $1.2M -> 220,000 + 74,000", () => {
+    const o = tx({ salary: { annual: 100_000 }, cashAwards: [{ label: "Award", amount: 1_200_000, paidOn: "2026-06-30" }] });
+    expect(y2026(o).withheld.supplemental).toBe(294_000);
+  });
+  it("pre-tax 401(k) deferrals lower salary withholding the way they lower the tax: nothing due", () => {
+    // 10% deferred: $9,000 a month taxable -> 108,000 a year -> tax on 91,900 = 5,800 + 22% x 41,500 = 14,930.
+    const y = y2026(tx({ retirement: { contributionPct: 0.1 } }));
+    expect(y.withheld.regular).toBe(14_930);
+    expect(y.federalIncomeTax).toBe(14_930);
+    expect(y.balanceDue).toBe(0);
+  });
+});
+
+describe("stay length: window hours, per month, and the horizon sweep", () => {
+  const all = (v: number) => ({ bear: v, base: v, bull: v });
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 100_000 }, ...o });
+
+  it("per month is the level month-end amount with the same PV (hand-checked factor)", () => {
+    // Month-ends of 2026 are days 30, 58, 89, ..., 364 after Jan 1; each is discounted (1.05)^-(days / 365.25).
+    const days = [30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364];
+    const factor = days.reduce((s, d) => s + 1.05 ** (-d / 365.25), 0);
+    expect(monthlyEquivalent(10_000, { start: "2026-01-01", years: 1 }, "2026-01-01")).toBeCloseTo(10_000 / factor, 9);
+    expect(monthlyEquivalent(12_000, { start: "2026-01-01", years: 2 }, "2026-01-01", 0)).toBeCloseTo(500, 9);
+  });
+  it("window hours tie to the employment years, prorated where the window cuts one (hand-checked)", () => {
+    // Same start: 45 x 50 = 2,250 hours; 79,655.80 / 2,250 = 35.40 an hour, as in the employment-year test.
+    const everything = tx({ retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] }, hours: { weekly: all(45) },
+      health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 } });
+    const w = projectScenario(everything, single, { years: 1 }).window;
+    expect(w.hours).toBe(2_250);
+    expect(w.perHour).toEqual({ afterTaxComp: 35.4, totalRewards: 36.29 });
+    // A July start in a window from Jan 1, 2026 for 2 years: employment year 1 (365 days) is all inside,
+    // 2,000 hours; year 2 runs Jul 1, 2027 to Jul 1, 2028 (366 days) with 184 inside: 2,000 x 184/366.
+    const late = projectScenario(tx({ startDate: "2026-07-01", hours: { weekly: all(40) } }), single,
+      { window: { start: "2026-01-01", years: 2 } }).window;
+    expect(late.hours).toBeCloseTo(2_000 + (2_000 * 184) / 366, 2);
+  });
+  it("the winner flips with the stay: a bigger sign-on wins short stays, a bigger salary wins from 3 years (hand-checked)", () => {
+    // TX, 0% inflation (2027-28 law = 2026's), 0% discount (PV = nominal). A: $110,000. B: $100,000 + $25,000 sign-on.
+    // A a year: tax 15,370 + 8,415 -> 86,215. B in 2026: on 125,000, 5,800 + 22% x 55,300 + 24% x 3,200 = 18,734
+    // + 9,562.50 -> 96,703.50; later years on 100,000: 13,170 + 7,650 -> 79,180.
+    // 1 year: B by 10,488.50 (874.04 a month). 2 years: B by 175,883.50 - 172,430 = 3,453.50 (143.90 a month,
+    // 1.96%: close). 3 years: A by 258,645 - 255,063.50 = 3,581.50 (99.49 a month, 1.38%: close).
+    const A = tx({ salary: { annual: 110_000 } });
+    const B = tx({ cashAwards: [{ label: "Sign-on", amount: 25_000, paidOn: "2026-01-31" }] });
+    const h = horizonSweep([A, B], single, [1, 2, 3], { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 });
+    expect(h.rows.map((r) => r.leads.cash)).toEqual([
+      { winner: 1, runnerUp: 0, margin: 10_488.5, perMonth: 874.04, share: expect.closeTo(10_488.5 / 96_703.5, 9), closeCall: false },
+      { winner: 1, runnerUp: 0, margin: 3_453.5, perMonth: 143.9, share: expect.closeTo(3_453.5 / 175_883.5, 9), closeCall: true },
+      { winner: 0, runnerUp: 1, margin: 3_581.5, perMonth: 99.49, share: expect.closeTo(3_581.5 / 258_645, 9), closeCall: true },
+    ]);
+    expect(h.rows[2].window).toEqual({ start: "2026-01-01", end: "2029-01-01" });
+    expect(h.rows[0].leads.colAdjustedTotal).toBeUndefined(); // no costOfLiving
+    expect(h.rows[0].leads.perHour).toBeUndefined(); // no hours
+  });
+  it("sample offers (illustrative): C leads after rent at U.S. prices at every stay; 5 years is a close call", () => {
+    const h = horizonSweep(SAMPLE_OFFERS, SAMPLE_HOUSEHOLD, [2, 3, 4, 5], { inflation: 0.025, valuationDate: "2026-07-13" });
+    expect(h.perHourOf).toBe("colAdjustedTotal");
+    expect(h.rows.map((r) => [r.leads.colAdjustedTotal!.winner, Math.round(r.leads.colAdjustedTotal!.perMonth!), r.leads.colAdjustedTotal!.closeCall]))
+      .toEqual([[2, 722, false], [2, 665, false], [2, 487, false], [2, 155, true]]);
+    expect(h.rows.map((r) => Math.round(r.leads.cash!.perMonth!))).toEqual([1_376, 1_177, 1_373, 1_733]);
+    expect(h.rows[2].values.perHour).toEqual([21.85, 21.66, 41.32]);
   });
 });
 
