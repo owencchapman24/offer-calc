@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, projectOffer,
+  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, describeSchedule, leaveDateSweep, nextCliff, projectOffer,
   projectScenario, VESTING_PRESETS, type AnnualBonus, type Household, type OfferInput,
 } from "../src/offer/index";
+import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
@@ -792,6 +793,70 @@ describe("cost of living (BEA RPPs)", () => {
     expect(breakeven(tx("19100", 1_500), tx("35620", 2_000), "salary", single, opts).increase).toBeCloseTo(0, 1);
     expect(() => breakeven(tx("19100", 1_500), { ...tx("35620", 0), costOfLiving: undefined }, "salary", single,
       { ...opts, basis: "colAdjustedTotal" })).toThrow(/costOfLiving/);
+  });
+});
+
+describe("cliffs and the next cliff (roadmap 7)", () => {
+  const tx = (o: Partial<OfferInput>): OfferInput =>
+    ({ label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 120_000 }, ...o });
+  const flat = { inflation: 0 }; // 2027 law = 2026 law (bar SALT), so 2027 is hand-checkable
+
+  it("bonus cliff: leaving Mar 1 vs Mar 15, 2027 forfeits a $12,000 bonus; staying is worth $13,434.26 (hand-checked)", () => {
+    // Fixed $12,000 bonus for calendar 2026, paid Mar 15, 2027; you must be employed that day.
+    // Leave Mar 1: 2027 wages 20,000 + 10,000 x 1/31 = 20,322.58; tax 10% x 4,222.58 + 7.65% = 1,976.94.
+    // Leave Mar 15: 20,000 + 10,000 x 15/31 + 12,000 = 36,838.71; tax 1,240 + 12% x 8,338.71 + 7.65% = 5,058.81.
+    // Value of staying = (36,838.71 - 5,058.81) - (20,322.58 - 1,976.94) = 13,434.26. The bonus itself,
+    // at 2027's average offer rate (5,058.81 / 36,838.71): 12,000 x (1 - 13.732%) = 10,352.12.
+    const o = tx({ bonus: { basis: "fixed", amount: { bear: 12_000, base: 12_000, bull: 12_000 }, payOn: { month: 3, day: 15 } } });
+    const r = nextCliff(o, single, "2027-03-01", flat);
+    expect(r.next).toMatchObject({ date: "2027-03-15", daysAway: 14, cliffs: [{ kind: "bonus", amount: 12_000 }] });
+    expect(r.next!.valueOfStaying.afterTaxComp).toBeCloseTo(13_434.26, 1);
+    expect(r.next!.valueOfStaying.totalRewards).toBeCloseTo(13_434.26, 1);
+    expect(r.next!.cliffValue).toBeCloseTo(10_352.12, 1);
+    // The day before vs the day of: on Mar 15 itself the bonus is kept, so the next cliff is a year on.
+    expect(nextCliff(o, single, "2027-03-14", flat).next!.date).toBe("2027-03-15");
+    expect(nextCliff(o, single, "2027-03-15", flat).next!.date).toBe("2028-03-15");
+  });
+
+  // $60,000 salary; a $12,000 sign-on paid on the start date, repaid by uncompleted months over 12.
+  const signOn = tx({ salary: { annual: 60_000 }, cashAwards: [{ label: "Sign-on", amount: 12_000, paidOn: "2026-01-01",
+    clawback: { months: 12, kind: "prorated" } }] });
+  it("prorated clawback: a $1,000 step at each month's end, cleared on Dec 31", () => {
+    const c = cliffs(signOn, single, flat).filter((x) => x.kind.startsWith("clawback"));
+    expect(c.map((x) => x.date).slice(0, 3)).toEqual(["2026-01-31", "2026-02-28", "2026-03-31"]);
+    expect(c).toHaveLength(12);
+    expect(c.every((x) => x.amount === 1_000)).toBe(true);
+    expect(c[11]).toMatchObject({ date: "2026-12-31", kind: "clawbackCleared" });
+  });
+  it("next cliff from Mar 15: the Mar 31 step saves $823.50 net; staying is worth $3,116.73 (hand-checked)", () => {
+    // Same-year repayment reverses wages, so the net cost is the repayment less the tax on it.
+    // Leave Mar 30: owe 10/12 = 10,000; wages 10,000 + 5,000 x 30/31 + 12,000 - 10,000; relief = 10% + 7.65%
+    // of 10,000 (all in the 10% bracket) = 1,765 -> net 8,235. Leave Mar 31: owe 9,000; relief 1,588.50 -> 7,411.50.
+    // Saved: 823.50. Kept: Mar 15 wages 14,419.35, FICA only (under the standard deduction): 13,316.27;
+    // Mar 31 wages 18,000, tax 190 + 1,377: 16,433. Difference 3,116.73.
+    const r = nextCliff(signOn, single, "2026-03-15", flat);
+    expect(r.next).toMatchObject({ date: "2026-03-31", daysAway: 16, cliffs: [{ kind: "clawbackStep", amount: 1_000 }] });
+    expect(r.next!.cliffValue).toBeCloseTo(823.5, 1);
+    expect(r.next!.valueOfStaying.afterTaxComp).toBeCloseTo(3_116.73, 1);
+  });
+  it("401(k) cliff vesting: 2029-07-12 under elapsed time, 2028-04-01 under plan-year hours", () => {
+    // Same plan as the vesting tests above: 3% of $110,000 a year, 3-year cliff.
+    const A: OfferInput = { label: "A", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13",
+      salary: { annual: 110_000 }, retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }], vesting: { kind: "cliff", years: 3 } },
+      hours: { weekly: { bear: 80, base: 80, bull: 80 } } };
+    const vest = (o: OfferInput) => cliffs(o, single).filter((c) => c.kind === "retirementVest");
+    expect(vest(A)).toEqual([expect.objectContaining({ date: "2029-07-12", amount: expect.closeTo(9_900, 1) })]);
+    const planYear = { ...A, retirement: { ...A.retirement!, vestingService: "planYearHours" as const } };
+    expect(vest(planYear)).toEqual([expect.objectContaining({ date: "2028-04-01", amount: expect.closeTo(5_677.72, 1) })]);
+    expect(nextCliff(A, single, "2029-07-12").next).toBeNull();
+  });
+  it("sample A (illustrative): leaving Jan 12, 2027, the first bonus is 19 days away; staying is worth $29,970", () => {
+    // The bonus is taxed at 2027's average offer rate in the stay-until-Jan-31 projection, where 2027
+    // has one month of salary: $26,057 of the $32,986 bonus is kept, more than in a full year there.
+    const r = nextCliff(SAMPLE_OFFERS[0], SAMPLE_HOUSEHOLD, "2027-01-12", { inflation: 0.025 });
+    expect(r.next).toMatchObject({ date: "2027-01-31", daysAway: 19, cliffs: [{ kind: "bonus", amount: 32_986.3 }] });
+    expect(Math.round(r.next!.valueOfStaying.afterTaxComp)).toBe(29_970);
+    expect(Math.round(r.next!.cliffValue)).toBe(26_057);
   });
 });
 

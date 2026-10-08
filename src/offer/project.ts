@@ -5,7 +5,7 @@ import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath, usd } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
-import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, vestedFraction } from "./benefits";
+import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import type {
   BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
@@ -271,22 +271,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // Employer 401(k) money vests by completed years of service at the leave date (or the
   // window's last day if you stay). The vested share applies to the whole employer balance.
   const vestingDay = leave ?? windowEnd - 1;
-  let completedYears: number;
-  if ((offer.retirement?.vestingService ?? "elapsedTime") === "elapsedTime") {
-    // A year completes once you work through the day before its anniversary.
-    completedYears = anniversaries.filter((d, n) => n >= 1 && d <= vestingDay + 1).length;
-  } else {
-    // Each calendar plan year with 1,000+ hours counts, credited once the 1,000th hour is worked;
-    // employment on the year's last day isn't required (29 CFR 2530.200b-1). Hours accrue evenly:
-    // weekly x weeks per year x days employed / days in the year.
-    if (!hours) throw new Error("vestingService \"planYearHours\" needs offer.hours.");
-    const perYear = hours.weekly[scenario] * (hours.weeksPerYear ?? 50);
-    completedYears = 0;
-    for (let y = yearOfDay(start); jan1(y) <= vestingDay; y++) {
-      const days = Math.max(0, Math.min(vestingDay + 1, jan1(y + 1), workEnd) - Math.max(start, jan1(y)));
-      if (perYear * (days / (jan1(y + 1) - jan1(y))) >= 1_000) completedYears++;
-    }
-  }
+  const completedYears = serviceYears(offer.retirement?.vestingService ?? "elapsedTime",
+    hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) : undefined, start, workEnd, vestingDay, anniversaries);
   const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
   const isPerk = (k: string) => k === "section127" || k === "commuter";
   const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
@@ -589,23 +575,41 @@ export function leaveDateSweep(
   const start = toDays(offer.startDate);
   return months.map((m) => {
     if (!Number.isInteger(m) || m < 1) throw new Error("Sweep months must be whole numbers >= 1.");
-    const leaveDate = fromDays(addMonths(start, m) - 1);
-    const years = Math.max(options.years ?? 5, Math.ceil(m / 12));
-    const r = projectScenario({ ...offer, leaveDate }, household, { ...options, years });
-    const paid = r.events.filter((e) => e.component !== "clawback").reduce((s, e) => s + e.gross, 0);
-    const sumOf = (kinds: string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
-    const afterTaxCompKept = r.events.reduce((s, e) => s + e.afterTax, 0) - sumOf(["premium"]);
-    const retirementVested = r.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0);
+    const k = keptIfLeaving(offer, household, addMonths(start, m) - 1, options);
     return {
       months: m,
-      leaveDate,
-      paid: round2(paid),
-      clawbackOwed: round2(r.leave!.clawbacks.reduce((s, c) => s + c.owed, 0)),
-      afterTaxCompKept: round2(afterTaxCompKept),
-      unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
-      retirementVested: round2(retirementVested),
-      totalRewardsKept: round2(afterTaxCompKept + retirementVested + sumOf(["section127", "commuter", "employerHsa"])
-        - sumOf(["outOfPocket"])),
+      leaveDate: k.result.leave!.leaveDate,
+      paid: round2(k.paid),
+      clawbackOwed: round2(k.clawbackOwed),
+      afterTaxCompKept: round2(k.afterTaxCompKept),
+      unvestedRsuForfeited: k.result.leave!.unvestedRsuForfeited,
+      retirementVested: round2(k.retirementVested),
+      totalRewardsKept: round2(k.totalRewardsKept),
     };
   });
+}
+
+/**
+ * What you keep if your last day is `leaveDay` (a day number): pay received, clawbacks owed, and
+ * after-tax comp and total rewards kept, nominal and unrounded, with the projection behind them.
+ * The projection tracks at least the employment years up to the leave date.
+ */
+export function keptIfLeaving(offer: OfferInput, household: Household, leaveDay: number, options: ProjectionOptions = {}) {
+  const start = toDays(offer.startDate);
+  let years = 1;
+  while (addMonths(start, 12 * years) <= leaveDay) years++;
+  const result = projectScenario({ ...offer, leaveDate: fromDays(leaveDay) }, household,
+    { ...options, years: Math.max(options.years ?? 5, years) });
+  const sumOf = (kinds: string[]) => result.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
+  const afterTaxCompKept = result.events.reduce((s, e) => s + e.afterTax, 0) - sumOf(["premium"]);
+  const retirementVested = result.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0);
+  return {
+    result,
+    paid: result.events.filter((e) => e.component !== "clawback").reduce((s, e) => s + e.gross, 0),
+    clawbackOwed: result.leave!.clawbacks.reduce((s, c) => s + c.owed, 0),
+    clawbackNetCost: result.leave!.clawbacks.reduce((s, c) => s + c.netCost, 0),
+    afterTaxCompKept,
+    retirementVested,
+    totalRewardsKept: afterTaxCompKept + retirementVested + sumOf(["section127", "commuter", "employerHsa"]) - sumOf(["outOfPocket"]),
+  };
 }

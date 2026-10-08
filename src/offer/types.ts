@@ -454,6 +454,35 @@ export interface LeaveResult {
   retirementForfeited: number;
 }
 
+export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest";
+
+/** A date where your last day starts to matter: leave on or after it to keep what it brings. */
+export interface Cliff {
+  /** The first last day that keeps it. */
+  date: ISODate;
+  kind: CliffKind;
+  label: string;
+  /** Gross: the payment or vest, the repayment no longer owed, or the employer 401(k) money that vests. */
+  amount: number;
+}
+
+export interface NextCliffResult {
+  leaveDate: ISODate;
+  /** Null when nothing pays, vests or steps down after the leave date within the projection. */
+  next: null | {
+    date: ISODate;
+    /** Days from the leave date to the cliff. */
+    daysAway: number;
+    /** Everything that lands on that date (a bonus and a vest can share one). */
+    cliffs: Cliff[];
+    /** Leaving on `date` instead of `leaveDate`, nominal: the extra after-tax comp and total rewards kept. */
+    valueOfStaying: { afterTaxComp: number; totalRewards: number };
+    /** The cliffs' own part of that: payments after tax, the clawback no longer owed (net of tax relief), and
+     *  employer 401(k) money that vests. The rest is pay for the extra days. */
+    cliffValue: number;
+  };
+}
+
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
 export interface LeaveSweepRow {
   months: number;

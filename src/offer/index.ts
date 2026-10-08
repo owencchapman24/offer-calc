@@ -1,5 +1,6 @@
 export * from "./types";
-export { leaveDateSweep, projectScenario } from "./project";
+export { keptIfLeaving, leaveDateSweep, projectScenario } from "./project";
+export { cliffs, nextCliff } from "./cliffs";
 export { breakeven, compareOffers, projectOffer } from "./compare";
 export { clawbackFraction } from "./clawback";
 export { byYear, describeSchedule, VESTING_PRESETS } from "./vesting";

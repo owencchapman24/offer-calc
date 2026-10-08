@@ -562,7 +562,7 @@ L-4 · LEAVING EARLY             After-tax pay kept, after clawbacks · nominal 
    If your last day is Jan 12, 2027 (6 months)
    A  keep $41,200✓ · repay the $10,000T sign-on in full (window ends Jul 12, 2027)
       Next cliff: your first bonus, paid Jan 31, 2027, is 19 days away. Staying until
-      then is worth +$29,970✓ after tax, $22,919✓ of it the bonus.
+      then is worth +$29,970✓ after tax, $26,057✓ of it the bonus.
    B  keep $34,974✓ · repay $2,500✓ of the sign-on (prorated; drops $417 a month)
       Next cliff: the clawback steps down on Feb 12; first bonus Mar 15, 2027 …
    C  keep $47,506✓ · repay $5,000✓ · $120,000✓ of RSUs unvested
