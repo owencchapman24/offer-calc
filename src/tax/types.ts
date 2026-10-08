@@ -54,6 +54,22 @@ export interface TaxResult {
   effectiveRate: number;
   /** Combined marginal rate on the next $1,000 of wages, all taxes included. */
   marginalRate: number;
-  /** Plain-language caveats triggered by this specific input. */
-  warnings: string[];
+  /** Caveats triggered by this specific input, as codes and numbers (formatted outside the engine). */
+  warnings: TaxWarning[];
 }
+
+/** A tax-engine caveat: a code and the numbers behind it. */
+export type TaxWarning =
+  /** Itemizing beats the standard deduction; `deduction` is SALT plus other itemized deductions. */
+  | { code: "itemizing"; params: { deduction: number } }
+  | { code: "k401OverLimit"; params: { year: number; limit: number } }
+  | { code: "amtNotModeled"; params: Record<string, never> }
+  /** Tax law for `year` is projected from 2026. */
+  | { code: "projectedLaw"; params: { year: number } }
+  | { code: "nycNonresident"; params: Record<string, never> }
+  | { code: "phillyNonresident"; params: Record<string, never> }
+  | { code: "flatLocalRate"; params: { label: string; rate: number } }
+  | { code: "headOfHouseholdState"; params: Record<string, never> }
+  | { code: "ctPersonalCredit"; params: Record<string, never> }
+  /** A state's standing caveat, from the state data (`StateSpec.notes`). */
+  | { code: "stateNote"; params: { state: string; note: string } };

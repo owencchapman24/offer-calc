@@ -1,6 +1,6 @@
 import type { LocalParams } from "./params";
 import { applySchedule, clamp0 } from "./schedule";
-import type { FilingStatus, Locality } from "./types";
+import type { FilingStatus, Locality, TaxWarning } from "./types";
 
 export interface LocalContext {
   status: FilingStatus;
@@ -13,13 +13,13 @@ export interface LocalContext {
 
 export function localTax(
   p: LocalParams, loc: Locality | undefined, ctx: LocalContext,
-): { tax: number; warnings: string[] } {
-  const warnings: string[] = [];
+): { tax: number; warnings: TaxWarning[] } {
+  const warnings: TaxWarning[] = [];
   if (!loc || loc.kind === "none") return { tax: 0, warnings };
 
   switch (loc.kind) {
     case "nyc": {
-      if (ctx.stateCode !== "NY") warnings.push("NYC tax applies to NYC residents only; check your state selection.");
+      if (ctx.stateCode !== "NY") warnings.push({ code: "nycNonresident", params: {} });
       const key = ctx.status === "joint" ? "joint" : "single";
       const ti = ctx.stateTaxableIncome;
       let tax = applySchedule(p.nyc[key], ti);
@@ -34,13 +34,13 @@ export function localTax(
     }
     case "philadelphia": {
       if (!loc.resident) {
-        warnings.push("Philadelphia nonresident wage tax applies only to days physically worked in the city.");
+        warnings.push({ code: "phillyNonresident", params: {} });
       }
       return { tax: ctx.localWageBase * (loc.resident ? p.philadelphia.resident : p.philadelphia.nonresident), warnings };
     }
     case "flat": {
       const base = loc.base === "wages" ? ctx.localWageBase : ctx.stateTaxableIncome;
-      return { tax: base * loc.rate, warnings: [`${loc.label}: user-supplied flat rate of ${(loc.rate * 100).toFixed(2)}%.`] };
+      return { tax: base * loc.rate, warnings: [{ code: "flatLocalRate", params: { label: loc.label, rate: loc.rate } }] };
     }
   }
 }
