@@ -1,4 +1,4 @@
-import { areaStates } from "../../src/col/index";
+import { statesOf } from "../../src/col/cities";
 import type { AnnualBonus, ByScenario, Household, OfferInput } from "../../src/offer/types";
 import type { FilingStatus } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
@@ -169,4 +169,4 @@ export function sampleOffers(today: string): AppOffer[] {
 export const SAMPLE_HOUSEHOLD_SAVINGS = SAMPLE_HOUSEHOLD.costOfLiving?.savingsRate ?? 0;
 
 /** States a city can be in, for the residence-state picker. */
-export const statesFor = (area: string | null) => (area ? areaStates(area) : []);
+export const statesFor = (area: string | null) => statesOf(area);

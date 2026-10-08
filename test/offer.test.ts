@@ -10,6 +10,7 @@ import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates"
 import { snapToVestDate } from "../src/offer/vesting";
 import { areaStates, cityOptions, findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
 import { estimateRent, FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
+import cities from "../src/col/cities.json";
 
 const single: Household = { filingStatus: "single" };
 
@@ -680,6 +681,9 @@ describe("cost of living (BEA RPPs)", () => {
     expect(options.filter((o) => rppArea(o.code).kind === "msa")).toHaveLength(387);
     expect(options).toContainEqual({ code: "37999", name: "North Carolina, outside metro areas", states: ["NC"] });
     expect(options.every((o) => o.states.length > 0)).toBe(true);
+    // The UI's slim list (src/col/cities.json) is generated from the same data: run `npm run build-cities` if this fails.
+    expect(cities.cities).toEqual(options);
+    expect([cities.rppDataYear, cities.fmrFiscalYear]).toEqual([RPP.dataYear, FMR.fiscalYear]);
   });
   it("non-housing RPP backs housing out at BEA's 16% weight: U.S. 99.8802, Charlotte 97.2933", () => {
     // (100 - 0.16 x 100.629) / 0.84 and (97.348 - 0.16 x 97.635) / 0.84.

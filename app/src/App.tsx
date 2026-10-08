@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
-import { FMR } from "../../src/col/rent";
-import { RPP } from "../../src/col/index";
+import { DATA_YEARS } from "../../src/col/cities";
+import { rentKey } from "./protocol";
 import { About } from "./About";
 import { Lead } from "./Lead";
 import { Ledger } from "./Ledger";
@@ -46,13 +46,16 @@ export function App() {
   const built = session.offers.map((o) => ({ o, r: toOfferInput(o) }));
   const complete = built.flatMap((x) => ("offer" in x.r ? [{ o: x.o, offer: x.r.offer }] : []));
   const missing = new Map<string, Missing[]>(built.flatMap((x) => ("missing" in x.r ? [[x.o.id, x.r.missing] as [string, Missing[]]] : [])));
-  const request = complete.length >= 2 ? {
+  const compare = complete.length >= 2 ? {
     offers: complete.map((x) => x.offer),
     household: toHousehold(session.household, Number(today.slice(0, 4))),
     stays: [...new Set([...STAYS, stayYears])].sort((a, b) => a - b),
     valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   } : null;
-  const engine = useEngine(request);
+  // Rent estimates come from the worker, which holds the HUD and BEA tables.
+  const rents = [...new Map(session.offers.filter((o) => o.quick.area && o.quick.state)
+    .map((o) => [rentKey(o.quick.area!, o.quick.state!), { area: o.quick.area!, state: o.quick.state! }])).values()];
+  const engine = useEngine({ compare, rents });
   const letters = complete.map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
     ? verdict(engine.sweep, letters, session.ui.basis, stayYears) : null;
@@ -77,7 +80,7 @@ export function App() {
       <About session={session} dispatch={dispatch} today={today} />
 
       <main className="workpaper">
-        <Ledger offers={session.offers} missing={missing} dispatch={dispatch} />
+        <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />
         <div className="results">
           <Lead view={view} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
             sample={sample} dispatch={dispatch} />
@@ -96,8 +99,8 @@ export function App() {
           <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>Reload the samples</button>
         </p>
         <p className="sources">
-          Tax law 2026 (later years projected) · Prices: BEA Regional Price Parities {RPP.dataYear} · Rent estimates: HUD Fair
-          Market Rents FY{FMR.fiscalYear} · Engine{engine.ms !== null ? `: ${engine.ms.toFixed(0)} ms in a Web Worker` : " in a Web Worker"}.
+          Tax law 2026 (later years projected) · Prices: BEA Regional Price Parities {DATA_YEARS.rpp} · Rent estimates: HUD Fair
+          Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null ? `: ${engine.ms.toFixed(0)} ms in a Web Worker` : " in a Web Worker"}.
           Not financial advice.
         </p>
       </footer>

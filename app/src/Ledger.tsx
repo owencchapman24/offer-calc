@@ -1,6 +1,7 @@
-import { type CSSProperties, type Dispatch, type ReactNode, useMemo, useState } from "react";
-import { cityOptions } from "../../src/col/index";
-import { estimateRent } from "../../src/col/rent";
+import { type CSSProperties, type Dispatch, type ReactNode, useState } from "react";
+import { CITIES } from "../../src/col/cities";
+import type { RentEstimate } from "../../src/col/rent";
+import { rentKey } from "./protocol";
 import { type AppOffer, type Missing, NYC_METRO, type QuickBonus, statesFor } from "./model";
 import type { Action } from "./session";
 import { dollars, figure } from "./text";
@@ -8,12 +9,11 @@ import { Help, MoneyInput, PercentInput, Stamp, Tick } from "./ui";
 
 // Quick mode: offers are columns, fields are rows, so A's salary sits beside B's (docs/ui-design.md §3.2).
 
-const CITIES = cityOptions();
 const CITY_BY_NAME = new Map(CITIES.map((c) => [c.name.toLowerCase(), c]));
 const CITY_BY_CODE = new Map(CITIES.map((c) => [c.code, c]));
 
-export function Ledger({ offers, missing, dispatch }: {
-  offers: AppOffer[]; missing: Map<string, Missing[]>; dispatch: Dispatch<Action>;
+export function Ledger({ offers, missing, rents, dispatch }: {
+  offers: AppOffer[]; missing: Map<string, Missing[]>; rents: Record<string, RentEstimate>; dispatch: Dispatch<Action>;
 }) {
   const set = (o: AppOffer, patch: Partial<AppOffer["quick"]>) => dispatch({ type: "offer", id: o.id, patch });
   return (
@@ -84,7 +84,12 @@ export function Ledger({ offers, missing, dispatch }: {
           If you leave it blank we use HUD's Fair Market Rent: what recent movers pay for a typical 1-bedroom across the
           metro (the 40th percentile, utilities included). City-center rents usually run higher, so enter yours if you know it.
         </Help>}>
-          {offers.map((o) => <div key={o.id} className="cell"><RentField offer={o} set={(v) => set(o, { rent: v })} /></div>)}
+          {offers.map((o) => (
+            <div key={o.id} className="cell">
+              <RentField offer={o} set={(v) => set(o, { rent: v })}
+                estimate={o.quick.area && o.quick.state ? rents[rentKey(o.quick.area, o.quick.state)] ?? null : null} />
+            </div>
+          ))}
         </Row>
 
         {offers.some((o) => o.base) && (
@@ -186,9 +191,8 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
   );
 }
 
-function RentField({ offer, set }: { offer: AppOffer; set: (v: number | null) => void }) {
+function RentField({ offer, set, estimate }: { offer: AppOffer; set: (v: number | null) => void; estimate: RentEstimate | null }) {
   const q = offer.quick;
-  const estimate = useMemo(() => (q.area && q.state ? estimateRent(q.area, q.state, { bedrooms: 1 }) : null), [q.area, q.state]);
   return (
     <div className="rent">
       <MoneyInput label={`Offer ${offer.letter} rent a month`} value={q.rent} onChange={set}

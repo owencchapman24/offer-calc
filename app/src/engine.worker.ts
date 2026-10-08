@@ -1,23 +1,11 @@
+import { estimateRent, type RentEstimate } from "../../src/col/rent";
 import { horizonSweep } from "../../src/offer/compare";
-import type { HorizonSweep, Household, OfferInput } from "../../src/offer/types";
+import { type EngineRequest, type EngineResponse, rentKey } from "./protocol";
 
-// The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4).
-// Requests carry a generation number; while one runs, only the newest waiting request is kept.
-
-export interface EngineRequest {
-  gen: number;
-  offers: OfferInput[];
-  household: Household;
-  /** Stay lengths in years; each is a comparison window from the earliest start. */
-  stays: number[];
-  valuationDate: string;
-  inflation: number;
-  discountRate: number;
-}
-
-export type EngineResponse =
-  | { gen: number; ok: true; sweep: HorizonSweep; ms: number }
-  | { gen: number; ok: false; error: string };
+// The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). It
+// also holds the full BEA and HUD tables: the main thread ships only the slim city list and asks
+// here for rent estimates. Requests carry a generation number; while one runs, only the newest
+// waiting request is kept.
 
 const scope = self as unknown as {
   postMessage(message: EngineResponse): void;
@@ -41,11 +29,18 @@ function run() {
   waiting = null;
   if (!req) return;
   const t = performance.now();
+  const rents: Record<string, RentEstimate> = {};
+  for (const { area, state } of req.rents) {
+    try {
+      rents[rentKey(area, state)] = estimateRent(area, state, { bedrooms: 1 });
+    } catch { /* an unknown area just shows no estimate */ }
+  }
   try {
-    const sweep = horizonSweep(req.offers, req.household, req.stays,
-      { valuationDate: req.valuationDate, inflation: req.inflation, discountRate: req.discountRate });
-    scope.postMessage({ gen: req.gen, ok: true, sweep, ms: performance.now() - t });
+    const c = req.compare;
+    const sweep = c ? horizonSweep(c.offers, c.household, c.stays,
+      { valuationDate: c.valuationDate, inflation: c.inflation, discountRate: c.discountRate }) : null;
+    scope.postMessage({ gen: req.gen, ok: true, sweep, rents, ms: performance.now() - t });
   } catch (err) {
-    scope.postMessage({ gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err) });
+    scope.postMessage({ gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), rents, ms: performance.now() - t });
   }
 }

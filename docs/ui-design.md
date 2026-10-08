@@ -1148,6 +1148,9 @@ font requests.
 `src/format` writes the words. That's faster (a projection takes 2.5 ms) and lets the UI own
 all formatting.
 
+**Roadmap:** HUD Small Area FMRs (ZIP-level) as an optional neighborhood rent estimate,
+loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
+
 ## 12. Build plan
 
 **Done:**

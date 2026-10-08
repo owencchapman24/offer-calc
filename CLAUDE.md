@@ -47,10 +47,9 @@ methodology page matter more than features.
     signature element; the default basis is "After rent, at U.S. prices".
 
 ## Next steps
-1. **Slice 1 review** (stopped here). Screenshots and the live URL go to the user. Deploy
-   on Vercel from the private repo:
+1. **Live at https://offer-calc.vercel.app.** Vercel deploys main from the private repo:
    - framework none, `npm ci`, `npm run build`, output `dist/`;
-   - CSP and other headers in `vercel.json`.
+   - CSP and other headers, plus immutable caching for `/assets/`, in `vercel.json`.
 2. **UI slices** per `docs/ui-design.md` §12. Deferred from slice 1:
    - phone tabs and a sticky verdict bar;
    - interactive tickmarks (slice 3);
@@ -73,6 +72,8 @@ methodology page matter more than features.
   `src/col/fmr.json`. Default FY 2027. HUD publishes each fiscal year's FMRs in August or
   September, effective October 1. HUD USER needs a browser User-Agent, which the script
   sends.
+- `npm run build-cities`: regenerate `src/col/cities.json`, the UI's slim city list. Both
+  fetch scripts run it, and a test fails if it's stale.
 
 ## Code map
 - `src/tax/`
@@ -97,6 +98,8 @@ methodology page matter more than features.
     `findRppAreas`.
   - `fmr.json` (HUD FY2027 FMRs, metro areas, source inside): `rent.ts` has `fmrArea`,
     `estimateRent` and `US_MEDIAN_GROSS_RENT`.
+  - `cities.json` / `cities.ts`: the slim city list (code, name, states, data years) for
+    the UI's main thread. Generated; don't edit.
 - `src/format/`: words for the engine's numbers and codes: event and benefit labels and
   formulas, warnings, assumptions, `usd`, `pct`, `describeSchedule`. Not part of the
   engine; the UI and the scripts use it.
@@ -106,8 +109,11 @@ methodology page matter more than features.
   - `src/model.ts`: quick fields ↔ `OfferInput`; the samples, moved to start on or after
     today.
   - `src/session.ts`: state, reducer, localStorage.
-  - `src/engine.worker.ts` and `src/useEngine.ts`: `horizonSweep` in a Web Worker,
-    debounced 200 ms, stale generations dropped.
+  - `src/engine.worker.ts` and `src/useEngine.ts`: `horizonSweep` and rent estimates in a
+    Web Worker, debounced 200 ms, stale generations dropped.
+  - **Bundles:** only the worker holds the engine and the BEA/HUD tables. The main thread
+    imports engine types and `src/col/cities.ts` only. `src/protocol.ts` holds the
+    message types and `rentKey`: never import values from `engine.worker.ts`.
   - `src/verdict.ts`: the lead schedule's view model.
   - `About.tsx`, `Ledger.tsx`, `Lead.tsx`, `ui.tsx` (tickmarks, stamps, inputs),
     `styles.css` (the workpaper tokens).
@@ -367,3 +373,12 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
    `nextCliff`); the UI shows it in L-4.
 8. HUD Fair Market Rents by metro as the rent estimate. Done (2026-10-08): `npm run
    fetch-fmr`, FY2027, matched to BEA metros by CBSA code.
+9. HUD Small Area FMRs (ZIP-level) for neighborhood rent estimates:
+   - Why: metro FMRs average the city center with the suburbs, so a Manhattan or
+     downtown-Seattle 1-bedroom runs well above the metro figure.
+   - Shape: an optional ZIP field per offer. Its SAFMR is used when given; otherwise the
+     metro FMR.
+   - Data: HUD publishes SAFMRs for every metro ZIP each fiscal year (the
+     `fy<year>_safmrs` file). A ZIP ↔ FMR-area crosswalk comes with it. Bake it like
+     `fmr.json`, but keep it out of the main bundle: tens of thousands of ZIPs is likely
+     megabytes of JSON, so load it in the worker, or on demand.
