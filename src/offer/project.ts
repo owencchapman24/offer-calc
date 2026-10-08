@@ -3,13 +3,14 @@ import type { TaxInput } from "../tax/types";
 import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, type RawEvent, salaryEarned, salaryEvents, usd } from "./streams";
+import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents } from "./vesting";
 import type {
   ByComponent, CalendarYearResult, CompEvent, Component, EmploymentYearResult, Household,
   OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
-const COMPONENTS: Component[] = ["salary", "bonus", "cash"];
+const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu"];
 const sumBy = (events: RawEvent[], pick: (e: RawEvent) => number = (e) => e.gross) => {
   const by = Object.fromEntries(COMPONENTS.map((c) => [c, 0])) as Record<Component, number>;
   for (const e of events) by[e.component] += pick(e);
@@ -42,19 +43,41 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const convenience = convenienceRuleWarning(offer.residence.state, offer.employerState);
   if (convenience) warnings.push(convenience);
 
+  // ---- equity: new-hire grants and refresher grants ----------------------------
+  const equity = offer.equity;
+  const growth = equity?.priceGrowth?.[scenario] ?? 0;
+  if (!(growth > -1)) throw new Error("Share-price growth must be greater than -100%.");
+  const grants: GrantInstance[] = (equity?.grants ?? []).map((g) => {
+    if (!(g.value >= 0)) throw new Error(`Grant "${g.label}" needs a non-negative value.`);
+    return {
+      label: g.label, value: g.value, schedule: g.schedule,
+      grantDay: g.grantDate ? toDays(g.grantDate) : start,
+      vestStartDay: g.vestStart ? toDays(g.vestStart) : start,
+    };
+  });
+  const refreshers = equity?.refreshers
+    ? refresherGrants(equity.refreshers, equity.refreshers.value[scenario], start, until) : [];
+  for (const g of [...grants, ...refreshers]) checkSchedule(g.schedule);
+
   const earned = (from: number, to: number) => salaryEarned(offer.salary.annual, from, to);
   const raw: RawEvent[] = [
     ...salaryEvents(offer.salary.annual, start, until, anniversaries),
     ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, warnings) : []),
     ...cashEvents(offer.cashAwards ?? [], start).filter((e) => e.day < until),
+    ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, until)),
   ].sort((a, b) => a.day - b.day);
   if (raw.some((e) => yearOfDay(e.day) < 2026)) throw new Error("Payments before 2026 aren't supported.");
 
-  // Accrued pay belongs to the year its first day falls in. A payment dated exactly on an
-  // anniversary counts toward the year just ended (decision 1), so a 12-month cliff is year 1.
+  // A payment dated exactly on an anniversary counts toward the year just ended (decision 1),
+  // so a 12-month cliff vest is year-1 pay. Infinity = past the anniversaries we track.
+  const yearOfPayment = (day: number) => {
+    const i = anniversaries.findIndex((d) => d >= day);
+    return i === -1 ? Infinity : Math.max(1, i);
+  };
+  // Accrued pay belongs to the year its first day falls in.
   const employmentYear = (e: RawEvent) => e.accruedFrom !== undefined
     ? anniversaries.findIndex((d) => d > e.accruedFrom!)
-    : Math.max(1, anniversaries.findIndex((d) => d >= e.day));
+    : yearOfPayment(e.day);
 
   // ---- calendar years: incremental tax --------------------------------------
   const firstYear = yearOfDay(raw[0]?.day ?? start);
@@ -112,6 +135,14 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const bonusTarget = offer.bonus
     ? (offer.bonus.basis === "percentOfSalary" ? offer.bonus.amount.base * offer.salary.annual : offer.bonus.amount.base)
     : 0;
+  // Quoted RSUs: new-hire tranches by nominal date at grant value (refreshers aren't in an offer letter).
+  const quotedRsu = new Map<number, number>();
+  for (const g of grants) {
+    nominalVestDays(g).forEach((day, i) => {
+      const n = yearOfPayment(day);
+      quotedRsu.set(n, (quotedRsu.get(n) ?? 0) + g.value * g.schedule.tranches[i].fraction);
+    });
+  }
   const employmentYears: EmploymentYearResult[] = [];
   for (let n = 1; n <= years; n++) {
     const inYear = taxed.filter((e) => e.ey === n);
@@ -124,7 +155,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       gross: rounded(by),
       tax: round2(tax),
       net: round2(total(by) - tax),
-      quotedTC: round2(offer.salary.annual + bonusTarget + by.cash),
+      quotedTC: round2(offer.salary.annual + bonusTarget + by.cash + (quotedRsu.get(n) ?? 0)),
     });
   }
 
@@ -142,6 +173,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
     assumptions.push(b.basis === "percentOfSalary"
       ? `Bonus: ${+(b.amount[scenario] * 100).toFixed(2)}% of salary earned in each period (${scenario} scenario).`
       : `Bonus: ${usd(b.amount[scenario])} a year, prorated by days employed (${scenario} scenario).`);
+  }
+
+  if (equity) {
+    assumptions.push(`RSUs are W-2 wages at their value on the vest date and are assumed sold at vest; `
+      + `share price grows ${+(growth * 100).toFixed(2)}% a year from each grant date (${scenario} scenario).`);
   }
 
   return { label: offer.label, scenario, events, calendarYears, employmentYears, warnings, assumptions };

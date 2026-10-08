@@ -1,7 +1,7 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
 
-// Offer model types (docs/offer-model.md §12b). Slice 1: salary, bonus, cash awards, one
-// scenario at a time. RSUs, leave date/clawbacks, raises and multi-scenario totals come later.
+// Offer model types (docs/offer-model.md §12b). Slices 1-2: salary, bonus, cash awards, RSUs,
+// one scenario at a time. Leave date/clawbacks, raises and multi-scenario totals come later.
 
 // ---- shared -----------------------------------------------------------------
 /** Civil date "YYYY-MM-DD". Date math is on calendar days (UTC), never local time. */
@@ -25,6 +25,45 @@ export interface OfferInput {
   bonus?: AnnualBonus;
   /** Sign-on, year-2 sign-on, relocation: anything paid as a lump of cash. */
   cashAwards?: CashAward[];
+  equity?: Equity;
+}
+
+export interface Equity {
+  /** Annual share-price growth, one path for all grants. Default 0 in every scenario. */
+  priceGrowth?: ByScenario;
+  grants: RsuGrant[];
+  refreshers?: RefresherPolicy;
+}
+
+export interface RsuGrant {
+  kind: "rsu"; // room for "option" later
+  label: string;
+  /** Dollar value at grant, as quoted. (Have shares? Pass shares x grant price.) */
+  value: number;
+  /** Default startDate. The price-growth clock starts here. */
+  grantDate?: ISODate;
+  /** Default startDate. Tranche months count from here. */
+  vestStart?: ISODate;
+  schedule: VestingSchedule;
+}
+
+export interface VestingSchedule {
+  /** Fraction vesting at each month offset from vestStart. Must sum to 1. */
+  tranches: Array<{ month: number; fraction: number }>;
+  /** Company vest calendar, e.g. { months: [2, 5, 8, 11], day: 15 }. A tranche moves to the
+   *  first company vest date on or after its nominal date. Omit to vest on the nominal date. */
+  vestDates?: { months: number[]; day: number };
+}
+
+/** Refresher grants: a new grant every `everyMonths`, the first `firstAfterMonths` after start. */
+export interface RefresherPolicy {
+  /** Default "Refresher". */
+  label?: string;
+  /** Dollar value of each refresher grant. */
+  value: ByScenario;
+  firstAfterMonths: number;
+  everyMonths: number;
+  schedule: VestingSchedule;
 }
 
 export interface Salary {
@@ -71,7 +110,7 @@ export interface ProjectionOptions {
 }
 
 // ---- outputs ------------------------------------------------------------------
-export type Component = "salary" | "bonus" | "cash";
+export type Component = "salary" | "bonus" | "cash" | "rsu";
 export type ByComponent = Record<Component, number> & { total: number };
 
 /** One dated payment: the unit of "show the work". Money is rounded to cents. */
@@ -113,7 +152,8 @@ export interface EmploymentYearResult {
   tax: number;
   net: number;
   /** Offer-letter view: salary rate at year start + target bonus on it + cash awards paid
-   *  in the year. No proration, no payout lag. */
+   *  in the year + new-hire RSU tranches nominally due in the year, at grant value. No
+   *  proration, payout lag, vest-date snapping, price growth or refreshers. */
   quotedTC: number;
 }
 

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
-import { convenienceRuleWarning, projectScenario, type Household, type OfferInput } from "../src/offer/index";
+import {
+  byYear, convenienceRuleWarning, projectScenario, VESTING_PRESETS, type Household, type OfferInput,
+} from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
+import { snapToVestDate } from "../src/offer/vesting";
 
 const single: Household = { filingStatus: "single" };
 
-/** docs/offer-model.md §10 worked example, minus RSUs (slice 2). */
+/** docs/offer-model.md §10 worked example. */
 const worked: OfferInput = {
   label: "Worked example",
   residence: { state: "TX" },
@@ -17,6 +20,12 @@ const worked: OfferInput = {
     payOn: { month: 3, day: 15 }, cutoff: { month: 10, day: 1 },
   },
   cashAwards: [{ label: "Sign-on", amount: 30_000, paidOn: { daysAfterStart: 30 } }],
+  equity: {
+    grants: [{
+      kind: "rsu", label: "New-hire grant", value: 200_000,
+      schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+    }],
+  },
 };
 
 const at = (iso: string) => toDays(iso);
@@ -48,10 +57,10 @@ describe("worked example (golden)", () => {
     // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, total: 186_169.35 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, total: 186_169.35 });
   });
-  it("quoted year-1 TC is $195,000 until RSUs land in slice 2 ($205,000 with them)", () => {
-    expect(ey1.quotedTC).toBe(195_000);
+  it("quoted year-1 TC is $205,000: $150k + $15k target bonus + $30k sign-on + 5% of $200k RSUs", () => {
+    expect(ey1.quotedTC).toBe(205_000);
   });
   it("sign-on pays 2026-09-02; the 2026 bonus pays 2027-03-15 on 2026's salary", () => {
     const signOn = r.events.find((e) => e.component === "cash")!;
@@ -59,9 +68,11 @@ describe("worked example (golden)", () => {
     const bonus = r.events.find((e) => e.component === "bonus")!;
     expect(bonus).toMatchObject({ date: "2027-03-15", gross: 6_169.35, calendarYear: 2027, employmentYear: 1 });
   });
-  it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $156,169.35", () => {
-    expect(r.calendarYears[0].offerGross).toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, total: 91_693.55 });
-    expect(r.calendarYears[1].offerGross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, total: 156_169.35 });
+  it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $166,169.35 with the first $10,000 vest", () => {
+    expect(r.calendarYears[0].offerGross)
+      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, total: 91_693.55 });
+    expect(r.calendarYears[1].offerGross)
+      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, total: 166_169.35 });
   });
   it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
     // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
@@ -172,6 +183,96 @@ describe("residence vs employer state (decision 9)", () => {
   it("flows into the projection's warnings", () => {
     const r = projectScenario({ ...worked, residence: { state: "NJ" }, employerState: "NY" }, single);
     expect(r.warnings).toHaveLength(1);
+  });
+});
+
+describe("vesting schedules", () => {
+  it("standard: 25% at a 1-year cliff, then 6.25% quarterly to month 48", () => {
+    const t = VESTING_PRESETS.standard.tranches;
+    expect(t[0]).toEqual({ month: 12, fraction: 0.25 });
+    expect(t.slice(1)).toEqual([15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48].map((month) => ({ month, fraction: 0.0625 })));
+  });
+  it("back-loaded 5/15/40/40: 5% at the cliff, 7.5% twice, then 20% every six months", () => {
+    expect(VESTING_PRESETS.backLoaded.tranches.map((t) => [t.month, +t.fraction.toFixed(6)]))
+      .toEqual([[12, 0.05], [18, 0.075], [24, 0.075], [30, 0.2], [36, 0.2], [42, 0.2], [48, 0.2]]);
+  });
+  it("annual and front-loaded monthly", () => {
+    expect(VESTING_PRESETS.annual.tranches).toEqual([12, 24, 36, 48].map((month) => ({ month, fraction: 0.25 })));
+    const f = VESTING_PRESETS.frontLoaded.tranches;
+    expect(f).toHaveLength(48);
+    expect(f[0].month).toBe(1);
+    expect(f[0].fraction).toBeCloseTo(0.0275, 12); // 33% / 12
+    expect(f.reduce((s, t) => s + t.fraction, 0)).toBeCloseTo(1, 12);
+  });
+  it("rejects percentages that don't sum to 100 and splits that don't divide the year", () => {
+    expect(() => byYear([25, 25, 25], { perYear: 4 })).toThrow(/sum to 100/);
+    expect(() => byYear([50, 50], { perYear: 5 })).toThrow(/divide 12/);
+  });
+  it("snaps to the next company vest date on or after the nominal date", () => {
+    const cal = { months: [2, 5, 8, 11], day: 15 };
+    expect(iso(snapToVestDate(at("2027-08-03"), cal))).toBe("2027-08-15");
+    expect(iso(snapToVestDate(at("2027-08-15"), cal))).toBe("2027-08-15");
+    expect(iso(snapToVestDate(at("2027-11-20"), cal))).toBe("2028-02-15");
+  });
+});
+
+describe("RSUs in the projection", () => {
+  const rsus = (r: ReturnType<typeof projectScenario>) => r.events.filter((e) => e.component === "rsu");
+
+  it("worked example: $200k back-loaded grant vests on company dates, first one 12 days into year 2", () => {
+    const r = projectScenario(worked, single);
+    expect(rsus(r).map((e) => [e.date, e.gross, e.employmentYear])).toEqual([
+      ["2027-08-15", 10_000, 2], ["2028-02-15", 15_000, 2], ["2028-08-15", 15_000, 3], ["2029-02-15", 40_000, 3],
+      ["2029-08-15", 40_000, 4], ["2030-02-15", 40_000, 4], ["2030-08-15", 40_000, 5],
+    ]);
+    expect(rsus(r)[0].label).toContain("nominal 2027-08-03");
+    expect(r.employmentYears.map((y) => y.gross.rsu)).toEqual([0, 25_000, 55_000, 80_000, 40_000]);
+  });
+  it("quoted TC counts new-hire tranches by nominal year at grant value", () => {
+    // Months 12 | 18, 24 | 30, 36 | 42, 48 -> $10k | $30k | $80k | $80k | $0, on $165k salary + target bonus.
+    const r = projectScenario(worked, single);
+    expect(r.employmentYears.map((y) => y.quotedTC)).toEqual([205_000, 195_000, 245_000, 245_000, 165_000]);
+  });
+  it("vests are taxed as wages at their calendar year's offer rate", () => {
+    const r = projectScenario(worked, single);
+    const first = rsus(r)[0];
+    expect(first.tax / first.gross).toBeCloseTo(r.calendarYears.find((c) => c.year === 2027)!.offerTaxRate, 4);
+  });
+  it("price growth compounds from grant to vest, per scenario", () => {
+    // 2026-08-03 to 2027-08-15 is 377 days.
+    const g = { ...worked, equity: { ...worked.equity!, priceGrowth: { bear: -0.2, base: 0, bull: 0.1 } } };
+    const first = (scenario: "bear" | "base" | "bull") => rsus(projectScenario(g, single, { scenario }))[0].gross;
+    expect(first("base")).toBe(10_000);
+    expect(first("bull")).toBeCloseTo(10_000 * 1.1 ** (377 / 365.25), 2);
+    expect(first("bear")).toBeCloseTo(10_000 * 0.8 ** (377 / 365.25), 2);
+  });
+  it("refreshers stack: $20k a year from month 12, vesting annually, adds 5k/10k/15k/20k in years 2-5", () => {
+    const g: OfferInput = {
+      ...worked,
+      equity: {
+        grants: [],
+        refreshers: { value: { bear: 10_000, base: 20_000, bull: 30_000 }, firstAfterMonths: 12, everyMonths: 12,
+          schedule: VESTING_PRESETS.annual },
+      },
+    };
+    const r = projectScenario(g, single);
+    // Refresher vests land on anniversaries, which count toward the year just ended (decision 1).
+    expect(r.employmentYears.map((y) => y.gross.rsu)).toEqual([0, 5_000, 10_000, 15_000, 20_000]);
+    expect(rsus(r).filter((e) => e.date === "2031-08-03")).toHaveLength(4);
+    expect(r.employmentYears[1].quotedTC).toBe(165_000); // refreshers aren't in the offer letter
+    expect(projectScenario(g, single, { scenario: "bear" }).employmentYears[4].gross.rsu).toBe(10_000);
+  });
+  it("arbitrary schedules with their own vest start", () => {
+    const g: OfferInput = {
+      ...worked,
+      equity: {
+        grants: [{ kind: "rsu", label: "Custom", value: 12_000, vestStart: "2026-09-01",
+          schedule: { tranches: [{ month: 6, fraction: 0.5 }, { month: 30, fraction: 0.5 }] } }],
+      },
+    };
+    expect(rsus(projectScenario(g, single)).map((e) => [e.date, e.gross])).toEqual([["2027-03-01", 6_000], ["2029-03-01", 6_000]]);
+    const bad = { ...g, equity: { grants: [{ ...g.equity!.grants[0], schedule: { tranches: [{ month: 6, fraction: 0.9 }] } }] } };
+    expect(() => projectScenario(bad, single)).toThrow(/sum to 1/);
   });
 });
 
