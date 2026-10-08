@@ -251,6 +251,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
   .ledger { grid-template-columns: 104px repeat(var(--cols), minmax(calc(100vw - 168px), 1fr)); scroll-snap-type: x mandatory; }
   .ledger .cell { scroll-snap-align: end; }
   .stays-margin { font-size: 14px; }
+  .stays-row > * { padding: 6px 6px; }
+  .stays-cell .stamp { font-size: 9px; padding: 0 3px; letter-spacing: 0.04em; transform: none; white-space: normal; text-align: center; }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step:nth-child(3) { border-left: none; }
   .step:nth-child(n + 3) { border-top: 1px solid var(--rule); }
