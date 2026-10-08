@@ -1001,6 +1001,51 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
     expect(h.rows.map((r) => Math.round(r.leads.cash!.perMonth!))).toEqual([1_376, 1_177, 1_373, 1_733]);
     expect(h.rows[2].values.perHour).toEqual([21.85, 21.66, 41.32]);
   });
+  it("each row carries the annuity factor its per-month figures divide by", () => {
+    // The 1-year factor from the hand-checked per-month test; and margin / factor is perMonth, to the cent.
+    const days = [30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333, 364];
+    const A = tx({ salary: { annual: 110_000 } });
+    const B = tx({ cashAwards: [{ label: "Sign-on", amount: 25_000, paidOn: "2026-01-31" }] });
+    const h = horizonSweep([A, B], single, [1, 3], { valuationDate: "2026-01-01", inflation: 0 });
+    expect(h.rows[0].annuityFactor).toBeCloseTo(days.reduce((s, d) => s + 1.05 ** (-d / 365.25), 0), 12);
+    for (const r of h.rows) expect(r.leads.cash!.perMonth).toBeCloseTo(r.leads.cash!.margin / r.annuityFactor, 2);
+    // At a 0% discount rate it's just the number of months.
+    expect(horizonSweep([A, B], single, [2], { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 }).rows[0].annuityFactor).toBe(24);
+  });
+  it("pay per extra hour: the gap in nominal value over the gap in hours worked (hand-checked)", () => {
+    // TX, 1-year stay from Jan 1, 2026, 0% inflation and discount. After tax (from the flip test above):
+    // $110,000 -> 86,215; $100,000 -> 79,180. Gap 7,035. Hours: 50 x 50 = 2,500 vs 45 x 50 = 2,250, 250 extra.
+    // 7,035 / 250 = 28.14 an extra hour. No benefits, so total rewards is the same.
+    const opts = { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 };
+    const A = tx({ salary: { annual: 110_000 }, hours: { weekly: all(50) } });
+    const B = tx({ hours: { weekly: all(45) } });
+    const row = horizonSweep([A, B], single, [1], opts).rows[0];
+    expect(row.nominal).toEqual({ cash: [86_215, 79_180], totalRewards: [86_215, 79_180] });
+    expect(row.hours).toEqual([2_500, 2_250]);
+    expect(row.extraHours).toEqual([
+      { more: 0, fewer: 1, hoursPerYear: 250, gapPerYear: { cash: 7_035, totalRewards: 7_035 }, perExtraHour: { cash: 28.14, totalRewards: 28.14 } },
+    ]);
+    // More hours for less pay: the gap is negative and there's no per-hour figure.
+    const less = horizonSweep([tx({ hours: { weekly: all(50) } }), tx({ salary: { annual: 110_000 }, hours: { weekly: all(45) } })], single, [1], opts);
+    expect(less.rows[0].extraHours).toEqual([{ more: 0, fewer: 1, hoursPerYear: 250, gapPerYear: { cash: -7_035, totalRewards: -7_035 }, perExtraHour: {} }]);
+    // The threshold is 100 scheduled hours a year (2 a week over 50 weeks): 45 vs 43 shows; 45 vs 43.5 doesn't;
+    // equal weekly hours with 48 weeks vs 50 differ by 90 and don't.
+    const pair = (a: Partial<OfferInput>, b: Partial<OfferInput>) => horizonSweep([tx(a), tx(b)], single, [1], opts).rows[0].extraHours.length;
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(43) } })).toBe(1);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(43.5) } })).toBe(0);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(45), weeksPerYear: 48 } })).toBe(0);
+    expect(horizonSweep([A, tx({})], single, [1], opts).rows[0].extraHours).toEqual([]); // hours only on one offer
+  });
+  it("sample offers (illustrative): A's extra hours don't pay after rent against C, but do after tax (docs/ui-design.md §4.2)", () => {
+    const row = horizonSweep(SAMPLE_OFFERS, SAMPLE_HOUSEHOLD, [4], { inflation: 0.025, valuationDate: "2026-07-13" }).rows[0];
+    expect(row.annuityFactor).toBeCloseTo(43.52, 2);
+    const ac = row.extraHours.find((x) => x.more === 0 && x.fewer === 2)!;
+    expect(ac.hoursPerYear).toBe(1_750); // (80 - 45) x 50
+    expect(Math.round(ac.gapPerYear.colAdjustedTotal!)).toBe(-5_577);
+    expect(ac.perExtraHour).toEqual({ cash: 9.59, totalRewards: 6.33 });
+    const ab = row.extraHours.find((x) => x.more === 0 && x.fewer === 1)!;
+    expect([ab.hoursPerYear, ab.perExtraHour.colAdjustedTotal]).toEqual([1_500, 22.15]);
+  });
 });
 
 describe("input validation", () => {
