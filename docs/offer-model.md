@@ -120,8 +120,11 @@ clawback terms:
 - **Vesting:** a schedule is any list of `{ month, fraction }` summing to 1.
   `byYear([25,25,25,25], { perYear: 4, cliffMonths: 12 })` is standard 4-year
   quarterly with a 1-year cliff. `byYear([5,15,40,40], { perYear: 2, cliffMonths: 12 })`
-  is back-loaded semiannual. `VESTING_PRESETS` names four common schedules:
-  `standard`, `annual`, `backLoaded` and `frontLoaded` (33/33/22/12 monthly).
+  is back-loaded semiannual. `VESTING_PRESETS` names four common schedules by split and
+  cadence: `evenQuarterlyAfterCliff`, `evenAnnual`, `backLoadedSemiannualAfterCliff`
+  and `frontLoadedMonthly`. `describeSchedule()` builds the label from the tranches (e.g.
+  "5/15/40/40, semiannual after a 1-year cliff"), so a label can't drift from the
+  schedule. For back-loaded quarterly, use `byYear([5,15,40,40], { perYear: 4, cliffMonths: 12 })`.
 - **Company vest dates:** an optional `vestDates` calendar moves each tranche to the next
   company vest date.
 - **Taxation:** vest-date value is W-2 wages. We assume you sell at vest.

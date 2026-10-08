@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  byYear, convenienceRuleWarning, leaveDateSweep, projectScenario, VESTING_PRESETS, type Household, type OfferInput,
+  byYear, convenienceRuleWarning, describeSchedule, leaveDateSweep, projectScenario, VESTING_PRESETS,
+  type Household, type OfferInput,
 } from "../src/offer/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
@@ -23,7 +24,7 @@ const worked: OfferInput = {
   equity: {
     grants: [{
       kind: "rsu", label: "New-hire grant", value: 200_000,
-      schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+      schedule: { ...VESTING_PRESETS.backLoadedSemiannualAfterCliff, vestDates: { months: [2, 5, 8, 11], day: 15 } },
     }],
   },
 };
@@ -188,21 +189,29 @@ describe("residence vs employer state (decision 9)", () => {
 
 describe("vesting schedules", () => {
   it("standard: 25% at a 1-year cliff, then 6.25% quarterly to month 48", () => {
-    const t = VESTING_PRESETS.standard.tranches;
+    const t = VESTING_PRESETS.evenQuarterlyAfterCliff.tranches;
     expect(t[0]).toEqual({ month: 12, fraction: 0.25 });
     expect(t.slice(1)).toEqual([15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48].map((month) => ({ month, fraction: 0.0625 })));
   });
   it("back-loaded 5/15/40/40: 5% at the cliff, 7.5% twice, then 20% every six months", () => {
-    expect(VESTING_PRESETS.backLoaded.tranches.map((t) => [t.month, +t.fraction.toFixed(6)]))
+    expect(VESTING_PRESETS.backLoadedSemiannualAfterCliff.tranches.map((t) => [t.month, +t.fraction.toFixed(6)]))
       .toEqual([[12, 0.05], [18, 0.075], [24, 0.075], [30, 0.2], [36, 0.2], [42, 0.2], [48, 0.2]]);
   });
   it("annual and front-loaded monthly", () => {
-    expect(VESTING_PRESETS.annual.tranches).toEqual([12, 24, 36, 48].map((month) => ({ month, fraction: 0.25 })));
-    const f = VESTING_PRESETS.frontLoaded.tranches;
+    expect(VESTING_PRESETS.evenAnnual.tranches).toEqual([12, 24, 36, 48].map((month) => ({ month, fraction: 0.25 })));
+    const f = VESTING_PRESETS.frontLoadedMonthly.tranches;
     expect(f).toHaveLength(48);
     expect(f[0].month).toBe(1);
     expect(f[0].fraction).toBeCloseTo(0.0275, 12); // 33% / 12
     expect(f.reduce((s, t) => s + t.fraction, 0)).toBeCloseTo(1, 12);
+  });
+  it("labels say the real cadence: only the even 4-year preset is quarterly after year 1", () => {
+    expect(describeSchedule(VESTING_PRESETS.evenQuarterlyAfterCliff)).toBe("25/25/25/25, quarterly after a 1-year cliff");
+    expect(describeSchedule(VESTING_PRESETS.backLoadedSemiannualAfterCliff)).toBe("5/15/40/40, semiannual after a 1-year cliff");
+    expect(describeSchedule(VESTING_PRESETS.evenAnnual)).toBe("25/25/25/25, annual");
+    expect(describeSchedule(VESTING_PRESETS.frontLoadedMonthly)).toBe("33/33/22/12, monthly");
+    expect(describeSchedule(byYear([5, 15, 40, 40], { perYear: 4, cliffMonths: 12 })))
+      .toBe("5/15/40/40, quarterly after a 1-year cliff");
   });
   it("rejects percentages that don't sum to 100 and splits that don't divide the year", () => {
     expect(() => byYear([25, 25, 25], { perYear: 4 })).toThrow(/sum to 100/);
@@ -252,7 +261,7 @@ describe("RSUs in the projection", () => {
       equity: {
         grants: [],
         refreshers: { value: { bear: 10_000, base: 20_000, bull: 30_000 }, firstAfterMonths: 12, everyMonths: 12,
-          schedule: VESTING_PRESETS.annual },
+          schedule: VESTING_PRESETS.evenAnnual },
       },
     };
     const r = projectScenario(g, single);
@@ -362,7 +371,7 @@ describe("leave date and clawbacks", () => {
     const g: OfferInput = {
       ...withClawback,
       equity: { ...worked.equity!, refreshers: { value: { bear: 20_000, base: 20_000, bull: 20_000 },
-        firstAfterMonths: 12, everyMonths: 12, schedule: VESTING_PRESETS.annual } },
+        firstAfterMonths: 12, everyMonths: 12, schedule: VESTING_PRESETS.evenAnnual } },
     };
     // The first refresher is granted 2027-08-03.
     expect(leaving("2027-08-02", g).leave!.unvestedRsuForfeited).toBe(200_000);

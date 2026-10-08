@@ -1,8 +1,8 @@
 // Prints a year-by-year table for two sample offers so results can be eyeballed before a UI exists.
 // Usage: npm run offers. The sample inputs are illustrative, not market data.
 import {
-  leaveDateSweep, projectScenario, VESTING_PRESETS,
-  type Household, type OfferInput, type ScenarioResult, type VestingSchedule,
+  describeSchedule, leaveDateSweep, projectScenario, VESTING_PRESETS,
+  type Household, type OfferInput, type ScenarioResult,
 } from "../src/offer/index";
 
 const household: Household = { filingStatus: "single" };
@@ -44,11 +44,11 @@ const offers: OfferInput[] = [
     equity: {
       grants: [{
         kind: "rsu", label: "New-hire RSUs", value: 120_000,
-        schedule: { ...VESTING_PRESETS.backLoaded, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+        schedule: { ...VESTING_PRESETS.backLoadedSemiannualAfterCliff, vestDates: { months: [2, 5, 8, 11], day: 15 } },
       }],
       refreshers: {
         value: { bear: 10_000, base: 25_000, bull: 40_000 }, firstAfterMonths: 12, everyMonths: 12,
-        schedule: { ...VESTING_PRESETS.standard, vestDates: { months: [2, 5, 8, 11], day: 15 } },
+        schedule: { ...VESTING_PRESETS.evenQuarterlyAfterCliff, vestDates: { months: [2, 5, 8, 11], day: 15 } },
       },
     },
   },
@@ -71,19 +71,11 @@ function describe(o: OfferInput): string {
     ? `${b.amount.bear * 100}/${b.amount.base * 100}/${b.amount.bull * 100}% of salary earned (bear/base/bull)`
     : `$${$(b.amount.base)}`;
   const where = o.residence.locality?.kind === "nyc" ? `${o.residence.state} (NYC)` : o.residence.state;
-  const byYearPct = (s: VestingSchedule) => {
-    const pcts: number[] = [];
-    for (const t of s.tranches) {
-      const y = Math.max(0, Math.ceil(t.month / 12) - 1);
-      pcts[y] = (pcts[y] ?? 0) + t.fraction * 100;
-    }
-    return `${Array.from(pcts, (p) => +(p ?? 0).toFixed(1)).join("/")}% by year`;
-  };
   const grants = o.equity?.grants ?? [];
   const r = o.equity?.refreshers;
   const rsu = grants.length
-    ? `; RSUs ${grants.map((g) => `$${$(g.value)} (${byYearPct(g.schedule)})`).join(" + ")}`
-      + (r ? `; refreshers $${$(r.value.bear)}/$${$(r.value.base)}/$${$(r.value.bull)} a year (${byYearPct(r.schedule)})` : "")
+    ? `;\n   RSUs ${grants.map((g) => `$${$(g.value)} (${describeSchedule(g.schedule)})`).join(" + ")}`
+      + (r ? `;\n   refreshers $${$(r.value.bear)}/$${$(r.value.base)}/$${$(r.value.bull)} a year (${describeSchedule(r.schedule)})` : "")
     : "; no RSUs";
   const signOn = o.cashAwards?.[0];
   const claw = signOn?.clawback

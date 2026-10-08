@@ -130,3 +130,5 @@ table for two sample offers.
    at the flat 22% supplemental rate (37% above $1M), below the real marginal rate for
    many offers. Warn and estimate the April balance due. We compute liability, so totals
    are already right; this is a cash-timing warning.
+8. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback step,
+   and the after-tax value of staying until it (built on `leaveDateSweep`).

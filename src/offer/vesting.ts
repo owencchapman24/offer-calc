@@ -29,17 +29,37 @@ export function byYear(pctPerYear: number[], opts: { perYear: number; cliffMonth
   };
 }
 
-/** Common schedules. Pair with `vestDates` for a company vest calendar. */
+/** Common schedules, named by split and cadence. Pair with `vestDates` for a company vest calendar. */
 export const VESTING_PRESETS = {
-  /** 25% a year: 25% at a 1-year cliff, then quarterly. */
-  standard: byYear([25, 25, 25, 25], { perYear: 4, cliffMonths: 12 }),
-  /** 25% on each of the first four anniversaries. */
-  annual: byYear([25, 25, 25, 25], { perYear: 1 }),
-  /** Back-loaded 5/15/40/40: 5% at a 1-year cliff, then semiannual. */
-  backLoaded: byYear([5, 15, 40, 40], { perYear: 2, cliffMonths: 12 }),
-  /** Front-loaded 33/33/22/12, monthly from month 1, no cliff. */
-  frontLoaded: byYear([33, 33, 22, 12], { perYear: 12 }),
+  /** 25/25/25/25: 25% at a 1-year cliff, then quarterly. */
+  evenQuarterlyAfterCliff: byYear([25, 25, 25, 25], { perYear: 4, cliffMonths: 12 }),
+  /** 25/25/25/25: 25% on each of the first four anniversaries. */
+  evenAnnual: byYear([25, 25, 25, 25], { perYear: 1 }),
+  /** 5/15/40/40: 5% at a 1-year cliff, then semiannual (7.5% twice, then 20% every six months). */
+  backLoadedSemiannualAfterCliff: byYear([5, 15, 40, 40], { perYear: 2, cliffMonths: 12 }),
+  /** 33/33/22/12: monthly from month 1, no cliff. */
+  frontLoadedMonthly: byYear([33, 33, 22, 12], { perYear: 12 }),
 } as const;
+
+const CADENCE: Record<number, string> = { 1: "monthly", 3: "quarterly", 6: "semiannual", 12: "annual" };
+
+/** Plain-language label read off the tranches, e.g. "5/15/40/40, semiannual after a 1-year cliff". */
+export function describeSchedule(s: VestingSchedule): string {
+  const pcts: number[] = [];
+  for (const t of s.tranches) {
+    const year = Math.max(0, Math.ceil(t.month / 12) - 1);
+    pcts[year] = (pcts[year] ?? 0) + t.fraction * 100;
+  }
+  const split = Array.from(pcts, (p) => +(p ?? 0).toFixed(1)).join("/");
+  const months = s.tranches.map((t) => t.month);
+  const gaps = months.slice(1).map((m, i) => m - months[i]);
+  if (gaps.length === 0) return `${split}, all at month ${months[0]}`;
+  if (!gaps.every((g) => g === gaps[0])) return `${split} by year, on a custom schedule`;
+  const cadence = CADENCE[gaps[0]] ?? `every ${gaps[0]} months`;
+  if (months[0] === gaps[0]) return `${split}, ${cadence}`;
+  const cliff = months[0] % 12 === 0 ? `${months[0] / 12}-year` : `${months[0]}-month`;
+  return `${split}, ${cadence} after a ${cliff} cliff`;
+}
 
 export function checkSchedule(s: VestingSchedule): void {
   if (s.tranches.length === 0) throw new Error("A vesting schedule needs at least one tranche.");
