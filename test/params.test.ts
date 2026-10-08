@@ -35,6 +35,15 @@ describe("paramsForYear", () => {
     expect(p.federal.salt).toEqual({ cap: 40_400, phaseDown: { threshold: 505_000, rate: 0.3, floor: 10_000 } });
     expect(p.payroll.socialSecurityWageBase).toBe(184_500);
   });
+  it("projected params are built once per (year, inflation), shared, and frozen", () => {
+    const a = paramsForYear(2028, { inflation: 0.025 });
+    expect(paramsForYear(2028, { inflation: 0.025 })).toBe(a);
+    expect(paramsForYear(2028, { inflation: 0.03 })).not.toBe(a);
+    expect(paramsForYear(2028, { inflation: 0.03 }).federal.standardDeduction.single).toBeCloseTo(16_100 * 1.03 ** 2, 6);
+    expect(Object.isFrozen(a.federal.brackets.single)).toBe(true);
+    expect(() => { (a.federal as { k401Limit: number }).k401Limit = 1; }).toThrow();
+    expect(Object.isFrozen(paramsForYear(2026).states.CA)).toBe(true);
+  });
   it("rejects years before 2026, fractional years, and projections without inflation", () => {
     expect(() => paramsForYear(2025)).toThrow();
     expect(() => paramsForYear(2026.5)).toThrow();

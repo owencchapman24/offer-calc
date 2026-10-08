@@ -74,7 +74,16 @@ export function saltForYear(year: number): SaltParams {
   return { cap: c, phaseDown: { ...phaseDown, threshold } };
 }
 
-const PARAMS_2026: TaxParams = {
+/** Freezes an object graph in place. Params are shared between callers, so none may change them. */
+function deepFreeze<T>(o: T): T {
+  if (o !== null && typeof o === "object" && !Object.isFrozen(o)) {
+    Object.freeze(o);
+    for (const v of Object.values(o)) deepFreeze(v);
+  }
+  return o;
+}
+
+const PARAMS_2026: TaxParams = deepFreeze({
   year: BASE_YEAR,
   indexFactor: 1,
   projected: false,
@@ -82,7 +91,15 @@ const PARAMS_2026: TaxParams = {
   payroll: PAYROLL_2026,
   states: STATES_2026,
   local: { nyc: NYC_2026, philadelphia: PHILLY_2026 },
-};
+});
+
+/**
+ * Projected params depend only on (year, inflation), and every projection asks for each of its
+ * years, so they're built once and shared (frozen). Inflation is a user input: the cache is
+ * cleared rather than allowed to grow without bound.
+ */
+const projectedCache = new Map<string, TaxParams>();
+const PROJECTED_CACHE_LIMIT = 256;
 
 const byStatus = <T, U>(r: Readonly<Record<FilingStatus, T>>, f: (v: T) => U): Record<FilingStatus, U> =>
   ({ single: f(r.single), joint: f(r.joint), headOfHousehold: f(r.headOfHousehold) });
@@ -125,9 +142,12 @@ export function paramsForYear(year: number, opts: { inflation?: number } = {}): 
   if (inflation === undefined || !Number.isFinite(inflation) || inflation <= -1) {
     throw new Error(`Tax year ${year} is projected from ${BASE_YEAR} law: pass paramsForYear(${year}, { inflation }).`);
   }
+  const key = `${year}:${inflation}`;
+  const cached = projectedCache.get(key);
+  if (cached) return cached;
   const indexFactor = (1 + inflation) ** (year - BASE_YEAR);
   const ix = (n: number) => n * indexFactor;
-  return {
+  const params: TaxParams = deepFreeze({
     year,
     indexFactor,
     projected: true,
@@ -143,5 +163,8 @@ export function paramsForYear(year: number, opts: { inflation?: number } = {}): 
     payroll: { ...PAYROLL_2026, socialSecurityWageBase: ix(PAYROLL_2026.socialSecurityWageBase) },
     states: Object.fromEntries(Object.entries(STATES_2026).map(([k, s]) => [k, projectState(s, indexFactor)])),
     local: PARAMS_2026.local, // NYC brackets are statutory; Philadelphia's rate is set yearly, so hold 2026
-  };
+  });
+  if (projectedCache.size >= PROJECTED_CACHE_LIMIT) projectedCache.clear();
+  projectedCache.set(key, params);
+  return params;
 }
