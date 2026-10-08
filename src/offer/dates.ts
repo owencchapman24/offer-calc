@@ -6,8 +6,18 @@ const DAY_MS = 86_400_000;
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Day -> date string and day -> year are pure and called for every event and benefit flow, so
+// they're memoized (building a Date each time was the largest cost in a projection after formatting).
+const isoByDay = new Map<number, ISODate>();
+const yearByDay = new Map<number, number>();
+
 export function fromDays(day: number): ISODate {
-  return new Date(day * DAY_MS).toISOString().slice(0, 10);
+  let iso = isoByDay.get(day);
+  if (iso === undefined) {
+    iso = new Date(day * DAY_MS).toISOString().slice(0, 10);
+    isoByDay.set(day, iso);
+  }
+  return iso;
 }
 
 /** Day number of a "YYYY-MM-DD" date. Throws on malformed or impossible dates (2026-02-30). */
@@ -19,7 +29,14 @@ export function toDays(iso: ISODate): number {
   return day;
 }
 
-export const yearOfDay = (day: number) => new Date(day * DAY_MS).getUTCFullYear();
+export function yearOfDay(day: number): number {
+  let year = yearByDay.get(day);
+  if (year === undefined) {
+    year = new Date(day * DAY_MS).getUTCFullYear();
+    yearByDay.set(day, year);
+  }
+  return year;
+}
 export const jan1 = (year: number) => Date.UTC(year, 0, 1) / DAY_MS;
 export const daysInYear = (year: number) => jan1(year + 1) - jan1(year);
 

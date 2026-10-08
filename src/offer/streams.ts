@@ -16,9 +16,12 @@ export interface RawEvent {
   nonWage?: { tax: number };
 }
 
+// Built once: toLocaleString with options constructs a formatter on every call, which was most of
+// a projection's run time (every event and monthly benefit flow formats its formula).
+const WHOLE = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** "$150,000" or "$62,054.79" */
-export const usd = (x: number) =>
-  `$${x.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(x) ? 0 : 2, maximumFractionDigits: 2 })}`;
+export const usd = (x: number) => `$${(Number.isInteger(x) ? WHOLE : CENTS).format(x)}`;
 const pct = (x: number) => `${+(x * 100).toFixed(4)}%`;
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
