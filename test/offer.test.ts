@@ -663,18 +663,21 @@ describe("cost of living (BEA RPPs)", () => {
 
   it("Charlotte end to end, hand-checked: $47,728.86 left after savings and rent = $48,997.88 in U.S. dollars", () => {
     // Tax: federal 13,170 + FICA 7,650 + NC 3.99% x (100,000 - 12,750) = 3,481.275 -> 24,301.275
-    // (floating point rounds the half cent down: 24,301.27). Take-home 75,698.725.
-    // Savings 10% = 7,569.87; rent 12 x 1,700 = 20,400; non-housing 47,728.85 (local dollars).
-    // Factor = U.S. non-housing 99.8802 / Charlotte 97.2933 = 1.026588 -> 48,997.88 U.S. dollars.
+    // (floating point rounds the half cent down: 24,301.27). Take-home 75,698.73.
+    // Savings 10% = 7,569.873; rent 12 x 1,700 = 20,400; non-housing 47,728.857 (local dollars).
+    // Factor = U.S. non-housing 99.8802 / Charlotte 97.2933 = 1.026588 -> 48,997.883 U.S. dollars.
+    // With no benefits, the COL-adjusted total just adds the savings back at face value:
+    // 48,997.883 + 7,569.873 = 56,567.76.
     const r = projectScenario(clt, saver, { years: 1 });
     const y = r.employmentYears[0];
     expect(y.tax).toBe(24_301.27);
     expect(y.takeHome).toBe(75_698.73);
-    expect(y.costOfLiving).toEqual({ savings: 7_569.87, rent: 20_400, nonHousingLocal: 47_728.86, discretionaryReference: 48_997.88 });
+    expect(y.costOfLiving).toEqual({ savings: 7_569.87, rent: 20_400, nonHousingLocal: 47_728.86, discretionaryReference: 48_997.88,
+      outOfPocketReference: 0, faceValue: 7_569.87, total: 56_567.76 });
     expect(r.costOfLiving!.nonHousingFactor).toBeCloseTo(99.88019 / 97.29333, 6);
     expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input", savingsRate: 0.1,
       area: { code: "16740", nonHousing: 97.293 }, reference: { code: "00000", nonHousing: 99.88 } });
-    expect(r.window.costOfLiving!.nominal).toBe(48_997.88);
+    expect(r.window.costOfLiving!.nominal).toEqual(y.costOfLiving);
   });
   it("gross pay is never adjusted: the same offer without cost of living has identical pay and tax", () => {
     const a = projectScenario(clt, saver, { years: 1 }).employmentYears[0];
@@ -692,6 +695,87 @@ describe("cost of living (BEA RPPs)", () => {
     const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });
     expect(r.costOfLiving!.nonHousingFactor).toBe(1);
     expect(r.employmentYears[0].costOfLiving!.discretionaryReference).toBe(r.employmentYears[0].costOfLiving!.nonHousingLocal);
+  });
+
+  // TX, calendar 2026, every benefit flow: 401(k) 6% pre-tax with a 3% match, premium 1,200,
+  // OOP 1,500, your HSA 1,000, employer HSA 500, Section 127 2,000. Rent 1,500 in Dallas.
+  const all = (v: number) => ({ bear: v, base: v, bull: v });
+  const dallas: OfferInput = {
+    label: "DAL", residence: { state: "TX" }, employerState: "TX", startDate: "2026-01-01", salary: { annual: 100_000 },
+    retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] },
+    health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employeeHsa: 1_000, employerHsa: 500 },
+    perks: { section127: 2_000 }, hours: { weekly: all(45) },
+    costOfLiving: { area: "19100", monthlyRent: 1_500 },
+  };
+  it("COL-adjusted total, Dallas, hand-checked: $65,771.03 = discretionary $47,469.90 - OOP $1,494.11 + face $19,795.23", () => {
+    // Federal: AGI 100,000 - 6,000 401(k) - 2,200 section 125 = 91,800; taxable 75,700 -> 1,240 + 4,560
+    // + 22% x 25,300 = 11,366. FICA 7.65% x 97,800 = 7,481.70. After-tax comp = 100,000 - 18,847.70 - 1,200
+    // = 79,952.30; take-home = - 6,000 - 1,000 = 72,952.30. Savings 10% = 7,295.23; rent 18,000;
+    // local non-housing 47,657.07. Factor = U.S. 99.88019 / Dallas 100.27400 = 0.996073:
+    // discretionary 47,469.90, out-of-pocket 1,500 -> 1,494.11. Face: 7,295.23 savings + 6,000 + 1,000
+    // yours + 3,000 match + 500 employer HSA + 2,000 perks = 19,795.23.
+    const r = projectScenario(dallas, saver, { years: 1 });
+    const y = r.employmentYears[0];
+    expect(y.afterTaxComp).toBe(79_952.3);
+    expect(y.costOfLiving).toEqual({ savings: 7_295.23, rent: 18_000, nonHousingLocal: 47_657.07, discretionaryReference: 47_469.9,
+      outOfPocketReference: 1_494.11, faceValue: 19_795.23, total: 65_771.03 });
+    // It reconciles with total rewards: 83,952.30 - rent 18,000 + (0.996073 - 1) x (47,657.07 - 1,500) = 65,771.03.
+    expect(y.totalRewards).toBe(83_952.3);
+    const f = r.costOfLiving!.nonHousingFactor;
+    expect(y.totalRewards - y.costOfLiving!.rent + (f - 1) * (y.costOfLiving!.nonHousingLocal - y.health.outOfPocket))
+      .toBeCloseTo(y.costOfLiving!.total, 2);
+  });
+  it("at a factor of 1 with no rent, the COL-adjusted total equals total rewards, whatever the savings rate", () => {
+    for (const savingsRate of [0, 0.25]) {
+      const r = projectScenario({ ...dallas, costOfLiving: { area: "19100", monthlyRent: 0 } },
+        { filingStatus: "single", costOfLiving: { reference: "19100", savingsRate } }, { years: 1 });
+      expect(r.employmentYears[0].costOfLiving!.total).toBeCloseTo(r.employmentYears[0].totalRewards, 2);
+    }
+  });
+  it("PV of the COL-adjusted total discounts each flow by its date; at 0% it equals nominal", () => {
+    const r = projectScenario(dallas, saver, { years: 1, valuationDate: "2026-01-01" });
+    expect(r.window.costOfLiving!.presentValue!.total).toBeLessThan(r.window.costOfLiving!.nominal.total);
+    const flat = projectScenario(dallas, saver, { years: 1, valuationDate: "2026-01-01", discountRate: 0 });
+    expect(flat.window.costOfLiving!.presentValue).toEqual(flat.window.costOfLiving!.nominal);
+  });
+
+  // Charlotte from 2026-07-13: the lease runs from the start date, so rent steps up each July 13.
+  const july: OfferInput = { ...clt, startDate: "2026-07-13" };
+  const rents = (o: OfferInput, years = 5) => projectScenario(o, single, { years }).employmentYears.map((y) => y.costOfLiving!.rent);
+  it("rent grows at the inflation input by default: $20,400, then x 1.025 each lease year (hand-checked)", () => {
+    // Year 1: 1,700 x (19/31 + 11 + 12/31) = 20,400. Year 2: 20,400 x 1.025 = 20,910.
+    // Window: 20,400 x (1 + 1.025 + 1.025^2 + 1.025^3 + 1.025^4 = 5.256329) = 107,229.10.
+    expect(rents(july)).toEqual([20_400, 20_910, 21_432.75, 21_968.57, 22_517.78]);
+    const r = projectScenario(july, single, { years: 5 });
+    expect(r.window.costOfLiving!.nominal.rent).toBe(107_229.1);
+    expect(r.costOfLiving).toMatchObject({ rentGrowth: 0.025, rentGrowthSource: "inflation" });
+    expect(projectScenario(july, single, { years: 1, inflation: 0.04 }).costOfLiving!.rentGrowth).toBe(0.04);
+  });
+  it("an entered rent growth overrides inflation; 0 holds rent flat", () => {
+    expect(rents({ ...july, costOfLiving: { area: "16740", monthlyRent: 1_700, rentGrowth: 0.03 } }, 2)).toEqual([20_400, 21_012]);
+    expect(rents({ ...july, costOfLiving: { area: "16740", monthlyRent: 1_700, rentGrowth: 0 } }, 3)).toEqual([20_400, 20_400, 20_400]);
+    expect(() => rents({ ...july, costOfLiving: { area: "16740", monthlyRent: 1_700, rentGrowth: -1 } })).toThrow(/Rent growth/);
+  });
+  it("rent at the lease anniversary: leaving the day before pays no year-2 rent; the day of pays 1 day at $1,742.50", () => {
+    // 1,700 x 1.025 = 1,742.50 a month; one day of July = 1,742.50 / 31 = 56.21.
+    expect(rents({ ...july, leaveDate: "2027-07-12" }, 2)).toEqual([20_400, 0]);
+    expect(rents({ ...july, leaveDate: "2027-07-13" }, 2)).toEqual([20_400, 56.21]);
+  });
+  it("breakeven on the COL-adjusted total: Dallas vs NYC prices, same TX taxes, needs +$13,230.95 (hand-checked)", () => {
+    // Both TX residents at $100,000 (take-home 79,180; marginal 22% + 7.65% = 29.65%), no savings. A pays
+    // 1,500 rent in Dallas, B 2,000 in NYC. COL totals: A = 61,180 x fA; B = (55,180 + 0.7035 D) x fB.
+    // Tie: D = (61,180 x fA / fB - 55,180) / 0.7035, with fA / fB = NYC 105.69576 / Dallas 100.27400 = 1.054069
+    // -> 13,230.95. Every month is identical, so discounting doesn't move the tie.
+    const tx = (area: string, monthlyRent: number): OfferInput => ({ label: area, residence: { state: "TX" }, employerState: "TX",
+      startDate: "2026-01-01", salary: { annual: 100_000 }, costOfLiving: { area, monthlyRent } });
+    const opts = { valuationDate: "2026-01-01", horizonYears: 1, years: 1 };
+    const r = breakeven(tx("19100", 1_500), tx("35620", 2_000), "salary", single, { ...opts, basis: "colAdjustedTotal" });
+    expect(r.basis).toBe("colAdjustedTotal");
+    expect(r.increase).toBeCloseTo(13_230.95, 1);
+    // On the cash basis the two are identical.
+    expect(breakeven(tx("19100", 1_500), tx("35620", 2_000), "salary", single, opts).increase).toBeCloseTo(0, 1);
+    expect(() => breakeven(tx("19100", 1_500), { ...tx("35620", 0), costOfLiving: undefined }, "salary", single,
+      { ...opts, basis: "colAdjustedTotal" })).toThrow(/costOfLiving/);
   });
 });
 

@@ -43,19 +43,27 @@ export function compareOffers(
 
 /**
  * How much B's starting salary (or first sign-on) must change for B to tie A in base-scenario
- * present value over their shared window, on cash net (default) or total rewards. Found by
- * bisection to the cent; PV rises with pay, since tax takes less than all of each extra dollar.
- * Raises, percent-of-salary bonuses and 401(k) amounts scale with the new salary.
+ * present value over their shared window, on after-tax comp (default), total rewards or the
+ * COL-adjusted total. Found by bisection to the cent; PV rises with pay, since tax takes less
+ * than all of each extra dollar. Raises, percent-of-salary bonuses and 401(k) amounts scale with
+ * the new salary.
  */
 export function breakeven(
   offerA: OfferInput, offerB: OfferInput, field: "salary" | "signOn", household: Household,
-  options: ValuedOptions & { horizonYears?: number; basis?: "cash" | "totalRewards" },
+  options: ValuedOptions & { horizonYears?: number; basis?: BreakevenResult["basis"] },
 ): BreakevenResult {
   const window = sharedWindow([offerA, offerB], options);
   const basis = options.basis ?? "cash";
+  if (basis === "colAdjustedTotal") {
+    for (const o of [offerA, offerB]) {
+      if (!o.costOfLiving) throw new Error(`The COL-adjusted basis needs costOfLiving on "${o.label}".`);
+    }
+  }
   const pv = (o: OfferInput) => {
     const w = projectScenario(o, household, { ...options, scenario: "base", window }).window;
-    return basis === "cash" ? w.presentValue!.afterTaxComp : w.totalRewards.presentValue!;
+    return basis === "cash" ? w.presentValue!.afterTaxComp
+      : basis === "totalRewards" ? w.totalRewards.presentValue!
+      : w.costOfLiving!.presentValue!.total;
   };
   const from = field === "salary" ? offerB.salary.annual : offerB.cashAwards?.[0]?.amount ?? 0;
   const adjusted = (d: number): OfferInput => {

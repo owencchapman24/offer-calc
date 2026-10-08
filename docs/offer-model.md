@@ -12,7 +12,7 @@ engine refactor in §8 comes first, then the offer model.
 | 2 | Offers are compared over a common date window (default: from the earliest start date). Totals are shown both nominal and as present value at a discount rate (default 5%), discounted to **today's date**. |
 | 3 | Before the offer model, the engine moves to per-year parameters (`paramsForYear`), including the statutory SALT schedule and its 2030 reversion (§8). |
 | 3a | States: a standard deduction linked to the federal one follows federal indexing **only where verified**; unclear ones stay flat. Every other state parameter is held flat at 2026 law in projected years. No per-state indexing research. |
-| 4 | Inflation (default 2.5%) only indexes tax law. Pay growth is a separate input: an annual raise % plus optional promotion step-ups. |
+| 4 | Inflation (default 2.5%) only indexes tax law. Pay growth is a separate input: an annual raise % plus optional promotion step-ups. (Later: inflation is also the default rent growth, §3.) |
 | 5 | The bonus percentage applies to salary earned during the performance period. |
 | 6 | Clawback tax relief is federal-only in v1. Repayment defaults to gross. FICA isn't automatically refunded after a cross-year repayment. |
 | 7 | One leave date cuts off every stream: salary, unpaid bonus, unvested RSUs, unpaid cash awards, clawbacks, and (roadmap 2) unvested 401(k) match. |
@@ -170,7 +170,8 @@ Default: none.
     what reaches your bank account.
 - **Total rewards:** after-tax comp + vested employer retirement + perks − out-of-pocket
   + employer HSA, nominal and PV. `compareOffers` shows it next to after-tax comp.
-  `breakeven` takes `basis: "cash"` (after-tax comp) or `"totalRewards"`.
+  `breakeven` takes `basis: "cash"` (after-tax comp), `"totalRewards"` or
+  `"colAdjustedTotal"` (see cost of living below).
 - **Vesting service:** `vestingService` is `"elapsedTime"` (default) or
   `"planYearHours"`. Under the second, each calendar plan year with 1,000+ hours (from
   `offer.hours`) counts, credited on the day the 1,000th hour is worked, even if you leave
@@ -179,7 +180,8 @@ Default: none.
 - **Federal limits:** 402(g), HSA, Section 127 and 132(f) are engine parameters with
   sources, indexed in projected years.
 
-**Cost of living (slice 6, roadmap item 3).**
+**Cost of living (slice 6, roadmap item 3; the COL-adjusted total and rent growth were added
+after slice 6's review).**
 
 - **Data:** BEA Regional Price Parities, baked into `src/col/rpp.json` by
   `npm run fetch-rpp`; the app never fetches at runtime.
@@ -197,6 +199,28 @@ Default: none.
   - What's left is non-housing spending in local dollars. Multiply it by reference
     non-housing RPP ÷ area non-housing RPP to get **discretionary income after rent, in
     reference-location dollars**.
+- **Rent growth:**
+  - **Timing:** the entered (or derived) rent is the first lease year's, and the lease
+    starts on your start date. Rent rises at each anniversary, so employment year n pays
+    `monthlyRent × (1 + g)^(n−1)` a month.
+  - **Rate:** `costOfLiving.rentGrowth` per offer, since rents rise at different rates in
+    different cities. Default: the `inflation` option (2.5%), shown in the assumptions.
+  - **Hand-check:** $1,700 from 2026-07-13 at 2.5% pays $20,400 in year 1 and $20,910 in
+    year 2, and $107,229.10 over five years.
+  - Rent is paid only while you work there.
+- **COL-adjusted total:** the cost-of-living counterpart of total rewards. Spending money is
+  local; saved money isn't.
+  - **Discretionary income after rent,** converted as above.
+  - **Minus expected out-of-pocket health spending.** It comes out of the local spending,
+    so the same factor converts it. Leaving it out would let a plan with high out-of-pocket
+    costs and an HSA seed beat an otherwise identical plan with neither.
+  - **Plus money not spent locally, at face value:** planned savings, your 401(k) and HSA
+    contributions, vested employer 401(k), employer HSA and perks.
+  - **Reconciliation:** COL-adjusted total = total rewards − rent + (factor − 1) ×
+    (local non-housing spending − out-of-pocket). At a factor of 1 with no rent, it equals
+    total rewards, whatever the savings rate.
+  - **Where it appears:** per employment year, and over the window, nominal and PV.
+    `breakeven` takes it as a third basis, `basis: "colAdjustedTotal"`.
 - **Non-housing RPP:** (all items − 0.16 × housing) ÷ 0.84. 16% is housing rents' share of
   BEA's PCE-based weights (BEA, *Survey of Current Business*, March 2022). As a
   cross-check, the fixed weights that best reproduce BEA's all-items index put housing at
@@ -205,10 +229,10 @@ Default: none.
 - **Reference:** default is the U.S. row ("00000"); the user can pick their current city.
 - **Output:**
   - `ScenarioResult.costOfLiving`: the area, the reference, the RPPs used, the factor,
-    the rent and the vintage.
-  - Per employment year: savings, rent, local non-housing and discretionary
-    (reference $).
-  - Window totals: nominal and PV.
+    the first-year rent, its growth rate and the vintage.
+  - `CostOfLivingTotals`, per employment year and over the window (nominal and PV):
+    savings, rent, local non-housing, discretionary (reference $), out-of-pocket
+    (reference $), face value, and the COL-adjusted total.
 
 ## 4. Leave date
 
@@ -283,9 +307,9 @@ compute nonresident tax or the resident credit.
   - `compareOffers(offers, household, { valuationDate, horizonYears })` returns each
     offer's nominal and PV totals per scenario over the shared window.
   - `breakeven(A, B, "salary" | "signOn", …)` finds, by bisection to the cent, the change
-    to B's starting salary (or first sign-on) that ties A in base-scenario PV. Raises and
-    percent-of-salary bonuses scale with the new salary; a negative result means B is
-    already ahead.
+    to B's starting salary (or first sign-on) that ties A in base-scenario PV, on after-tax
+    comp, total rewards or the COL-adjusted total. Raises and percent-of-salary bonuses
+    scale with the new salary; a negative result means B is already ahead.
 
 ## 8. Prerequisite: per-year tax parameters (refactor plan)
 

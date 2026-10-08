@@ -44,8 +44,10 @@ export interface OfferInput {
 export interface OfferCostOfLiving {
   /** BEA GeoFIPS code of the metro area or state-nonmetro portion, e.g. "35620"; see findRppAreas(). */
   area: string;
-  /** Your expected rent there. If omitted, derived from the household reference rent and the housing RPPs. */
+  /** Your expected rent there when you move in. If omitted, derived from the household reference rent and the housing RPPs. */
   monthlyRent?: number;
+  /** Annual rent increase, applied at each lease anniversary (your start date), e.g. 0.04. Default: the inflation option. */
+  rentGrowth?: number;
 }
 
 /** 401(k): your deferrals, the employer's match and non-elective money, and its vesting. */
@@ -241,7 +243,7 @@ export interface ProjectionOptions {
   scenario?: Scenario;
   /** Employment years to show. Default 5. */
   years?: number;
-  /** Indexes tax law after 2026 (not pay growth). Default 0.025. */
+  /** Indexes tax law after 2026, and is the default rent growth. Never pay growth. Default 0.025. */
   inflation?: number;
   /** Present values are as of this date. The UI passes today; tests pass a fixed date. */
   valuationDate?: ISODate;
@@ -330,8 +332,31 @@ export interface WindowTotals {
   benefits: { nominal: BenefitTotals; presentValue?: BenefitTotals };
   /** After-tax comp + vested retirement + perks - out-of-pocket + employer HSA (= gross - tax + retirement + perks - health net). */
   totalRewards: { nominal: number; presentValue?: number };
-  /** Discretionary income after rent, in reference-location dollars. Present with costOfLiving. */
-  costOfLiving?: { nominal: number; presentValue?: number };
+  /** Discretionary income after rent and the COL-adjusted total, in reference-location dollars. Present with costOfLiving. */
+  costOfLiving?: { nominal: CostOfLivingTotals; presentValue?: CostOfLivingTotals };
+}
+
+/**
+ * Cost of living over a stretch of time, in reference-location dollars where noted. Spending money
+ * is local, so it's converted by the non-housing RPPs; money not spent locally counts at face value.
+ */
+export interface CostOfLivingTotals {
+  /** Planned savings: savingsRate x take-home. */
+  savings: number;
+  rent: number;
+  /** Take-home - savings - rent: non-housing spending, in local dollars. */
+  nonHousingLocal: number;
+  /** nonHousingLocal x nonHousingFactor: discretionary income after rent, in reference dollars. */
+  discretionaryReference: number;
+  /** Expected out-of-pocket health spending x nonHousingFactor. It comes out of the local spending, so it's converted the same way. */
+  outOfPocketReference: number;
+  /** Money not spent locally, at face value: planned savings, your 401(k) and HSA contributions, vested employer 401(k), employer HSA and perks. */
+  faceValue: number;
+  /**
+   * COL-adjusted total = discretionaryReference - outOfPocketReference + faceValue.
+   * Equivalently, total rewards - rent + (nonHousingFactor - 1) x (nonHousingLocal - out-of-pocket).
+   */
+  total: number;
 }
 
 export interface RppUsed { code: string; name: string; allItems: number; housing: number; nonHousing: number }
@@ -342,8 +367,12 @@ export interface CostOfLivingInfo {
   reference: RppUsed;
   /** Reference non-housing RPP / area non-housing RPP: multiplies local non-housing dollars. */
   nonHousingFactor: number;
+  /** Rent in the first lease year, which starts on your start date. */
   monthlyRent: number;
   rentSource: "input" | "derived";
+  /** Annual increase at each lease anniversary. */
+  rentGrowth: number;
+  rentGrowthSource: "input" | "inflation";
   savingsRate: number;
   /** BEA data year and release note. */
   rppVintage: string;
@@ -394,9 +423,10 @@ export interface EmploymentYearResult {
   hourly?: { afterTaxComp: number; totalRewards: number };
   /**
    * Take-home - savings - rent = non-housing spending in local dollars, then deflated by the
-   * non-housing RPP: discretionary income after rent, in reference-location dollars.
+   * non-housing RPP: discretionary income after rent, in reference-location dollars. Plus the
+   * COL-adjusted total, which adds back money not spent locally at face value.
    */
-  costOfLiving?: { savings: number; rent: number; nonHousingLocal: number; discretionaryReference: number };
+  costOfLiving?: CostOfLivingTotals;
 }
 
 export interface ClawbackResult {
@@ -480,8 +510,8 @@ export interface Comparison {
 
 export interface BreakevenResult {
   field: "salary" | "signOn";
-  /** What's being tied: cash net only, or total rewards. */
-  basis: "cash" | "totalRewards";
+  /** What's being tied: after-tax comp, total rewards, or the COL-adjusted total (needs costOfLiving on both offers). */
+  basis: "cash" | "totalRewards" | "colAdjustedTotal";
   /** Change to B's starting salary (or first sign-on) that ties A; negative if B is already ahead. */
   increase: number;
   /** B's value before and after the change. */

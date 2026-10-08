@@ -16,7 +16,9 @@ methodology page matter more than features.
   - **Slice 5:** 401(k), health, perks, hours and total rewards.
   - **Slice 6:** cost of living (BEA RPPs). The fixes made with it: after-tax comp and
     take-home as the cash measures, plan-year-hours vesting.
-- **Tests:** 117 passing: `test/offer.test.ts` 86, `test/params.test.ts` 21,
+  - **After slice 6:** the COL-adjusted total (per year, window nominal and PV, a third
+    breakeven basis) and rent growth.
+- **Tests:** 124 passing: `test/offer.test.ts` 93, `test/params.test.ts` 21,
   `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
 - `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
   Seattle tech finance. Inputs are illustrative, not market data.
@@ -24,13 +26,7 @@ methodology page matter more than features.
   types were the pre-build proposal; `src/offer/types.ts` is authoritative.
 
 ## Next steps
-1. **COL-adjusted total, plus rent growth.**
-   - **Total:** a total-rewards figure on the cost-of-living basis, to sit beside
-     after-tax comp, total rewards and discretionary-after-rent. Decide first which
-     parts get deflated: spending money is local, retirement money isn't.
-   - **Rent growth:** an annual rent escalation input, likely by scenario. Rent is flat
-     today.
-2. **UI design doc** (`docs/ui-design.md`) for review before any UI code. Roadmap item 6:
+1. **UI design doc** (`docs/ui-design.md`) for review before any UI code. Roadmap item 6:
    - React/TS, client-side only, no login, live-updating, inline input help.
    - No misleading defaults (NN/g calculator guidelines).
    - A methodology page drawn from `assumptions[]` and the design doc.
@@ -112,7 +108,8 @@ methodology page matter more than features.
   partial month earns days worked / days in month. Calendar and employment years both sum
   to the annual rate. A rate change mid-month splits the month by days.
 - **Projected tax law:** `paramsForYear(year, { inflation })`. Inflation indexes tax law
-  only, never pay. Pay growth comes from raises and promotions.
+  and is the default rent growth; it never moves pay. Pay growth comes from raises and
+  promotions.
 
 **Scenarios, PV and comparisons**
 - **Scenarios:** bear/base/bull are joint scenarios, not percentiles. Each sets every
@@ -123,8 +120,8 @@ methodology page matter more than features.
   today's date.
 - **Comparison window:** earliest start + horizon (default 5 years), so a later start
   counts as lost pay.
-- **Breakeven:** bisection to the cent on base-scenario PV, on the cash basis or total
-  rewards.
+- **Breakeven:** bisection to the cent on base-scenario PV, on after-tax comp, total
+  rewards or the COL-adjusted total.
 - **Quoted TC:** the offer-letter view. It excludes refreshers, proration, payout lag and
   vest snapping.
 
@@ -164,7 +161,15 @@ methodology page matter more than features.
 - **Scale:** RPP components are on the U.S. all-items scale (U.S. housing = 100.629, not
   100). Always use ratios to a reference row (default U.S. "00000").
 - **Rent:** the user's rent per offer, or the household reference rent x the housing RPP
-  ratio.
+  ratio. It's the first lease year's rent; the lease starts on the start date and rent
+  rises by `rentGrowth` (per offer, default the inflation input) at each anniversary.
+- **COL-adjusted total:** spending money is local; saved money isn't.
+  - **Converted:** discretionary after rent, minus expected out-of-pocket health
+    spending, both through the non-housing factor.
+  - **At face value:** planned savings, your 401(k) and HSA, vested employer 401(k),
+    employer HSA and perks.
+  - **Check:** it equals total rewards - rent + (factor - 1) x (local non-housing -
+    out-of-pocket). At factor 1 with no rent, it equals total rewards.
 
 ## Validation workflow (run after any tax change)
 1. `npm test` — unit tests with hand-checked values.
@@ -238,7 +243,7 @@ methodology page matter more than features.
   v1 and valued at $0. RSUs are assumed sold at vest; post-vest price moves aren't
   modeled.
 - **Cash timing:** withholding isn't modeled, since we compute liability. The 22%
-  supplemental-rate shortfall warning is roadmap item 7.
+  supplemental-rate shortfall warning is roadmap item 5.
 - **401(k):**
   - no catch-up contributions, no 415(c) check
   - pre-tax deferrals at face value: no tax on withdrawal, no investment growth
@@ -250,14 +255,18 @@ methodology page matter more than features.
 - **Cost of living:**
   - **Prices:** relative prices held at the 2024 RPPs for every year; one national
     housing weight, while BEA weights each region differently.
-  - **Rent:** flat, and paid only while employed there.
+  - **Rent:** one growth rate per offer, stepped once a year at the start-date
+    anniversary; paid only while employed there.
+  - **Perks:** counted at face value in the COL-adjusted total, though 132(f) commuter
+    money buys local transit.
   - **Geography:** RPPs are metro-wide; the NYC metro averages Manhattan with its
     suburbs.
 - **Layoffs:** a layoff, severance, or clawbacks waived on a layoff aren't modeled. The
   leave date assumes a voluntary exit.
 
 ## Roadmap (remaining)
-1. (Next) COL-adjusted total plus rent growth; see Next steps.
+Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
+
 2. (Next) UI design doc, then the UI (item 6 below).
 3. Time: commute cost (IRS 76c/mi includes depreciation — offer a variable-cost option),
    remote-work valuation default ~5% of pay (editable). Weekly hours and effective hourly

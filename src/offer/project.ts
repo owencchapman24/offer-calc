@@ -9,7 +9,7 @@ import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import type {
   BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
-  CostOfLivingInfo, EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
+  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -351,8 +351,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
 
   // ---- cost of living -----------------------------------------------------------------
   // Never adjust gross pay. Start from take-home, take out planned savings and rent, and express
-  // what's left (non-housing spending) in reference-location dollars via non-housing RPPs.
-  let col: { info: CostOfLivingInfo; flows: Array<{ day: number; ey: number; takeHome: number; rent: number }> } | undefined;
+  // what's left (non-housing spending) in reference-location dollars via non-housing RPPs. The
+  // COL-adjusted total adds back money not spent locally at face value and takes out out-of-pocket
+  // health spending, converted like the rest of the local spending.
+  interface ColFlow { day: number; ey: number; takeHome: number; rent: number; oop: number; face: number }
+  let col: { info: CostOfLivingInfo; flows: ColFlow[] } | undefined;
   if (offer.costOfLiving) {
     const hc = household.costOfLiving ?? {};
     const area = rppArea(offer.costOfLiving.area);
@@ -369,39 +372,60 @@ export function projectScenario(offer: OfferInput, household: Household, options
       rentSource = "derived";
     }
     if (!(monthlyRent >= 0)) throw new Error("Rent can't be negative.");
+    const rentGrowth = offer.costOfLiving.rentGrowth ?? inflation;
+    if (!(rentGrowth > -1)) throw new Error("Rent growth must be greater than -100%.");
     const used = (a: ReturnType<typeof rppArea>) =>
       ({ code: a.code, name: a.name, allItems: a.allItems, housing: a.housing, nonHousing: Math.round(nonHousingRpp(a) * 1000) / 1000 });
-    const flows: Array<{ day: number; ey: number; takeHome: number; rent: number }> = [];
-    for (const e of taxed) flows.push({ day: e.day, ey: e.ey, takeHome: e.gross - e.tax, rent: 0 });
+    const flows: ColFlow[] = [];
+    const flow = (day: number, ey: number, f: Partial<ColFlow>) => flows.push({ day, ey, takeHome: 0, rent: 0, oop: 0, face: 0, ...f });
+    for (const e of taxed) flow(e.day, e.ey, { takeHome: e.gross - e.tax });
     for (const b of benefits) {
-      if (b.kind === "premium" || b.kind === "employee401k" || b.kind === "employeeHsa") {
-        flows.push({ day: b.day, ey: b.ey, takeHome: -b.amount, rent: 0 });
-      }
+      if (b.kind === "premium") flow(b.day, b.ey, { takeHome: -b.amount });
+      // Yours: out of take-home, but saved, not spent locally.
+      else if (b.kind === "employee401k" || b.kind === "employeeHsa") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount });
+      else if (b.kind === "employer401k") flow(b.day, b.ey, { face: b.vested });
+      else if (b.kind === "employerHsa" || isPerk(b.kind)) flow(b.day, b.ey, { face: b.amount });
+      else if (b.kind === "outOfPocket") flow(b.day, b.ey, { oop: b.amount });
     }
-    // Rent is paid monthly while you work there.
+    // Rent is paid monthly while you work there. The lease starts on your start date, so rent
+    // rises by rentGrowth at each anniversary: employment year n pays monthlyRent x (1 + g)^(n-1).
     for (const { a, b, share } of monthlyPieces(start, workEnd, anniversaries)) {
-      flows.push({ day: b - 1, ey: anniversaries.findIndex((d) => d > a), takeHome: 0, rent: monthlyRent * share });
+      const n = anniversaries.findIndex((d) => d > a);
+      flow(b - 1, n, { rent: monthlyRent * (1 + rentGrowth) ** (n - 1) * share });
     }
     col = {
       info: {
         area: used(area), reference: used(ref), nonHousingFactor: nonHousingRpp(ref) / nonHousingRpp(area),
-        monthlyRent: round2(monthlyRent), rentSource, savingsRate, rppVintage: `${RPP.dataYear} RPPs. ${RPP.vintage}`,
+        monthlyRent: round2(monthlyRent), rentSource, rentGrowth,
+        rentGrowthSource: offer.costOfLiving.rentGrowth !== undefined ? "input" : "inflation",
+        savingsRate, rppVintage: `${RPP.dataYear} RPPs. ${RPP.vintage}`,
       },
       flows,
     };
   }
-  const colSum = (keep: (f: { day: number; ey: number }) => boolean, weight: (day: number) => number = () => 1) => {
-    let takeHome = 0;
-    let rent = 0;
+  const colSum = (keep: (f: ColFlow) => boolean, weight: (day: number) => number = () => 1): CostOfLivingTotals => {
+    const t = { takeHome: 0, rent: 0, oop: 0, face: 0 };
     for (const f of col!.flows) {
       if (!keep(f)) continue;
-      takeHome += f.takeHome * weight(f.day);
-      rent += f.rent * weight(f.day);
+      const w = weight(f.day);
+      t.takeHome += f.takeHome * w;
+      t.rent += f.rent * w;
+      t.oop += f.oop * w;
+      t.face += f.face * w;
     }
-    const savings = takeHome * col!.info.savingsRate;
-    const nonHousingLocal = takeHome - savings - rent;
-    return { savings, rent, nonHousingLocal, discretionaryReference: nonHousingLocal * col!.info.nonHousingFactor };
+    const k = col!.info.nonHousingFactor;
+    const savings = t.takeHome * col!.info.savingsRate;
+    const nonHousingLocal = t.takeHome - savings - t.rent;
+    const discretionaryReference = nonHousingLocal * k;
+    const outOfPocketReference = t.oop * k;
+    const faceValue = savings + t.face;
+    return {
+      savings, rent: t.rent, nonHousingLocal, discretionaryReference, outOfPocketReference, faceValue,
+      total: discretionaryReference - outOfPocketReference + faceValue,
+    };
   };
+  const colRounded = (c: CostOfLivingTotals) =>
+    Object.fromEntries(Object.entries(c).map(([key, v]) => [key, round2(v)])) as unknown as CostOfLivingTotals;
 
   const windowTotals: ScenarioResult["window"] = {
     start: fromDays(windowStart),
@@ -415,9 +439,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     },
     ...(col ? {
       costOfLiving: {
-        nominal: round2(colSum((f) => inWindow(f.day)).discretionaryReference),
-        ...(valuation !== undefined
-          ? { presentValue: round2(colSum((f) => inWindow(f.day), (day) => discount(day)!).discretionaryReference) } : {}),
+        nominal: colRounded(colSum((f) => inWindow(f.day))),
+        ...(valuation !== undefined ? { presentValue: colRounded(colSum((f) => inWindow(f.day), (day) => discount(day)!)) } : {}),
       },
     } : {}),
   };
@@ -467,11 +490,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       totalRewards: round2(m.totalRewards),
       ...(worked !== undefined ? { hours: round2(worked) } : {}),
       ...(worked ? { hourly: { afterTaxComp: round2(m.afterTaxComp / worked), totalRewards: round2(m.totalRewards / worked) } } : {}),
-      ...(col ? (() => {
-        const c = colSum((f) => f.ey === n);
-        return { costOfLiving: { savings: round2(c.savings), rent: round2(c.rent), nonHousingLocal: round2(c.nonHousingLocal),
-          discretionaryReference: round2(c.discretionaryReference) } };
-      })() : {}),
+      ...(col ? { costOfLiving: colRounded(colSum((f) => f.ey === n)) } : {}),
     });
   }
 
@@ -543,10 +562,15 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (col) {
     const c = col.info;
     assumptions.push(`Cost of living (${c.rppVintage}): gross pay is never adjusted. Take-home - ${+(c.savingsRate * 100).toFixed(2)}% `
-      + `savings - rent (${usd(c.monthlyRent)} a month, ${c.rentSource === "input" ? "as entered" : "derived from the housing RPPs"}, `
-      + `held flat while employed) = non-housing spending, converted to ${c.reference.name} dollars by the non-housing RPPs `
+      + `savings - rent = non-housing spending, converted to ${c.reference.name} dollars by the non-housing RPPs `
       + `(${c.reference.nonHousing} / ${c.area.nonHousing} = ${c.nonHousingFactor.toFixed(4)}). Non-housing RPP = `
       + `${RPP.nonHousing.formula}; relative prices are held at ${RPP.dataYear} levels.`);
+    assumptions.push(`Rent: ${usd(c.monthlyRent)} a month (${c.rentSource === "input" ? "as entered" : "derived from the housing RPPs"}) `
+      + `from your start date, rising ${+(c.rentGrowth * 100).toFixed(2)}% a year at each lease anniversary`
+      + `${c.rentGrowthSource === "inflation" ? " (the inflation rate)" : ""}; paid only while employed there.`);
+    assumptions.push("COL-adjusted total = discretionary income after rent - expected out-of-pocket health spending (local, so "
+      + "converted the same way) + money not spent locally, at face value: planned savings, your 401(k) and HSA contributions, "
+      + "vested employer 401(k), employer HSA and perks.");
   }
 
   return {
