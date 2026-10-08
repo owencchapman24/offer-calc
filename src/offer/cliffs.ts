@@ -31,9 +31,9 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
   for (const e of base.events) {
     const day = toDays(e.date);
     if (day <= start) continue; // kept from your first day
-    if (e.component === "bonus" && mustBeEmployed) push(day, { kind: "bonus", label: e.label, amount: e.gross });
-    else if (e.component === "rsu") push(day, { kind: "rsuVest", label: e.label, amount: e.gross });
-    else if (e.component === "cash") push(day, { kind: "cashAward", label: e.label, amount: e.gross });
+    if (e.component === "bonus" && mustBeEmployed) push(day, { kind: "bonus", detail: e.detail, amount: e.gross });
+    else if (e.component === "rsu") push(day, { kind: "rsuVest", detail: e.detail, amount: e.gross });
+    else if (e.component === "cash") push(day, { kind: "cashAward", detail: e.detail, amount: e.gross });
   }
 
   // Clawbacks: the owed share drops when a window month completes (leave = clock + k months - 1).
@@ -53,7 +53,7 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
       const cleared = clawbackFraction(c, clock, day) === 0;
       push(day, {
         kind: cleared ? "clawbackCleared" : "clawbackStep",
-        label: `${award.label} clawback ${cleared ? "ends" : "steps down"}`,
+        detail: { kind: "clawbackStep", award: award.label },
         amount: award.amount * drop,
       });
     }
@@ -79,7 +79,7 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
       const credited = keptIfLeaving(offer, household, day, { ...options, scenario }).result.benefitEvents
         .filter((b) => b.kind === "employer401k").reduce((s, b) => s + b.amount, 0);
       push(day, {
-        kind: "retirementVest", label: `401(k) match vests to ${+(after * 100).toFixed(1)}% (${now} years of service)`,
+        kind: "retirementVest", detail: { kind: "retirementVest", vestedShare: after, serviceYears: now },
         amount: credited * (after - before),
       });
     }

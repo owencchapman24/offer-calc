@@ -1,8 +1,9 @@
 // Prints a year-by-year table for sample offers so results can be eyeballed before a UI exists.
 // Usage: npm run offers. The sample inputs are illustrative, not market data.
 import {
-  breakeven, compareOffers, describeSchedule, leaveDateSweep, type OfferInput, type ScenarioResult,
+  breakeven, compareOffers, leaveDateSweep, type OfferInput, type ScenarioResult,
 } from "../src/offer/index";
+import { describeSchedule, formatWarning, rppVintage } from "../src/format/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 
 const household = SAMPLE_HOUSEHOLD;
@@ -110,7 +111,7 @@ offers.forEach((o, i) => {
   out.push("", o.label, describe(o), "", "Employment years, cash (base scenario):", offerTable(base[i]),
     "", "Total rewards and hours (base scenario):",
     benefitTable(base[i]));
-  for (const w of comparison.projections[i].warnings) out.push(`   ! ${w}`);
+  for (const w of comparison.projections[i].warnings) out.push(`   ! ${formatWarning(w)}`);
 });
 
 const short = (o: OfferInput) => o.label.slice(0, 1);
@@ -147,7 +148,7 @@ out.push("",
 // ---- cost of living ------------------------------------------------------------------
 const colInfo = base.map((r) => r.costOfLiving!);
 const savingsRate = household.costOfLiving?.savingsRate ?? 0;
-out.push("", `Cost of living: ${colInfo[0].rppVintage}`,
+out.push("", `Cost of living: ${rppVintage(colInfo[0].rppVintage)}`,
   `Reference: ${colInfo[0].reference.name} dollars. Non-housing RPP = (all items - 0.16 x housing) / 0.84; `
     + "factor = reference non-housing / area non-housing.",
   "Rent is the first lease year's, from the start date; it rises at each anniversary (default: the inflation input).",

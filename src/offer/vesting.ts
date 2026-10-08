@@ -1,6 +1,6 @@
 import { addMonths, checkMonthDay, dayIn, fromDays, yearOfDay } from "./dates";
-import { type RawEvent, usd } from "./streams";
-import type { RefresherPolicy, VestingSchedule } from "./types";
+import type { RawEvent } from "./streams";
+import type { RefresherPolicy, RsuGrantRef, VestingSchedule } from "./types";
 
 /**
  * Vesting schedule from percentages per year, each year split into `perYear` equal vests.
@@ -41,26 +41,6 @@ export const VESTING_PRESETS = {
   frontLoadedMonthly: byYear([33, 33, 22, 12], { perYear: 12 }),
 } as const;
 
-const CADENCE: Record<number, string> = { 1: "monthly", 3: "quarterly", 6: "semiannual", 12: "annual" };
-
-/** Plain-language label read off the tranches, e.g. "5/15/40/40, semiannual after a 1-year cliff". */
-export function describeSchedule(s: VestingSchedule): string {
-  const pcts: number[] = [];
-  for (const t of s.tranches) {
-    const year = Math.max(0, Math.ceil(t.month / 12) - 1);
-    pcts[year] = (pcts[year] ?? 0) + t.fraction * 100;
-  }
-  const split = Array.from(pcts, (p) => +(p ?? 0).toFixed(1)).join("/");
-  const months = s.tranches.map((t) => t.month);
-  const gaps = months.slice(1).map((m, i) => m - months[i]);
-  if (gaps.length === 0) return `${split}, all at month ${months[0]}`;
-  if (!gaps.every((g) => g === gaps[0])) return `${split} by year, on a custom schedule`;
-  const cadence = CADENCE[gaps[0]] ?? `every ${gaps[0]} months`;
-  if (months[0] === gaps[0]) return `${split}, ${cadence}`;
-  const cliff = months[0] % 12 === 0 ? `${months[0] / 12}-year` : `${months[0]}-month`;
-  return `${split}, ${cadence} after a ${cliff} cliff`;
-}
-
 export function checkSchedule(s: VestingSchedule): void {
   if (s.tranches.length === 0) throw new Error("A vesting schedule needs at least one tranche.");
   for (const t of s.tranches) {
@@ -83,7 +63,7 @@ export function snapToVestDate(day: number, cal: { months: number[]; day: number
 }
 
 export interface GrantInstance {
-  label: string;
+  grant: RsuGrantRef;
   value: number;
   grantDay: number;
   vestStartDay: number;
@@ -109,12 +89,13 @@ export function rsuEvents(g: GrantInstance, growth: number, until: number): RawE
     const day = actual[i];
     if (day >= until) return [];
     const factor = (1 + growth) ** ((day - g.grantDay) / 365.25);
-    const moved = day !== nominal[i] ? ` (nominal ${fromDays(nominal[i])})` : "";
     return [{
       day,
       component: "rsu" as const,
-      label: `RSU: ${g.label}, tranche ${i + 1} of ${n}${moved}`,
-      formula: `${usd(g.value)} x ${+(t.fraction * 100).toFixed(4)}% x ${factor.toFixed(4)} price factor`,
+      detail: {
+        kind: "rsu" as const, grant: g.grant, tranche: i + 1, tranches: n, grantValue: g.value, fraction: t.fraction,
+        priceFactor: factor, ...(day !== nominal[i] ? { nominalDate: fromDays(nominal[i]) } : {}),
+      },
       gross: t.fraction * g.value * factor,
     }];
   });
@@ -129,7 +110,7 @@ export function refresherGrants(p: RefresherPolicy, value: number, start: number
     const grantDay = addMonths(start, p.firstAfterMonths + k * p.everyMonths);
     if (grantDay >= until) break;
     out.push({
-      label: `${p.label ?? "Refresher"} ${k + 1} (granted ${fromDays(grantDay)})`,
+      grant: { kind: "refresher", ...(p.label !== undefined ? { label: p.label } : {}), number: k + 1, grantDate: fromDays(grantDay) },
       value, grantDay, vestStartDay: grantDay, schedule: p.schedule,
     });
   }

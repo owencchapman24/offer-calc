@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Job offer comparison calculator: correct after-tax, location-adjusted, year-by-year comparisons.",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && tsx scripts/check-engine.ts",
     "typecheck": "tsc -p . && tsc -p scripts",
     "grid": "tsx scripts/grid.ts > grid_ts.json",
     "oracle": "npm run grid && tsx scripts/run-oracle.ts grid_ts.json",

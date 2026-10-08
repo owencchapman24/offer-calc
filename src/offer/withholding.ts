@@ -1,8 +1,7 @@
 import { federalIncomeTax } from "../tax/federal";
 import { paramsForYear } from "../tax/index";
 import { projectScenario } from "./project";
-import { usd } from "./streams";
-import type { Household, OfferInput, ProjectionOptions, WithholdingResult, WithholdingYear } from "./types";
+import type { Household, OfferInput, OfferWarning, ProjectionOptions, WithholdingResult, WithholdingYear } from "./types";
 
 // Withholding vs liability (roadmap 5): a cash-timing warning, not a change to any total. The
 // projection already computes what you owe; this estimates what your employer withholds, so the
@@ -34,7 +33,7 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
   const status = household.filingStatus;
   const bonusDeferrals = offer.retirement?.eligiblePay === "salaryAndBonus";
   const years: WithholdingYear[] = [];
-  const warnings: string[] = [];
+  const warnings: OfferWarning[] = [];
   for (const cy of r.calendarYears) {
     const inYear = r.events.filter((e) => e.calendarYear === cy.year);
     const salary = inYear.filter((e) => e.component === "salary");
@@ -78,18 +77,12 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
       balanceDue: round2(balanceDue),
     });
     if (balanceDue >= WARN_AT) {
-      warnings.push(`Federal withholding on ${cy.year} pay falls about ${usd(Math.round(balanceDue))} short of its `
-        + `federal income tax${supplementalWithheld > 0 ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}. `
-        + `Expect to owe it in April ${cy.year + 1}, or raise your withholding on Form W-4.`);
+      warnings.push({ code: "withholdingShortfall", params: { year: cy.year, balanceDue, supplemental: supplementalWithheld > 0 } });
     }
   }
   return {
     years,
     warnings,
-    assumptions: [
-      "Withholding is estimated, federal income tax only: salary by the IRS percentage method (2020+ Form W-4 with "
-        + "your filing status and nothing else entered, monthly pay); bonuses, RSU vests and cash awards at the 22% "
-        + "supplemental rate (37% over $1 million a year). State withholding, FICA and other jobs' withholding aren't included.",
-    ],
+    assumptions: [{ code: "withholding", params: {} }],
   };
 }

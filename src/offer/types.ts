@@ -257,7 +257,86 @@ export interface ProjectionOptions {
 export type ValuedOptions = Omit<ProjectionOptions, "scenario"> & { valuationDate: ISODate };
 
 // ---- outputs ------------------------------------------------------------------
+// The engine returns numbers and codes, never formatted text: src/format turns details, warnings
+// and assumptions into words, so the UI owns formatting and the engine stays fast.
+
 export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback";
+
+/** A new-hire grant (its label), or a refresher (the policy's label, its number and grant date). */
+export type RsuGrantRef =
+  | { kind: "grant"; label: string }
+  | { kind: "refresher"; label?: string; number: number; grantDate: ISODate };
+
+/** How a payment was worked out. */
+export type EventDetail =
+  /** annual / 12 x days / daysInMonth, for [from, to] (inclusive). */
+  | { kind: "salary"; from: ISODate; to: ISODate; annual: number; days: number; daysInMonth: number }
+  /** rate x salary earned in the period [periodFrom, periodTo] (inclusive). */
+  | { kind: "bonus"; basis: "percentOfSalary"; periodFrom: ISODate; periodTo: ISODate; proratedToLeave: boolean;
+      rate: number; salaryEarned: number }
+  /** amount x daysEmployed / periodDays; employmentYear says whose amount (byEmploymentYear only). */
+  | { kind: "bonus"; basis: "fixed" | "byEmploymentYear"; periodFrom: ISODate; periodTo: ISODate; proratedToLeave: boolean;
+      amount: number; employmentYear?: number; daysEmployed: number; periodDays: number }
+  | { kind: "cash"; award: string; amount: number }
+  /** grantValue x fraction x priceFactor. nominalDate: set when a company vest date moved the tranche. */
+  | { kind: "rsu"; grant: RsuGrantRef; tranche: number; tranches: number; grantValue: number; fraction: number;
+      priceFactor: number; nominalDate?: ISODate }
+  /** -amount x fraction (after tax for a later-year repayment on a net basis). */
+  | { kind: "clawback"; award: string; amount: number; fraction: number; basis: "gross" | "net"; sameYear: boolean;
+      paidYear: number; repaidYear: number };
+
+/** How a benefit flow was worked out. */
+export type BenefitDetail =
+  /** Your deferral: rate x pay, capped at the 402(g) limit. */
+  | { kind: "deferral"; type: "pretax" | "roth"; rate: number; pay: number; capped: boolean }
+  /** Employer money: rate (match + non-elective) x pay. */
+  | { kind: "employerContribution"; rate: number; pay: number }
+  /** annual / 12 x days / daysInMonth; capped at its annual limit; usage: the out-of-pocket level. */
+  | { kind: "accrual"; annual: number; days: number; daysInMonth: number; capped: boolean; usage?: "low" | "medium" | "high" }
+  /** monthly x days / daysInMonth (132(f) commuter). */
+  | { kind: "monthly"; monthly: number; days: number; daysInMonth: number };
+
+/** A warning about the inputs or the result: a code and the numbers behind it. */
+export type OfferWarning =
+  | { code: "convenienceRule"; params: { residenceState: string; employerState: string } }
+  | { code: "bonusCutoff"; params: { start: ISODate; cutoff: MonthDay; periodFrom: ISODate; periodTo: ISODate } }
+  | { code: "bonusForfeited"; params: { leaveDate: ISODate; periodFrom: ISODate; periodTo: ISODate; payDate: ISODate } }
+  | { code: "k401Cap"; params: { year: number; limit: number } }
+  | { code: "hsaCap"; params: { year: number; limit: number } }
+  | { code: "section127Cap"; params: { year: number; limit: number } }
+  | { code: "commuterCap"; params: { year: number; monthlyLimit: number } }
+  | { code: "clawbackFica"; params: { award: string; paidYear: number; repaidYear: number } }
+  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean } };
+
+/** A salary change's reasons; same-day changes multiply. */
+export type SalaryChangeReason = { kind: "merit"; rate: number } | { kind: "promotion"; stepUp: number };
+
+type NoParams = Record<string, never>;
+
+/** An assumption behind the numbers, for the methodology page: a code and its numbers. */
+export type Assumption =
+  | { code: "cashBasis"; params: NoParams }
+  | { code: "monthlyAccrual"; params: NoParams }
+  | { code: "incrementalTax"; params: NoParams }
+  | { code: "residence"; params: { state: string; locality?: "nyc" | "philadelphia" | "flat" } }
+  | { code: "projectedLaw"; params: { inflation: number } }
+  | { code: "salaryChanges"; params: { scenario: Scenario; changes: Array<{ date: ISODate; annual: number; reasons: SalaryChangeReason[] }> } }
+  | { code: "bonus"; params: { scenario: Scenario; basis: "percentOfSalary"; rate: number } }
+  | { code: "bonus"; params: { scenario: Scenario; basis: "fixed"; amount: number } }
+  | { code: "bonus"; params: { scenario: Scenario; basis: "byEmploymentYear"; amounts: number[] } }
+  | { code: "presentValue"; params: { valuationDate: ISODate; discountRate: number } }
+  | { code: "rsu"; params: { scenario: Scenario; priceGrowth: number } }
+  | { code: "leaveDate"; params: { leaveDate: ISODate } }
+  | { code: "retirement"; params: { contributionPct: number; type: "pretax" | "roth"; eligiblePay: "salary" | "salaryAndBonus";
+      vestedShare: number; completedYears: number } }
+  | { code: "health"; params: { usage: "low" | "medium" | "high" } }
+  | { code: "perks"; params: NoParams }
+  | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number } }
+  | { code: "costOfLiving"; params: { rppVintage: { dataYear: number; release: string }; savingsRate: number; reference: string;
+      referenceNonHousing: number; areaNonHousing: number; factor: number; nonHousingFormula: string } }
+  | { code: "rent"; params: { monthlyRent: number; source: "input" | "derived"; growth: number; growthSource: "input" | "inflation" } }
+  | { code: "colAdjustedTotal"; params: NoParams }
+  | { code: "withholding"; params: NoParams };
 export type ByComponent = Record<Component, number> & { total: number };
 
 /** One dated payment: the unit of "show the work". Money is rounded to cents. */
@@ -265,9 +344,8 @@ export interface CompEvent {
   /** Pay date; a salary event is dated on the last day of the stretch it covers. */
   date: ISODate;
   component: Component;
-  label: string;
-  /** The arithmetic, e.g. "$150,000 x 29/365". */
-  formula: string;
+  /** How it was worked out, as numbers; src/format writes the label and the arithmetic. */
+  detail: EventDetail;
   gross: number;
   calendarYear: number;
   /** 1-based. Above `years` means after the reported horizon (kept so its year is taxed in full). */
@@ -289,8 +367,8 @@ export type BenefitKind =
 export interface BenefitEvent {
   date: ISODate;
   kind: BenefitKind;
-  label: string;
-  formula: string;
+  /** How it was worked out, as numbers; src/format writes the label and the arithmetic. */
+  detail: BenefitDetail;
   amount: number;
   /** employer401k: the share vested at the leave date (or the window's last day). */
   vested?: number;
@@ -378,8 +456,8 @@ export interface CostOfLivingInfo {
   rentGrowth: number;
   rentGrowthSource: "input" | "inflation";
   savingsRate: number;
-  /** BEA data year and release note. */
-  rppVintage: string;
+  /** BEA data year and BEA's release note. */
+  rppVintage: { dataYear: number; release: string };
 }
 
 export interface CalendarYearResult {
@@ -442,7 +520,8 @@ export interface ClawbackResult {
   basis: "gross" | "net";
   /** Cash you hand back. */
   owed: number;
-  treatment: "same-year wage reversal" | "IRC 1341 credit" | "no relief ($3,000 or less)";
+  /** Same-year wage reversal, the IRC 1341 credit, or no relief (a later-year repayment of $3,000 or less). */
+  treatment: "sameYearReversal" | "irc1341Credit" | "noRelief";
   /** Tax you get back: the reversed year's tax (same year) or the federal 1341 credit (later year). */
   taxRelief: number;
   /** What leaving costs you: owed - taxRelief (for same-year net repayment, the employer keeps the withholding). */
@@ -465,7 +544,8 @@ export interface Cliff {
   /** The first last day that keeps it. */
   date: ISODate;
   kind: CliffKind;
-  label: string;
+  /** The payment's detail, the award whose clawback steps down, or the vesting step reached. */
+  detail: EventDetail | { kind: "clawbackStep"; award: string } | { kind: "retirementVest"; vestedShare: number; serviceYears: number };
   /** Gross: the payment or vest, the repayment no longer owed, or the employer 401(k) money that vests. */
   amount: number;
 }
@@ -500,10 +580,10 @@ export interface WithholdingYear {
 
 export interface WithholdingResult {
   years: WithholdingYear[];
-  /** Plain language, for years whose balance due reaches $1,000. */
-  warnings: string[];
+  /** For years whose balance due reaches $1,000. */
+  warnings: OfferWarning[];
   /** How withholding was estimated, for the methodology page. */
-  assumptions: string[];
+  assumptions: Assumption[];
 }
 
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
@@ -538,10 +618,10 @@ export interface ScenarioResult {
   leave?: LeaveResult;
   /** Present when the offer has costOfLiving. */
   costOfLiving?: CostOfLivingInfo;
-  /** Input-specific, plain language. */
-  warnings: string[];
+  /** Input-specific warnings, as codes and numbers; src/format writes them out. */
+  warnings: OfferWarning[];
   /** Assumptions behind these numbers, for the methodology page. */
-  assumptions: string[];
+  assumptions: Assumption[];
 }
 
 /** One offer under all three joint scenarios. */
@@ -549,7 +629,7 @@ export interface OfferProjection {
   label: string;
   scenarios: Record<Scenario, ScenarioResult>;
   /** Unique warnings across the scenarios. */
-  warnings: string[];
+  warnings: OfferWarning[];
 }
 
 /** Offers projected over one shared window, with nominal and present-value totals per scenario. */
