@@ -5,47 +5,84 @@ gross comp -> after-tax -> location-adjusted -> per hour of your life, year by y
 and show the work. Portfolio piece for analyst-track roles, so correctness and a clear
 methodology page matter more than features.
 
-## Current state
-`src/tax/` is a tax engine (annual liability, not withholding) on enacted 2026 law:
-federal income tax, FICA + Additional Medicare, state income tax (50 states + DC),
-employee state payroll taxes (SDI/paid leave/LTC), NYC + Philadelphia local tax,
-a flat-rate local escape hatch, and a standard-vs-itemize optimizer (OBBBA SALT cap).
-Entry point: `computeTaxes(input, params?)` in `src/tax/index.ts`.
+## Status (2026-10-07)
+- **Tax engine** (`src/tax/`): done and validated against PolicyEngine-US for 2026, with
+  projected later years (`paramsForYear`).
+- **Offer model** (`src/offer/`): slices 1-6 done, merged to main and pushed:
+  - **Slice 1:** salary, bonus and cash awards.
+  - **Slice 2:** RSUs, vesting and refreshers.
+  - **Slice 3:** leave date, clawbacks and the leave-date sweep.
+  - **Slice 4:** raises and promotions, bear/base/bull, PV, `compareOffers` and `breakeven`.
+  - **Slice 5:** 401(k), health, perks, hours and total rewards.
+  - **Slice 6:** cost of living (BEA RPPs). The fixes made with it: after-tax comp and
+    take-home as the cash measures, plan-year-hours vesting.
+- **Tests:** 117 passing: `test/offer.test.ts` 86, `test/params.test.ts` 21,
+  `test/tax.test.ts` 10. Hand-checked values carry their arithmetic in comments.
+- `npm run offers` prints the sample tables: NYC IB analyst, Charlotte corporate finance,
+  Seattle tech finance. Inputs are illustrative, not market data.
+- **Design docs:** `docs/offer-model.md` (approved rev 3, updated per slice). Its §12
+  types were the pre-build proposal; `src/offer/types.ts` is authoritative.
 
-Later years are projections: `paramsForYear(year, { inflation })` in
-`src/tax/params/index.ts`. Federal amounts that the IRC indexes scale by
-(1 + inflation)^(year - 2026); the SALT cap follows IRC 164(b)(7) (1%/yr through 2029,
-$10,000 from 2030); Additional Medicare thresholds stay fixed. State and local law is held
-at 2026, except CA (indexed by statute: brackets, standard deduction, exemption credit and
-its phase-out threshold; `StateSpec.indexed`) and amounts linked to federal ones by
-statute: the standard deduction in CO,
-IA, MO, MT, NM, ND (`stdDeductionIsFederal`); UT's credit (6% of the federal standard
-deduction); payroll caps at the SS wage base in CO, CT, DE, ME, MA, OR, WA
-(`"ssWageBase"`). ID is held flat: its IRC conformity is static, updated by annual bill.
-There's deliberately no default inflation in the engine.
+## Next steps
+1. **COL-adjusted total, plus rent growth.**
+   - **Total:** a total-rewards figure on the cost-of-living basis, to sit beside
+     after-tax comp, total rewards and discretionary-after-rent. Decide first which
+     parts get deflated: spending money is local, retirement money isn't.
+   - **Rent growth:** an annual rent escalation input, likely by scenario. Rent is flat
+     today.
+2. **UI design doc** (`docs/ui-design.md`) for review before any UI code. Roadmap item 6:
+   - React/TS, client-side only, no login, live-updating, inline input help.
+   - No misleading defaults (NN/g calculator guidelines).
+   - A methodology page drawn from `assumptions[]` and the design doc.
 
-`src/offer/` is the offer model (docs/offer-model.md), built in slices. Each slice gets
-hand-checked tests and merges to main when green. Entry points:
-- `projectScenario`: one scenario.
-- `projectOffer`: bear/base/bull together.
-- `compareOffers`: a shared window, with nominal and PV totals.
-- `breakeven`: the salary or sign-on change that ties two offers.
-- `leaveDateSweep`: what you keep if you leave after N months.
+## Commands
+- `npm test`: unit tests. `npm run typecheck`: `tsc -p .` (src and test, no Node types)
+  and `tsc -p scripts` (Node types).
+- `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
+  `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
+- `npm run offers`: sample comparison tables.
+- `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
+  publishes a new vintage (usually December).
 
-`npm run offers` prints tables for three sample offers.
+## Code map
+- `src/tax/`
+  - `index.ts`: `computeTaxes(input, params?)`.
+  - `params/`: 2026 data, `paramsForYear`, the SALT schedule.
+  - `federal.ts`, `state.ts`, `local.ts`.
+- `src/offer/`
+  - `types.ts`.
+  - `project.ts`: `projectScenario`, `leaveDateSweep`.
+  - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`.
+  - `streams.ts`: salary path, bonus, cash.
+  - `vesting.ts`: `byYear`, presets, snapping, refreshers.
+  - `clawback.ts`.
+  - `benefits.ts`: 401(k), health, perks, monthly pieces.
+  - `location.ts`: convenience-rule warning.
+  - `dates.ts`: civil dates as day numbers, UTC.
+- `src/col/`: `rpp.json` (BEA data, source and vintage inside), `nonHousingRpp`,
+  `rppArea`, `findRppAreas`.
+- `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
+  `offer-table.ts`, `fetch-rpp.ts`.
 
-`src/col/` holds BEA Regional Price Parities (`rpp.json`, 2024 RPPs, released 2026-02-19), baked
-in by `npm run fetch-rpp` with source and vintage recorded. The offer model's
-`costOfLiving` turns take-home minus savings and rent into discretionary income in
-reference-location dollars. Gross pay is never adjusted.
+## Working agreements
+- **Branches:** one branch per slice. Merge to main with `--no-ff` when green (tests,
+  typecheck, grid unchanged), push, delete the branch.
+- **Tests:** hand-check at the edges: the day before vs the day of a vest, payout or
+  window end; thresholds; bracket crossings.
+- **Review stops:** stop after each slice and show `npm run offers` tables for review.
+- **Tax-engine changes:** branch, then separate commits. After each: tests pass and the
+  2026 oracle report is byte-identical to the baseline (or the diff is explained).
+- **Windows PowerShell 5.1:** pass multi-line commit messages with `git commit -F <file>`;
+  embedded double quotes break native argument passing.
 
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
   table are marked `OVERRIDE:` with the bill/statute.
 - Schedules are `[lowerBound, rate]`; a 0% first band means "rate starts above X".
 - State quirks live in `state.ts` under the state's `special` key; keep data in `params/`.
-- All money math is annual. Round only at output (`round2`).
+- Round only at output (`round2`); internal sums stay unrounded.
 - Pure functions, no I/O in `src/`. The engine must run client-side in the browser.
+  "Today" is always passed in (`valuationDate`), never read from the clock.
 - Engine functions take `TaxParams` as an argument; never import `*_2026` constants into
   `federal.ts`/`state.ts`/`local.ts`. Hardcoded thresholds in `state.ts` specials are
   2026 law; wrap them in `ix()` only if the state sets `indexed.specialThresholds`.
@@ -53,20 +90,93 @@ reference-location dollars. Gross pay is never adjusted.
   (the state indexes it by statute) or a federal link (`stdDeductionIsFederal`,
   `wageCap: "ssWageBase"`). Unverified = held flat. To upgrade a state, add `indexed`
   with the statute and a hand-checked projected-year test (see CA in params.test.ts).
+- No misleading defaults: these default to 0 and are visible in assumptions:
+  - raises
+  - price growth
+  - refreshers
+  - savings rate
+  The engine has no default inflation; the offer model defaults to 2.5%, shown.
+
+## Key design decisions (settled; don't relitigate without the user)
+**Time and tax attribution**
+- **Dated events:** every payment or vest is a dated event. Tax is computed per
+  calendar year on a cash basis. Events regroup into employment years for display and
+  into the comparison window for totals, so all views reconcile.
+- **Employment years:** employment year n = [start + (n-1) years, start + n years).
+  Accrued pay belongs to the year of its first day. A discrete payment dated exactly on an
+  anniversary counts toward the year just ended (a 12-month cliff vest is year-1 pay).
+- **Extra-tax attribution:** an offer's tax for a calendar year = household tax with the
+  offer minus without it (other wages, spouse wages). It's spread over that year's
+  payments pro rata by gross.
+- **Monthly accrual:** salary earns 1/12 of the annual rate per calendar month, and a
+  partial month earns days worked / days in month. Calendar and employment years both sum
+  to the annual rate. A rate change mid-month splits the month by days.
+- **Projected tax law:** `paramsForYear(year, { inflation })`. Inflation indexes tax law
+  only, never pay. Pay growth comes from raises and promotions.
+
+**Scenarios, PV and comparisons**
+- **Scenarios:** bear/base/bull are joint scenarios, not percentiles. Each sets every
+  uncertain input at once: bonus, raise, price growth, refresher size, which promotions
+  happen. Single-input sensitivity is for the planned tornado chart.
+- **Present value:** each event's after-tax cash is discounted by
+  (1 + r)^-((date - valuationDate) / 365.25), default r = 5% nominal. The UI passes
+  today's date.
+- **Comparison window:** earliest start + horizon (default 5 years), so a later start
+  counts as lost pay.
+- **Breakeven:** bisection to the cent on base-scenario PV, on the cash basis or total
+  rewards.
+- **Quoted TC:** the offer-letter view. It excludes refreshers, proration, payout lag and
+  vest snapping.
+
+**Cash measures and benefits**
+- **Cash measures:**
+  - **after-tax comp** (cash basis) = gross - tax - your health premiums. Premiums are a
+    cost, not compensation.
+  - **take-home** = after-tax comp - your 401(k) - your HSA.
+  - **total rewards** = after-tax comp + vested employer 401(k) + perks - out-of-pocket +
+    employer HSA.
+  - Your deferrals count at face value.
+- **Leave date:** last day worked, inclusive. It cuts off every stream. Bonuses unpaid
+  by then are forfeited (`mustBeEmployedOnPayDate`, default true; `false` prorates).
+- **Clawbacks:**
+  - **Window:** cleared once the last day is the day before clock start + months.
+    Prorated by completed months by default (`per: "day"` optional). Repay gross by
+    default.
+  - **Same calendar year:** the wages are reversed, and relief is exact.
+  - **Later year:** IRC 1341 credit, federal only, for repayments over $3,000. FICA
+    isn't automatically refunded.
+- **401(k):**
+  - **Cap:** 402(g) limit per calendar year.
+  - **Match:** per paycheck on the actual deferral rate, with no true-up.
+  - **Vesting service:** `elapsedTime` (default: complete a year by working through the
+    day before the anniversary) or `planYearHours`. Under `planYearHours`, each calendar
+    plan year with 1,000+ hours counts from the day the 1,000th hour is worked, even if
+    you leave before year-end (29 CFR 2530.200b-1). Example: A, 80 hours a week, vests
+    2028-04-01, not at the end of 2028.
+
+**Cost of living**
+- **BEA RPPs:** 2024, released 2026-02-19. Never adjust gross pay: take-home - savings -
+  rent = local non-housing money, times reference/area non-housing RPP = discretionary
+  income after rent in reference dollars.
+- **Non-housing RPP:** (all items - 0.16 x housing) / 0.84. 16% is housing rents' share
+  of BEA's PCE-based weights (BEA SCB, March 2022). A least-squares cross-check gives
+  0.187 but fits poorly, so the published weight wins.
+- **Scale:** RPP components are on the U.S. all-items scale (U.S. housing = 100.629, not
+  100). Always use ratios to a reference row (default U.S. "00000").
+- **Rent:** the user's rent per offer, or the household reference rent x the housing RPP
+  ratio.
 
 ## Validation workflow (run after any tax change)
 1. `npm test` — unit tests with hand-checked values.
 2. `npm run oracle` — runs our engine and PolicyEngine-US over $40k-$320k for every
-   state (single + joint) and prints differences. Needs a `.venv` with
-   `requirements.txt` installed (see README); the runner uses `.venv`'s Python
-   automatically, no activation needed. Takes ~3-4 min.
-   Target: FICA, state payroll and NYC exact; state income tax within ~$10 for
-   single filers at $60k-$200k.
+   state (single + joint) and prints differences. Target: FICA, state payroll and NYC
+   exact; state income tax within ~$10 for single filers at $60k-$200k.
    Baseline (2026-10-07, policyengine-us 2.30.3): FICA, state payroll, NYC all exact.
    Single $60k-$200k: 44/51 within $5. The 7 misses are all listed below (VT, CO, ND,
    OR, CT, AR, MO). A new state over $10 there is a regression.
-   The oracle checks 2026 only. Projected years are covered by `test/params.test.ts`
-   (SALT schedule, indexing, held-flat state law, federal links).
+   The oracle checks 2026 only. Projected years are covered by `test/params.test.ts`.
+   Offer-model changes don't touch the engine: check that `npm run grid` output is
+   unchanged instead.
 
 ## Intentional differences vs PolicyEngine (do not "fix")
 - SALT: PolicyEngine deducts *estimated withholding*; we deduct state/local tax *owed*
@@ -77,7 +187,7 @@ reference-location dollars. Gross pay is never adjusted.
   exactly $100,000 in the 15% tier ("From $50,001 to $100,000"); PolicyEngine applies 5%.
   Shows as -$62 single / -$36 joint at the $100k grid point only.
 
-## Known gaps (fix in rough priority order)
+## Known gaps — tax engine (fix in rough priority order)
 - VT brackets use 2025 widths (up to ~$150 high). ND/OR small indexing gaps; OR also
   -$46 single at $140k (federal-tax subtraction phase-out is approximated).
 - Low-income credits/tables: CT personal credit and AR low/middle-income tables reach
@@ -100,8 +210,7 @@ reference-location dollars. Gross pay is never adjusted.
   settle this: we copied PolicyEngine's value, so agreement is circular. Needs a primary
   source (ADOR 2026 Form 140 instructions).
 - No dependents/credits (CTC, EITC), no AMT, head-of-household uses single state params.
-- Projected years: state indexing modeled for CA only. Other states' brackets,
-  deductions, exemptions, credits and special-rule thresholds are held at 2026 law.
+- Projected years: state indexing modeled for CA only. Other states are held at 2026 law.
   Measured upper bound (single, $75k-$250k, 2.5% inflation, as if every state indexed):
   overstates state tax by ~$15-20 at the median in 2027, compounding to ~$80-100 by 2031.
   Largest: VT ~$95 in 2027 and ~$500 by 2031 at $150k; MN, DC, HI, RI similar. States that
@@ -113,53 +222,53 @@ reference-location dollars. Gross pay is never adjusted.
   really tracks the national average wage index (usually faster). Indexed amounts aren't
   rounded the way the IRS rounds them (at most ~$50 per threshold). The inflation input
   stands in for chained CPI.
-- Convenience-of-employer rule (NY, DE, NE, PA; CT/NJ reciprocal) not modeled — should
-  at least warn on remote offers.
-- Offer model (planned, docs/offer-model.md §9): part-year residency in a relocation year
-  (we tax the whole year as a resident of the new state); spouse income is shared across
-  offers (can't vary per offer).
-- Private-company equity (stock options, double-trigger RSUs) is out of scope for v1. It
-  defaults to $0 value; an optional scenario value may come later.
-- Benefits (slice 5) simplifications:
-  - **401(k):** deferrals at another employer in the same year don't count toward the
-    402(g) cap; no catch-up contributions; no 415(c) check. Pre-tax deferrals are counted
-    at face value (no tax on withdrawal, no investment growth). Vesting uses elapsed-time
-    service, not 1,000-hour years.
-  - **Health:** costs are held flat (no medical inflation) and accrue monthly. The HSA
-    limit isn't prorated for partial-year eligibility.
-  - **State conformity:** the engine excludes section 125 amounts (premiums, HSA) from
-    every state's wages. CA and NJ actually tax HSA contributions.
-  - **Commuter:** one input for 132(f), capped at $340 a month, though transit and
-    parking each have their own $340 limit.
-- Cost of living (slice 6) simplifications:
-  - **Relative prices:** held at the 2024 RPPs for every projected year.
-  - **Non-housing index:** uses one national housing weight (16%), while BEA weights each
-    region differently.
-  - **Rent:** held flat, and paid only while you're employed there.
-  - **Geography:** RPPs are metro-wide; the NYC metro averages Manhattan with its suburbs.
-  - **Savings rate:** defaults to 0.
-  - **Refresh:** re-run `npm run fetch-rpp` when BEA publishes a new vintage
-    (usually December).
+- State conformity: the engine excludes section 125 amounts (premiums, HSA) from every
+  state's wages. CA and NJ actually tax HSA contributions.
 
-## Roadmap
-1. Offer model on top of the engine: year-by-year cash comp (base, bonus as range,
-   sign-on with clawback exposure, RSU vesting incl. back-loaded schedules, refreshers),
-   calendar-year vs employment-year split (partial first year for new grads).
-   Approved design: `docs/offer-model.md` (rev 3). Prerequisite: per-year tax params (§8).
-2. (Done in slice 5.) Benefits: 401(k) match x vesting x expected tenure; health plan expected cost
-   (premium + OOP scenarios - employer HSA); tax-free perks grossed up at marginal rate
-   (Section 127 $5,250, 132(f) $340/mo).
-3. (Done in slice 6.) Cost of living: apply BEA Regional Price Parities only to post-tax, post-savings
-   spending (never gross salary); user rent override.
-4. Time: commute cost (IRS 76c/mi includes depreciation — offer variable-cost option),
-   effective hourly rate, remote-work valuation default ~5% of pay (editable).
-5. Decision layer: breakeven ("Offer B needs $X base to tie"), sensitivity/tornado,
-   even-swaps for soft factors; show gaps per paycheck to counter distinction bias.
-6. UI (React/TS, client-side only, no login, live-updating, inline input help,
-   no misleading defaults — per NN/g calculator guidelines) + methodology page.
-7. Withholding-shortfall warning: employers withhold federal tax on bonuses and RSU vests
+## Known gaps — offer model
+- **Residence and household:**
+  - **Nonresident tax:** taxed as a full-year resident of the residence state only. No
+    part-year residency in a relocation year, and no nonresident tax or resident credit
+    for the employer state; the convenience-of-employer rule (NY, DE, NE, PA; CT/NJ
+    reciprocal) only triggers a warning.
+  - **Spouse wages:** shared across offers; they can't vary per offer.
+  - **Other jobs:** wages from another job in the same year count for tax, but those
+    deferrals don't count toward the 402(g) cap.
+- **Equity:** private-company equity (options, double-trigger RSUs) is out of scope for
+  v1 and valued at $0. RSUs are assumed sold at vest; post-vest price moves aren't
+  modeled.
+- **Cash timing:** withholding isn't modeled, since we compute liability. The 22%
+  supplemental-rate shortfall warning is roadmap item 7.
+- **401(k):**
+  - no catch-up contributions, no 415(c) check
+  - pre-tax deferrals at face value: no tax on withdrawal, no investment growth
+  - vesting service uses elapsed time or plan-year hours from a constant weekly rate
+- **Health:** costs held flat (no medical inflation) and accrued monthly; the HSA limit
+  isn't prorated for partial-year eligibility.
+- **Commuter:** one 132(f) input capped at $340 a month, though transit and parking each
+  have their own limit.
+- **Cost of living:**
+  - **Prices:** relative prices held at the 2024 RPPs for every year; one national
+    housing weight, while BEA weights each region differently.
+  - **Rent:** flat, and paid only while employed there.
+  - **Geography:** RPPs are metro-wide; the NYC metro averages Manhattan with its
+    suburbs.
+- **Layoffs:** a layoff, severance, or clawbacks waived on a layoff aren't modeled. The
+  leave date assumes a voluntary exit.
+
+## Roadmap (remaining)
+1. (Next) COL-adjusted total plus rent growth; see Next steps.
+2. (Next) UI design doc, then the UI (item 6 below).
+3. Time: commute cost (IRS 76c/mi includes depreciation — offer a variable-cost option),
+   remote-work valuation default ~5% of pay (editable). Weekly hours and effective hourly
+   rate are done.
+4. Decision layer: sensitivity/tornado and even-swaps for soft factors; show gaps per
+   paycheck to counter distinction bias. Breakeven is done.
+5. Withholding-shortfall warning: employers withhold federal tax on bonuses and RSU vests
    at the flat 22% supplemental rate (37% above $1M), below the real marginal rate for
-   many offers. Warn and estimate the April balance due. We compute liability, so totals
-   are already right; this is a cash-timing warning.
-8. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback step,
-   and the after-tax value of staying until it (built on `leaveDateSweep`).
+   many offers. Warn and estimate the April balance due. Totals are already right; this
+   is a cash-timing warning.
+6. UI (React/TS, client-side only, no login, live-updating, inline input help, no
+   misleading defaults, per NN/g calculator guidelines) and a methodology page.
+7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
+   step, and the after-tax value of staying until it (built on `leaveDateSweep`).
