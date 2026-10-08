@@ -59,6 +59,12 @@ describe("projected years (federal indexed, state held at 2026)", () => {
     expect(p.federal.brackets.single[1][0]).toBeCloseTo(12_710, 6);
     expect(p.federal.brackets.single[1][1]).toBe(0.12);
     expect(p.federal.k401Limit).toBeCloseTo(25_112.5, 6);
+    expect(p.federal.hsaLimit.self).toBeCloseTo(4_510, 6);
+    expect(p.federal.section127Limit).toBeCloseTo(5_381.25, 6);
+    expect(p.federal.commuterMonthlyLimit).toBeCloseTo(348.5, 6);
+    expect(paramsForYear(2026).federal).toMatchObject({
+      hsaLimit: { self: 4_400, family: 8_750 }, section127Limit: 5_250, commuterMonthlyLimit: 340,
+    });
     expect(p.payroll.socialSecurityWageBase).toBeCloseTo(189_112.5, 6);
   });
   it("keeps statutory amounts fixed: Additional Medicare thresholds, non-indexed states, local law", () => {

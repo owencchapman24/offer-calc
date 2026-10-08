@@ -43,17 +43,20 @@ export function compareOffers(
 
 /**
  * How much B's starting salary (or first sign-on) must change for B to tie A in base-scenario
- * present value of net pay over their shared window. Found by bisection to the cent; PV rises
- * with pay, since tax takes less than all of each extra dollar. Raises and percent-of-salary
- * bonuses scale with the new salary.
+ * present value over their shared window, on cash net (default) or total rewards. Found by
+ * bisection to the cent; PV rises with pay, since tax takes less than all of each extra dollar.
+ * Raises, percent-of-salary bonuses and 401(k) amounts scale with the new salary.
  */
 export function breakeven(
   offerA: OfferInput, offerB: OfferInput, field: "salary" | "signOn", household: Household,
-  options: ValuedOptions & { horizonYears?: number },
+  options: ValuedOptions & { horizonYears?: number; basis?: "cash" | "totalRewards" },
 ): BreakevenResult {
   const window = sharedWindow([offerA, offerB], options);
-  const pv = (o: OfferInput) =>
-    projectScenario(o, household, { ...options, scenario: "base", window }).window.presentValue!.net;
+  const basis = options.basis ?? "cash";
+  const pv = (o: OfferInput) => {
+    const w = projectScenario(o, household, { ...options, scenario: "base", window }).window;
+    return basis === "cash" ? w.presentValue!.net : w.totalRewards.presentValue!;
+  };
   const from = field === "salary" ? offerB.salary.annual : offerB.cashAwards?.[0]?.amount ?? 0;
   const adjusted = (d: number): OfferInput => {
     if (field === "salary") return { ...offerB, salary: { ...offerB.salary, annual: from + d } };
@@ -89,7 +92,7 @@ export function breakeven(
   }
   const increase = round2((lo + hi) / 2);
   return {
-    field, increase, from, to: round2(from + increase), targetPV: target,
+    field, basis, increase, from, to: round2(from + increase), targetPV: target,
     window: { start: window.start, end: fromDays(addMonths(toDays(window.start), 12 * window.years)) },
   };
 }

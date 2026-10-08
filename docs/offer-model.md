@@ -136,6 +136,39 @@ clawback terms:
 grant, a first-grant month, an interval and a schedule. Overlapping refreshers stack.
 Default: none.
 
+**401(k), health, perks and hours (slice 5).**
+
+- **401(k):**
+  - **Deferrals:** a % of eligible pay (salary, optionally plus bonus), pre-tax or Roth,
+    capped each calendar year at the 402(g) limit. Pre-tax deferrals flow into the
+    engine as `pretax401k`, which lowers income tax but not FICA.
+  - **Match:** tiered on each paycheck's actual deferral rate, with no year-end true-up,
+    so hitting the cap early loses match. Non-elective contributions are a % of pay.
+  - **Vesting:** immediate, cliff or graded, by completed years of service at the leave
+    date (or at the window's end if you stay). A year is complete once you work through
+    the day before its anniversary.
+  - **Reporting:** employer money counts as retirement value, vested amounts only. Your
+    deferrals stay in cash net: they're your money, at face value.
+- **Health:**
+  - **Pre-tax amounts:** premiums and your HSA contributions run through the section 125
+    cafeteria plan, so they're excluded from income tax and FICA.
+  - **Net health cost:** premiums plus expected out-of-pocket (by the household's usage
+    level, capped at the out-of-pocket max), minus employer HSA money.
+  - **HSA cap:** your contributions are capped at the HSA limit minus the employer's
+    contributions for that year.
+  - **Timing:** everything accrues monthly while you're employed.
+- **Perks:** Section 127 (up to $5,250 a year) and 132(f) commuter (up to $340 a month),
+  both tax-free. They're shown at face value and as a pre-tax cash equivalent, face ÷
+  (1 − that year's marginal rate). Total rewards uses face value.
+- **Hours:** weekly hours by scenario × weeks a year (default 50), prorated for a
+  partial year. The hourly rate is after-tax dollars per hour, on cash only and on total
+  rewards.
+- **Total rewards:** cash net + vested employer retirement + perks − net health cost,
+  nominal and PV. `compareOffers` shows it next to cash-only. `breakeven` takes
+  `basis: "cash" | "totalRewards"`.
+- **Federal limits:** 402(g), HSA, Section 127 and 132(f) are engine parameters with
+  sources, indexed in projected years.
+
 ## 4. Leave date
 
 `leaveDate` is your last day of work, inclusive. It's the single cut-off for every stream
@@ -147,7 +180,7 @@ Default: none.
 | Bonus | Forfeited unless paid on or before the leave date (`mustBeEmployedOnPayDate`, default true). With `false`, every earned bonus still pays on its usual date, and the period you leave in is prorated to the leave date |
 | RSUs | Tranches vesting after the leave date are forfeited; later refreshers are never granted |
 | Cash awards | Unpaid installments are never paid; each paid award's clawback is evaluated at the leave date |
-| 401(k) match (roadmap 2) | The unvested employer match is forfeited per the plan's vesting schedule |
+| 401(k) match (slice 5) | Unvested employer money is forfeited per the plan's vesting schedule; deferrals, health costs and perks stop |
 
 Omit it to stay through the window. It assumes a voluntary exit; layoffs and severance
 aren't modeled. Clawbacks are often waived when you're laid off.

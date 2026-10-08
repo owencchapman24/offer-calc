@@ -35,8 +35,20 @@ export const FEDERAL_2026 = {
    */
   salt: { cap: 40_400, phaseDown: { threshold: 505_000, rate: 0.3, floor: 10_000 } },
 
-  /** Elective deferral limit, IRC 402(g). 2026 amount per IRS Notice 2025-67. Used for a warning only. */
+  /** Elective deferral limit, IRC 402(g). 2026 amount per IRS Notice 2025-67. */
   k401Limit: 24_500,
+
+  /** HSA contribution limit (employee + employer), IRC 223(b)(2). 2026 amounts per Rev. Proc. 2025-19. */
+  hsaLimit: { self: 4_400, family: 8_750 },
+
+  /**
+   * Educational assistance exclusion, IRC 127(a)(2): $5,250 a year, including student loan
+   * payments (made permanent by Pub. L. 119-21); indexed for years after 2026 (IRS FS-2026-10).
+   */
+  section127Limit: 5_250,
+
+  /** Qualified transportation fringe, IRC 132(f)(2): $340 a month for 2026 (Rev. Proc. 2025-32). */
+  commuterMonthlyLimit: 340,
 } as const;
 
 /**

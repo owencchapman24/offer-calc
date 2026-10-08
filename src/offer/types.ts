@@ -33,6 +33,65 @@ export interface OfferInput {
   /** Sign-on, year-2 sign-on, relocation: anything paid as a lump of cash. */
   cashAwards?: CashAward[];
   equity?: Equity;
+  retirement?: Retirement;
+  health?: Health;
+  perks?: Perks;
+  hours?: Hours;
+}
+
+/** 401(k): your deferrals, the employer's match and non-elective money, and its vesting. */
+export interface Retirement {
+  /** Your deferral as a fraction of eligible pay, e.g. 0.06. Capped each calendar year at the 402(g) limit. */
+  contributionPct: number;
+  /** "pretax" (traditional: lowers taxable wages, not FICA) or "roth" (after tax). Default "pretax". */
+  type?: "pretax" | "roth";
+  /** Pay that counts for deferrals and the match. Default "salary"; "salaryAndBonus" adds bonuses. */
+  eligiblePay?: "salary" | "salaryAndBonus";
+  /**
+   * Match tiers on your deferral rate, applied per paycheck (no year-end true-up), e.g.
+   * 100% of the first 3% + 50% of the next 2%: [{ upToPct: 0.03, rate: 1 }, { upToPct: 0.05, rate: 0.5 }].
+   * 50% of everything you defer: [{ upToPct: 1, rate: 0.5 }].
+   */
+  match?: Array<{ upToPct: number; rate: number }>;
+  /** Employer non-elective contribution as a fraction of eligible pay, whatever you defer. */
+  nonElectivePct?: number;
+  /** Vesting of employer money by completed years of service at the leave date. Default immediate. */
+  vesting?:
+    | { kind: "immediate" }
+    | { kind: "cliff"; years: number }
+    /** e.g. [{ years: 2, pct: 0.2 }, { years: 3, pct: 0.4 }, ..., { years: 6, pct: 1 }] */
+    | { kind: "graded"; steps: Array<{ years: number; pct: number }> };
+}
+
+/** Health plan costs. Amounts are per year, accrued by month while employed. */
+export interface Health {
+  /** Your premium share, paid pre-tax through a section 125 cafeteria plan. */
+  premium: number;
+  /** Expected out-of-pocket spending by usage level (household.healthUsage picks one). */
+  outOfPocket: { low: number; medium: number; high: number };
+  /** Out-of-pocket maximum; expected spending is capped at it. */
+  oopMax: number;
+  /** Your HSA payroll contributions (pre-tax and FICA-free). Yours to keep, so not a cost. */
+  employeeHsa?: number;
+  /** Employer HSA contributions ("seed"); offset the health cost. */
+  employerHsa?: number;
+  /** HSA limit tier. Default "self". */
+  coverage?: "self" | "family";
+}
+
+/** Tax-free employer perks, valued at face and at their pre-tax cash equivalent. */
+export interface Perks {
+  /** Section 127 educational assistance or student loan payments per year, tax-free up to the limit. */
+  section127?: number;
+  /** 132(f) employer-paid transit or parking per month, tax-free up to the monthly limit. */
+  commuterMonthly?: number;
+}
+
+export interface Hours {
+  /** Hours worked per week, by scenario. */
+  weekly: ByScenario;
+  /** Weeks worked per year. Default 50. */
+  weeksPerYear?: number;
 }
 
 export interface Equity {
@@ -147,6 +206,8 @@ export interface Household {
   otherWages?: Record<number, number>;
   /** Joint filers: spouse's W-2 wages by calendar year. Unlisted years are 0. */
   spouseWages?: Record<number, number>;
+  /** Which expected out-of-pocket level applies to every offer's health plan. Default "medium". */
+  healthUsage?: "low" | "medium" | "high";
 }
 
 export interface ProjectionOptions {
@@ -191,15 +252,50 @@ export interface CompEvent {
   discountFactor?: number;
 }
 
+export type BenefitKind =
+  | "employee401k" | "employer401k" | "premium" | "outOfPocket" | "employeeHsa" | "employerHsa"
+  | "section127" | "commuter";
+
+/** A dated benefit flow. Amounts are positive; kind says which way they count. */
+export interface BenefitEvent {
+  date: ISODate;
+  kind: BenefitKind;
+  label: string;
+  formula: string;
+  amount: number;
+  /** employer401k: the share vested at the leave date (or the window's last day). */
+  vested?: number;
+  /** Perks: the pre-tax cash raise worth the same after tax, amount / (1 - marginal rate). */
+  preTaxEquivalent?: number;
+  calendarYear: number;
+  employmentYear: number;
+  inWindow: boolean;
+  discountFactor?: number;
+}
+
 export interface Money { gross: number; tax: number; net: number }
+
+/** Non-cash value: vested employer retirement money and perks, less the net health cost. */
+export interface BenefitTotals {
+  /** Vested employer 401(k) contributions. */
+  retirement: number;
+  /** Tax-free perks at face value. */
+  perks: number;
+  /** Premiums + expected out-of-pocket - employer HSA. A cost. */
+  healthNet: number;
+}
 
 export interface WindowTotals {
   start: ISODate;
   /** Exclusive. */
   end: ISODate;
+  /** Cash only: pay less tax. */
   nominal: Money;
   /** Each event discounted by its cash date. Present when a valuation date is given. */
   presentValue?: Money;
+  benefits: { nominal: BenefitTotals; presentValue?: BenefitTotals };
+  /** Cash net + retirement + perks - health net. */
+  totalRewards: { nominal: number; presentValue?: number };
 }
 
 export interface CalendarYearResult {
@@ -233,6 +329,15 @@ export interface EmploymentYearResult {
    *  in the year + new-hire RSU tranches nominally due in the year, at grant value. No
    *  proration, payout lag, vest-date snapping, price growth or refreshers. */
   quotedTC: number;
+  retirement: { employee: number; employerCredited: number; employerVested: number };
+  health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
+  perks: { face: number; preTaxEquivalent: number };
+  /** Cash net + vested employer retirement + perks - health net. */
+  totalRewards: number;
+  /** Hours worked in the year (prorated if employment covers part of it). Present when hours are given. */
+  hours?: number;
+  /** After-tax dollars per hour worked. */
+  hourly?: { cash: number; totalRewards: number };
 }
 
 export interface ClawbackResult {
@@ -256,6 +361,8 @@ export interface LeaveResult {
   /** RSU tranches granted by the leave date but not vested by it, at grant value. */
   unvestedRsuForfeited: number;
   clawbacks: ClawbackResult[];
+  /** Employer 401(k) money not vested at the leave date. */
+  retirementForfeited: number;
 }
 
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
@@ -270,12 +377,18 @@ export interface LeaveSweepRow {
   /** After tax and clawbacks, nominal. */
   netKept: number;
   unvestedRsuForfeited: number;
+  /** Employer 401(k) money vested at the leave date. */
+  retirementVested: number;
+  /** netKept + retirementVested + perks - health net. */
+  totalRewardsKept: number;
 }
 
 export interface ScenarioResult {
   label: string;
   scenario: Scenario;
   events: CompEvent[];
+  /** 401(k), health and perk flows. Not wages; their tax effects are in the calendar years' inputs. */
+  benefitEvents: BenefitEvent[];
   calendarYears: CalendarYearResult[];
   employmentYears: EmploymentYearResult[];
   /** Totals over the window: nominal, and present value when a valuation date is given. */
@@ -306,12 +419,14 @@ export interface Comparison {
 
 export interface BreakevenResult {
   field: "salary" | "signOn";
+  /** What's being tied: cash net only, or total rewards. */
+  basis: "cash" | "totalRewards";
   /** Change to B's starting salary (or first sign-on) that ties A; negative if B is already ahead. */
   increase: number;
   /** B's value before and after the change. */
   from: number;
   to: number;
-  /** A's base-scenario present value of net pay over the shared window: the target. */
+  /** A's base-scenario present value over the shared window, on this basis: the target. */
   targetPV: number;
   window: { start: ISODate; end: ISODate };
 }

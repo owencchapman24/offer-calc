@@ -16,7 +16,14 @@ export interface FederalParams {
   standardDeduction: Readonly<Record<FilingStatus, number>>;
   brackets: Readonly<Record<FilingStatus, Schedule>>;
   salt: SaltParams;
+  /** IRC 402(g) elective deferral limit. */
   k401Limit: number;
+  /** IRC 223(b)(2) HSA contribution limit, employee + employer. */
+  hsaLimit: Readonly<{ self: number; family: number }>;
+  /** IRC 127 educational assistance exclusion per year. */
+  section127Limit: number;
+  /** IRC 132(f) qualified transportation fringe per month. */
+  commuterMonthlyLimit: number;
 }
 
 export interface PayrollParams {
@@ -129,6 +136,9 @@ export function paramsForYear(year: number, opts: { inflation?: number } = {}): 
       brackets: byStatus(FEDERAL_2026.brackets, (s) => s.map(([lo, rate]) => [ix(lo), rate] as const)), // IRC 1(f), 1(j)(3)
       salt: saltForYear(year),
       k401Limit: ix(FEDERAL_2026.k401Limit), // IRC 402(g)(4)
+      hsaLimit: { self: ix(FEDERAL_2026.hsaLimit.self), family: ix(FEDERAL_2026.hsaLimit.family) }, // IRC 223(g)
+      section127Limit: ix(FEDERAL_2026.section127Limit), // IRC 127, indexed after 2026
+      commuterMonthlyLimit: ix(FEDERAL_2026.commuterMonthlyLimit), // IRC 132(f)(6)
     },
     payroll: { ...PAYROLL_2026, socialSecurityWageBase: ix(PAYROLL_2026.socialSecurityWageBase) },
     states: Object.fromEntries(Object.entries(STATES_2026).map(([k, s]) => [k, projectState(s, indexFactor)])),
