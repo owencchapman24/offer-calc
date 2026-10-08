@@ -25,11 +25,12 @@ methodology page matter more than features.
 - **Rent estimates:** HUD FY2027 Fair Market Rents by metro (`npm run fetch-fmr`). A
   BEA-derived fallback, anchored at the ACS 2024 median gross rent ($1,487), covers areas
   without an FMR.
-- **Speed** (`npm run bench`, median of warm runs):
-  - one projection 2.6 ms; `compareOffers` 20 ms; `horizonSweep` (stays of 2-5) 23 ms;
-  - one breakeven 46 ms; a 60-month leave sweep 81 ms.
+- **Speed** (`npm run bench`, median of warm runs; the machine is noisy, so compare
+  branches side by side, not with these):
+  - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
+  - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slice 1 and the first half of slice 2 are live at https://offer-calc.vercel.app.**
+**UI: slices 1 and 2 are live at https://offer-calc.vercel.app.**
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -40,11 +41,20 @@ methodology page matter more than features.
   - HUD rent estimates;
   - the lead schedule: verdict, rank list, basis pipeline, the "if you stay 2-5 years"
     row, the disagreement line, and pay per extra hour;
-  - **tickmarks that open Show the work** (slice 2, first half): every figure in the lead
-    schedule, and every default or estimate in the inputs. The popover shows the derivation
-    with your values, each part ticked so you can drill down, and lights up the figures it
-    uses. Arrow keys move between tickmarks; Escape closes and returns focus. On phones it's
-    a bottom sheet.
+  - **tickmarks that open Show the work** (slice 2): every figure is a button (the number
+    itself, not just its ✓), with a hit area of at least 24 × 24 px. The popover shows the
+    derivation with your values in Next with tabular figures, each part ticked so you can
+    drill down, lights up the figures it uses and ties to, and links to its methodology
+    section. Arrow keys move between figures; Escape closes and returns focus. On phones
+    it's a bottom sheet. A one-time hint under the verdict points to them.
+  - **L-1 by year:** a hand-built SVG line chart (each year or running total) with a
+    keyboard-readable crosshair, end labels, notes (promotion, new-hire RSUs finishing) and
+    a ticked table view whose present-value row ties to the rank list.
+  - **The bridge** beside it: the offer letter to after rent, at U.S. prices, for any
+    offer and year (W4), each line explained ("first bonus is a stub", "RSUs vest on
+    company dates") and footed; its total ties to L-1.
+  - The first-use note for the after-rent basis (remembered), and **the methodology** at
+    `#/method` (M-1 to M-13, code-split), with live numbers in M-1, M-6.3, M-7.2 and M-12.
   - light and dark themes.
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo.
@@ -52,17 +62,20 @@ methodology page matter more than features.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 309 / 95 KB (276 / 85 KB in slice 1; the derivations and the popover
-    added the rest). It was 437 / 122 KB before the slim city list.
-  - **Worker:** 233 / 61 KB. Per edit it runs `horizonSweep` plus your stay's three full
+  - **Main thread:** 346 / 106 KB (276 / 85 KB in slice 1; the derivations, the popover,
+    L-1 and the bridge added the rest). It was 437 / 122 KB before the slim city list.
+  - **Methodology chunk:** 37 / 12 KB, loaded when `#/method` opens.
+  - **Worker:** 234 / 62 KB. Per edit it runs `horizonSweep` plus your stay's three full
     projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 173 passing.
+**Tests:** 178 passing.
 - `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `app/src/app.test.ts` 15, `app/src/metrics.test.ts` 12.
-- `metrics.test.ts` renders the schedules (react-dom/server) and fails if any tickmark's
-  figure lacks a tickmark kind, a methodology section or a derivation, drill-downs included.
+  `app/src/app.test.ts` 15, `app/src/metrics.test.ts` 17.
+- `metrics.test.ts` renders the schedules, L-1 and the bridge (react-dom/server) and fails if
+  any tickmark's figure lacks a tickmark kind, a methodology section or a derivation,
+  drill-downs included, or if a section has no anchor on the methodology page. It also
+  checks the hero against §4.1 and the bridge against W4 to the dollar.
 - Hand-checked values carry their arithmetic in comments.
 - `npm test` also runs `scripts/check-engine.ts`, the no-formatting-in-the-engine guard.
 
@@ -78,22 +91,12 @@ methodology page matter more than features.
     UI slices as shipped.
 
 ## Next steps
-1. **UI slice 2: Explanations** (`docs/ui-design.md` §8-9, §12). First half done
-   (tickmarks and Show the work in the lead schedule and inputs; pay per extra hour;
-   the review fixes). It's at a review stop: continue after the user's review.
-   - L-1 by year (chart plus table view), its figures ticked; `<` ties to its table view.
-     No d3: the scale and axis are hand-written.
-   - The bridge from the offer letter (uses `quoted`), and the first-use note for the
-     after-rent basis.
-   - Methodology v1 (M-1 to M-13): written sections plus each offer's live
-     `assumptions[]` through `src/format`. It must list every data source with its
-     vintage (IRS 2026 parameters, the Tax Foundation table plus each state override and
-     its statute, BEA 2024 RPPs, HUD FY2027 FMRs, Census ACS 2024), the PolicyEngine-US
-     validation results, and the known gaps in plain language. Then the popovers'
-     "Methodology M-x" references become links.
-   - Stop for the final slice-2 review with light and dark screenshots of the live site.
-2. **Later slices**, per §12:
-   - 3: detailed mode, plus error codes with input paths (§11, item 7);
+1. **UI slice 2 is done** and at its final review stop (2026-10-08). After the review:
+2. **UI slice 3: detailed mode** (`docs/ui-design.md` §3.3, §12), with the help text for
+   each input (`app/help.ts` and its coverage test) and engine item 7 (error codes with
+   input paths). The methodology's M-x sections and the "Also counted" row already say
+   detailed mode is coming; update them when it lands.
+3. **Later slices**, per §12:
    - 4: risk and breakeven, plus the close-call flip line;
    - 5: leaving early and warnings;
    - 6: finish (export/import, print, accessibility, phone tabs and a sticky verdict bar).
@@ -163,11 +166,18 @@ methodology page matter more than features.
   - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
   - `src/metrics.ts`: Show the work. Each figure's metric id maps to a tickmark kind, a
     methodology section (`src/sections.ts`) and a derivation built from the engine's
-    numbers. Pure; the words for derivations live here, beside `src/format`'s.
-  - `src/Tickmarks.tsx`: `WorkProvider`, `Fig` (a figure and its tickmark), `TickButton`,
-    `Trace` (an input derivations can light up), `useRovingTicks`, and the popover.
-  - `About.tsx`, `Ledger.tsx`, `Lead.tsx`, `ui.tsx` (the tickmark table, stamps, inputs),
-    `styles.css` (the workpaper tokens).
+    numbers. Also the view models behind L-1 (`byYear`) and the bridge (`bridge`), so the
+    figures and their derivations share one source. Pure; the words for derivations live
+    here, beside `src/format`'s. The BEA indexes show the fewest decimals (3-6) at which
+    every product foots to the dollar (`indexDigits`).
+  - `src/Tickmarks.tsx`: `WorkProvider`, `Fig` (a figure and its tickmark, one button),
+    `TickButton` (a lone mark), `Trace` (an input derivations can light up),
+    `useRovingTicks`, and the popover.
+  - `src/ByYear.tsx`: L-1 (the hand-built SVG chart, notes, table view) and the bridge.
+  - `src/Methodology.tsx`: `#/method`, lazy-loaded. Routes are hashes (`App.tsx`):
+    `#/`, `#/method`, `#/method/M-7.2`.
+  - `About.tsx`, `Ledger.tsx`, `Lead.tsx` (with the first-use note and the tickmark hint),
+    `ui.tsx` (the tickmark table, stamps, inputs), `styles.css` (the workpaper tokens).
   - Windows: `metrics.ts` and `Tickmarks.tsx` are named apart on purpose; `work.ts` and
     `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
@@ -346,8 +356,10 @@ methodology page matter more than features.
    state (single + joint) and prints differences. Target: FICA, state payroll and NYC
    exact; state income tax within ~$10 for single filers at $60k-$200k.
    Baseline (2026-10-07, policyengine-us 2.30.3): FICA, state payroll, NYC all exact.
-   Single $60k-$200k: 44/51 within $5. The 7 misses are all listed below (VT, CO, ND,
-   OR, CT, AR, MO). A new state over $10 there is a regression.
+   Single $60k-$200k: 42/51 within $5 and 44/51 within $6 (NE -$5.67, WI -$5.59, from
+   `oracle_report.json` of 2026-10-08; this line said "44 within $5" until then). The 7
+   over $10 are all listed below (VT, CO, ND, OR, CT, AR, MO). A new state over $10 there
+   is a regression. The methodology page (M-4) quotes these figures: update it with them.
    The oracle checks 2026 only. Projected years are covered by `test/params.test.ts`.
    Offer-model changes don't touch the engine: check that `npm run grid` output is
    unchanged instead.
