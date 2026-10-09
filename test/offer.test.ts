@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, leaveDateSweep, leaveDaySweep, nextCliff, projectOffer,
+  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, keptIfLeaving, leaveDateSweep, leaveDaySweep, nextCliff, projectOffer,
   projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, annuityTerms, type AnnualBonus, type Household,
-  type OfferInput,
+  type Cliff, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { describeSchedule, formatWarning } from "../src/format/index";
@@ -931,6 +931,25 @@ describe("cliffs and the next cliff (roadmap 7)", () => {
     const planYear = { ...A, retirement: { ...A.retirement!, vestingService: "planYearHours" as const } };
     expect(vest(planYear)).toEqual([expect.objectContaining({ date: "2028-04-01", amount: expect.closeTo(5_677.72, 1) })]);
     expect(nextCliff(A, single, "2029-07-12").next).toBeNull();
+  });
+  it("skipping a prorated clawback's monthly steps finds the next real cliff; a full clawback's end isn't skipped", () => {
+    // Sample B (illustrative): a $5,000 sign-on repaid by uncompleted months over 12, so a step on the 12th of every
+    // month. From Aug 20, 2026 the next step is Sep 12; skipping steps, it's the first bonus on Mar 15, 2027: 10% of
+    // the 2026 salary earned from Jul 13 (80,000 / 12 x (19/31 + 5) = 37,419.35) = 3,741.94.
+    const prorated = (c: Cliff) => c.detail.kind === "clawbackStep" && c.detail.prorated;
+    const [A, B] = SAMPLE_OFFERS;
+    const o = { inflation: 0.025 };
+    expect(nextCliff(B, SAMPLE_HOUSEHOLD, "2026-08-20", o).next).toMatchObject({ date: "2026-09-12",
+      cliffs: [{ kind: "clawbackStep", detail: { award: "Sign-on", prorated: true }, amount: 416.67 }] });
+    const real = nextCliff(B, SAMPLE_HOUSEHOLD, "2026-08-20", o, { skip: prorated }).next!;
+    expect(real).toMatchObject({ date: "2027-03-15", daysAway: 207, cliffs: [{ kind: "bonus", amount: 3_741.94 }] });
+    // Staying counts everything on the way, the clawback steps included: owed falls from 11/12 to 4/12 of $5,000.
+    const kept = (d: string) => keptIfLeaving(B, SAMPLE_HOUSEHOLD, toDays(d), o);
+    expect([kept("2026-08-20").clawbackOwed, kept("2027-03-15").clawbackOwed].map(Math.round)).toEqual([4_583, 1_667]);
+    expect(real.valueOfStaying.afterTaxComp).toBeCloseTo(kept("2027-03-15").afterTaxCompKept - kept("2026-08-20").afterTaxCompKept, 1);
+    // A's sign-on is repaid in full until the window ends: that end is a real cliff.
+    expect(nextCliff(A, SAMPLE_HOUSEHOLD, "2027-02-01", o, { skip: prorated }).next).toMatchObject({ date: "2027-07-12",
+      cliffs: [{ kind: "clawbackCleared", detail: { prorated: false }, amount: 10_000 }] });
   });
   it("sample A (illustrative): leaving Jan 12, 2027, the first bonus is 19 days away; staying is worth $29,970", () => {
     // The bonus is taxed at 2027's average offer rate in the stay-until-Jan-31 projection, where 2027

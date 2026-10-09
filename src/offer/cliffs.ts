@@ -53,7 +53,7 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
       const cleared = clawbackFraction(c, clock, day) === 0;
       push(day, {
         kind: cleared ? "clawbackCleared" : "clawbackStep",
-        detail: { kind: "clawbackStep", award: award.label },
+        detail: { kind: "clawbackStep", award: award.label, prorated: c.kind === "prorated" },
         amount: award.amount * drop,
       });
     }
@@ -93,12 +93,15 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
  * after-tax comp kept and total rewards kept if you leave on the cliff date instead. `cliffValue`
  * is the cliffs' own part: payments after tax, the clawback no longer owed (net of tax relief),
  * and employer 401(k) money that vests. The rest of the value is pay for the extra days.
+ * `skip` passes over cliffs (L-4 skips a prorated clawback's monthly steps): the value of staying
+ * until the next one still counts everything on the way, those steps included.
  */
 export function nextCliff(
   offer: OfferInput, household: Household, leaveDate: string, options: ProjectionOptions = {},
+  { skip }: { skip?: (c: Cliff) => boolean } = {},
 ): NextCliffResult {
   const leave = toDays(leaveDate);
-  const upcoming = cliffs(offer, household, options).filter((c) => toDays(c.date) > leave);
+  const upcoming = cliffs(offer, household, options).filter((c) => toDays(c.date) > leave && !skip?.(c));
   if (upcoming.length === 0) return { leaveDate, next: null };
   const date = upcoming[0].date;
   const day = toDays(date);
