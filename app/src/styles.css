@@ -587,3 +587,5 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .row-editor .range { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .row-editor .range-cases { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; }
 .editor-grid.years .editor-grid-row { padding-top: 4px; padding-bottom: 4px; border-top: 1px solid var(--rule); }
+.loading-row { grid-column: 1 / -1; padding: 10px 24px; }
+.loading-row .note { margin: 0; }

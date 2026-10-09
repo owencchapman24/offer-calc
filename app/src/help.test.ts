@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { LedgerProvider, ResetFields } from "./fields";
+import { ResetFields } from "./controls";
+import { LedgerProvider } from "./fields";
 import type { AppOffer } from "./model";
 import { DEFAULTS } from "./defaults";
 import { HELP, helpKey } from "./help";

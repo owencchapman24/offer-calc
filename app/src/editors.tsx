@@ -1,9 +1,8 @@
 import { type ReactNode, useState } from "react";
 import { describeSchedule } from "../../src/format/index";
 import type { Scenario } from "../../src/offer/types";
-import {
-  DateField, DefaultTick, EditorHead, fieldId, hintId, inputMetric, Issues, issuesAt, NumberField, RangeField, ResetFields, useLedger,
-} from "./fields";
+import { DateField, EditorHead, NumberField, RangeField, ResetFields } from "./controls";
+import { DefaultTick, fieldId, hintId, inputMetric, Issues, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
 import { type AppOffer, getPath, type GrantDraft, type PromotionDraft, type RefresherDraft, type ScheduleDraft } from "./model";
 import { DEFAULT_PRESET, PRESET_IDS, presetOf, PRESETS, type PresetId } from "./presets";
