@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { asymmetries, asymmetryText } from "./comparability";
+import { asymmetries, asymmetryText, type Category, CATEGORY_INPUT, enterable } from "./comparability";
 import { type AppOffer, blankDraft, sampleOffers } from "./model";
-import { context, renderPage } from "./testing";
+import { context, renderAllInputs, renderPage } from "./testing";
 
 // Step 0.5: a cost or benefit counted for some offers but not others is named under the verdict, and
 // no per-hour figure shows unless every offer has hours.
@@ -33,6 +33,10 @@ describe("the comparability warning", () => {
     ];
     for (const [category, offers, text] of cases) {
       const found = asymmetries(offers);
+      if (!enterable(category as Category)) {
+        expect(found, `${category} can't be entered yet, so it isn't named`).toEqual([]);
+        continue;
+      }
       expect(found.map((x) => x.category), category).toEqual([category]);
       expect(asymmetryText(found[0]), category).toBe(text);
     }
@@ -43,13 +47,18 @@ describe("the comparability warning", () => {
     expect(asymmetries([blank("A"), blank("B")])).toEqual([]);
   });
 
-  it("your own offer beside the samples: health, 401(k), HSA, perks and hours, each named", () => {
+  it("your own offer beside the samples: each category you can enter is named, and only those", () => {
     const [a, b] = samples();
     const mine: AppOffer = { id: "C", letter: "C", sample: null, draft: { ...blankDraft(), salary: { ...blankDraft().salary, annual: 90_000 } } };
-    const found = asymmetries([a, b, mine]);
-    expect(found.map((x) => `${x.category}: ${x.missing.join("")}`)).toEqual(
-      ["premium: C", "outOfPocket: C", "employer401k: C", "employerHsa: C", "perks: C", "hours: C"]);
-    expect(asymmetryText(found[0])).toBe("Health premiums are counted for A and B but not for C. If C has a health plan, add it: otherwise the comparison favors C.");
+    const all: Category[] = ["premium", "outOfPocket", "employer401k", "employerHsa", "perks", "hours"];
+    expect(asymmetries([a, b, mine]).map((x) => `${x.category}: ${x.missing.join("")}`)).toEqual(all.filter(enterable).map((c) => `${c}: C`));
+  });
+
+  it("never names a category you can't enter: each one it can name has its input on the page", () => {
+    const html = renderAllInputs(context());
+    for (const c of Object.keys(CATEGORY_INPUT) as Category[]) {
+      expect(enterable(c), c).toBe(html.includes(`data-help="${CATEGORY_INPUT[c]}"`));
+    }
   });
 });
 
