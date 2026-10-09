@@ -89,17 +89,34 @@ methodology page matter more than features.
   - `docs/ui-design.md`: UI design, approved rev 2 (2026-10-08). Audit tickmarks are the
     signature element; the default basis is "After rent, at U.S. prices". §12 numbers the
     UI slices as shipped.
+  - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
+    export/import) and the public-repo prep after it.
 
 ## Next steps
-1. **UI slice 2 is done** and at its final review stop (2026-10-08). After the review:
-2. **UI slice 3: detailed mode** (`docs/ui-design.md` §3.3, §12), with the help text for
-   each input (`app/help.ts` and its coverage test) and engine item 7 (error codes with
-   input paths). The methodology's M-x sections and the "Also counted" row already say
-   detailed mode is coming; update them when it lands.
+1. **UI slice 3: detailed mode. Execute `docs/slice-3-plan.md`** (approved 2026-10-08). It
+   has the build order, the decisions and every input's default, check and figures:
+   - **Step 0, groundwork:** engine item 7 (`validateOffer`: every problem at once, with its
+     input path; words in `src/format`); offers as editable detailed data (session schema
+     v2, with a migration); `app/help.ts` and its coverage test; a defaults registry; the
+     "+ range" control and row editor; "Show the work" reaching every detailed input; the
+     asymmetry warning; per hour only when every offer has hours.
+   - **Group 1:** hours, bonus (amount, per-year schedule, payout date, timing), RSUs
+     (grants, presets, custom schedule editor, vest dates, growth, refreshers), raises and
+     promotions. Then a **review checkpoint** (merge, deploy, screenshots, stop).
+   - **Group 2:** 401(k), health, perks, cash awards and clawbacks, employer state, rent
+     growth.
+   - **JSON export/import** on a Data page (moved from slice 6), then the final review stop.
+   - **Decided:** weekly hours and the health premium default to blank ("Not counted"), not
+     a guess.
+2. **Public-repo prep, after slice 3** (the list is in `docs/slice-3-plan.md`): no license
+   (all rights reserved; "source shown for review only" in the README), a README rewrite with
+   the Claude Code note and data attributions, a neutral line 5 here, an honest User-Agent
+   with a manual-download fallback in `fetch-fmr`, a CI workflow, `.claude/` ignored, then
+   the GitHub branch-protection and Vercel settings the user changes, and the visibility.
 3. **Later slices**, per §12:
    - 4: risk and breakeven, plus the close-call flip line;
    - 5: leaving early and warnings;
-   - 6: finish (export/import, print, accessibility, phone tabs and a sticky verdict bar).
+   - 6: finish (CSV export, print, accessibility, phone tabs and a sticky verdict bar).
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
