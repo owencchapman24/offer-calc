@@ -331,6 +331,18 @@ describe("leave date and clawbacks", () => {
       params: expect.objectContaining({ periodFrom: "2026-01-01", periodTo: "2026-12-31" }) });
     expect(sum(leaving("2027-03-15"), "bonus")).toBe(6_169.35);
   });
+  it("a forfeited bonus says what was earned toward it by the last day, and what it pays if you stay", () => {
+    // Leaving Mar 14, 2027 (10% of salary; $150,000 from Aug 3, 2026):
+    // - 2026, a stub from the start: all of it earned, 6,169.35, the same as it would pay (the bonus edge above);
+    // - 2027: Jan + Feb + 14/31 of Mar = 30,645.16 x 10% = 3,064.52 earned (as the prorated alternative below pays),
+    //   of a full 150,000 x 10% = 15,000.
+    const forfeited = leaving("2027-03-14").warnings.flatMap((w) => (w.code === "bonusForfeited" ? [w.params] : []));
+    expect(forfeited.map((p) => [p.periodFrom, p.earned, p.full])).toEqual([["2026-01-01", 6_169.35, 6_169.35], ["2027-01-01", 3_064.52, 15_000]]);
+    expect(forfeited[1].detail).toMatchObject({ basis: "percentOfSalary", rate: 0.1, proratedToLeave: true });
+    expect(forfeited[1].fullDetail).toMatchObject({ salaryEarned: 150_000, proratedToLeave: false });
+    // Leaving on the last day of a period: nothing of the next one is earned, so it isn't listed.
+    expect(leaving("2026-12-31").warnings.filter((w) => w.code === "bonusForfeited").map((w) => w.params.periodFrom)).toEqual(["2026-01-01"]);
+  });
   it("prorated-bonus alternative: earned bonuses still pay, the leave period is prorated", () => {
     // 2026: 6,169.35 on 2027-03-15. 2027 so far: Jan + Feb + 14/31 of Mar = 30,645.16 x 10% = 3,064.52.
     const r = leaving("2027-03-14", { ...withClawback, bonus: { ...worked.bonus!, mustBeEmployedOnPayDate: false } });

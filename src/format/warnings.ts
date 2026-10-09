@@ -20,8 +20,8 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
     }
     case "bonusForfeited": {
       const p = w.params;
-      return `Leaving on ${p.leaveDate} forfeits the bonus for ${p.periodFrom} to ${p.periodTo}: it pays ${p.payDate} `
-        + "and requires being employed on the payout date.";
+      return `Leaving on ${p.leaveDate} forfeits ${usd(p.earned)} earned toward the bonus for ${p.periodFrom} to ${p.periodTo} `
+        + `(it pays ${usd(p.full)} on ${p.payDate}, to those employed that day).`;
     }
     case "k401Cap":
       return `Your ${w.params.year} 401(k) deferrals reach the 402(g) limit of ${usd(round2(w.params.limit))} before `
