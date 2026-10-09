@@ -3,7 +3,8 @@
 **Status (2026-10-08): done.** Step 0, group 1 (checkpoint approved), group 2, JSON export/import
 and the public-repo prep are merged and live. Where the build differs from this plan is in
 `docs/ui-design.md` §12, "UI slice 3 versus this design". What's left of the prep is the settings
-the user changes (item 7) and the visibility.
+the user changes (item 7) and the visibility, both deferred (2026-10-08): the repo stays private
+until the app is user-ready.
 
 The plan for UI slice 3 and the public-repo prep after it, with the decisions made in review on
 2026-10-08. A fresh session should be able to execute it from this file, `CLAUDE.md` and
@@ -245,9 +246,28 @@ scan before switching the visibility.
    manual: it needs Python and PolicyEngine and takes minutes.
 6. **Ignore `.claude/`:** add it to `.gitignore` and `git rm --cached .claude/launch.json`. The
    desktop preview config then stays local.
-7. **Settings you change** (not in the repo):
-   - **GitHub branch protection for `main`:** require a pull request and the CI check, and block
-     force pushes and deletion. Pushing `main` deploys production.
-   - **Vercel:** keep Git Fork Protection on, so a fork's pull request can't run a deployment
-     without approval, and review the preview-deployment settings.
-   - Then switch the repository's visibility to public.
+7. **Settings you change** (not in the repo). Deferred until the repo goes public; pull requests
+   are already the way changes reach `main`, by agreement (CLAUDE.md, Working agreements).
+   - **GitHub:**
+     1. **Settings → Rules → Rulesets → New branch ruleset.** Enforcement: Active. Target: the
+        default branch. Turn on:
+        - Restrict deletions and Block force pushes;
+        - Require a pull request before merging, with 0 approvals;
+        - Require status checks to pass, adding `check` (GitHub Actions).
+     2. **Settings → General → Pull Requests:** keep "Allow merge commits" on (the `--no-ff`
+        equivalent). Turn on "Automatically delete head branches".
+     3. **Settings → Actions → General:** require approval for workflow runs from fork pull
+        requests by all outside contributors; workflow permissions "Read repository contents and
+        packages permissions".
+     4. **Settings → Code security:** secret scanning with push protection, and Dependabot alerts.
+     5. **Account settings → Emails:** "Keep my email addresses private" and "Block command line
+        pushes that expose my email". The history already uses the noreply address.
+   - **Vercel** (project settings):
+     1. **Git → Git Fork Protection:** keep it on, so a fork's pull request can't deploy without
+        approval.
+     2. **Deployment Protection → Vercel Authentication:** Standard Protection. Previews need a
+        login; production stays public.
+     3. **Security → Build Logs and Source Protection:** keep it on.
+     4. **Environment Variables:** check the list is empty. The app uses none.
+   - Re-run the history scan above, then switch the repository's visibility to public
+     (Settings → General → Danger Zone).

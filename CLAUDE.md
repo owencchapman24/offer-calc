@@ -29,7 +29,7 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1 to 3 are live at https://offer-calc.vercel.app.**
+**UI: slices 1 to 3 are complete and live at https://offer-calc.vercel.app.**
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -78,16 +78,16 @@ and show the work. Correctness and a clear methodology page matter more than fea
     checked, then every offer by `validateOffer` in a worker; a review before "Replace
     everything") and "Delete all data".
 - **Samples:** loaded by default and stamped illustrative.
-- **Deploys:** Vercel deploys every push to `main` from the GitHub repo (private until the
-  user switches it). CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, `npm run
-  typecheck` and `npm run build` on every push and pull request.
+- **Deploys:** Vercel deploys every push to `main` from the private GitHub repo (going public
+  is deferred; see Decisions). CI (`.github/workflows/ci.yml`, job `check`) runs `npm ci`,
+  `npm test`, `npm run typecheck` and `npm run build` on every push and pull request.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 352 / 109 KB for a quick-mode visit (346 / 106 KB in slice 2, 276 / 85 KB
-    in slice 1). Before lazy loading, slice 3 had it at 418 / 128 KB. Target: under ~110 KB
-    gzipped.
+  - **Main thread:** 351.8 / 108.7 KB for a quick-mode visit (346 / 106 KB in slice 2,
+    276 / 85 KB in slice 1). Before lazy loading, slice 3 had it at 418.4 / 127.6 KB. Target:
+    under ~110 KB gzipped.
   - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
     text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
     methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB.
@@ -128,20 +128,29 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
     export/import) and the public-repo prep after it.
 
-## Next steps
-1. **Before the repo goes public** (the user does these; see `docs/slice-3-plan.md` item 7):
-   GitHub branch protection for `main` (a pull request and the CI check required, no force
-   pushes or deletion), Vercel's Git Fork Protection kept on and preview deployments
-   reviewed, then the visibility. The prep in the repo is done: no LICENSE ("All rights
-   reserved; source shown for review only" in the README), the README, the neutral opening
-   line here, `fetch-fmr`'s honest User-Agent and `--file` fallback, CI, `.claude/` ignored.
-   The history scan (2026-10-08) found only noreply author addresses, no secret-shaped strings
-   and no sensitive files; re-run it before switching the visibility.
-2. **Later slices**, per `docs/ui-design.md` §12:
-   - 4: risk and breakeven (L-2, L-3), plus the close-call flip line;
-   - 5: leaving early and warnings (L-4, L-5); the warnings now at their fields move into L-5;
-   - 6: finish (CSV export of each table, print, an accessibility pass, phone tabs and a
-     sticky verdict bar).
+## Decisions (2026-10-08)
+- **The repo stays private for now.** The goal is "user-ready" first; going public comes after.
+  The public-repo settings and the visibility switch are deferred. Their checklist, with each
+  setting, is `docs/slice-3-plan.md`, "Public-repo prep", item 7. The prep in the repo is done:
+  no LICENSE ("All rights reserved; source shown for review only" in the README), the README, the
+  neutral opening line here, `fetch-fmr`'s honest User-Agent and `--file` fallback, CI, `.claude/`
+  ignored. The history scan (2026-10-08) found only noreply author addresses, no secret-shaped
+  strings and no sensitive files; re-run it before switching the visibility.
+- **Pull requests by agreement** (see Working agreements). Not enforced: rulesets and branch
+  protection on a private repo may need a paid plan.
+
+## Next steps (in this order)
+`docs/ui-design.md` §12 keeps the slice numbers; this is the order to build them in.
+1. **Slice 5: leaving early and downside risk,** including the "next cliff" panel: L-4 (§4.5)
+   and L-2, "If things go badly" (§4.4). The engine is done: `leaveDateSweep`, `keptIfLeaving`,
+   `cliffs` / `nextCliff`, the bear/base/bull scenarios. §12 also put L-5 (warnings, §4.7) in
+   slice 5; for now the engine's warnings show at their fields. Plan where L-5 goes when this
+   slice is planned.
+2. **Slice 4: close calls with the flip line, and breakeven** (L-3, §4.6; the close-call line,
+   §4.1). Engine: `breakeven`, including "alreadyAhead".
+3. **Mobile polish:** offer tabs and a sticky verdict bar (from slice 6).
+4. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+   cross-footed to the lead schedule), CSV export of each table, and print.
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
@@ -248,10 +257,17 @@ and show the work. Correctness and a clear methodology page matter more than fea
   `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 
 ## Working agreements
-- **Branches:** one branch per slice. Merge to main with `--no-ff` when green (tests,
-  typecheck, grid unchanged), push, delete the branch.
-- **Pushing `main` deploys to production** (Vercel, offer-calc.vercel.app). Keep main green,
-  and run `npm run build` before merging UI work.
+- **Pull requests** (adopted 2026-10-08, by agreement; not enforced): one branch per slice or
+  fix, and every change reaches `main` through a pull request. Never push `main` directly.
+  1. `git switch -c <branch>`, commit, `git push -u origin <branch>`;
+  2. `gh pr create` (the body ends with the Claude Code line);
+  3. `gh pr checks --watch`: CI must pass;
+  4. `gh pr merge --merge --delete-branch` (a merge commit, as `--no-ff` was), then
+     `git switch main` and `git pull --ff-only`.
+  Before opening the PR: tests and typecheck pass locally, the grid is unchanged (`npm run
+  grid`; `grid_ts.json` is ignored, so compare against `main`'s output), and `npm run build`
+  for UI work.
+- **Merging to `main` deploys to production** (Vercel, offer-calc.vercel.app). Keep main green.
 - **Tests:** hand-check at the edges: the day before vs the day of a vest, payout or
   window end; thresholds; bracket crossings.
 - **Review stops:** stop after each slice for review.
@@ -262,6 +278,12 @@ and show the work. Correctness and a clear methodology page matter more than fea
   2026 oracle report is byte-identical to the baseline (or the diff is explained).
 - **Windows PowerShell 5.1:** pass multi-line commit messages with `git commit -F <file>`;
   embedded double quotes break native argument passing.
+- **Live screenshots:** the desktop app's browser pane didn't render this app. Headless Edge
+  (`msedge --headless=new --remote-debugging-port=<port>`) driven over the DevTools protocol
+  with Node's built-in WebSocket works: screenshots, real key presses, file inputs
+  (`DOM.setFileInputFiles`), downloads. Close it with `Browser.close`, then
+  `taskkill /pid <pid> /T /F`: Edge relaunches itself, so `kill()` leaves processes behind (about
+  290 once, which crashed vitest's workers).
 
 ## Conventions (keep these)
 - Every parameter carries a source comment. Laws newer than the Tax Foundation Feb-2026
@@ -518,7 +540,8 @@ and show the work. Correctness and a clear methodology page matter more than fea
 ## Roadmap (remaining)
 Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
 
-2. UI: in progress. Slice 1 is live; see Next steps and `docs/ui-design.md` §12.
+2. UI: slices 1-3 live; what's next, in order, is in Next steps (slice numbers per
+   `docs/ui-design.md` §12).
 3. Time: commute cost (IRS 76c/mi includes depreciation — offer a variable-cost option),
    remote-work valuation default ~5% of pay (editable). Weekly hours and effective hourly
    rate are done.
@@ -529,8 +552,8 @@ Numbers are stable IDs; item 1 (COL-adjusted total, rent growth) is done.
    many offers. Warn and estimate the April balance due. Totals are already right; this
    is a cash-timing warning. Engine done (`withholdingShortfall`); the UI shows it in L-5.
 6. UI (React/TS, client-side only, no login, live-updating, inline input help, no
-   misleading defaults, per NN/g calculator guidelines) and a methodology page. Slice 1
-   live; the methodology page comes in UI slice 2.
+   misleading defaults, per NN/g calculator guidelines) and a methodology page. Done in UI
+   slices 1-3.
 7. "Next cliff" UI: from any leave date, show the next vest, bonus payout or clawback
    step, and the after-tax value of staying until it. Engine done (`cliffs`,
    `nextCliff`); the UI shows it in L-4.
