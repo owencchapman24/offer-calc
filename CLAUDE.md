@@ -123,9 +123,11 @@ and show the work. Correctness and a clear methodology page matter more than fea
 - **Design docs:**
   - `docs/offer-model.md`: approved rev 3, updated per slice. Its §12 types were the
     pre-build proposal; `src/offer/types.ts` is authoritative.
-  - `docs/ui-design.md`: UI design, approved rev 2 (2026-10-08). Audit tickmarks are the
-    signature element; the default basis is "After rent, at U.S. prices". §12 numbers the
-    UI slices as shipped.
+  - `docs/ui-design.md`: UI design, approved rev 3 (2026-10-09). Audit tickmarks are the
+    signature element; the default basis is "After rent, at U.S. prices". §12 lists the
+    UI slices by stable number, with the build order (rev 3).
+  - `docs/ui-slices-4-8-plan.md`: the approved plan for UI slices 4-8 (2026-10-09), in build
+    order 5, 4, 8, 7, 6.
   - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
     export/import) and the public-repo prep after it.
 
@@ -141,17 +143,23 @@ and show the work. Correctness and a clear methodology page matter more than fea
   protection on a private repo may need a paid plan.
 
 ## Next steps (in this order)
-`docs/ui-design.md` §12 keeps the slice numbers; this is the order to build them in.
-1. **Slice 5: leaving early and downside risk,** including the "next cliff" panel: L-4 (§4.5)
-   and L-2, "If things go badly" (§4.4). The engine is done: `leaveDateSweep`, `keptIfLeaving`,
-   `cliffs` / `nextCliff`, the bear/base/bull scenarios. §12 also put L-5 (warnings, §4.7) in
-   slice 5; for now the engine's warnings show at their fields. Plan where L-5 goes when this
-   slice is planned.
-2. **Slice 4: close calls with the flip line, and breakeven** (L-3, §4.6; the close-call line,
-   §4.1). Engine: `breakeven`, including "alreadyAhead".
-3. **Mobile polish:** offer tabs and a sticky verdict bar (from slice 6).
-4. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
-   cross-footed to the lead schedule), CSV export of each table, and print.
+The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
+and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
+build them in.
+1. **Slice 5: leaving early and downside risk:** L-2, "If things go badly" (§4.4); L-4 with the
+   next-cliff panel (§4.5); L-5, the warnings roll-up (§4.7). Groundwork: bear and bull in the
+   worker's fast lane, the slow lane, a leave sweep by day, and the CI bundle check. Review stops
+   A (L-2), B (L-4) and C (L-5).
+2. **Slice 4: close calls and breakeven:** L-3 (§4.6) with the winner's cushion and the rent
+   lever, and the close-call flip line (§4.1). Step 0 fixes the breakeven window (the comparison
+   window of every offer), tested against the rank list to the cent.
+3. **Slice 8: prices in a city you know** (§5, item 6).
+4. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
+   and axe in CI (any WCAG A/AA violation fails; exceptions need a reason), a screen-reader
+   walkthrough the user runs from a script.
+5. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+   cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
+   setting.
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
