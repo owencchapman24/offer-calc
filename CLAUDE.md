@@ -2,8 +2,7 @@
 
 A job-offer comparison calculator. Differentiator: do the math correctly, in one pipeline —
 gross comp -> after-tax -> location-adjusted -> per hour of your life, year by year (years 1-5),
-and show the work. Portfolio piece for analyst-track roles, so correctness and a clear
-methodology page matter more than features.
+and show the work. Correctness and a clear methodology page matter more than features.
 
 ## Status (2026-10-08)
 **Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
@@ -151,10 +150,11 @@ methodology page matter more than features.
   engine changes; the UI's live-update budget depends on them.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
-- `npm run fetch-fmr [-- <FY>]`: re-download HUD Fair Market Rents into
-  `src/col/fmr.json`. Default FY 2027. HUD publishes each fiscal year's FMRs in August or
-  September, effective October 1. HUD USER needs a browser User-Agent, which the script
-  sends.
+- `npm run fetch-fmr [-- <FY>] [--file <FY27_FMRs.xlsx>]`: re-download HUD Fair Market Rents
+  into `src/col/fmr.json` (then the city list). Default FY 2027. HUD publishes each fiscal
+  year's FMRs in August or September, effective October 1. The script's User-Agent names the
+  project; HUD USER answers non-browser clients with an empty 202, and then the script prints
+  the file's URL to download in a browser and pass with `--file`.
 - `npm run build-cities`: regenerate `src/col/cities.json`, the UI's slim city list. Both
   fetch scripts run it, and a test fails if it's stale.
 
