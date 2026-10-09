@@ -1,7 +1,9 @@
 import { type ReactNode, useState } from "react";
 import { describeSchedule } from "../../src/format/index";
 import type { Scenario } from "../../src/offer/types";
-import { DateField, DefaultTick, EditorHead, fieldId, hintId, inputMetric, Issues, issuesAt, NumberField, RangeField, useLedger } from "./fields";
+import {
+  DateField, DefaultTick, EditorHead, fieldId, hintId, inputMetric, Issues, issuesAt, NumberField, RangeField, ResetFields, useLedger,
+} from "./fields";
 import { HELP, helpKey } from "./help";
 import { type AppOffer, getPath, type GrantDraft, type PromotionDraft, type RefresherDraft, type ScheduleDraft } from "./model";
 import { DEFAULT_PRESET, PRESET_IDS, presetOf, PRESETS, type PresetId } from "./presets";
@@ -23,7 +25,7 @@ function EditorField({ o, k, path, children }: { o: AppOffer; k: string; path: s
     <div className="editor-field">
       <div className="editor-field-label">
         <span className="editor-col-name">{h.label}</span>
-        <Help hint={h.hint} hintId={hintId(k)} section={h.section}>{h.help}</Help>
+        <Help hint={h.hint} hintId={hintId(k)} section={h.section} extra={<ResetFields o={o} fields={[[`${o.letter}`, path]]} />}>{h.help}</Help>
       </div>
       <Trace id={inputMetric(o.letter, path)} className="editor-field-value">
         {children}
@@ -47,7 +49,7 @@ export function PromotionsEditor({ o }: { o: AppOffer }) {
       <div className="editor-grid promotions">
         <EditorHead k="salary.promotions.on" />
         <EditorHead k="salary.promotions.stepUp" />
-        <EditorHead k="salary.promotions.scenarios" />
+        <EditorHead k="salary.promotions.scenarios" o={o} rows={list.map((_, i): [string, string] => [`promotion ${i + 1}`, `salary.promotions.${i}.scenarios`])} />
         <span />
         {list.map((p, i) => {
           const path = `salary.promotions.${i}`;

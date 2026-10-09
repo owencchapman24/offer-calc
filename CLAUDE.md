@@ -83,10 +83,10 @@ methodology page matter more than features.
     `horizonSweep` plus your stay's three full projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 259 passing.
+**Tests:** 260 passing.
 - `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 21,
-  `app/src/comparability.test.ts` 7, `app/src/help.test.ts` 5.
+  `app/src/comparability.test.ts` 7, `app/src/help.test.ts` 6.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
   it. `help.test.ts` renders every view of the inputs (each section, each row editor) and fails
   on an input without help, or help that's too long, too short or unused.

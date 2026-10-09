@@ -1,4 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { LedgerProvider, ResetFields } from "./fields";
+import type { AppOffer } from "./model";
 import { DEFAULTS } from "./defaults";
 import { HELP, helpKey } from "./help";
 import { SECTIONS } from "./sections";
@@ -45,6 +49,18 @@ describe("help on every input", () => {
   it("every help entry is used: each key names a rendered field", () => {
     const used = new Set([...html.matchAll(/data-help="([^"]+)"/g)].map((m) => m[1]));
     expect(Object.keys(HELP).filter((k) => !used.has(k)), "help for no field").toEqual([]);
+  });
+
+  it("an editor field away from its default offers the reset in its help; at the default, it doesn't", () => {
+    const c = context().offers[2];
+    const moved = { ...c, draft: { ...c.draft, equity: { ...c.draft.equity, grants: [{ ...c.draft.equity.grants[0], grantDate: "2027-08-01" }] } } };
+    const render = (o: AppOffer, path: string) => renderToStaticMarkup(createElement(LedgerProvider, {
+      value: { offers: [o], issues: {}, editor: null, set: () => {}, openEditor: () => {} },
+      children: createElement(ResetFields, { o, fields: [["C", path]] }),
+    }));
+    expect(render(moved, "equity.grants.0.grantDate")).toContain("Reset to the default (Your start date, Jul 13, 2026):");
+    expect(render(moved, "equity.grants.0.vestStart")).toBe(""); // still at its default
+    expect(render(c, "equity.grants.0.grantDate")).toBe("");
   });
 
   it("every default is for an input with help", () => {
