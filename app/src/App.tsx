@@ -82,8 +82,11 @@ export function App() {
     valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   } : null;
   // Rent estimates come from the worker, which holds the HUD and BEA tables.
-  const rents = [...new Map(session.offers.filter((o) => o.quick.area && o.quick.state)
-    .map((o) => [rentKey(o.quick.area!, o.quick.state!), { area: o.quick.area!, state: o.quick.state! }])).values()];
+  const rents = [...new Map(session.offers.flatMap((o) => {
+    const area = o.draft.costOfLiving.area;
+    const state = o.draft.residence.state;
+    return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
+  })).values()];
   const engine = useEngine({ compare, rents });
   const letters = complete.map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length

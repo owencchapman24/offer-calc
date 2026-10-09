@@ -76,6 +76,9 @@ export function MoneyInput({ id, value, onChange, label, placeholder, invalidNot
   );
 }
 
+/** A fraction as the percent a field shows: 0.07 -> 7 (not 7.000000000000001). */
+export const toPercent = (f: number) => +(f * 100).toFixed(8);
+
 export function PercentInput({ id, value, onChange, label }: { id?: string; value: number | null; onChange: (v: number | null) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (value === null ? "" : String(value));

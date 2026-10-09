@@ -552,7 +552,7 @@ function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
         const offer = ctx.offers.find((o) => o.letter === l);
         return (
           <div key={l} className="method-assumptions">
-            <h4><span className={`who offer-${l}`}>{l}</span>{offer?.quick.label ? ` · ${offer.quick.label}` : ""}{" "}
+            <h4><span className={`who offer-${l}`}>{l}</span>{offer?.draft.label ? ` · ${offer.draft.label}` : ""}{" "}
               {offer?.sample && sample ? <span className="stamp">Sample</span> : null}</h4>
             <ul>{r.detail!.offers[i].assumptions.map((a, k) => <li key={k}>{formatAssumption(a)}</li>)}</ul>
           </div>

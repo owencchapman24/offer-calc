@@ -8,7 +8,7 @@ import { compute } from "./compute";
 import { Lead } from "./Lead";
 import Methodology, { sectionAnchor } from "./Methodology";
 import { Ledger } from "./Ledger";
-import { type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
+import { type AppOffer, ASSUMPTIONS, blankDraft, DEFAULT_HOUSEHOLD, type Letter, type OfferDraft, sampleOffers, toHousehold, toOfferInput } from "./model";
 import { bridge, byYear, derive, highlightedSentence, type MetricId, metricKind, metricSection, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
 import { initialSession } from "./session";
@@ -31,10 +31,17 @@ function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => Ap
   const out = compute({
     compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: 4, valuationDate: VALUATION,
       inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
-    rents: offers.map((o) => ({ area: o.quick.area!, state: o.quick.state! })),
+    rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
   const view = verdict(out.sweep!, LETTERS, basis, 4)!;
   return { today: VALUATION, household, wagesYear: 2026, offers, rents: out.rents, results: { sweep: out.sweep!, detail: out.detail, view, letters: LETTERS } };
+}
+
+/** Only what quick mode asks for, as your own offer would have it: a 10% bonus on the default timing, and an estimated rent. */
+function quickOnly(d: OfferDraft): OfferDraft {
+  const b = blankDraft();
+  return { ...b, label: d.label, salary: { ...b.salary, annual: d.salary.annual }, residence: d.residence, startDate: d.startDate,
+    costOfLiving: { ...b.costOfLiving, area: d.costOfLiving.area }, bonus: { ...b.bonus, amount: { bear: 0.1, base: 0.1, bull: 0.1 } } };
 }
 
 const parse = (s: string | undefined) => Number((s ?? "").replace(/[$,]/g, "").replace("−", "-"));
@@ -170,7 +177,7 @@ describe("L-1 by year", () => {
     const a = byYear(context(), "A");
     expect(a.years.map((y) => Math.round(y.value))).toEqual([62_595, 80_562, 87_631, 118_764]); // W4a's end label: 118,764
     expect(a.sum!).toBeCloseTo(a.window!, 1);
-    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, quick: { ...o.quick, startDate: "2026-10-01" } } : o)));
+    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)));
     const b = byYear(later, "B");
     expect(b.sum! - b.window!).toBeGreaterThan(1_000); // B's year 4 ends Sep 30, 2030, after the stay's last day, Jul 12, 2030
     const d = derive("eysum.B", later);
@@ -199,7 +206,7 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
     ["after rent", context()],
     ["per hour", context("perHour")],
     ["after tax, B yours with an estimated rent", context("cash", (os) => os.map((o) => (o.letter !== "B" ? o
-      : { ...o, sample: null, base: undefined, quick: { ...o.quick, bonus: { kind: "percent" as const, value: 10 }, rent: null } })))],
+      : { ...o, sample: null, draft: quickOnly(o.draft) })))],
   ];
 
   for (const [name, ctx] of contexts) {

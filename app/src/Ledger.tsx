@@ -2,10 +2,10 @@ import { type CSSProperties, type Dispatch, type ReactNode, useRef, useState } f
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
-import { alsoCounted, type AppOffer, type Missing, NYC_METRO, type QuickBonus, statesFor } from "./model";
+import { alsoCounted, type AppOffer, type BonusDraft, type Missing, NYC_METRO, statesFor, withBase } from "./model";
 import type { Action } from "./session";
 import { dollars } from "./text";
-import { Help, MoneyInput, PercentInput, Stamp } from "./ui";
+import { Help, MoneyInput, PercentInput, Stamp, toPercent } from "./ui";
 import { TickButton, Trace, useRovingTicks } from "./Tickmarks";
 
 // Quick mode: offers are columns, fields are rows, so A's salary sits beside B's (docs/ui-design.md §3.2).
@@ -16,7 +16,7 @@ const CITY_BY_CODE = new Map(CITIES.map((c) => [c.code, c]));
 export function Ledger({ offers, missing, rents, dispatch }: {
   offers: AppOffer[]; missing: Map<string, Missing[]>; rents: Record<string, RentEstimate>; dispatch: Dispatch<Action>;
 }) {
-  const set = (o: AppOffer, patch: Partial<AppOffer["quick"]>) => dispatch({ type: "offer", id: o.id, patch });
+  const set = (o: AppOffer, values: Record<string, unknown>) => dispatch({ type: "edit", id: o.id, set: values });
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   return (
@@ -47,7 +47,7 @@ export function Ledger({ offers, missing, rents, dispatch }: {
                 )}
               </div>
               <input className="offer-label" aria-label={`Offer ${o.letter} name`} placeholder={`Offer ${o.letter}`}
-                value={o.quick.label} onChange={(e) => set(o, { label: e.target.value })} />
+                value={o.draft.label} onChange={(e) => set(o, { label: e.target.value })} />
               {(missing.get(o.id)?.length ?? 0) > 0 && (
                 <p className="needs">Needs {missing.get(o.id)!.join(", ")} to be compared.</p>
               )}
@@ -61,7 +61,7 @@ export function Ledger({ offers, missing, rents, dispatch }: {
         </Help>}>
           {offers.map((o) => (
             <Trace key={o.id} id={`in.${o.letter}.salary`} className="cell">
-              <MoneyInput id={`in-${o.letter}-salary`} label={`Offer ${o.letter} salary`} value={o.quick.salary} onChange={(v) => set(o, { salary: v })} />
+              <MoneyInput id={`in-${o.letter}-salary`} label={`Offer ${o.letter} salary`} value={o.draft.salary.annual} onChange={(v) => set(o, { "salary.annual": v })} />
             </Trace>
           ))}
         </Row>
@@ -85,7 +85,7 @@ export function Ledger({ offers, missing, rents, dispatch }: {
         <Row label="Start date">
           {offers.map((o) => (
             <Trace key={o.id} id={`in.${o.letter}.start`} className="cell">
-              <input id={`in-${o.letter}-start`} type="date" aria-label={`Offer ${o.letter} start date`} value={o.quick.startDate ?? ""} min="2026-01-01"
+              <input id={`in-${o.letter}-start`} type="date" aria-label={`Offer ${o.letter} start date`} value={o.draft.startDate ?? ""} min="2026-01-01"
                 onChange={(e) => set(o, { startDate: e.target.value || null })} />
             </Trace>
           ))}
@@ -97,19 +97,20 @@ export function Ledger({ offers, missing, rents, dispatch }: {
         </Help>}>
           {offers.map((o) => (
             <Trace key={o.id} id={`in.${o.letter}.rent`} className="cell">
-              <RentField offer={o} set={(v) => set(o, { rent: v })}
-                estimate={o.quick.area && o.quick.state ? rents[rentKey(o.quick.area, o.quick.state)] ?? null : null} />
+              <RentField offer={o} set={(v) => set(o, { "costOfLiving.monthlyRent": v })}
+                estimate={o.draft.costOfLiving.area && o.draft.residence.state ? rents[rentKey(o.draft.costOfLiving.area, o.draft.residence.state)] ?? null : null} />
             </Trace>
           ))}
         </Row>
 
-        {offers.some((o) => o.base) && (
+        {offers.some((o) => alsoCounted(o.draft).length) && (
           <Row label="Also counted" help={<div className="help"><span className="hint">
-            Sample inputs quick mode doesn't show. They still count; detailed mode (coming soon) will let you edit them.
+            Detailed inputs quick mode doesn't show. They still count.
           </span></div>}>
-            {offers.map((o) => (
-              <Trace key={o.id} id={`in.${o.letter}.also`} className="cell also">{o.base ? alsoCounted(o).join(", ") : "—"}</Trace>
-            ))}
+            {offers.map((o) => {
+              const also = alsoCounted(o.draft);
+              return <Trace key={o.id} id={`in.${o.letter}.also`} className="cell also">{also.length ? also.join(", ") : "—"}</Trace>;
+            })}
           </Row>
         )}
       </div>
@@ -129,44 +130,46 @@ function Row({ label, help, children }: { label: string; help?: ReactNode; child
   );
 }
 
-function BonusField({ offer, set }: { offer: AppOffer; set: (b: QuickBonus) => void }) {
-  const b = offer.quick.bonus;
-  const base = offer.base?.bonus;
-  if (b.kind === "schedule" && base?.basis === "byEmploymentYear") {
-    const ks = base.amounts.map((a) => `${Math.round(a.base / 1000)}k`);
+function BonusField({ offer, set }: { offer: AppOffer; set: (b: BonusDraft) => void }) {
+  const b = offer.draft.bonus;
+  if (b.basis === "byEmploymentYear") {
+    const ks = b.amounts.map((a) => (a ? `${Math.round(a.base / 1000)}k` : "—"));
     return (
       <div className="bonus">
         <span className="static">By year: {ks[0]} → {ks[ks.length - 1]}</span>
-        <button type="button" className="link" onClick={() => set({ kind: "percent", value: null })}>Use a % instead</button>
+        <button type="button" className="link" onClick={() => set({ ...b, basis: "percentOfSalary", amount: null, amounts: [] })}>Use a % instead</button>
       </div>
     );
   }
-  const kind = b.kind === "schedule" ? "percent" : b.kind;
-  const value = b.kind === "schedule" ? null : b.value;
+  const pct = b.basis === "percentOfSalary";
+  const value = b.amount === null ? null : pct ? toPercent(b.amount.base) : b.amount.base;
+  const setValue = (v: number | null) => set({ ...b, amount: withBase(b.amount, v === null ? null : pct ? v / 100 : v) });
   return (
     <div className="bonus">
-      {kind === "percent"
-        ? <PercentInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, % of salary`} value={value} onChange={(v) => set({ kind, value: v })} />
-        : <MoneyInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, dollars a year`} value={value} onChange={(v) => set({ kind, value: v })} />}
-      <select aria-label={`Offer ${offer.letter} bonus basis`} value={kind}
-        onChange={(e) => set({ kind: e.target.value as "percent" | "amount", value: null })}>
-        <option value="percent">of salary</option>
-        <option value="amount">a year</option>
+      {pct
+        ? <PercentInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, % of salary`} value={value} onChange={setValue} />
+        : <MoneyInput id={`in-${offer.letter}-bonus`} label={`Offer ${offer.letter} bonus, dollars a year`} value={value} onChange={setValue} />}
+      <select aria-label={`Offer ${offer.letter} bonus basis`} value={b.basis}
+        onChange={(e) => set({ ...b, basis: e.target.value as BonusDraft["basis"], amount: null })}>
+        <option value="percentOfSalary">of salary</option>
+        <option value="fixed">a year</option>
       </select>
-      {!base && <span className="sub">paid each March<TickButton id={`in.${offer.letter}.bonusTiming`} label="the bonus paid each March" /></span>}
+      {b.payOn === null && <span className="sub">paid each March<TickButton id={`in.${offer.letter}.bonusTiming`} label="the bonus paid each March" /></span>}
     </div>
   );
 }
 
-function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer["quick"]>) => void }) {
-  const q = offer.quick;
-  const current = q.area ? CITY_BY_CODE.get(q.area)?.name ?? "" : "";
+function CityField({ offer, set }: { offer: AppOffer; set: (values: Record<string, unknown>) => void }) {
+  const d = offer.draft;
+  const area = d.costOfLiving.area;
+  const state = d.residence.state;
+  const current = area ? CITY_BY_CODE.get(area)?.name ?? "" : "";
   const [draft, setDraft] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const states = statesFor(q.area);
+  const states = statesFor(area);
   return (
     <div className="city">
-      {q.area && !editing ? (
+      {area && !editing ? (
         <span className="city-name">
           {current}{" "}
           <button id={`in-${offer.letter}-city`} type="button" className="link" onClick={() => setEditing(true)} aria-label={`Change offer ${offer.letter} city`}>Change</button>
@@ -179,7 +182,7 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
             setDraft(e.target.value);
             const match = CITY_BY_NAME.get(e.target.value.trim().toLowerCase());
             if (match) {
-              set({ area: match.code, state: match.states.includes(q.state ?? "") ? q.state : match.states[0], rent: null });
+              set({ "costOfLiving.area": match.code, "residence.state": match.states.includes(state ?? "") ? state : match.states[0], "costOfLiving.monthlyRent": null });
               setEditing(false);
               setDraft(null);
             }
@@ -188,15 +191,15 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
       )}
       {states.length > 1 && (
         <label className="sub">Live in
-          <select aria-label={`Offer ${offer.letter} state you'd live in`} value={q.state ?? states[0]}
-            onChange={(e) => set({ state: e.target.value, rent: null })}>
+          <select aria-label={`Offer ${offer.letter} state you'd live in`} value={state ?? states[0]}
+            onChange={(e) => set({ "residence.state": e.target.value, "costOfLiving.monthlyRent": null })}>
             {states.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
       )}
-      {q.area === NYC_METRO && q.state === "NY" && (
+      {area === NYC_METRO && state === "NY" && (
         <label className="sub check">
-          <input type="checkbox" checked={q.nyc} onChange={(e) => set({ nyc: e.target.checked })} />
+          <input type="checkbox" checked={d.residence.nyc} onChange={(e) => set({ "residence.nyc": e.target.checked })} />
           <span>Inside NYC (city tax)</span>
         </label>
       )}
@@ -210,18 +213,18 @@ function CityField({ offer, set }: { offer: AppOffer; set: (p: Partial<AppOffer[
  * estimate back.
  */
 function RentField({ offer, set, estimate }: { offer: AppOffer; set: (v: number | null) => void; estimate: RentEstimate | null }) {
-  const q = offer.quick;
+  const rent = offer.draft.costOfLiving.monthlyRent;
   const who = estimate?.source === "fmr" ? "HUD" : "BEA";
-  const estimated = q.rent === null && estimate !== null;
+  const estimated = rent === null && estimate !== null;
   return (
     <div className="rent">
       <span className={`rent-value${estimated ? " is-estimate" : ""}`}>
         <MoneyInput id={`in-${offer.letter}-rent`} label={`Offer ${offer.letter} rent a month${estimated ? `, estimated by ${who}` : ""}`}
-          value={q.rent ?? estimate?.monthlyRent ?? null} onChange={set} />
+          value={rent ?? estimate?.monthlyRent ?? null} onChange={set} />
         {estimated && <TickButton id={`in.${offer.letter}.rent`} label={`the rent estimate, ${dollars(estimate.monthlyRent)} a month`} />}
       </span>
       {estimated && <span className="sub estimate one-line">{who} estimate · edit</span>}
-      {q.rent !== null && estimate && (
+      {rent !== null && estimate && (
         <span className="sub estimate one-line">
           {who} est. {dollars(estimate.monthlyRent)} ·{" "}
           <button type="button" className="link" onClick={() => set(null)}
