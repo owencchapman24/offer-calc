@@ -1225,12 +1225,16 @@ numbered.
    row, the pipeline toggle, local saving and the samples. Engine item 10 came with it.
 2. **Explanations** (done, 2026-10-08): tickmarks and Show the work, L-1, the bridge and the
    first-use note, and methodology v1. Engine item 6 (pay per extra hour) came with it.
-3. **Detailed mode:** every section, with the help text for each. Engine item 7 (error
-   codes with input paths) comes with it.
+3. **Detailed mode** (next; plan approved 2026-10-08 in `docs/slice-3-plan.md`): every section,
+   with the help text for each. Engine item 7 (error codes with input paths) comes with it. The
+   plan adds blank defaults for weekly hours and the health premium, an asymmetry warning when a
+   cost or benefit is counted for some offers but not others, per-hour figures only when every
+   offer has hours, a review checkpoint after the verdict-moving inputs, and JSON export/import
+   (moved from slice 6).
 4. **L-2 and L-3:** the risk view and breakeven, with the close-call flip line.
 5. **L-4 and L-5:** leaving early and warnings.
-6. **Finish:** export and import, print, an accessibility pass, phone tabs and a sticky
-   verdict bar.
+6. **Finish:** CSV export of each table, print, an accessibility pass, phone tabs and a sticky
+   verdict bar. (JSON export/import moved to slice 3.)
 
 ## 13. Decided in rev 2 (say if you disagree)
 
