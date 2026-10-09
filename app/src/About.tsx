@@ -51,6 +51,19 @@ export function About({ session, dispatch, today, wagesYear }: {
             describedBy="hint-about-wages" onChange={(v) => dispatch({ type: "household", patch: { otherWagesThisYear: v ?? 0 } })} />
           <AboutHelp k="about.wages" />
         </Trace>
+        <Trace id="about.healthUsage" className="about-field">
+          <span className="about-label">
+            <label htmlFor="about-health">Health use</label>
+            {!h.healthUsage && <TickButton id="about.healthUsage" label="medium health use" />}
+          </span>
+          <select id="about-health" value={h.healthUsage ?? "medium"} data-help="about.healthUsage" aria-describedby="hint-about-healthUsage"
+            onChange={(e) => dispatch({ type: "household", patch: { healthUsage: e.target.value as "low" | "medium" | "high" } })}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <AboutHelp k="about.healthUsage" />
+        </Trace>
         <Trace id="about.prices" className="about-field">
           <span className="about-label">Prices in<TickButton id="about.prices" label="prices in the U.S. average" /></span>
           <span className="about-static">U.S. average</span>

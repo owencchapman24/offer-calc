@@ -85,13 +85,54 @@ const META: Record<string, FieldMeta> = {
   "equity.refreshers.everyMonths": { label: "Every", section: "M-3", group: "equity", editor: "equity.refreshers" },
   "equity.refreshers.schedule": { label: "Vesting", section: "M-3", group: "equity", editor: "equity.refreshers" },
   ...tranches("equity.refreshers", "equity.refreshers"),
+  // ---- sign-on and other cash ----
+  cashAwards: { label: "Sign-on and other cash", section: "M-2", group: "cash", editor: "cashAwards" },
+  "cashAwards.label": { label: "Name", section: "M-2", group: "cash", editor: "cashAwards" },
+  "cashAwards.amount": { label: "Amount", section: "M-2", group: "cash", editor: "cashAwards" },
+  "cashAwards.paidOn": { label: "Paid", section: "M-7.1", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback": { label: "Clawback", section: "M-9", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback.months": { label: "Window", section: "M-9", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback.kind": { label: "Owed back", section: "M-9", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback.per": { label: "Prorated by", section: "M-9", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback.from": { label: "Clock starts", section: "M-9", group: "cash", editor: "cashAwards" },
+  "cashAwards.clawback.repay": { label: "Repay", section: "M-9", group: "cash", editor: "cashAwards" },
+  // ---- 401(k) ----
+  retirement: { label: "401(k) plan", section: "M-5.1", group: "retirement" },
+  "retirement.contributionPct": { label: "Your contribution", section: "M-5.1", group: "retirement" },
+  "retirement.type": { label: "Pre-tax or Roth", section: "M-5.1", group: "retirement" },
+  "retirement.eligiblePay": { label: "Pay that counts", section: "M-5.1", group: "retirement" },
+  "retirement.match": { label: "Match", section: "M-5.1", group: "retirement", editor: "retirement.match" },
+  "retirement.match.rate": { label: "Match rate", section: "M-5.1", group: "retirement", editor: "retirement.match" },
+  "retirement.match.upToPct": { label: "On deferrals up to", section: "M-5.1", group: "retirement", editor: "retirement.match" },
+  "retirement.nonElectivePct": { label: "Employer contribution", section: "M-5.1", group: "retirement" },
+  "retirement.vesting": { label: "Vesting", section: "M-5.1", group: "retirement" },
+  "retirement.vesting.years": { label: "Cliff after", section: "M-5.1", group: "retirement" },
+  "retirement.vesting.steps": { label: "Vesting steps", section: "M-5.1", group: "retirement", editor: "retirement.vesting.steps" },
+  "retirement.vesting.steps.years": { label: "After", section: "M-5.1", group: "retirement", editor: "retirement.vesting.steps" },
+  "retirement.vesting.steps.pct": { label: "Vested", section: "M-5.1", group: "retirement", editor: "retirement.vesting.steps" },
+  "retirement.vestingService": { label: "Vesting service", section: "M-5.1", group: "retirement" },
+  // ---- health ----
+  health: { label: "Health plan", section: "M-5.2", group: "health" },
+  "health.premium": { label: "Premium, a year", section: "M-5.2", group: "health" },
+  "health.outOfPocket": { label: "Out-of-pocket, a year", section: "M-5.2", group: "health" },
+  "health.oopMax": { label: "Out-of-pocket maximum", section: "M-5.2", group: "health" },
+  "health.employeeHsa": { label: "Your HSA, a year", section: "M-5.2", group: "health" },
+  "health.employerHsa": { label: "Employer HSA, a year", section: "M-5.2", group: "health" },
+  "health.coverage": { label: "Coverage", section: "M-5.2", group: "health" },
+  // ---- perks ----
+  "perks.section127": { label: "Education assistance, a year", section: "M-5.3", group: "perks" },
+  "perks.commuterMonthly": { label: "Commuter, a month", section: "M-5.3", group: "perks" },
   // ---- hours ----
   "hours.weekly": { label: "Weekly hours", section: "M-5.4", group: "hours" },
   "hours.weeksPerYear": { label: "Weeks a year", section: "M-5.4", group: "hours" },
+  // ---- where you'd live ----
+  employerState: { label: "Employer state", section: "M-4", group: "where" },
+  "costOfLiving.rentGrowth": { label: "Rent growth", section: "M-6.2", group: "where" },
   // ---- about you ----
   "about.filing": { label: "Filing status", section: "M-4", group: "about" },
   "about.stay": { label: "How long do you expect to stay?", section: "M-7.3", group: "about" },
   "about.wages": { label: "Other wages", section: "M-4", group: "about" },
+  "about.healthUsage": { label: "Health use", section: "M-5.2", group: "about" },
 };
 
 /** Quick mode's and About you's text. */
@@ -140,6 +181,11 @@ const QUICK_TEXT: Record<string, FieldText> = {
     hint: "An internship or the job you're leaving.",
     help: "Pay you earn in the year the earliest offer starts, before the new job begins. It's taxed in the same year, so it changes "
       + "the new job's first-year tax. Leave it at $0 if there's none.",
+  },
+  "about.healthUsage": {
+    hint: "Which of your out-of-pocket estimates counts.",
+    help: "Each health plan takes your low, medium or high out-of-pocket estimate; this picks one for every offer. Medium is the "
+      + "default: the middle of your own estimates.",
   },
 };
 

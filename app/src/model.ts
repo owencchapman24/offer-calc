@@ -47,10 +47,10 @@ export interface OfferDraft {
     /** Null: none. */
     refreshers: RefresherDraft | null;
   };
-  /** Null: no 401(k) entered. */
-  retirement: RetirementDraft | null;
-  /** Null: no health plan entered. */
-  health: HealthDraft | null;
+  /** Null: not entered. "none": the offer has no 401(k) (entered, as none). */
+  retirement: RetirementDraft | null | "none";
+  /** Null: not entered. "none": no health plan from this job, such as staying on a parent's plan (entered, as none). */
+  health: HealthDraft | null | "none";
   perks: { section127: number | null; commuterMonthly: number | null };
   hours: {
     /** Null: not counted. */
@@ -177,6 +177,8 @@ export interface AppOffer {
 
 export interface AppHousehold {
   filingStatus: FilingStatus;
+  /** Which out-of-pocket estimate applies to every health plan. Absent: medium (the default). */
+  healthUsage?: "low" | "medium" | "high";
   /** "How long do you expect to stay?": the comparison window. */
   stayYears: number;
   /**
@@ -242,6 +244,9 @@ export function dropTrailing<T>(rows: T[], blank: (row: T) => boolean): T[] {
 }
 const blankPromotion = (p: PromotionDraft) => p.on === null && p.stepUp === null;
 const blankTranche = (t: { month: number | null; fraction: number | null }) => t.month === null && t.fraction === null;
+const blankCash = (a: CashAwardDraft) => a.amount === null && !a.label && a.paidOn === null && a.clawback === null;
+const blankTier = (t: { upToPct: number | null; rate: number | null }) => t.upToPct === null && t.rate === null;
+const blankStep = (s: { years: number | null; pct: number | null }) => s.years === null && s.pct === null;
 const blankGrant = (g: GrantDraft) => g.value === null && !g.label && g.grantDate === null && g.vestStart === null && g.schedule.tranches === null
   && g.schedule.vestDates === null;
 
@@ -276,10 +281,11 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   };
   const bonus = bonusInput(d.bonus);
   if (bonus) offer.bonus = bonus;
-  if (d.cashAwards.length) offer.cashAwards = d.cashAwards.map(cashInput);
+  const cash = dropTrailing(d.cashAwards, blankCash);
+  if (cash.length) offer.cashAwards = cash.map(cashInput);
   const equity = equityInput(d.equity);
   if (equity) offer.equity = equity;
-  if (d.retirement) offer.retirement = retirementInput(d.retirement);
+  if (d.retirement && d.retirement !== "none") offer.retirement = retirementInput(d.retirement);
   const health = healthInput(d.health);
   if (health) offer.health = health;
   const perks = { ...(d.perks.section127 ? { section127: d.perks.section127 } : {}), ...(d.perks.commuterMonthly ? { commuterMonthly: d.perks.commuterMonthly } : {}) };
@@ -354,16 +360,16 @@ function retirementInput(r: RetirementDraft): Retirement {
     contributionPct: r.contributionPct ?? 0,
     ...(r.type ? { type: r.type } : {}),
     ...(r.eligiblePay ? { eligiblePay: r.eligiblePay } : {}),
-    ...(r.match.length ? { match: r.match.map((t) => ({ upToPct: req(t.upToPct), rate: req(t.rate) })) } : {}),
+    ...(dropTrailing(r.match, blankTier).length ? { match: dropTrailing(r.match, blankTier).map((t) => ({ upToPct: req(t.upToPct), rate: req(t.rate) })) } : {}),
     ...(r.nonElectivePct !== null ? { nonElectivePct: r.nonElectivePct } : {}),
     ...(v ? { vesting: v.kind === "immediate" ? v : v.kind === "cliff" ? { kind: "cliff", years: req(v.years) }
-      : { kind: "graded", steps: v.steps.map((s) => ({ years: req(s.years), pct: req(s.pct) })) } } : {}),
+      : { kind: "graded", steps: dropTrailing(v.steps, blankStep).map((s) => ({ years: req(s.years), pct: req(s.pct) })) } } : {}),
     ...(r.vestingService ? { vestingService: r.vestingService } : {}),
   };
 }
 
-function healthInput(h: HealthDraft | null): OfferInput["health"] {
-  if (!h) return undefined;
+function healthInput(h: HealthDraft | null | "none"): OfferInput["health"] {
+  if (!h || h === "none") return undefined;
   const o = h.outOfPocket;
   const oop = { low: o.low ?? 0, medium: o.medium ?? 0, high: o.high ?? 0 };
   // Nothing entered that counts: no health plan for the engine.
@@ -491,7 +497,7 @@ export function firstYear(offers: AppOffer[], today: string): number {
 export function toHousehold(h: AppHousehold, year: number): Household {
   return {
     filingStatus: h.filingStatus,
-    healthUsage: "medium",
+    healthUsage: h.healthUsage ?? "medium",
     costOfLiving: { reference: ASSUMPTIONS.reference, savingsRate: 0 },
     ...(h.otherWagesThisYear > 0 ? { otherWages: { [year]: h.otherWagesThisYear } } : {}),
   };
@@ -548,7 +554,7 @@ export function sampleOffers(today: string): AppOffer[] {
 export function completeSample(d: OfferDraft): OfferDraft {
   return {
     ...d,
-    health: d.health && { ...d.health, employeeHsa: d.health.employeeHsa ?? 0, employerHsa: d.health.employerHsa ?? 0 },
+    health: d.health && d.health !== "none" ? { ...d.health, employeeHsa: d.health.employeeHsa ?? 0, employerHsa: d.health.employerHsa ?? 0 } : d.health,
     perks: { section127: d.perks.section127 ?? 0, commuterMonthly: d.perks.commuterMonthly ?? 0 },
   };
 }
@@ -566,8 +572,8 @@ export function alsoCounted(d: OfferDraft): string[] {
     || (b.payOn && (b.payOn.month !== DRAFT_DEFAULTS.bonusPayOn.month || b.payOn.day !== DRAFT_DEFAULTS.bonusPayOn.day))) out.push("bonus timing");
   if (d.cashAwards.length) out.push(d.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards");
   if (d.equity.grants.length || d.equity.refreshers) out.push("RSUs");
-  if (d.retirement) out.push("401(k)");
-  if (d.health) out.push("health");
+  if (d.retirement && d.retirement !== "none") out.push("401(k)");
+  if (d.health && d.health !== "none") out.push("health");
   if (d.perks.section127 || d.perks.commuterMonthly) out.push("perks");
   if (d.hours.weekly) out.push(`${d.hours.weekly.base} hrs/week`);
   return out;

@@ -1,13 +1,16 @@
 import { type ReactNode, useState } from "react";
-import { describeSchedule } from "../../src/format/index";
+import { describeSchedule } from "../../src/format/schedule";
 import type { Scenario } from "../../src/offer/types";
-import { DateField, EditorHead, NumberField, RangeField, ResetFields } from "./controls";
+import { ChoiceField, DateField, EditorHead, NumberField, RangeField, ResetFields } from "./controls";
 import { DefaultTick, fieldId, hintId, inputMetric, Issues, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
-import { type AppOffer, getPath, type GrantDraft, type PromotionDraft, type RefresherDraft, type ScheduleDraft } from "./model";
+import {
+  type AppOffer, type CashAwardDraft, getPath, type GrantDraft, type HealthDraft, type PromotionDraft, type RefresherDraft, type RetirementDraft,
+  type ScheduleDraft,
+} from "./model";
 import { DEFAULT_PRESET, PRESET_IDS, presetOf, PRESETS, type PresetId } from "./presets";
 import { Trace } from "./Tickmarks";
-import { Help } from "./ui";
+import { Help, NumberInput } from "./ui";
 
 // The row editors (docs/ui-design.md §3.3, W3): each opens beneath its row, spanning the ledger, for one
 // offer: promotions, the bonus by year, RSU grants with their vesting, and refreshers. Every field keeps
@@ -15,6 +18,13 @@ import { Help } from "./ui";
 
 export const newPromotion = (): PromotionDraft => ({ on: null, stepUp: null, scenarios: null });
 export const newGrant = (): GrantDraft => ({ label: "", value: null, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } });
+export const newRetirement = (): RetirementDraft => ({
+  contributionPct: null, type: null, eligiblePay: null, match: [], nonElectivePct: null, vesting: null, vestingService: null,
+});
+export const newHealth = (): HealthDraft => ({
+  premium: null, outOfPocket: { low: null, medium: null, high: null }, oopMax: null, employeeHsa: null, employerHsa: null, coverage: null,
+});
+export const newCashAward = (): CashAwardDraft => ({ label: "", amount: null, paidOn: null, clawback: null });
 export const newRefreshers = (): RefresherDraft => ({ value: null, firstAfterMonths: null, everyMonths: null, schedule: { tranches: null, vestDates: null } });
 
 /** A field inside an editor: its label and help beside it, its problems under it, lit up when a derivation uses it. */
@@ -321,5 +331,162 @@ function VestDatesField({ o, path, what }: { o: AppOffer; path: string; what: st
         </>
       )}
     </div>
+  );
+}
+
+// ---- 401(k): match tiers and graded vesting --------------------------------------------------------
+
+export function MatchEditor({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const r = o.draft.retirement;
+  if (!r || r === "none") return null;
+  const list = r.match;
+  return (
+    <div className="editor-table">
+      <div className="editor-grid tiers">
+        <EditorHead k="retirement.match.rate" />
+        <EditorHead k="retirement.match.upToPct" />
+        <span />
+        {list.map((_, i) => {
+          const path = `retirement.match.${i}`;
+          return (
+            <Trace key={i} id={inputMetric(o.letter, path)} className="editor-grid-row">
+              <NumberField o={o} path={`${path}.rate`} kind="percent" label={`match tier ${i + 1}, rate`} />
+              <NumberField o={o} path={`${path}.upToPct`} kind="percent" unit="% of pay" label={`match tier ${i + 1}, deferrals up to`} />
+              <button type="button" className="link remove-row" aria-label={`Remove match tier ${i + 1}`}
+                onClick={() => api.set(o, { "retirement.match": remove(list, i) })}>Remove</button>
+              <span className="editor-row-issues"><Issues letter={o.letter} path={path} /></span>
+            </Trace>
+          );
+        })}
+      </div>
+      <button type="button" className="link add-row" onClick={() => api.set(o, { "retirement.match": [...list, { rate: null, upToPct: null }] })}>
+        + Add a tier</button>
+      {!list.length && <p className="sub">No match: the employer adds nothing for what you defer.</p>}
+    </div>
+  );
+}
+
+export function VestingStepsEditor({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const r = o.draft.retirement;
+  if (!r || r === "none" || r.vesting?.kind !== "graded") return null;
+  const list = r.vesting.steps;
+  return (
+    <div className="editor-table">
+      <div className="editor-grid tiers">
+        <EditorHead k="retirement.vesting.steps.years" />
+        <EditorHead k="retirement.vesting.steps.pct" />
+        <span />
+        {list.map((_, i) => {
+          const path = `retirement.vesting.steps.${i}`;
+          return (
+            <Trace key={i} id={inputMetric(o.letter, path)} className="editor-grid-row">
+              <NumberField o={o} path={`${path}.years`} kind="number" unit="years" label={`vesting step ${i + 1}, years of service`} />
+              <NumberField o={o} path={`${path}.pct`} kind="percent" label={`vesting step ${i + 1}, share vested`} />
+              <button type="button" className="link remove-row" aria-label={`Remove vesting step ${i + 1}`}
+                onClick={() => api.set(o, { "retirement.vesting.steps": remove(list, i) })}>Remove</button>
+            </Trace>
+          );
+        })}
+      </div>
+      <Issues letter={o.letter} path="retirement.vesting.steps" />
+      <button type="button" className="link add-row" onClick={() => api.set(o, { "retirement.vesting.steps": [...list, { years: null, pct: null }] })}>
+        + Add a step</button>
+    </div>
+  );
+}
+
+// ---- sign-on and other cash ---------------------------------------------------------------------------
+
+export function CashAwardsEditor({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const list = o.draft.cashAwards;
+  return (
+    <div className="editor-blocks">
+      {list.map((a, i) => {
+        const path = `cashAwards.${i}`;
+        const c = a.clawback;
+        return (
+          <fieldset key={i} className="editor-block">
+            <legend>Payment {i + 1}{a.label ? `: ${a.label}` : ""}</legend>
+            <EditorField o={o} k="cashAwards.label" path={`${path}.label`}>
+              <input id={fieldId(o.letter, `${path}.label`)} aria-label={`Offer ${o.letter} payment ${i + 1} name`} placeholder="Sign-on" value={a.label}
+                data-help="cashAwards.label" aria-describedby={hintId("cashAwards.label")} onChange={(e) => api.set(o, { [`${path}.label`]: e.target.value })} />
+            </EditorField>
+            <EditorField o={o} k="cashAwards.amount" path={`${path}.amount`}>
+              <NumberField o={o} path={`${path}.amount`} kind="money" label={`payment ${i + 1} amount`} />
+            </EditorField>
+            <EditorField o={o} k="cashAwards.paidOn" path={`${path}.paidOn`}>
+              <PaidOnField o={o} path={`${path}.paidOn`} what={`payment ${i + 1}`} />
+            </EditorField>
+            <EditorField o={o} k="cashAwards.clawback" path={`${path}.clawback`}>
+              {c ? (
+                <div className="clawback">
+                  <span className="clawback-field"><span className="sub">Window</span>
+                    <NumberField o={o} path={`${path}.clawback.months`} kind="number" unit="months" label={`payment ${i + 1} clawback window`} />
+                  </span>
+                  <span className="clawback-field"><span className="sub">Owed back</span>
+                    <ChoiceField o={o} path={`${path}.clawback.kind`} label={`payment ${i + 1} clawback, owed back`}
+                      options={[["prorated", "The unworked share"], ["full", "All of it"]]} />
+                  </span>
+                  {(c.kind ?? "prorated") === "prorated" && (
+                    <span className="clawback-field"><span className="sub">Prorated by</span>
+                      <ChoiceField o={o} path={`${path}.clawback.per`} label={`payment ${i + 1} clawback, prorated by`}
+                        options={[["month", "Completed months"], ["day", "Days"]]} />
+                    </span>
+                  )}
+                  <span className="clawback-field"><span className="sub">Clock starts</span>
+                    <ChoiceField o={o} path={`${path}.clawback.from`} label={`payment ${i + 1} clawback clock`}
+                      options={[["start", "Your start date"], ["payment", "The payment date"]]} />
+                  </span>
+                  <span className="clawback-field"><span className="sub">Repay</span>
+                    <ChoiceField o={o} path={`${path}.clawback.repay`} label={`payment ${i + 1} clawback repayment`}
+                      options={[["gross", "Gross (the full amount)"], ["net", "Net (what you received)"]]} />
+                  </span>
+                  <button type="button" className="link remove-row" data-help="cashAwards.clawback" onClick={() => api.set(o, { [`${path}.clawback`]: null })}>
+                    Remove the clawback</button>
+                </div>
+              ) : (
+                <span className="field">
+                  <span className="sub">None</span>
+                  <button type="button" className="link" id={fieldId(o.letter, `${path}.clawback`)} data-help="cashAwards.clawback" onClick={() => api.set(o, {
+                    [`${path}.clawback`]: { months: null, kind: null, per: null, from: null, repay: null },
+                  })}>+ Add a clawback</button>
+                </span>
+              )}
+            </EditorField>
+            <button type="button" className="link remove-row" onClick={() => api.set(o, { cashAwards: remove(list, i) })}>Remove this payment</button>
+          </fieldset>
+        );
+      })}
+      <button type="button" className="link add-row" onClick={() => api.set(o, { cashAwards: [...list, newCashAward()] })}>
+        + Add {list.length ? "another" : "a"} payment</button>
+    </div>
+  );
+}
+
+/** When a payment lands: some days after your start date (30 by default), or on a date. */
+function PaidOnField({ o, path, what }: { o: AppOffer; path: string; what: string }) {
+  const api = useLedger();
+  const v = getPath(o.draft, path) as CashAwardDraft["paidOn"];
+  const onDate = typeof v === "string";
+  const days = v === null ? 30 : typeof v === "string" ? null : v.daysAfterStart;
+  const common = { "data-help": "cashAwards.paidOn", "aria-describedby": hintId("cashAwards.paidOn") };
+  return (
+    <span className="field paid-on">
+      <select aria-label={`Offer ${o.letter} ${what}, paid`} {...common} value={onDate ? "date" : "days"}
+        onChange={(e) => api.set(o, { [path]: e.target.value === "date" ? (o.draft.startDate ?? "") : { daysAfterStart: 30 } })}>
+        <option value="days">Days after you start</option>
+        <option value="date">On a date</option>
+      </select>
+      {onDate
+        ? <input id={fieldId(o.letter, path)} type="date" min="2026-01-01" aria-label={`Offer ${o.letter} ${what}, paid on`} {...common} value={v}
+            aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} onChange={(e) => api.set(o, { [path]: e.target.value || null })} />
+        : <NumberInput id={fieldId(o.letter, path)} kind="number" unit="days" label={`Offer ${o.letter} ${what}, days after you start`}
+            value={days} help="cashAwards.paidOn" describedBy={hintId("cashAwards.paidOn")} invalid={issuesAt(api, o.letter, path).length > 0}
+            onChange={(x) => api.set(o, { [path]: x === null ? null : { daysAfterStart: x } })} />}
+      <DefaultTick o={o} path={path} label={`${what} paid 30 days after you start`} />
+    </span>
   );
 }

@@ -15,7 +15,7 @@
     "offers": "tsx scripts/offer-table.ts",
     "bench": "tsx scripts/bench.ts",
     "fetch-rpp": "tsx scripts/fetch-rpp.ts && tsx scripts/build-cities.ts",
-    "fetch-fmr": "tsx scripts/fetch-fmr.ts && tsx scripts/build-cities.ts",
+    "fetch-fmr": "tsx scripts/fetch-fmr.ts",
     "build-cities": "tsx scripts/build-cities.ts"
   },
   "devDependencies": {

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ResetFields } from "./controls";
 import { LedgerProvider } from "./fields";
-import type { AppOffer } from "./model";
+import type { AppOffer, RetirementDraft } from "./model";
 import { DEFAULTS } from "./defaults";
 import { HELP, helpKey } from "./help";
 import { SECTIONS } from "./sections";
@@ -18,8 +18,11 @@ const words = (s: string) => s.trim().split(/\s+/).length;
 const sentences = (s: string) => (s.replace(/U\.S\./g, "US").match(/[.!?](?=\s+[A-Z"(]|\s*$)/g) ?? []).length;
 
 describe("help on every input", () => {
-  // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, so every editor's fields render.
-  const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter !== "C" ? o : { ...o, draft: { ...o.draft, equity: {
+  // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, and B's 401(k) vesting in graded
+  // steps, so every editor's fields render.
+  const graded = { kind: "graded" as const, steps: [{ years: 2, pct: 0.5 }, { years: 3, pct: 1 }] };
+  const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft,
+    retirement: { ...(o.draft.retirement as RetirementDraft), vesting: graded } } } : o.letter !== "C" ? o : { ...o, draft: { ...o.draft, equity: {
     ...o.draft.equity,
     grants: o.draft.equity.grants.map((g) => ({ ...g, schedule: { ...g.schedule, tranches: [{ month: 12, fraction: 0.5 }, { month: 24, fraction: 0.5 }] } })),
     refreshers: { ...o.draft.equity.refreshers!, schedule: { tranches: [{ month: 12, fraction: 1 }], vestDates: { months: [3, 9], day: 1 } } },

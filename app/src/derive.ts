@@ -1,7 +1,9 @@
 import type { ByScenario, CashTotals, HorizonRow, RppUsed, ValueBasis, WindowTotals, Basis } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { HELP, helpKey } from "./help";
-import { alsoCounted, type AppOffer, bonusBasis, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft } from "./model";
+import {
+  alsoCounted, type AppOffer, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft,
+} from "./model";
 import {
   aboutIsDefault, type AboutField, BASIS_PHRASE, bridge, type BridgeLine, byYear, cityName, type Derivation, detailOf, type EditTarget, eyOfDate,
   indexOf, type InputRef, join, metricKind, type MetricId, offerByLetter, pathOf, type PvPart, rentEstimate, res, rowFor, shortCity,
@@ -10,7 +12,8 @@ import {
 import type { OfferDetail } from "./protocol";
 import type { SectionId } from "./sections";
 import {
-  bonusText, cashAwardsText, employerStateText, healthText, perksText, rangeText, refreshersText, rentGrowthText, retirementText, scheduleText,
+  bonusText, cashAwardsText, employerStateText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText, retirementText,
+  scheduleText, vestingText,
 } from "./summary";
 import { cents, dayBefore, dollars, figure, longDate, percent, shortDate, signed } from "./text";
 import type { TickKind } from "./ui";
@@ -35,7 +38,7 @@ const INPUT_SECTION: Record<string, SectionId> = {
   hours: "M-5.4", costOfLiving: "M-6.2", residence: "M-4", employerState: "M-4", also: "M-5",
 };
 const inputSection = (path: string): SectionId => HELP[helpKey(path)]?.section ?? INPUT_SECTION[path.split(".")[0]] ?? "M-1";
-const ABOUT_SECTION: Record<AboutField, SectionId> = { filing: "M-4", stay: "M-7.3", wages: "M-4", prices: "M-6.1" };
+const ABOUT_SECTION: Record<AboutField, SectionId> = { filing: "M-4", stay: "M-7.3", wages: "M-4", healthUsage: "M-5.2", prices: "M-6.1" };
 const BRIDGE_SECTION: Record<BridgeLine, SectionId> = {
   letter: "M-2", salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", clawback: "M-9", paid: "M-1", tax: "M-4", premiums: "M-5.2",
   afterTax: "M-1", retirement: "M-5.1", perks: "M-5.3", hsa: "M-5.2", oop: "M-5.2", totalRewards: "M-1", rent: "M-6.2", prices: "M-6.1",
@@ -52,7 +55,9 @@ const READ_ONLY_NAME: Record<string, string> = {
   "costOfLiving.rentGrowth": "rent growth", "hours.weekly": "weekly hours",
 };
 const inputName = (path: string) => READ_ONLY_NAME[path] ?? HELP[helpKey(path)]?.label.toLowerCase() ?? path;
-const ABOUT_NAME: Record<AboutField, string> = { filing: "your filing status", stay: "your stay", wages: "your other wages", prices: "the prices setting" };
+const ABOUT_NAME: Record<AboutField, string> = {
+  filing: "your filing status", stay: "your stay", wages: "your other wages", healthUsage: "your health use", prices: "the prices setting",
+};
 const PART: Record<PvPart, { label: string; gloss: string }> = {
   gross: { label: "Gross pay", gloss: "salary, bonuses, cash awards and RSU vests paid in your stay" },
   tax: { label: "Tax", gloss: "federal, Social Security and Medicare, state and local: the offer's share of household tax each calendar year" },
@@ -362,7 +367,7 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
           : `Nothing to add: offer ${letter} has no 401(k), perks or health costs entered.`,
         discountNote,
       ],
-      ties: [], ...fromInputs(ctx, letter, ["retirement", "health", "perks"]),
+      ties: [], ...fromInputs(ctx, letter, ["retirement", "health", "perks.section127", "perks.commuterMonthly"]),
     };
   }
   const col = w.costOfLiving?.presentValue;
@@ -742,10 +747,12 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
       const v = line === "premiums" ? y.health.premiums : line === "perks" ? y.perks.face : line === "hsa" ? y.health.employerHsa : y.health.outOfPocket;
       const what = { premiums: "your health premiums", perks: "perks", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
       return {
-        title: title(what), scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(v), ref: `in.${letter}.${line === "perks" ? "perks" : "health"}`,
-          tick: "traced" }],
-        notes: [traced, line === "oop" ? "Your own estimate at medium usage, capped at the out-of-pocket maximum; held flat each year." : "Held flat each year."],
-        ties: [], ...fromInputs(ctx, letter, [line === "perks" ? "perks" : "health"]),
+        title: title(what), scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(v), tick: "traced" }],
+        notes: [traced, line === "oop"
+          ? `Your own estimate at ${ctx.household.healthUsage ?? "medium"} use, capped at the out-of-pocket maximum; held flat each year.`
+          : "Held flat each year."],
+        ties: [], ...fromInputs(ctx, letter, { premiums: ["health.premium"], perks: ["perks.section127", "perks.commuterMonthly"],
+          hsa: ["health.employerHsa"], oop: ["health.outOfPocket", "health.oopMax"] }[line]),
       };
     }
     case "retirement": {
@@ -761,7 +768,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         notes: [ret?.code === "retirement"
           ? `Employer money is ${percent(ret.params.vestedShare)} vested after ${ret.params.completedYears} completed ${ret.params.completedYears === 1 ? "year" : "years"} by the end of your stay; unvested money is forfeited.`
           : "Only the vested share counts."],
-        ties: [], ...fromInputs(ctx, letter, ["retirement"]),
+        ties: [], ...fromInputs(ctx, letter, ["retirement.match", "retirement.nonElectivePct", "retirement.vesting", "retirement.vestingService"]),
       };
     }
     case "rent": {
@@ -964,6 +971,20 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
         a ? rangeText(a, dollars) : "—")) : [line(label, "None")];
     case "bonus.amount": return [line("Target bonus", bonusText(d))];
     case "bonus.basis": return [line(label, { percentOfSalary: "% of salary", fixed: "Dollars a year", byEmploymentYear: "Dollars by employment year" }[bonusBasis(d.bonus)])];
+    case "retirement.match": return d.retirement && d.retirement !== "none" ? [line(label, matchText(d.retirement))] : [line(label, "—")];
+    case "retirement.vesting": return d.retirement && d.retirement !== "none" ? [line(label, vestingText(d.retirement))] : [line(label, "—")];
+    case "health.outOfPocket": {
+      const o = v as { low: number | null; medium: number | null; high: number | null } | undefined;
+      return o ? (["low", "medium", "high"] as const).map((k) => line(`${label}, ${k} use`, o[k] === null ? "Not counted" : dollars(o[k]!))) : [line(label, "—")];
+    }
+    case "cashAwards.paidOn": {
+      const p = v as CashAwardDraft["paidOn"];
+      return [line(label, typeof p === "string" ? longDate(p) : `${p?.daysAfterStart ?? "—"} days after you start`)];
+    }
+    case "cashAwards.clawback": {
+      const c = v as ClawbackDraft | null;
+      return [line(label, !c ? "None" : `${(c.kind ?? "prorated") === "full" ? "All of it" : "The unworked share"} if you leave within ${c.months ?? 12} months`)];
+    }
     case "salary.raiseOn": return [line(label, v === "jan1" ? "Each January 1" : "Each work anniversary")];
     case "salary.promotions.scenarios": return [line(label, Array.isArray(v) && v.length ? v.join(", ") : "None")];
     case "equity.grants.schedule.vestDates": case "equity.refreshers.schedule.vestDates": {
@@ -980,6 +1001,7 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
   }
   if (v === null || v === undefined) return [line(label, "—")];
   if (typeof v === "boolean") return [line(label, v ? "Yes" : "No")];
+  if (typeof v === "string" && CHOICE_WORDS[key]?.[v]) return [line(label, CHOICE_WORDS[key][v])];
   if (typeof v === "string") return [line(label, /^\d{4}-\d{2}-\d{2}$/.test(v) ? longDate(v) : v)];
   if (typeof v === "number") return [line(label, fmt(v))];
   if (typeof v === "object" && "month" in v && "day" in v) {
@@ -989,9 +1011,22 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
   return [line(label, "Entered")];
 }
 
+/** How a choice reads. */
+const CHOICE_WORDS: Record<string, Record<string, string>> = {
+  "retirement.type": { pretax: "Pre-tax", roth: "Roth" },
+  "retirement.eligiblePay": { salary: "Salary", salaryAndBonus: "Salary and bonus" },
+  "retirement.vestingService": { elapsedTime: "Years worked", planYearHours: "Plan years with 1,000 hours" },
+  "health.coverage": { self: "Self", family: "Family" },
+  "cashAwards.clawback.kind": { prorated: "The unworked share", full: "All of it" },
+  "cashAwards.clawback.per": { month: "Completed months", day: "Days" },
+  "cashAwards.clawback.from": { start: "Your start date", payment: "The payment date" },
+  "cashAwards.clawback.repay": { gross: "Gross (the full amount)", net: "Net (what you received)" },
+};
+
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const isRange = (v: unknown): v is ByScenario => !!v && typeof v === "object" && "base" in v && "bear" in v;
 const PERCENT_KEYS = new Set(["salary.raise", "equity.priceGrowth", "salary.promotions.stepUp", "costOfLiving.rentGrowth",
+  "retirement.contributionPct", "retirement.nonElectivePct", "retirement.match.rate", "retirement.match.upToPct", "retirement.vesting.steps.pct",
   "equity.grants.schedule.tranches.fraction", "equity.refreshers.schedule.tranches.fraction"]);
 const MONTH_KEYS = new Set(["equity.refreshers.firstAfterMonths", "equity.refreshers.everyMonths", "equity.grants.schedule.tranches.month",
   "equity.refreshers.schedule.tranches.month"]);
@@ -1001,7 +1036,8 @@ function formatterFor(d: OfferDraft, key: string): (x: number) => string {
   if (PERCENT_KEYS.has(key) || (key === "bonus.amount" && bonusBasis(d.bonus) === "percentOfSalary")) return percent;
   if (key === "hours.weekly") return (x) => `${x} hours a week`;
   if (key === "hours.weeksPerYear") return (x) => `${x} weeks`;
-  if (MONTH_KEYS.has(key)) return (x) => `${x} ${x === 1 ? "month" : "months"}`;
+  if (MONTH_KEYS.has(key) || key === "cashAwards.clawback.months") return (x) => `${x} ${x === 1 ? "month" : "months"}`;
+  if (key === "retirement.vesting.years" || key === "retirement.vesting.steps.years") return (x) => `${x} ${x === 1 ? "year" : "years"}`;
   return dollars;
 }
 
@@ -1024,6 +1060,13 @@ function aboutWork(ctx: WorkContext, field: AboutField): Work {
         notes: [isDefault ? "The default: none." : "As you entered it.",
           `Pay from another job in ${ctx.wagesYear} is taxed in the same year, so it raises the new job's first-year tax.`],
         ties: [], uses: [], edit: { about: "wages" } };
+    case "healthUsage": {
+      const usage = h.healthUsage ?? "medium";
+      return { title: "Health use", lines: [{ label: "Out-of-pocket estimate that counts", value: usage[0].toUpperCase() + usage.slice(1), tick }],
+        notes: [isDefault ? "The default: the middle of your own three estimates." : "As you chose it.",
+          "Every offer's health plan counts your out-of-pocket estimate at this level of use, capped at its maximum."],
+        ties: [], uses: [], edit: { about: "healthUsage" } };
+    }
     case "prices":
       return { title: "Prices in", lines: [{ label: "Dollars", value: "U.S. average", tick: "default" }],
         notes: ["The default: every offer's spending money is priced as in an average U.S. city, so offers in different cities compare in the same dollars."],

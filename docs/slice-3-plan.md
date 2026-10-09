@@ -1,5 +1,10 @@
 # UI slice 3 plan: detailed mode (approved 2026-10-08)
 
+**Status (2026-10-08): done.** Step 0, group 1 (checkpoint approved), group 2, JSON export/import
+and the public-repo prep are merged and live. Where the build differs from this plan is in
+`docs/ui-design.md` §12, "UI slice 3 versus this design". What's left of the prep is the settings
+the user changes (item 7) and the visibility.
+
 The plan for UI slice 3 and the public-repo prep after it, with the decisions made in review on
 2026-10-08. A fresh session should be able to execute it from this file, `CLAUDE.md` and
 `docs/ui-design.md`.

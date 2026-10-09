@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { ByScenario, MonthDay } from "../../src/offer/types";
+import { formatWarning } from "../../src/format/warnings";
+import type { ByScenario, MonthDay, OfferWarning } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { DefaultTick, fieldId, hintId, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
@@ -20,19 +21,63 @@ const unitOf = (kind: NumberKind) => (kind === "percent" ? (x: number) => toPerc
 const fromUnit = (kind: NumberKind) => (kind === "percent" ? (x: number) => x / 100 : (x: number) => x);
 
 /** A plain number field over a draft path (percents are fractions in the draft). */
-export function NumberField({ o, path, kind, label, unit, placeholder }: {
+export function NumberField({ o, path, kind, label, unit, placeholder, k = helpKey(path), blank }: {
   o: AppOffer; path: string; kind: NumberKind; label: string; unit?: string; placeholder?: string;
+  /** Its help, when its path isn't its help key (health.outOfPocket.low is health.outOfPocket's). */ k?: string;
+  /** Said when it's blank: "Not counted". */ blank?: string;
 }) {
   const api = useLedger();
   const v = shownValue<number>(o, path);
-  const k = helpKey(path);
   return (
     <span className="field">
       <NumberInput id={fieldId(o.letter, path)} kind={kind} label={`Offer ${o.letter} ${label}`} unit={unit} placeholder={placeholder}
         value={v === null ? null : unitOf(kind)(v)} help={k} describedBy={hintId(k)} invalid={issuesAt(api, o.letter, path).length > 0}
         onChange={(x) => api.set(o, { [path]: x === null ? null : fromUnit(kind)(x) })} />
       <DefaultTick o={o} path={path} label={`the ${label}`} />
+      {v === null && blank && <span className="sub not-counted">{blank}</span>}
     </span>
+  );
+}
+
+/**
+ * Whether an offer has a plan (401(k), health): not entered (not counted), entered, or none (entered,
+ * as none). Entering one starts it blank, at its defaults.
+ */
+export function PlanField<T>({ o, path, label, has, none, start }: {
+  o: AppOffer; path: "retirement" | "health"; label: string; /** "Has a 401(k)" */ has: string; /** "No 401(k)" */ none: string; start: () => T;
+}) {
+  const api = useLedger();
+  const v = getPath(o.draft, path);
+  const value = v === null ? "unset" : v === "none" ? "none" : "plan";
+  return (
+    <span className="field">
+      <select id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} ${label}`} data-help={path} aria-describedby={hintId(path)} value={value}
+        onChange={(e) => api.set(o, { [path]: e.target.value === "unset" ? null : e.target.value === "none" ? "none" : start() })}>
+        <option value="unset">Not entered</option>
+        <option value="plan">{has}</option>
+        <option value="none">{none}</option>
+      </select>
+      {value === "unset" && <span className="sub not-counted">Not counted</span>}
+    </span>
+  );
+}
+
+/** The engine's warnings at a field: the remote-work rule under employer state, the limits under the HSA, perks and 401(k). */
+const WARNING_AT: Partial<Record<OfferWarning["code"], string>> = {
+  convenienceRule: "employerState", hsaCap: "health.employeeHsa", section127Cap: "perks.section127", commuterCap: "perks.commuterMonthly",
+  k401Cap: "retirement.contributionPct", bonusCutoff: "bonus.cutoff",
+};
+
+export function Warnings({ o, path }: { o: AppOffer; path: string }) {
+  const api = useLedger();
+  const list = (api.warnings?.[o.letter] ?? []).filter((w) => WARNING_AT[w.code] === path);
+  const seen = new Set<string>();
+  const unique = list.filter((w) => { const key = w.code; if (seen.has(key)) return false; seen.add(key); return true; });
+  if (!unique.length) return null;
+  return (
+    <ul className="field-warnings" role="note">
+      {unique.map((w) => <li key={w.code}><span aria-hidden="true">⚠</span> {formatWarning(w)}</li>)}
+    </ul>
   );
 }
 

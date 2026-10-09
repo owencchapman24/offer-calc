@@ -5,12 +5,13 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
+import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
-import { type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
+import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
 import type { EditTarget, WorkContext } from "./metrics";
 import { localToday } from "./text";
 import { WorkProvider } from "./Tickmarks";
@@ -21,9 +22,11 @@ import { verdict } from "./verdict";
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
 const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.area", "startDate", "costOfLiving.monthlyRent", "label"]);
-const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", prices: "about-filing" } as const;
+const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-filing" } as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
+// The Data page (export, import, delete) loads when it's opened too.
+const DataPage = lazy(() => import("./Data"));
 
 function storage(): KeyValueStore | undefined {
   try {
@@ -39,8 +42,9 @@ const themeOverride = (): Theme | null => {
   return t === "light" || t === "dark" ? t : null;
 };
 
-/** Hash routes, so static hosting needs no rewrites: #/ (compare) and #/method or #/method/M-7.2 (methodology). */
-function parseRoute(hash: string): { page: "compare" } | { page: "method"; section: SectionId | null } {
+/** Hash routes, so static hosting needs no rewrites: #/ (compare), #/method or #/method/M-7.2 (methodology), #/data (your data). */
+function parseRoute(hash: string): { page: "compare" } | { page: "data" } | { page: "method"; section: SectionId | null } {
+  if (/^#\/data/.test(hash)) return { page: "data" };
   const m = hash.match(/^#\/method(?:\/(M-[\d.]+))?/);
   if (!m) return { page: "compare" };
   return { page: "method", section: m[1] && m[1] in SECTIONS ? (m[1] as SectionId) : null };
@@ -94,7 +98,7 @@ export function App() {
     const state = o.draft.residence.state;
     return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
   })).values()];
-  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) });
+  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) }, session.revision ?? 0);
   // The validator's problems, by offer: the engine checks the complete offers, in order.
   const issues: Partial<Record<Letter, OfferIssue[]>> = {};
   complete.forEach((x, i) => { if (engine.issues[i]?.length) issues[x.o.letter] = engine.issues[i]; });
@@ -125,6 +129,9 @@ export function App() {
   const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
     ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours) : null;
+  // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
+  const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
+  if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
   // A cost or benefit counted for some offers but not others: the lead schedule says so.
   const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
 
@@ -151,6 +158,7 @@ export function App() {
         <nav className="pages" aria-label="Pages">
           <a href="#/" aria-current={route.page === "compare" ? "page" : undefined}>Compare</a>
           <a href="#/method" aria-current={route.page === "method" ? "page" : undefined}>Methodology</a>
+          <a href="#/data" aria-current={route.page === "data" ? "page" : undefined}>Data</a>
         </nav>
       </header>
 
@@ -158,12 +166,17 @@ export function App() {
         <Suspense fallback={<p className="note">Loading the methodology…</p>}>
           <Methodology ctx={work} section={route.section} sample={sample} />
         </Suspense>
+      ) : route.page === "data" ? (
+        <Suspense fallback={<p className="note">Loading…</p>}>
+          <DataPage session={session} dispatch={dispatch} today={today} saved={saved} clear={() => { clearSession(storage()); }} />
+        </Suspense>
       ) : (
         <>
           <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
 
           <main className="workpaper">
-            <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} ui={session.ui} dispatch={dispatch} />
+            <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} warnings={warnings} ui={session.ui}
+              dispatch={dispatch} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}

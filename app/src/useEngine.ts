@@ -27,10 +27,17 @@ const DEBOUNCE_MS = 200;
  * any response for an older generation is dropped, so a slow result never overwrites a newer one.
  * While recomputing, the previous result stays on screen (dimmed by the caller).
  */
-export function useEngine(request: Omit<EngineRequest, "gen">): EngineState {
+export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when the offers are replaced wholesale: older results then don't apply. */ revision = 0): EngineState {
   const worker = useRef<Worker | null>(null);
   const gen = useRef(0);
   const [state, setState] = useState<EngineState>({ sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null });
+  // An import or "Delete all data" replaces every offer: the last valid results were for offers that are gone.
+  const seen = useRef(revision);
+  useEffect(() => {
+    if (seen.current === revision) return;
+    seen.current = revision;
+    setState((s) => ({ ...s, sweep: null, detail: null }));
+  }, [revision]);
 
   useEffect(() => {
     const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });

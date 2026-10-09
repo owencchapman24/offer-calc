@@ -1,6 +1,6 @@
-import { describeSchedule } from "../../src/format/index";
+import { describeSchedule } from "../../src/format/schedule";
 import type { ByScenario } from "../../src/offer/types";
-import { bonusBasis, type CashAwardDraft, hasRange, type OfferDraft, type ScheduleDraft } from "./model";
+import { bonusBasis, type CashAwardDraft, hasRange, type OfferDraft, type RetirementDraft, type ScheduleDraft } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
 import { dollars, longDate, percent } from "./text";
 
@@ -69,6 +69,7 @@ export const cashAwardsText = (d: OfferDraft) => (d.cashAwards.length ? d.cashAw
 export function retirementText(d: OfferDraft): string {
   const r = d.retirement;
   if (!r) return "Not entered";
+  if (r === "none") return "No 401(k)";
   const tiers = r.match.map((t) => `${percent(t.rate ?? 0)} of ${t.upToPct === 1 ? "all deferrals" : `the first ${percent(t.upToPct ?? 0)}`}`);
   const v = r.vesting;
   const vesting = !v || v.kind === "immediate" ? "vests immediately" : v.kind === "cliff" ? `vests after a ${v.years}-year cliff` : "graded vesting";
@@ -76,9 +77,25 @@ export function retirementText(d: OfferDraft): string {
     + `${r.nonElectivePct ? ` + ${percent(r.nonElectivePct)} of pay` : ""}; ${vesting}`;
 }
 
+/** "100% of the first 3%, then 50% of the first 5%". */
+export function matchText(r: RetirementDraft): string {
+  if (!r.match.length) return "None";
+  return r.match.map((t) => `${t.rate === null ? "—" : percent(t.rate)} of ${t.upToPct === 1 ? "all you defer" : `the first ${t.upToPct === null ? "—" : percent(t.upToPct)}`}`)
+    .join(", then ");
+}
+
+/** "Immediate", "After a 3-year cliff", "20% after 2, 40% after 3, ..." */
+export function vestingText(r: RetirementDraft): string {
+  const v = r.vesting;
+  if (!v || v.kind === "immediate") return "Immediate";
+  if (v.kind === "cliff") return `After a ${v.years ?? "—"}-year cliff`;
+  return v.steps.map((x) => `${x.pct === null ? "—" : percent(x.pct)} after ${x.years ?? "—"} ${x.years === 1 ? "year" : "years"}`).join(", ");
+}
+
 export function healthText(d: OfferDraft): string {
   const h = d.health;
   if (!h) return "Not entered";
+  if (h === "none") return "No health plan from this job";
   const o = h.outOfPocket;
   const parts = [h.premium !== null ? `premium ${dollars(h.premium)} a year` : "premium not counted",
     o.medium !== null ? `out-of-pocket ${dollars(o.medium)} (medium use)` : "out-of-pocket not counted"];

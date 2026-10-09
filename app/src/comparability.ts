@@ -20,10 +20,10 @@ export interface Asymmetry {
 
 /** Whether each category is entered for an offer. */
 const COUNTED: Record<Category, (d: OfferDraft) => boolean> = {
-  premium: (d) => d.health?.premium != null,
-  outOfPocket: (d) => !!d.health && (d.health.outOfPocket.low != null || d.health.outOfPocket.medium != null || d.health.outOfPocket.high != null),
+  premium: (d) => d.health === "none" || (d.health !== null && d.health.premium !== null),
+  outOfPocket: (d) => d.health === "none" || (d.health !== null && Object.values(d.health.outOfPocket).some((v) => v !== null)),
   employer401k: (d) => d.retirement !== null,
-  employerHsa: (d) => d.health?.employerHsa != null,
+  employerHsa: (d) => d.health === "none" || (d.health !== null && d.health.employerHsa !== null),
   perks: (d) => d.perks.section127 !== null || d.perks.commuterMonthly !== null,
   hours: (d) => d.hours.weekly !== null,
 };

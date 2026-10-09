@@ -1,26 +1,17 @@
 import type {
-  Assumption, BenefitDetail, BenefitKind, Cliff, ClawbackResult, EventDetail, MonthDay, OfferWarning, RsuGrantRef,
-  SalaryChangeReason, VestingSchedule,
+  Assumption, BenefitDetail, BenefitKind, Cliff, ClawbackResult, EventDetail, RsuGrantRef, SalaryChangeReason,
 } from "../offer/types";
-import type { OfferIssue } from "../offer/validate";
-import type { TaxWarning } from "../tax/types";
 import type { RentEstimate } from "../col/rent";
+import { pct, round2, usd } from "./numbers";
 
 // Words for the engine's numbers and codes. The engine (src/tax, src/offer, src/col) never formats
-// text; this module does, for the UI and the scripts. English, U.S. conventions.
+// text; this module does, for the UI and the scripts. English, U.S. conventions. Its parts are their own
+// modules (numbers, issues, schedule, warnings) so the app's chunks each take only what they use.
 
-const WHOLE = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const PLAIN = new Intl.NumberFormat("en-US");
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const round2 = (x: number) => Math.round(x * 100) / 100;
-
-/** "$150,000" or "$62,054.79" */
-export const usd = (x: number) => `$${(Number.isInteger(x) ? WHOLE : CENTS).format(x)}`;
-/** A fraction as a percent with up to `digits` decimals: pct(0.06125) = "6.125%". */
-export const pct = (x: number, digits = 4) => `${+(x * 100).toFixed(digits)}%`;
-/** "Mar 15" */
-export const monthDay = (md: MonthDay) => `${MONTHS[md.month - 1]} ${md.day}`;
+export * from "./numbers";
+export * from "./issues";
+export * from "./schedule";
+export * from "./warnings";
 
 // ---- payments --------------------------------------------------------------------
 
@@ -94,118 +85,6 @@ export function cliffLabel(c: Cliff): string {
 
 export const clawbackTreatment = (t: ClawbackResult["treatment"]) =>
   ({ sameYearReversal: "same-year wage reversal", irc1341Credit: "IRC 1341 credit", noRelief: "no relief ($3,000 or less)" })[t];
-
-// ---- warnings ------------------------------------------------------------------------------
-
-export function formatWarning(w: OfferWarning | TaxWarning): string {
-  switch (w.code) {
-    case "convenienceRule": {
-      const { residenceState: r, employerState: e } = w.params;
-      return `The employer is in ${e}, which can tax a nonresident's remote-work wages under its convenience-of-employer `
-        + `rule. If you work from home in ${r}, ${e} may tax this pay too, and ${r}'s credit may not offset it fully. `
-        + `This projection taxes ${r} residence only.`;
-    }
-    case "bonusCutoff": {
-      const p = w.params;
-      return `Start date ${p.start} is on or after the ${monthDay(p.cutoff)} bonus cutoff, so the ${p.periodFrom} to `
-        + `${p.periodTo} period pays nothing.`;
-    }
-    case "bonusForfeited": {
-      const p = w.params;
-      return `Leaving on ${p.leaveDate} forfeits the bonus for ${p.periodFrom} to ${p.periodTo}: it pays ${p.payDate} `
-        + "and requires being employed on the payout date.";
-    }
-    case "k401Cap":
-      return `Your ${w.params.year} 401(k) deferrals reach the 402(g) limit of ${usd(round2(w.params.limit))} before `
-        + "year-end: deferrals and any match stop for the rest of that year (no true-up assumed).";
-    case "hsaCap":
-      return `HSA contributions in ${w.params.year} reach the ${usd(round2(w.params.limit))} limit (yours plus your `
-        + "employer's); yours are capped there.";
-    case "section127Cap":
-      return `Section 127 help above ${usd(round2(w.params.limit))} in ${w.params.year} is taxable; only the limit is counted.`;
-    case "commuterCap":
-      return `Commuter benefits above ${usd(round2(w.params.monthlyLimit))} a month in ${w.params.year} are taxable; `
-        + "only the limit is counted.";
-    case "clawbackFica":
-      return `Repaying ${w.params.award} in ${w.params.repaidYear} for pay received in ${w.params.paidYear}: the FICA `
-        + "withheld on it isn't automatically refunded (your employer may return it on a corrected W-2c). This "
-        + "projection assumes you don't get it back, and gives no state relief.";
-    case "withholdingShortfall":
-      return `Federal withholding on ${w.params.year} pay falls about ${usd(Math.round(w.params.balanceDue))} short of `
-        + `its federal income tax${w.params.supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}. `
-        + `Expect to owe it in April ${w.params.year + 1}, or raise your withholding on Form W-4.`;
-    case "itemizing":
-      return `Itemizing beats the standard deduction here (SALT and other deductions total $${PLAIN.format(Math.round(w.params.deduction))}).`;
-    case "k401OverLimit": return `401(k) deferral exceeds the ${w.params.year} limit of $${PLAIN.format(w.params.limit)}.`;
-    case "amtNotModeled": return "Alternative minimum tax is not modeled; check AMT above roughly $400k of income.";
-    case "projectedLaw":
-      return `${w.params.year} tax law is projected from 2026: federal amounts indexed for inflation, state and local law held at 2026.`;
-    case "nycNonresident": return "NYC tax applies to NYC residents only; check your state selection.";
-    case "phillyNonresident": return "Philadelphia nonresident wage tax applies only to days physically worked in the city.";
-    case "flatLocalRate": return `${w.params.label}: user-supplied flat rate of ${(w.params.rate * 100).toFixed(2)}%.`;
-    case "headOfHouseholdState": return "Head of household: state tax uses single-filer brackets and deductions (approximation).";
-    case "ctPersonalCredit":
-      return "Connecticut personal tax credit (1-75% by income) not modeled; tax may be slightly overstated.";
-    case "stateNote": return w.params.note;
-  }
-}
-
-// ---- input problems ------------------------------------------------------------------------------
-
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
-  "December"];
-
-/** A share as a percent, as precise as entered: 0.9999 -> "99.99%". */
-const sharePct = (x: number) => `${+(x * 100).toFixed(6)}%`;
-
-/** The plain-English message shown under the field an input problem belongs to. */
-export function formatIssue(i: OfferIssue): string {
-  switch (i.code) {
-    case "required":
-      return { amount: "Enter an amount.", percent: "Enter a percent.", date: "Enter a date.", number: "Enter a number.",
-        choice: "Pick one." }[i.params.kind];
-    case "date": return `"${i.params.value}" isn't a date: use a date like 2027-07-12.`;
-    case "monthDay": {
-      const { month, day } = i.params;
-      return month >= 1 && month <= 12 ? `${MONTH_NAMES[month - 1]} has no ${day}${ordinal(day)}.` : "Pick a month from January to December.";
-    }
-    case "before2026":
-      return i.params.what === "start" ? "Start dates before 2026 aren't supported: tax data starts in 2026."
-        : i.params.what === "vest" ? "A tranche would vest before 2026, and tax data starts in 2026: move the vesting start later."
-        : "Payments before 2026 aren't supported: tax data starts in 2026.";
-    case "leaveBeforeStart": return "The leave date can't be before the start date.";
-    case "notAfterStart": return "The promotion date must be after your start date.";
-    case "negative": return "Enter 0 or more.";
-    case "rate": return "Enter more than −100%.";
-    case "share": return "Enter a percent from 0 to 100.";
-    case "hours": return `Weekly hours must be between ${i.params.min} and ${i.params.max}.`;
-    case "weeks": return `Weeks a year must be between ${i.params.min} and ${i.params.max}.`;
-    case "wholeMonths":
-      return /clawback/.test(i.path) ? `A clawback window is a whole number of months, at least ${i.params.min}.`
-        : `Enter a whole number of months, ${i.params.min} or more.`;
-    case "wholeYears": return `Enter a whole number of years, ${i.params.min} or more.`;
-    case "wholeDays": return `Enter a whole number of days, ${i.params.min} or more.`;
-    case "positive": return "Each tranche must vest more than 0%.";
-    case "trancheSum": {
-      const { sum } = i.params;
-      return sum < 1 ? `These tranches add up to ${sharePct(sum)}: ${sharePct(1 - sum)} is missing.`
-        : `These tranches add up to ${sharePct(sum)}: ${sharePct(sum - 1)} too much.`;
-    }
-    case "noTranches": return "Add at least one tranche.";
-    case "noMonths": return "Pick at least one vest month.";
-    case "tierRange": return "A match tier goes up to more than 0% and at most 100% of pay, at a rate of 0% or more.";
-    case "tierOrder": return "Each match tier must go higher than the one before it.";
-    case "noYears": return "Enter at least one year's bonus.";
-    case "needsHours": return "Counting service by plan-year hours needs weekly hours for this offer.";
-    case "gradedSteps": return "Graded vesting steps must rise year by year and reach 100%.";
-    case "oopOrder": return "Out-of-pocket costs should rise from low to medium to high use.";
-    case "unknownArea": return "We don't have prices for this area: pick a city from the list.";
-    case "unknownState": return i.params.state ? `"${i.params.state}" isn't a state we can tax: pick a U.S. state or DC.` : "Pick a state.";
-    case "savingsRate": return "A savings rate is at least 0% and below 100%.";
-  }
-}
-
-const ordinal = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th");
 
 // ---- assumptions -----------------------------------------------------------------------------
 
@@ -291,26 +170,4 @@ export function rentSource(source: "input" | "fmr" | "derived", estimate?: RentE
   return estimate.source === "fmr"
     ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${BEDROOMS[estimate.bedrooms]}, ${estimate.hudAreaName}`
     : `derived from the housing RPPs: ${usd(estimate.anchorRent)} x ${estimate.housingRatio.toFixed(4)}`;
-}
-
-// ---- vesting schedules ------------------------------------------------------------------------
-
-const CADENCE: Record<number, string> = { 1: "monthly", 3: "quarterly", 6: "semiannual", 12: "annual" };
-
-/** Plain-language label read off the tranches, e.g. "5/15/40/40, semiannual after a 1-year cliff". */
-export function describeSchedule(s: VestingSchedule): string {
-  const pcts: number[] = [];
-  for (const t of s.tranches) {
-    const year = Math.max(0, Math.ceil(t.month / 12) - 1);
-    pcts[year] = (pcts[year] ?? 0) + t.fraction * 100;
-  }
-  const split = Array.from(pcts, (p) => +(p ?? 0).toFixed(1)).join("/");
-  const months = s.tranches.map((t) => t.month);
-  const gaps = months.slice(1).map((m, i) => m - months[i]);
-  if (gaps.length === 0) return `${split}, all at month ${months[0]}`;
-  if (!gaps.every((g) => g === gaps[0])) return `${split} by year, on a custom schedule`;
-  const cadence = CADENCE[gaps[0]] ?? `every ${gaps[0]} months`;
-  if (months[0] === gaps[0]) return `${split}, ${cadence}`;
-  const cliff = months[0] % 12 === 0 ? `${months[0] / 12}-year` : `${months[0]}-month`;
-  return `${split}, ${cadence} after a ${cliff} cliff`;
 }

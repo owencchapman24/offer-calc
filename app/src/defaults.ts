@@ -1,8 +1,8 @@
-import { describeSchedule } from "../../src/format/index";
-import { getPath, type OfferDraft } from "./model";
+import { describeSchedule } from "../../src/format/schedule";
+import { ASSUMPTIONS, getPath, type OfferDraft } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
 import { helpKey } from "./help";
-import { longDate } from "./text";
+import { longDate, percent } from "./text";
 
 // Defaults (docs/ui-design.md §3.6): a default is a real, visible, editable value with a D tickmark
 // that says why. In a draft, null means "at its default"; this registry gives each default's value in
@@ -59,6 +59,36 @@ export const DEFAULTS: Record<string, DefaultSpec> = {
   "equity.refreshers.schedule": schedule("refresher"),
   "equity.refreshers.schedule.vestDates": noVestDates,
   "hours.weeksPerYear": { value: 50, shown: () => "50", reason: "Two weeks off a year." },
+  "cashAwards.paidOn": { shown: () => "30 days after you start", reason: "Sign-ons usually come with the first paycheck or two." },
+  "cashAwards.clawback.months": { value: 12, shown: () => "12 months", reason: "The most common sign-on clawback window." },
+  "cashAwards.clawback.kind": { value: "prorated", shown: () => "Prorated", reason: "Many sign-on clawbacks owe back only the share of the window you didn't work." },
+  "cashAwards.clawback.per": { value: "month", shown: () => "Completed months", reason: "Prorating by completed months is the usual contract term." },
+  "cashAwards.clawback.from": { value: "start", shown: () => "Your start date", reason: "The window usually runs from your start date." },
+  "cashAwards.clawback.repay": {
+    value: "gross", shown: () => "Gross", reason: "The usual contract term: you repay the full amount, though you received it after withholding.",
+  },
+  "retirement.contributionPct": {
+    value: 0, shown: () => "0%", reason: "Zero until you say what you'd put in: this tool doesn't advise how much to save. The note under it says what the full match needs.",
+  },
+  "retirement.type": { value: "pretax", shown: () => "Pre-tax", reason: "Most plans start you on pre-tax deferrals; Roth is a choice you make." },
+  "retirement.eligiblePay": { value: "salary", shown: () => "Salary", reason: "Most plans count base salary; some count bonuses too." },
+  "retirement.nonElectivePct": { value: 0, shown: () => "0%", reason: "Most plans add money only as a match on what you defer." },
+  "retirement.vesting": {
+    shown: () => "Immediate", reason: "Many plans vest immediately; check your plan's summary for a cliff or a graded schedule.",
+  },
+  "retirement.vestingService": { value: "elapsedTime", shown: () => "Years worked", reason: "The usual way: each year worked counts." },
+  "health.employeeHsa": { value: 0, shown: () => "$0", reason: "Zero until you choose to put money in an HSA." },
+  "health.employerHsa": { value: 0, shown: () => "$0", reason: "Zero unless the plan puts money in your HSA: enter it if it does." },
+  "health.coverage": { value: "self", shown: () => "Self", reason: "Coverage for you alone; family coverage has a higher HSA limit." },
+  "perks.section127": { value: 0, shown: () => "$0", reason: "Zero unless the offer includes education assistance." },
+  "perks.commuterMonthly": { value: 0, shown: () => "$0", reason: "Zero unless the offer includes commuter benefits." },
+  employerState: {
+    shown: (d) => `Where you'd live${d.residence.state ? ` (${d.residence.state})` : ""}`,
+    reason: "Most people work for an employer in the state they live in. Change it if the employer is elsewhere: some states tax remote workers.",
+  },
+  "costOfLiving.rentGrowth": {
+    value: ASSUMPTIONS.inflation, shown: () => `${percent(ASSUMPTIONS.inflation)} (inflation)`, reason: "Rent rises with inflation unless you know your city's rents rise faster or slower.",
+  },
 };
 
 /** The default for an input path, if it has one. */

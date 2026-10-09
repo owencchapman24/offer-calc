@@ -176,7 +176,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-5">
           <p>
             Total rewards adds what the job gives you beyond cash, and takes out what its health plan costs you beyond premiums.
-            Quick mode doesn't ask for these; detailed mode shows each offer's, and the sample offers include them.
+            Quick mode doesn't ask for these; detailed mode does, and the sample offers include them. A 401(k) or a health plan
+            you haven't entered isn't counted, and you can say an offer has none. When one is counted for some offers but not
+            others, the lead schedule says so, since leaving it out flatters one side.
           </p>
         </Section>
         <Section id="M-5.1">
@@ -191,8 +193,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-5.2">
           <p>
             Premiums and your HSA contributions are taken pre-tax. Health costs beyond premiums are your expected out-of-pocket
-            spending (at medium usage, capped at the plan's out-of-pocket maximum), minus any HSA money from the employer. They're
-            held flat each year.
+            spending (your own estimate at the health use you pick in About you, medium unless you change it, capped at the plan's
+            out-of-pocket maximum), minus any HSA money from the employer. They're held flat each year. A premium or out-of-pocket
+            estimate left blank isn't counted: we don't guess what a plan you haven't seen costs.
           </p>
         </Section>
         <Section id="M-5.3">
@@ -241,8 +244,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             ask for your actual rent.
           </p>
           <p>
-            The rent you enter is the first lease year's. The lease starts on your start date and rises by the inflation
-            assumption ({percent(ASSUMPTIONS.inflation)}) at each anniversary, and it's paid only while you work there.
+            The rent you enter is the first lease year's. The lease starts on your start date and rises at each anniversary by the
+            rent growth under Where you'd live (the inflation assumption, {percent(ASSUMPTIONS.inflation)}, unless you change it),
+            and it's paid only while you work there.
           </p>
         </Section>
         <Section id="M-6.3">
