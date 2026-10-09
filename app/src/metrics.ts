@@ -45,6 +45,7 @@ export type MetricId =
   | `win.${Scenario}` // L-2: who leads in a scenario, by how much a month (or an hour)
   | `kept.${L}` // L-4: what you keep if your last day is the one picked (after tax, or total rewards)
   | `repay.${L}` // L-4: clawbacks owed on that last day
+  | `forgone.${L}.${number}` // L-4: what was earned toward a bonus that leaving forfeits (the offer's nth)
   | `forfeit.${L}.${"rsu" | "k401"}` // L-4: RSUs or employer 401(k) money not vested by then
   | `next.${L}` // L-4: what staying until the next cliff is worth
   | `nextown.${L}` // L-4: the next cliff's own part of that

@@ -6,7 +6,7 @@ import type { Letter } from "./model";
 import { CASES, changeText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
 import { cents, dollars, figure } from "./text";
 import { Fig, useRovingTicks } from "./figures";
-import { Stamp, TickLegend } from "./ui";
+import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
 
 // L-2 · If things go badly (docs/ui-design.md §4.4): which offer holds up best. A sentence, a range chart
 // (bear and bull joined, base as a diamond), who wins each scenario, what goes wrong in the bear case,
@@ -19,7 +19,9 @@ const short = (x: number, perHour: boolean) =>
 
 const Who = ({ l }: { l: Letter }) => <strong className={`who offer-${l}`}>{l}</strong>;
 
-export function Risk({ ctx, sample, tableOpen = false }: { ctx: WorkContext; sample: boolean; /** Tests open the table view. */ tableOpen?: boolean }) {
+export function Risk({ ctx, sample, tableOpen = false, status = null }: {
+  ctx: WorkContext; sample: boolean; /** Tests open the table view. */ tableOpen?: boolean; /** Its figures are from earlier inputs. */ status?: Stale;
+}) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   const [table, setTable] = useState(tableOpen);
@@ -35,10 +37,11 @@ export function Risk({ ctx, sample, tableOpen = false }: { ctx: WorkContext; sam
   const title = v.perHour ? `Per hour worked over your stay (${v.years} ${v.years === 1 ? "year" : "years"}), nominal`
     : `${BASIS_PHRASE[basis][0].toUpperCase()}${BASIS_PHRASE[basis].slice(1)}, ${v.years}-year total, present value`;
   return (
-    <section ref={ref} className="schedule risk" aria-labelledby="l2-title">
+    <section ref={ref} className={`schedule risk${status ? " is-updating" : ""}`} aria-labelledby="l2-title" aria-busy={status === "updating"}>
       <header className="schedule-head">
         <h2 id="l2-title"><span className="ref">L-2</span> If things go badly</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}
+        <StaleNote status={status} />
       </header>
       {!v.anyRange ? (
         <p className="risk-none">

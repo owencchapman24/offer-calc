@@ -150,17 +150,40 @@ export function cliffsText(cliffs: Cliff[]): string {
 }
 
 /** A bonus period in words: "2026" for a calendar year. */
-const period = (from: ISODate, to: ISODate) =>
+export const periodText = (from: ISODate, to: ISODate) =>
   (from.endsWith("-01-01") && to === `${from.slice(0, 4)}-12-31` ? from.slice(0, 4) : `${longDate(from)} – ${longDate(to)}`);
 
-/** The leave-date warnings, in the UI's words: the bonuses forfeited as one line, then each clawback's FICA. */
+/** A bonus forfeited by leaving: what was earned toward it by the last day, and what it pays if you stay. */
+export interface Forfeit {
+  /** Its place among the offer's forfeited bonuses: the figure's id. */
+  index: number;
+  period: string;
+  earned: number;
+  full: number;
+  payDate: ISODate;
+  /** All of it was earned: the period ended by the last day. */
+  all: boolean;
+  /** A first period that began before your start: what it pays counts from your start. */
+  stub: boolean;
+}
+
+export function forfeits(warnings: OfferWarning[], start: ISODate): Forfeit[] {
+  return warnings.flatMap((w) => (w.code === "bonusForfeited" ? [w.params] : [])).map((p, index) => ({
+    index, period: periodText(p.periodFrom, p.periodTo), earned: p.earned, full: p.full, payDate: p.payDate,
+    all: Math.abs(p.full - p.earned) < 0.5, stub: p.periodFrom < start,
+  }));
+}
+
+/** "$1,151 earned toward the 2027 bonus (target $36,000, paid Mar 15, 2028)", the amount left to the caller to tick. */
+export function forfeitText(f: Forfeit): { before: string; after: string } {
+  if (f.all) return { before: `the ${f.period} bonus, `, after: `, all of it earned (paid ${longDate(f.payDate)}${f.stub ? "; it counts from your start" : ""})` };
+  return { before: "", after: ` earned toward the ${f.period} bonus (${f.stub ? "the whole first bonus, from your start" : "target"} `
+    + `${dollars(f.full)}, paid ${longDate(f.payDate)})` };
+}
+
+/** The leave-date warnings other than forfeited bonuses (which the panel ticks): FICA on a later-year clawback. */
 export function leaveWarningTexts(warnings: OfferWarning[]): string[] {
   const out: string[] = [];
-  const bonuses = warnings.flatMap((w) => (w.code === "bonusForfeited" ? [w.params] : []));
-  if (bonuses.length) {
-    out.push(`Leaving then forfeits the ${bonuses.length > 1 ? "bonuses" : "bonus"} for `
-      + `${join(bonuses.map((b) => `${period(b.periodFrom, b.periodTo)} (paid ${longDate(b.payDate)})`))}: you must be employed on the payout date.`);
-  }
   for (const w of warnings) {
     if (w.code !== "clawbackFica") continue;
     const p = w.params;

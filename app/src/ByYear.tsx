@@ -6,7 +6,7 @@ import type { Action, UiState } from "./session";
 import { niceTicks } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Fig, useRovingTicks } from "./Tickmarks";
-import { Stamp, TickLegend } from "./ui";
+import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
 
 // L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4).
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
@@ -19,7 +19,9 @@ const UNIT: Record<Basis, string> = {
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
 
-export function ByYear({ ctx, ui, sample, dispatch }: { ctx: WorkContext; ui: UiState; sample: boolean; dispatch: Dispatch<Action> }) {
+export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
+  ctx: WorkContext; ui: UiState; sample: boolean; dispatch: Dispatch<Action>; /** Its figures are from earlier inputs. */ status?: Stale;
+}) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   const r = ctx.results;
@@ -30,10 +32,11 @@ export function ByYear({ ctx, ui, sample, dispatch }: { ctx: WorkContext; ui: Ui
   const offers = r.letters.map((l) => byYear(ctx, l));
   const setView = (patch: Partial<NonNullable<UiState["byYear"]>>) => dispatch({ type: "ui", patch: { byYear: { mode, table, ...patch } } });
   return (
-    <section ref={ref} className="schedule by-year" aria-labelledby="l1-title">
+    <section ref={ref} className={`schedule by-year${status ? " is-updating" : ""}`} aria-labelledby="l1-title" aria-busy={status === "updating"}>
       <header className="schedule-head">
         <h2 id="l1-title"><span className="ref">L-1</span> By year</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}
+        <StaleNote status={status} />
       </header>
       <div className="by-year-grid">
         <div className="by-year-chart">

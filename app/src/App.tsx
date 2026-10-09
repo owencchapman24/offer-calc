@@ -16,6 +16,7 @@ import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOffer
 import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
 import type { EditTarget, WorkContext } from "./metrics";
 import { dayBefore, localToday } from "./text";
+import type { Stale } from "./ui";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
 import { SECTIONS, type SectionId } from "./sections";
@@ -149,6 +150,8 @@ export function App() {
   const panels = engine.cursor.result;
   const leave = view && panels?.length === letters.length
     ? { leave: { basis: leaveBasis, stayEnd: dayBefore(view.row.window.end), panels } } : {};
+  // The schedules after the lead show their figures from earlier inputs dimmed, and say why.
+  const stale: Stale = engine.updating ? "updating" : engine.invalid ? "invalid" : null;
   const work: WorkContext = {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
     ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave } } : {}),
@@ -191,10 +194,10 @@ export function App() {
                 cautions={cautions} />
             </div>
           </main>
-          {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}
-          {work.results && <RiskSlot ctx={work} sample={sample} />}
+          {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
+          {work.results && <RiskSlot ctx={work} sample={sample} status={stale} />}
           {work.results && (
-            <LeavingSlot ctx={work} sample={sample} compare={compare} ready={!engine.updating && !engine.invalid && !!engine.sweep}
+            <LeavingSlot ctx={work} sample={sample} compare={compare} ready={!engine.updating && !engine.invalid && !!engine.sweep} status={stale}
               leave={engine.leave} cursor={engine.cursor} requestSlow={engine.requestSlow} at={leaveAt} basis={leaveBasis} onAt={setLeaveAt}
               onBasis={setLeaveBasis} />
           )}

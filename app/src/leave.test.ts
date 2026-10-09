@@ -5,6 +5,7 @@ import { toDays } from "../../src/offer/dates";
 import { keptIfLeaving, leaveDateSweep } from "../../src/offer/project";
 import { derive } from "./derive";
 import { Leaving } from "./Leaving";
+import { Risk } from "./Risk";
 import { addMonthsIso, leaveAxis, leaveLines, reconcile, valueAt, worked } from "./leaveModel";
 import type { WorkContext } from "./metrics";
 import type { LeaveCurve, LeavePanel } from "./protocol";
@@ -86,9 +87,17 @@ describe("L-4's panel (W6)", () => {
       + "after tax, $26,057 of it the cliff itself.");
     expect(text).toContain("Next cliff: your 2026 bonus ($3,742 before tax) on Mar 15, 2027, 62 days later.");
   });
-  it("the warnings that leaving that day sets off are in the panel", () => {
-    expect(text).toContain("Leaving then forfeits the bonuses for 2026 (paid Jan 31, 2027) and 2027 (paid Jan 31, 2028): you must be employed on "
-      + "the payout date.");
+  it("the warnings that leaving that day sets off are in the panel; a forfeited bonus is what was earned toward it", () => {
+    // A: the 2026 stub, $70,000 x 172 / 365 days = 32,986.30, all earned; 2027, 12 days in: $85,000 x 12 / 365 = 2,794.52 of $85,000.
+    expect(text).toContain("Leaving then forfeits the 2026 bonus, $32,986, all of it earned (paid Jan 31, 2027; it counts from your start) and $2,795 "
+      + "earned toward the 2027 bonus (target $85,000, paid Jan 31, 2028): you must be employed on the payout date.");
+    // B: the stub is 10% of the $37,419.35 salary from Jul 13 = 3,741.94; 2027 so far: 10% x 80,000 x 12/31 / 12 = 258.06.
+    expect(text).toContain("Leaving then forfeits the 2026 bonus, $3,742, all of it earned (paid Mar 15, 2027; it counts from your start) and $258 "
+      + "earned toward the 2027 bonus (target $8,112, paid Mar 15, 2028)");
+    const d = derive("forgone.A.1", withLeave(ctx).ctx);
+    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "85,000"], ["×", "0.0329"], ["=", "2,795"]]);
+    expect(d.notes[0]).toBe("If you stayed through its payout on Jan 31, 2028 it would pay $85,000: $85,000 × 365 / 365 days.");
+    expect(d.section).toBe("M-9");
     expect(text).toContain("Repaying the Sign-on in 2027 for pay received in 2026: the Social Security and Medicare tax withheld on it isn't "
       + "refunded automatically");
   });
@@ -144,5 +153,25 @@ describe("L-4 at your stay's last day: the reconciliation with the stay", () => 
   it("a curve's value between samples is a straight line", () => {
     const line = { points: [{ date: "2027-01-01", value: 0 }, { date: "2027-01-11", value: 100 }] };
     expect([valueAt(line, "2026-12-31"), valueAt(line, "2027-01-06"), valueAt(line, "2027-02-01")]).toEqual([null, 50, 100]);
+  });
+});
+
+describe("schedules whose figures are from earlier inputs say so", () => {
+  const ctx = context();
+  const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement(WorkProvider, { ctx, children: el }));
+  it("L-4 dims and says Updating… while its slow jobs answer older inputs, and while the comparison is", () => {
+    const L = withLeave(ctx);
+    const stale = { ...L.props, leave: { ...L.props.leave, key: "older inputs" } };
+    expect(html(createElement(Leaving, L.props))).not.toContain("Updating…");
+    for (const props of [stale, { ...L.props, status: "updating" as const }]) {
+      const h = html(createElement(Leaving, props));
+      expect(h).toContain("Updating…");
+      expect(h).toMatch(/class="schedule leaving is-updating"/);
+    }
+  });
+  it("L-2 dims with the comparison, and says when its figures are the last valid ones", () => {
+    expect(html(createElement(Risk, { ctx, sample: true, status: "updating" }))).toContain("Updating…");
+    expect(html(createElement(Risk, { ctx, sample: true, status: "invalid" }))).toContain("Last valid results");
+    expect(html(createElement(Risk, { ctx, sample: true }))).not.toMatch(/is-updating/);
   });
 });
