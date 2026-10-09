@@ -8,3 +8,4 @@ export {
 export { clawbackFraction } from "./clawback";
 export { byYear, VESTING_PRESETS } from "./vesting";
 export { CONVENIENCE_RULE_STATES, convenienceRuleWarning } from "./location";
+export { type IssueCode, type OfferIssue, realMonthDay, validateOffer } from "./validate";
