@@ -526,9 +526,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 }
 
 /* Show the work: the inputs a figure is built from, each opening its own work. */
-.work-inputs { margin: 8px 0 0; font-size: 13.5px; line-height: 1.7; }
-.work-inputs-head { color: var(--graphite); }
-.work-input { white-space: nowrap; }
+.work-inputs { margin: 8px 0 0; font-size: 13.5px; }
+.work-inputs-head { margin: 0; color: var(--graphite); }
+.work-inputs ul { margin: 2px 0 0; padding-left: 18px; line-height: 1.55; }
+.work-inputs li { margin: 2px 0; }
 
 /* A cost or benefit counted for some offers but not others: a status color, always with its icon and label (§9). */
 .caution { margin: 10px 0 0; padding: 8px 10px; background: var(--band); border-left: 3px solid var(--warning); font-size: 14px; }
