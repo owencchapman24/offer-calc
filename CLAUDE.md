@@ -29,7 +29,7 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1 and 2, and slice 3's step 0 and group 1, are live at https://offer-calc.vercel.app.**
+**UI: slices 1 to 3 are live at https://offer-calc.vercel.app.**
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -55,37 +55,56 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - The first-use note for the after-rent basis (remembered), and **the methodology** at
     `#/method` (M-1 to M-13, code-split), with live numbers in M-1, M-6.3, M-7.2 and M-12.
   - light and dark themes.
-  - **Detailed mode** (slice 3, in progress; step 0 and group 1 done 2026-10-08): the
-    Quick / Detailed switch, nine sections one open at a time, row editors beneath their row.
+  - **Detailed mode** (slice 3, done 2026-10-08): the Quick / Detailed switch, nine sections
+    one open at a time, row editors beneath their row. It loads the first time it's opened.
     - Every input has its hint, ⓘ help and "How this is used →" (`app/src/help.ts`), a default
       with a `D` tickmark and its reason, or a blank where decided (`defaults.ts`), its problems
       at the field (`validateOffer` in the worker), and "Show the work" from the figures it
       affects ("From your inputs"; "Edit it" opens the section and editor).
-    - Group 1 is editable: raises, raise timing, promotions; bonus basis, target, by year,
-      payout date, bonus year, cutoff, guarantee, must-be-employed; RSU grants (presets or your
-      own tranches, company vest dates), share-price growth, refreshers; weekly hours and weeks.
-      Ranges are opt-in ("+ range"). Group 2's sections show what's counted, read only.
-    - Problems keep the last valid results, said in the lead schedule with "Fix it". A cost or
-      benefit counted for some offers but not others is named under the verdict. Per hour shows
-      only when every offer has hours.
+    - Everything is editable: pay (raises, raise timing, promotions), bonus (basis, target, by
+      year, payout date, bonus year, cutoff, guarantee, must-be-employed), cash awards with
+      clawbacks, equity (RSU grants with presets or your own tranches, company vest dates,
+      share-price growth, refreshers), 401(k) (contribution, type, pay that counts, match
+      tiers, non-elective, vesting, service), health (premium, out-of-pocket, maximum, HSAs,
+      coverage), perks, hours, and where you'd live (employer state, rent growth). Health use
+      is in About you. Ranges are opt-in ("+ range").
+    - A 401(k) or health plan is not entered (not counted), entered, or none (entered, as none).
+    - Problems keep the last valid results, said in the lead schedule with "Fix it" (cleared
+      after an import or a reset). The engine's warnings show at their field. A cost or benefit
+      counted for some offers but not others is named under the verdict, and only for
+      categories that can be entered. Per hour shows only when every offer has hours.
+  - **The Data page** (`#/data`, loaded when opened): what's stored, JSON export
+    (`offer-calc-YYYY-MM-DD[-sample].json`), import (format, schema and every field's shape
+    checked, then every offer by `validateOffer` in a worker; a review before "Replace
+    everything") and "Delete all data".
 - **Samples:** loaded by default and stamped illustrative.
-- **Deploys:** Vercel deploys every push to `main` from the private GitHub repo.
+- **Deploys:** Vercel deploys every push to `main` from the GitHub repo (private until the
+  user switches it). CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, `npm run
+  typecheck` and `npm run build` on every push and pull request.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 418 / 127 KB (346 / 106 KB in slice 2, 276 / 85 KB in slice 1; detailed
-    mode, its help text, and `src/format` now on the main thread added the rest). It was
-    437 / 122 KB before the slim city list.
-  - **Methodology chunk:** 32 / 11 KB, loaded when `#/method` opens.
+  - **Main thread:** 352 / 109 KB for a quick-mode visit (346 / 106 KB in slice 2, 276 / 85 KB
+    in slice 1). Before lazy loading, slice 3 had it at 418 / 128 KB. Target: under ~110 KB
+    gzipped.
+  - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
+    text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
+    methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB.
+  - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
+    re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
+    with every export any chunk uses.
   - **Worker:** 240 / 63 KB. Per edit it runs `validateOffer` on each offer, then
     `horizonSweep` plus your stay's three full projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 260 passing.
+**Tests:** 309 passing.
 - `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 21,
-  `app/src/comparability.test.ts` 7, `app/src/help.test.ts` 6.
+  `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
+  `app/src/exchange.test.ts` 5.
+- `defaults.test.ts` checks every default in the registry against the engine: an offer with
+  the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
   it. `help.test.ts` renders every view of the inputs (each section, each row editor) and fails
   on an input without help, or help that's too long, too short or unused.
@@ -110,32 +129,19 @@ and show the work. Correctness and a clear methodology page matter more than fea
     export/import) and the public-repo prep after it.
 
 ## Next steps
-1. **UI slice 3: detailed mode. Execute `docs/slice-3-plan.md`** (approved 2026-10-08). It
-   has the build order, the decisions and every input's default, check and figures:
-   - **Done (2026-10-08): step 0 and group 1**, merged and deployed for the checkpoint review.
-     Next: group 2.
-   - **Step 0, groundwork:** engine item 7 (`validateOffer`: every problem at once, with its
-     input path; words in `src/format`); offers as editable detailed data (session schema
-     v2, with a migration); `app/help.ts` and its coverage test; a defaults registry; the
-     "+ range" control and row editor; "Show the work" reaching every detailed input; the
-     asymmetry warning; per hour only when every offer has hours.
-   - **Group 1:** hours, bonus (amount, per-year schedule, payout date, timing), RSUs
-     (grants, presets, custom schedule editor, vest dates, growth, refreshers), raises and
-     promotions. Then a **review checkpoint** (merge, deploy, screenshots, stop).
-   - **Group 2:** 401(k), health, perks, cash awards and clawbacks, employer state, rent
-     growth.
-   - **JSON export/import** on a Data page (moved from slice 6), then the final review stop.
-   - **Decided:** weekly hours and the health premium default to blank ("Not counted"), not
-     a guess.
-2. **Public-repo prep, after slice 3** (the list is in `docs/slice-3-plan.md`): no license
-   (all rights reserved; "source shown for review only" in the README), a README rewrite with
-   the Claude Code note and data attributions, a neutral line 5 here, an honest User-Agent
-   with a manual-download fallback in `fetch-fmr`, a CI workflow, `.claude/` ignored, then
-   the GitHub branch-protection and Vercel settings the user changes, and the visibility.
-3. **Later slices**, per §12:
-   - 4: risk and breakeven, plus the close-call flip line;
-   - 5: leaving early and warnings;
-   - 6: finish (CSV export, print, accessibility, phone tabs and a sticky verdict bar).
+1. **Before the repo goes public** (the user does these; see `docs/slice-3-plan.md` item 7):
+   GitHub branch protection for `main` (a pull request and the CI check required, no force
+   pushes or deletion), Vercel's Git Fork Protection kept on and preview deployments
+   reviewed, then the visibility. The prep in the repo is done: no LICENSE ("All rights
+   reserved; source shown for review only" in the README), the README, the neutral opening
+   line here, `fetch-fmr`'s honest User-Agent and `--file` fallback, CI, `.claude/` ignored.
+   The history scan (2026-10-08) found only noreply author addresses, no secret-shaped strings
+   and no sensitive files; re-run it before switching the visibility.
+2. **Later slices**, per `docs/ui-design.md` §12:
+   - 4: risk and breakeven (L-2, L-3), plus the close-call flip line;
+   - 5: leaving early and warnings (L-4, L-5); the warnings now at their fields move into L-5;
+   - 6: finish (CSV export of each table, print, an accessibility pass, phone tabs and a
+     sticky verdict bar).
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
@@ -194,14 +200,22 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - `src/model.ts`: the offer draft (`OfferDraft`: `OfferInput` field by field, null = at
     its default or blank) ↔ `OfferInput`; the samples, moved to start on or after
     today.
-  - `src/session.ts`: state, reducer (drafts edited by path), localStorage; schema 2, with
-    the v1 migration.
-  - Detailed mode: `help.ts` (help by input path), `defaults.ts` (the defaults registry),
-    `fields.tsx` (rows, the "+ range" control, the row editor), `rows.tsx` (quick mode's
-    fields), `Detailed.tsx` (the sections), `editors.tsx` (promotions, bonus by year, grants,
-    refreshers), `summary.ts` (one-line summaries), `presets.ts` (the vesting presets, checked
-    against the engine's), `comparability.ts` (the asymmetry warning). `testing.ts` is shared
-    by the tests only.
+  - `src/session.ts`: state, reducer (drafts edited by path, imports, resets), localStorage;
+    schema 2, with the v1 migration. `revision` counts imports and resets.
+  - Inputs: `help.ts` (every field's name and place, and quick mode's help text),
+    `helpText.ts` (detailed mode's help text, loaded with it), `defaults.ts` (the defaults
+    registry), `fields.tsx` (rows and their help, problems at the field: what quick mode
+    needs), `controls.tsx` (detailed mode's controls: numbers, "+ range", choices, plans, the
+    row editor, the engine's warnings at their field), `rows.tsx` (quick mode's fields),
+    `Detailed.tsx` (the sections), `editors.tsx` (promotions, bonus by year, grants,
+    refreshers, cash awards, match tiers, vesting steps), `summary.ts` (one-line summaries),
+    `presets.ts` (the vesting presets, checked against the engine's), `comparability.ts` (the
+    asymmetry warning).
+  - `lazy.ts`: a module loaded on first use that components read synchronously once it's
+    there (`Ledger.tsx`'s `detailedModule`, `Tickmarks.tsx`'s `derivations`); tests supply
+    them up front. `testing.ts` is shared by the tests only.
+  - `src/exchange.ts` (export and import: format, schema, the shape check) and `src/Data.tsx`
+    (the Data page).
   - `src/engine.worker.ts` and `src/useEngine.ts`: the engine in a Web Worker, debounced
     200 ms, stale generations dropped. `src/compute.ts` is what it computes per request:
     `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms and
@@ -211,12 +225,14 @@ and show the work. Correctness and a clear methodology page matter more than fea
     message types and `rentKey`: never import values from `engine.worker.ts` or
     `compute.ts`.
   - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
-  - `src/metrics.ts`: Show the work. Each figure's metric id maps to a tickmark kind, a
-    methodology section (`src/sections.ts`) and a derivation built from the engine's
-    numbers. Also the view models behind L-1 (`byYear`) and the bridge (`bridge`), so the
-    figures and their derivations share one source. Pure; the words for derivations live
-    here, beside `src/format`'s. The BEA indexes show the fewest decimals (3-6) at which
-    every product foots to the dollar (`indexDigits`).
+  - Show the work: each figure's metric id maps to a tickmark kind, a methodology section
+    (`src/sections.ts`) and a derivation built from the engine's numbers.
+    - `src/metrics.ts`: what the page renders: the ids, their tickmark kinds, the lookups,
+      and the view models behind L-1 (`byYear`) and the bridge (`bridge`), so the figures and
+      their derivations share one source.
+    - `src/derive.ts` (loaded on first use): the derivations and their words, beside
+      `src/format`'s. Pure. The BEA indexes show the fewest decimals (3-6) at which every
+      product foots to the dollar (`indexDigits`).
   - `src/Tickmarks.tsx`: `WorkProvider`, `Fig` (a figure and its tickmark, one button),
     `TickButton` (a lone mark), `Trace` (an input derivations can light up),
     `useRovingTicks`, and the popover.

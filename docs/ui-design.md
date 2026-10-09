@@ -1219,13 +1219,44 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **Not yet:** the hide-tickmarks setting; switching "Prices in" to a city you know (§5,
   item 6, not assigned to a slice).
 
+- **UI slice 3** (2026-10-08; plan in `docs/slice-3-plan.md`):
+  - **Step 0:** engine item 7 (`validateOffer`, every problem with its input path; words in
+    `src/format`); offers as editable drafts (session schema 2, migrating v1); help on every input
+    (`app/src/help.ts`, with a coverage test); the defaults registry (a test checks it against the
+    engine's defaults); the "+ range" control and row editors; Show the work reaching every detailed
+    input; the comparability warning; per hour only with every offer's hours.
+  - **Groups 1 and 2:** every section of §3.3 (pay, bonus, cash and clawbacks, equity, 401(k),
+    health, perks, hours, where you'd live), with health use in About you.
+  - **The Data page** (`#/data`): JSON export and import, and "Delete all data" (from slice 6).
+  - **Lazy loading:** detailed mode, the derivations, the Data page and the methodology load on
+    first use; a quick-mode visit's main chunk is 351.8 / 108.7 KB (raw / gzip).
+
+**UI slice 3 versus this design:**
+- **Figures point to their inputs** with a "From your inputs" line at the foot of each derivation,
+  each input a figure with its own `T` or `D`, rather than `T` marks inside the arithmetic.
+- **Plans can be "none":** the 401(k) and health plan are not entered (not counted), entered, or
+  none (entered, as none: say, staying on a parent's health plan).
+- **The comparability warning** counts a category as entered when its input is (an explicit $0
+  counts), and names only categories that can be entered. A sample's missing benefits are entered as
+  $0, so the samples raise none. Its 401(k) category is "a 401(k) is entered", not "employer money".
+- **Editor rows** just added and still blank aren't errors (trailing blank rows are left out of the
+  engine's input). Company vest dates start with no months picked, which works as none.
+- **Problems keep the last valid results** (§3.4), except after an import or "Delete all data":
+  results for offers that are gone are cleared.
+- **The engine's warnings show at their field** (the convenience-of-employer rule under employer
+  state; the HSA, perk and 402(g) limits under theirs) rather than in L-5, which comes with slice 5.
+- **"Edit it"** opens the field's mode, section and row editor and focuses the field; opening an
+  editor focuses its first field.
+- **Phones:** as in slices 1 and 2, the ledger scrolls one offer at a time; a section's heading and an
+  open editor stay in view while it scrolls.
+
 **UI slices**, numbered as shipped. The engine prerequisites came first and aren't
 numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
    row, the pipeline toggle, local saving and the samples. Engine item 10 came with it.
 2. **Explanations** (done, 2026-10-08): tickmarks and Show the work, L-1, the bridge and the
    first-use note, and methodology v1. Engine item 6 (pay per extra hour) came with it.
-3. **Detailed mode** (next; plan approved 2026-10-08 in `docs/slice-3-plan.md`): every section,
+3. **Detailed mode** (done, 2026-10-08; plan in `docs/slice-3-plan.md`): every section,
    with the help text for each. Engine item 7 (error codes with input paths) comes with it. The
    plan adds blank defaults for weekly hours and the health premium, an asymmetry warning when a
    cost or benefit is counted for some offers but not others, per-hour figures only when every
