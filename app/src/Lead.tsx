@@ -59,8 +59,9 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
           </ul>
         </div>
       )}
+      {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
       {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions} />
-        : !error && notes.length === 0 && (
+        : !error && notes.length === 0 && problems.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
       <TickLegend />

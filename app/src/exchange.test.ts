@@ -1,8 +1,11 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import { compute } from "./compute";
 import { exportSession, readImport } from "./exchange";
 import { ASSUMPTIONS, blankOffer, shiftOffer, toHousehold, toOfferInput } from "./model";
+import { Lead } from "./Lead";
 import { initialSession, migrateOffer, reducer, type Session, type V1Offer } from "./session";
 
 // JSON export and import (docs/slice-3-plan.md): a round trip gives the same results; an invalid file
@@ -92,6 +95,18 @@ describe("import", () => {
     expect(r.migratedFrom).toBe(1);
     expect(r.offers).toEqual([migrateOffer(mine), migrateOffer(v1)]); // sorted by letter
     expect(r.offers[1].draft.salary.annual).toBe(85_000);
+  });
+
+  it("after an import with a problem, the lead says what to fix and doesn't say it's working: the comparison waits", () => {
+    const issue = { code: "trancheSum", path: "equity.grants.0.schedule.tranches", params: { sum: 0.95 } } as const;
+    const lead = (issues: Parameters<typeof Lead>[0]["issues"]) => renderToStaticMarkup(createElement(Lead, {
+      view: null, letters: ["A", "B", "C"], stayYears: 4, updating: false, error: null, notes: [], sample: false, dispatch: () => {}, issues,
+    }));
+    const waiting = lead({ C: [issue] });
+    expect(waiting).toContain("Nothing to compare yet.");
+    expect(waiting).not.toContain("Working out the comparison");
+    // With nothing to fix, no results yet means the worker is on it.
+    expect(lead({})).toContain("Working out the comparison");
   });
 
   it("\"Delete all data\" goes back to the first visit, with the samples", () => {
