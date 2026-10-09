@@ -6,7 +6,7 @@
   "description": "Job offer comparison calculator: correct after-tax, location-adjusted, year-by-year comparisons.",
   "scripts": {
     "test": "vitest run && tsx scripts/check-engine.ts",
-    "typecheck": "tsc -p . && tsc -p scripts && tsc -p app",
+    "typecheck": "tsc -p . && tsc -p scripts && tsc -p app && tsc -p e2e",
     "dev": "vite --config app/vite.config.ts",
     "build": "vite build --config app/vite.config.ts",
     "preview": "vite preview --config app/vite.config.ts",
@@ -18,9 +18,12 @@
     "fetch-fmr": "tsx scripts/fetch-fmr.ts",
     "build-cities": "tsx scripts/build-cities.ts",
     "check-bundle": "tsx scripts/check-bundle.ts",
-    "lighthouse": "tsx scripts/lighthouse.ts"
+    "lighthouse": "tsx scripts/lighthouse.ts",
+    "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "^26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -37,5 +40,8 @@
     "@fontsource-variable/atkinson-hyperlegible-next": "5.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
+  },
+  "overrides": {
+    "playwright-core": "1.63.0"
   }
 }

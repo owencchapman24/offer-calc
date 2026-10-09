@@ -252,7 +252,7 @@ function VestingField({ o }: { o: AppOffer }) {
       <DefaultTick o={o} path="retirement.vesting" label="vesting at once" />
       {v?.kind === "cliff" && (
         <span className="field"><span className="sub">after</span>
-          <NumberField o={o} path="retirement.vesting.years" kind="number" unit="years" label="401(k) cliff, years of service" />
+          <NumberField o={o} path="retirement.vesting.years" kind="number" unit="years" label="401(k) cliff, years of service" hint="retirement.vesting" />
         </span>
       )}
       {v?.kind === "graded" && (

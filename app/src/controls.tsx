@@ -22,9 +22,10 @@ const unitOf = (kind: NumberKind) => (kind === "percent" ? (x: number) => toPerc
 const fromUnit = (kind: NumberKind) => (kind === "percent" ? (x: number) => x / 100 : (x: number) => x);
 
 /** A plain number field over a draft path (percents are fractions in the draft). */
-export function NumberField({ o, path, kind, label, unit, placeholder, k = helpKey(path), blank }: {
+export function NumberField({ o, path, kind, label, unit, placeholder, k = helpKey(path), hint = k, blank }: {
   o: AppOffer; path: string; kind: NumberKind; label: string; unit?: string; placeholder?: string;
   /** Its help, when its path isn't its help key (health.outOfPocket.low is health.outOfPocket's). */ k?: string;
+  /** The hint it points at, when its own isn't shown (a clawback's window: the clawback's). */ hint?: string;
   /** Said when it's blank: "Not counted". */ blank?: string;
 }) {
   const api = useLedger();
@@ -32,7 +33,7 @@ export function NumberField({ o, path, kind, label, unit, placeholder, k = helpK
   return (
     <span className="field">
       <NumberInput id={fieldId(o.letter, path)} kind={kind} label={`Offer ${o.letter} ${label}`} unit={unit} placeholder={placeholder}
-        value={v === null ? null : unitOf(kind)(v)} help={k} describedBy={hintId(k)} invalid={issuesAt(api, o.letter, path).length > 0}
+        value={v === null ? null : unitOf(kind)(v)} help={k} describedBy={hintId(hint)} invalid={issuesAt(api, o.letter, path).length > 0}
         onChange={(x) => api.set(o, { [path]: x === null ? null : fromUnit(kind)(x) })} />
       <DefaultTick o={o} path={path} label={`the ${label}`} />
       {v === null && blank && <span className="sub not-counted">{blank}</span>}
@@ -71,9 +72,11 @@ export function Warnings({ o, path }: { o: AppOffer; path: string }) {
   const unique = list.filter((w) => { const key = w.code; if (seen.has(key)) return false; seen.add(key); return true; });
   if (!unique.length) return null;
   return (
-    <ul className="field-warnings" role="note">
-      {unique.map((w) => <li key={w.code}><span aria-hidden="true">⚠</span> {formatWarning(w)}</li>)}
-    </ul>
+    <div role="note">
+      <ul className="field-warnings">
+        {unique.map((w) => <li key={w.code}><span aria-hidden="true">⚠</span> {formatWarning(w)}</li>)}
+      </ul>
+    </div>
   );
 }
 
@@ -153,16 +156,16 @@ export function MonthDayField({ o, path, label, none }: { o: AppOffer; path: str
 }
 
 /** A choice among a few values (a select), showing its default with a D tickmark. */
-export function ChoiceField<T extends string | boolean>({ o, path, label, options, alsoSet }: {
+export function ChoiceField<T extends string | boolean>({ o, path, label, options, alsoSet, hint }: {
   o: AppOffer; path: string; label: string; options: Array<[T, string]>; /** Fields a new choice resets (a bonus's amount goes with its basis). */
-  alsoSet?: Record<string, unknown>;
+  alsoSet?: Record<string, unknown>; /** The hint it points at, when its own isn't shown. */ hint?: string;
 }) {
   const api = useLedger();
   const v = shownValue<T>(o, path);
   const k = helpKey(path);
   return (
     <span className="field">
-      <select id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(k)}
+      <select id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(hint ?? k)}
         value={String(v)} onChange={(e) => api.set(o, { [path]: options.find(([x]) => String(x) === e.target.value)![0], ...alsoSet })}>
         {options.map(([x, text]) => <option key={String(x)} value={String(x)}>{text}</option>)}
       </select>

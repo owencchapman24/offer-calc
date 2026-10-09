@@ -7,3 +7,5 @@ dist/
 .vercel/
 .claude/
 .lighthouse/
+.playwright/
+.a11y/

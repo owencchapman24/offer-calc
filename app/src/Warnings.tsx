@@ -4,7 +4,7 @@ import { Fig, useApi, useRovingTicks } from "./figures";
 import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { dayBefore, dollars, longDate } from "./text";
-import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
 import { WARNING_AT, withholdingParts } from "./warningAt";
 import { stayWarnings, WARNING_KIND, type WarningKind, yearOf } from "./warningKinds";
 
@@ -89,7 +89,7 @@ export function Warnings({ ctx, sample, status = null }: { ctx: WorkContext; sam
   if (!r?.detail || r.detail.years !== r.view.row.years) return <section ref={ref} id="l5" className="later" />;
   const items = warningItems(ctx);
   return (
-    <section ref={ref} id="l5" className={`schedule warnings${status ? " is-updating" : ""}`} aria-labelledby="l5-title" aria-busy={status === "updating"}>
+    <section ref={ref} id="l5" className={`schedule warnings${staleClass(status)}`} aria-labelledby="l5-title" aria-busy={status === "updating"}>
       <header className="schedule-head">
         <h2 id="l5-title" tabIndex={-1}><span className="ref">L-5</span> Warnings</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}

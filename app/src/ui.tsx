@@ -121,7 +121,14 @@ export function PercentInput(props: Omit<Parameters<typeof NumberInput>[0], "kin
 /** Why a schedule's figures aren't for the current inputs: being worked out, or the inputs have a problem. */
 export type Stale = "updating" | "invalid" | null;
 
-/** A schedule's note while its figures are from earlier inputs (the schedule dims them meanwhile). */
+/**
+ * A schedule's class while its figures are from earlier inputs. Being worked out (a moment), they're dimmed; while the
+ * inputs have a problem (until it's fixed), they keep full contrast, to stay readable (WCAG 1.4.3), and the note says so.
+ */
+export const staleClass = (status: Stale) => (status === "updating" ? " is-updating" : status === "invalid" ? " is-invalid" : "");
+
+/** A schedule's note while its figures are from earlier inputs. */
 export function StaleNote({ status }: { status: Stale }) {
-  return <span className="updating" aria-hidden={!status}>{status === "updating" ? "Updating…" : status === "invalid" ? "Last valid results" : ""}</span>;
+  if (status === "invalid") return <span className="updating stale-note"><span className="warn-icon" aria-hidden="true">⚠</span> Last valid results</span>;
+  return <span className="updating" aria-hidden={!status}>{status === "updating" ? "Updating…" : ""}</span>;
 }

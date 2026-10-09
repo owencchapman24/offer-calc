@@ -169,9 +169,11 @@ describe("schedules whose figures are from earlier inputs say so", () => {
       expect(h).toMatch(/class="schedule leaving is-updating"/);
     }
   });
-  it("L-2 dims with the comparison, and says when its figures are the last valid ones", () => {
+  it("L-2 dims with the comparison, and says when its figures are the last valid ones, without dimming them (WCAG 1.4.3)", () => {
     expect(html(createElement(Risk, { ctx, sample: true, status: "updating" }))).toContain("Updating…");
-    expect(html(createElement(Risk, { ctx, sample: true, status: "invalid" }))).toContain("Last valid results");
+    const invalid = html(createElement(Risk, { ctx, sample: true, status: "invalid" }));
+    expect(invalid).toContain("Last valid results");
+    expect(invalid).toMatch(/class="schedule risk is-invalid"/);
     expect(html(createElement(Risk, { ctx, sample: true }))).not.toMatch(/is-updating/);
   });
 });

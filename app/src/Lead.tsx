@@ -1,4 +1,4 @@
-import { type Dispatch, useRef } from "react";
+import { type Dispatch, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/issues";
 import type { Basis, BreakevenResult } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -21,6 +21,42 @@ export interface FlipLine { row: BreakevenResult | null; updating: boolean; erro
 const margin = (basis: Basis, lead: NonNullable<StepView["lead"]>) =>
   basis === "perHour" ? `${cents(lead.margin)}` : dollars(lead.perMonth ?? 0);
 const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
+/** The verdict as one sentence: "C leaves you about $487 a month more than A, after rent, at U.S. prices." */
+export function verdictSentence(view: VerdictView): string {
+  const { lead, basis, prices } = view;
+  const step = pipeline(prices).find((p) => p.basis === basis)!;
+  return lead && lead.margin > 0
+    ? `${lead.winnerLetter} ${basis === "perHour" ? "pays about" : "leaves you about"} ${margin(basis, lead)} ${per(basis)} more than ${lead.runnerUpLetter}, ${step.phrase}.`
+    : `The offers tie ${step.phrase}.`;
+}
+
+/** How long the inputs must rest before a new verdict is announced. */
+export const ANNOUNCE_AFTER_MS = 1000;
+
+/**
+ * The verdict for screen readers (docs/ui-design.md §10): one short sentence in a polite live region, said once the inputs
+ * have rested (ANNOUNCE_AFTER_MS after the last result), and only when it changes. The first verdict isn't announced: it's
+ * on the page as it loads. `text` is null while the verdict is being worked out.
+ */
+function LiveVerdict({ text }: { text: string | null }) {
+  const [said, setSaid] = useState("");
+  const last = useRef<string | null>(null);
+  useEffect(() => {
+    if (text === null) return;
+    if (last.current === null) {
+      last.current = text;
+      return;
+    }
+    if (text === last.current) return;
+    const t = setTimeout(() => {
+      last.current = text;
+      setSaid(text);
+    }, ANNOUNCE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [text]);
+  return <p id="verdict-live" className="sr-only" role="status">{said}</p>;
+}
+
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
@@ -49,6 +85,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
         {sample && <Stamp>Illustrative samples</Stamp>}
         <span className="updating" aria-hidden={!updating}>{updating ? "Updating…" : ""}</span>
       </header>
+      <LiveVerdict text={view && !updating && !error ? verdictSentence(view) : null} />
       {sample && (
         <p className="banner">
           Sample offers: illustrative inputs, not market data. They start next July.{" "}
@@ -108,7 +145,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
           </p>
         </div>
       )}
-      <div className="verdict" aria-live="polite">
+      <div className="verdict">
         {lead && lead.margin > 0 ? (
           <>
             <p className="verdict-lede">

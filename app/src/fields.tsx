@@ -58,14 +58,17 @@ export function Issues({ letter, path, exclude, exact }: {
   const list = issuesAt(api, letter, path).filter((i) => (!exclude || !within(i.path, exclude)) && (!exact || i.path === path));
   if (!list.length) return null;
   return (
-    <ul className="field-errors" role="alert">
-      {list.map((i) => {
-        const last = i.path.split(".").pop()!;
-        const tranche = i.path.match(/tranches\.(\d+)/);
-        const where = [tranche ? `Tranche ${Number(tranche[1]) + 1}` : "", SCENARIO_WORD[last] ?? ""].filter(Boolean).join(", ");
-        return <li key={`${i.path}|${i.code}`}>{where ? `${where}: ` : ""}{formatIssue(i)}</li>;
-      })}
-    </ul>
+    // The alert wraps the list (a list with role="alert" would stop being a list).
+    <div role="alert">
+      <ul className="field-errors">
+        {list.map((i) => {
+          const last = i.path.split(".").pop()!;
+          const tranche = i.path.match(/tranches\.(\d+)/);
+          const where = [tranche ? `Tranche ${Number(tranche[1]) + 1}` : "", SCENARIO_WORD[last] ?? ""].filter(Boolean).join(", ");
+          return <li key={`${i.path}|${i.code}`}>{where ? `${where}: ` : ""}{formatIssue(i)}</li>;
+        })}
+      </ul>
+    </div>
   );
 }
 

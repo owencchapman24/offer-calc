@@ -54,18 +54,19 @@ function useOpen(id: MetricId, drill: boolean) {
 }
 
 /**
- * A lone audit tickmark, for an input's default or estimate: a small mark with a 24px hit area
- * (WCAG 2.5.8). `drill` (inside a popover) opens it on top of the current one, with a way back.
+ * A lone audit tickmark, for an input's default or estimate: a small mark in a button at least 24 x 24 px
+ * (WCAG 2.5.8, which counts the button's own box). `drill` (inside a popover) opens it on top of the current
+ * one, with a way back.
  */
 export function TickButton({ id, label, drill = false }: { id: MetricId; label: string; drill?: boolean }) {
   const api = useApi();
   const kind = api.kind(id);
   const open = api.openId === id;
   return (
-    <button type="button" className={`tick tick-btn tick-${kind}${open ? " is-open" : ""}`} data-tick={id}
+    <button type="button" className={`tick-btn tick-lone${open ? " is-open" : ""}`} data-tick={id}
       aria-label={`${PHRASE[kind](label)} (${tickWord(kind)})`} aria-haspopup="dialog" aria-expanded={drill ? undefined : open}
       onClick={useOpen(id, drill)}>
-      {TICKS[kind].mark}
+      <span className={`tick tick-${kind}`} aria-hidden="true">{TICKS[kind].mark}</span>
     </button>
   );
 }

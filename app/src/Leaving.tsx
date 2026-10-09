@@ -11,7 +11,7 @@ import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import type { CompareRequest, LeaveCurve, LeavePanel } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
-import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
 import type { Engine, SlowJob, SlowState } from "./useEngine";
 
 // L-4 · Leaving early (docs/ui-design.md §4.5): what you keep if your last day is any day, after tax
@@ -82,7 +82,7 @@ export function Leaving(p: LeavingProps) {
   // Stale while the comparison is, and while the slow lane works on the curves or the panel after it.
   const status: Stale = p.status ?? (fresh ? null : "updating");
   return (
-    <section ref={ref} className={`schedule leaving${status ? " is-updating" : ""}`} aria-labelledby="l4-title" aria-busy={status === "updating"}
+    <section ref={ref} className={`schedule leaving${staleClass(status)}`} aria-labelledby="l4-title" aria-busy={status === "updating"}
       data-ready={fresh ? "1" : "0"} data-fill-ms={p.leave.ms !== null ? Math.round(p.leave.ms) : undefined}>
       <header className="schedule-head">
         <h2 id="l4-title"><span className="ref">L-4</span> Leaving early</h2>
@@ -306,24 +306,26 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
         ) : <>Nothing else pays, vests or steps down within five years of {letter}'s start.</>}
       </p>
       {panel.warnings.length > 0 && (
-        <ul className="leave-warnings" role="note">
-          {fs.length > 0 && (
-            <li>
-              <span className="warn-icon" aria-hidden="true">⚠</span> Leaving then forfeits{" "}
-              {fs.map((f, i) => {
-                const t = forfeitText(f);
-                return (
-                  <span key={f.index}>
-                    {i ? (i === fs.length - 1 ? " and " : ", ") : ""}{t.before}
-                    <Fig id={`forgone.${letter}.${f.index}`} label={`${dollars(f.earned)} earned toward the ${f.period} bonus`}>{dollars(f.earned)}</Fig>
-                    {t.after}
-                  </span>
-                );
-              })}: you must be employed on the payout date.
-            </li>
-          )}
-          {leaveWarningTexts(panel.warnings).map((x) => <li key={x}><span className="warn-icon" aria-hidden="true">⚠</span> {x}</li>)}
-        </ul>
+        <div role="note">
+          <ul className="leave-warnings">
+            {fs.length > 0 && (
+              <li>
+                <span className="warn-icon" aria-hidden="true">⚠</span> Leaving then forfeits{" "}
+                {fs.map((f, i) => {
+                  const t = forfeitText(f);
+                  return (
+                    <span key={f.index}>
+                      {i ? (i === fs.length - 1 ? " and " : ", ") : ""}{t.before}
+                      <Fig id={`forgone.${letter}.${f.index}`} label={`${dollars(f.earned)} earned toward the ${f.period} bonus`}>{dollars(f.earned)}</Fig>
+                      {t.after}
+                    </span>
+                  );
+                })}: you must be employed on the payout date.
+              </li>
+            )}
+            {leaveWarningTexts(panel.warnings).map((x) => <li key={x}><span className="warn-icon" aria-hidden="true">⚠</span> {x}</li>)}
+          </ul>
+        </div>
       )}
       {panel.leaveDate === axis.stayEnd && <Reconciled letter={letter} panel={panel} basis={basis} ctx={ctx} />}
     </li>

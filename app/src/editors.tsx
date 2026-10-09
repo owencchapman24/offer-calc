@@ -240,7 +240,8 @@ function ScheduleField({ o, path, what }: { o: AppOffer; path: string; what: str
 function TrancheStrip({ tranches }: { tranches: Array<{ month: number; fraction: number }> }) {
   return (
     <div className="tranche-strip">
-      <div className="tranche-scroll">
+      {/* It can scroll sideways on a phone, so it takes focus: arrow keys scroll it. */}
+      <div className="tranche-scroll" tabIndex={0} role="group" aria-label="The vesting schedule, by month">
         <table>
           <tbody>
             <tr><th scope="row">Month</th>{tranches.map((t) => <td key={t.month}>{t.month}</td>)}</tr>
@@ -424,24 +425,24 @@ export function CashAwardsEditor({ o }: { o: AppOffer }) {
               {c ? (
                 <div className="clawback">
                   <span className="clawback-field"><span className="sub">Window</span>
-                    <NumberField o={o} path={`${path}.clawback.months`} kind="number" unit="months" label={`payment ${i + 1} clawback window`} />
+                    <NumberField o={o} path={`${path}.clawback.months`} kind="number" unit="months" label={`payment ${i + 1} clawback window`} hint="cashAwards.clawback" />
                   </span>
                   <span className="clawback-field"><span className="sub">Owed back</span>
-                    <ChoiceField o={o} path={`${path}.clawback.kind`} label={`payment ${i + 1} clawback, owed back`}
+                    <ChoiceField o={o} path={`${path}.clawback.kind`} label={`payment ${i + 1} clawback, owed back`} hint="cashAwards.clawback"
                       options={[["prorated", "The unworked share"], ["full", "All of it"]]} />
                   </span>
                   {(c.kind ?? "prorated") === "prorated" && (
                     <span className="clawback-field"><span className="sub">Prorated by</span>
-                      <ChoiceField o={o} path={`${path}.clawback.per`} label={`payment ${i + 1} clawback, prorated by`}
+                      <ChoiceField o={o} path={`${path}.clawback.per`} label={`payment ${i + 1} clawback, prorated by`} hint="cashAwards.clawback"
                         options={[["month", "Completed months"], ["day", "Days"]]} />
                     </span>
                   )}
                   <span className="clawback-field"><span className="sub">Clock starts</span>
-                    <ChoiceField o={o} path={`${path}.clawback.from`} label={`payment ${i + 1} clawback clock`}
+                    <ChoiceField o={o} path={`${path}.clawback.from`} label={`payment ${i + 1} clawback clock`} hint="cashAwards.clawback"
                       options={[["start", "Your start date"], ["payment", "The payment date"]]} />
                   </span>
                   <span className="clawback-field"><span className="sub">Repay</span>
-                    <ChoiceField o={o} path={`${path}.clawback.repay`} label={`payment ${i + 1} clawback repayment`}
+                    <ChoiceField o={o} path={`${path}.clawback.repay`} label={`payment ${i + 1} clawback repayment`} hint="cashAwards.clawback"
                       options={[["gross", "Gross (the full amount)"], ["net", "Net (what you received)"]]} />
                   </span>
                   <button type="button" className="link remove-row" data-help="cashAwards.clawback" onClick={() => api.set(o, { [`${path}.clawback`]: null })}>

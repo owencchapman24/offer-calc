@@ -2,7 +2,9 @@
 
 **Status (2026-10-09): approved; slices 5, 4 and 8 done** (slice 5's review stops A, B and C, and slice 4's and
 slice 8's stop A, merged; how each differs from the design is in `docs/ui-design.md` §12, "UI slice 5 versus
-this design", "UI slice 4 versus this design" and "UI slice 8 versus this design"). Slice 7 is next.
+this design", "UI slice 4 versus this design" and "UI slice 8 versus this design"). Slice 7 is under way: its stop A
+(the scan, the smoke tests and their fixes) is done, versus the design in §12 "UI slice 7 versus this design"; stop B
+is next.
 
 The plan for the UI slices after slice 3, with the decisions made in review on 2026-10-09. A fresh
 session should be able to execute it from this file, `CLAUDE.md` and `docs/ui-design.md` (rev 3,

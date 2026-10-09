@@ -1,0 +1,6 @@
+{
+  // The Playwright tests run under Node and drive a browser: Node types, and the DOM for code that runs in the page.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["node"], "lib": ["ES2022", "DOM", "DOM.Iterable"] },
+  "include": ["."]
+}

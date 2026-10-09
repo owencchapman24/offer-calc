@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
@@ -104,6 +104,13 @@ function CityField({ offer, set }: { offer: AppOffer; set: (values: Record<strin
   const [editing, setEditing] = useState(false);
   const states = statesFor(area);
   const id = fieldId(offer.letter, "costOfLiving.area");
+  // After a pick or Escape the search unmounts, so focus goes to Change, which replaces it (not after clicking elsewhere).
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (editing || !refocus.current) return;
+    refocus.current = false;
+    document.getElementById(id)?.focus();
+  }, [editing, area, id]);
   return (
     <div className="city">
       {area && !editing ? (
@@ -120,11 +127,18 @@ function CityField({ offer, set }: { offer: AppOffer; set: (values: Record<strin
             setDraft(e.target.value);
             const match = CITY_BY_NAME.get(e.target.value.trim().toLowerCase());
             if (match) {
+              refocus.current = true;
               set({ "costOfLiving.area": match.code, "residence.state": match.states.includes(state ?? "") ? state : match.states[0],
                 "costOfLiving.monthlyRent": null });
               setEditing(false);
               setDraft(null);
             }
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape" || !area) return;
+            refocus.current = true;
+            setDraft(null);
+            setEditing(false);
           }}
           onBlur={() => { setDraft(null); setEditing(false); }} />
       )}

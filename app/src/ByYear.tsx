@@ -1,4 +1,4 @@
-import { type Dispatch, type KeyboardEvent, type PointerEvent, useLayoutEffect, useRef, useState } from "react";
+import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Basis, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext } from "./metrics";
@@ -6,7 +6,7 @@ import type { Action, UiState } from "./session";
 import { niceTicks } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Fig, useRovingTicks } from "./Tickmarks";
-import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
 
 // L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4).
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
@@ -30,9 +30,10 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
   const table = ui.byYear?.table ?? false;
   const basis = r.view.basis;
   const offers = r.letters.map((l) => byYear(ctx, l));
+  const title = `${basisPhrase(pricesOf(ctx))[basis][0].toUpperCase() + basisPhrase(pricesOf(ctx))[basis].slice(1)}, each employment year`;
   const setView = (patch: Partial<NonNullable<UiState["byYear"]>>) => dispatch({ type: "ui", patch: { byYear: { mode, table, ...patch } } });
   return (
-    <section ref={ref} className={`schedule by-year${status ? " is-updating" : ""}`} aria-labelledby="l1-title" aria-busy={status === "updating"}>
+    <section ref={ref} className={`schedule by-year${staleClass(status)}`} aria-labelledby="l1-title" aria-busy={status === "updating"}>
       <header className="schedule-head">
         <h2 id="l1-title"><span className="ref">L-1</span> By year</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}
@@ -41,14 +42,14 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
       <div className="by-year-grid">
         <div className="by-year-chart">
           <div className="chart-bar">
-            <p className="chart-title">{basisPhrase(pricesOf(ctx))[basis][0].toUpperCase() + basisPhrase(pricesOf(ctx))[basis].slice(1)}, each employment year</p>
+            <p className="chart-title">{title}</p>
             <div className="segmented" role="group" aria-label="Chart shows">
               <button type="button" className={mode === "each" ? "is-on" : ""} aria-pressed={mode === "each"} onClick={() => setView({ mode: "each" })}>Each year</button>
               <button type="button" className={mode === "running" ? "is-on" : ""} aria-pressed={mode === "running"} disabled={basis === "perHour"}
                 title={basis === "perHour" ? "Per hour doesn't add up across years" : undefined} onClick={() => setView({ mode: "running" })}>Running total</button>
             </div>
           </div>
-          <Chart offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} />
+          <Chart offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} title={title} />
           <Notes ctx={ctx} />
           <p className="caption">
             Each year is in that year's dollars, as paid; the verdict discounts them to today.{sample ? " (Sample inputs.)" : ""}{" "}
@@ -71,8 +72,9 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
 const H = 240;
 const M = { top: 14, right: 132, bottom: 30, left: 52 };
 
-function Chart({ offers, basis, units, running }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean }) {
+function Chart({ offers, basis, units, running, title }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean; title: string }) {
   const box = useRef<HTMLDivElement>(null);
+  const hintId = useId();
   const [width, setWidth] = useState(640);
   const [hover, setHover] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -112,12 +114,22 @@ function Chart({ offers, basis, units, running }: { offers: ByYearData[]; basis:
     setHover(Math.min(n, Math.max(1, year)));
   };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    const by = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+    if (by) {
       e.preventDefault();
-      setHover((h) => Math.min(n, Math.max(1, (h ?? (e.key === "ArrowRight" ? 0 : n + 1)) + (e.key === "ArrowRight" ? 1 : -1))));
+      setHover((h) => Math.min(n, Math.max(1, (h ?? (by > 0 ? 0 : n + 1)) + by)));
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      setHover(e.key === "Home" ? 1 : n);
     } else if (e.key === "Escape") setHover(null);
   };
   const fmt = (v: number) => (perHour ? cents(v) : figure(v));
+  // What a screen reader says as the year moves: the slider's value, so it speaks only when you move it.
+  const year = hover ?? 1;
+  const readout = `Year ${year}${running ? ", running total" : ""}: ${series.flatMap((s) => {
+    const p = s.points.find((q) => q.n === year);
+    return p ? [`${s.letter} ${fmt(p.value)}`] : [];
+  }).join(", ")}`;
   const id = (letter: Letter, year: number): MetricId => (running ? `run.${letter}.${year}` : `ey.${letter}.${year}`);
 
   return (
@@ -148,12 +160,13 @@ function Chart({ offers, basis, units, running }: { offers: ByYearData[]; basis:
             <line key={e.letter} className="leader" x1={x(e.n) + 6} y1={e.py} x2={x(e.n) + 14} y2={e.ly} />
           ))}
         </svg>
-        {/* The plot reads out every offer at a year: by pointer, or by arrow keys once focused. */}
-        <div className="chart-hit" tabIndex={0} role="group"
-          aria-label="Chart of each offer by year. Arrow keys read each year; the table view lists every value."
+        {/* The plot reads out every offer at a year: by pointer, or by arrow keys once focused (a slider over the years). */}
+        <div className="chart-hit" tabIndex={0} role="slider" aria-label={title} aria-valuemin={1} aria-valuemax={n} aria-valuenow={year}
+          aria-valuetext={readout} aria-describedby={hintId}
           style={{ left: M.left - 12, width: plotW + 24, top: M.top, height: H }}
           onPointerMove={(e: PointerEvent<HTMLDivElement>) => pick(e.clientX)} onPointerLeave={() => setHover(null)}
-          onKeyDown={onKey} onBlur={() => setHover(null)} />
+          onKeyDown={onKey} onFocus={() => setHover((h) => h ?? 1)} onBlur={() => setHover(null)} />
+        <span id={hintId} className="sr-only">Arrow keys move a year. The table view lists every value.</span>
         {ends.map((e) => (
           <span key={e.letter} className={`end-label offer-${e.letter}`} style={{ left: x(e.n) + 16, top: e.ly - 11 }}>
             <span className="end-letter">{e.letter}</span>{" "}
@@ -161,7 +174,8 @@ function Chart({ offers, basis, units, running }: { offers: ByYearData[]; basis:
           </span>
         ))}
         {hover !== null && (
-          <div className="chart-tip" role="status" style={{ left: Math.min(x(hover) + 12, width - 190), top: M.top }}>
+          // What the slider's value says, drawn: hidden from screen readers, which hear the value instead.
+          <div className="chart-tip" aria-hidden="true" style={{ left: Math.min(x(hover) + 12, width - 190), top: M.top }}>
             <p className="tip-head">Year {hover}{running ? ", running total" : ""}</p>
             {series.map((s) => {
               const p = s.points.find((q) => q.n === hover);

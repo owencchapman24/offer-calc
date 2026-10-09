@@ -244,12 +244,16 @@ export function App() {
       )}
 
       <footer className="colophon">
-        <div className="theme" role="radiogroup" aria-label="Theme">
+        {/* Native radios: arrow keys move and choose, and Tab stops once, on the one chosen. */}
+        <fieldset className="theme">
+          <legend className="sr-only">Theme</legend>
           {(["system", "light", "dark"] as Theme[]).map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={theme === t} className={theme === t ? "is-on" : ""}
-              onClick={() => dispatch({ type: "theme", theme: t })}>{t[0].toUpperCase() + t.slice(1)}</button>
+            <label key={t} className={theme === t ? "is-on" : ""}>
+              <input type="radio" name="theme" value={t} checked={theme === t} className="sr-only" onChange={() => dispatch({ type: "theme", theme: t })} />
+              {t[0].toUpperCase() + t.slice(1)}
+            </label>
           ))}
-        </div>
+        </fieldset>
         <p>
           {saved ? "Saved in this browser only; nothing leaves this device." : "This browser isn't saving (private window?): your entries last until you close the tab."}{" "}
           <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>Reload the samples</button>

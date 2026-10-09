@@ -29,8 +29,8 @@ export function headersFor(path: string, rules: VercelHeaders[]): Record<string,
   return out;
 }
 
-/** Serves `dir` on a free port on 127.0.0.1; resolves with the server and its URL. */
-export function serveDist(dir: string, vercelJson: string): Promise<{ server: Server; url: string }> {
+/** Serves `dir` on 127.0.0.1, on `port` (0: a free one); resolves with the server and its URL. */
+export function serveDist(dir: string, vercelJson: string, port = 0): Promise<{ server: Server; url: string }> {
   const rules: VercelHeaders[] = JSON.parse(readFileSync(vercelJson, "utf8")).headers ?? [];
   const root = normalize(dir);
   const server = createServer((req, res) => {
@@ -53,7 +53,7 @@ export function serveDist(dir: string, vercelJson: string): Promise<{ server: Se
   });
   return new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(port, "127.0.0.1", () => {
       const addr = server.address();
       if (addr === null || typeof addr === "string") return reject(new Error("no port"));
       resolve({ server, url: `http://127.0.0.1:${addr.port}/` });
