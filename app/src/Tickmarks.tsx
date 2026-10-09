@@ -294,6 +294,15 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
           ))}
         </tbody>
       </table>
+      {d.inputs && d.inputs.length > 0 && (
+        <p className="work-inputs">
+          <span className="work-inputs-head">From your inputs:</span>{" "}
+          {d.inputs.map((x, i) => (
+            <span key={x.ref} className="work-input">{i ? " · " : ""}{x.label}{" "}
+              <Fig id={x.ref} label={`${x.label}, ${x.value}`} drill>{x.value}</Fig></span>
+          ))}
+        </p>
+      )}
       {d.notes.map((n) => <p key={n} className="work-note">{n}</p>)}
       {(d.uses.length > 0 || d.ties.length > 0) && (
         <p className="work-ties">

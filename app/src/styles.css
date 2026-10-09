@@ -524,3 +524,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* Show the work: the inputs a figure is built from, each opening its own work. */
+.work-inputs { margin: 8px 0 0; font-size: 13.5px; line-height: 1.7; }
+.work-inputs-head { color: var(--graphite); }
+.work-input { white-space: nowrap; }

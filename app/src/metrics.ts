@@ -77,7 +77,12 @@ export interface Derivation {
   uses: MetricId[];
   /** For an input: the field "Edit it" opens and focuses. */
   edit?: EditTarget;
+  /** "From your inputs": the inputs this figure is built from, each opening its own work (T or D). */
+  inputs?: InputRef[];
 }
+
+/** An input a derivation is built from, with its value as it reads. */
+export interface InputRef { ref: MetricId; label: string; value: string }
 
 /** An offer's input, by its path, or a field in About you. */
 export type EditTarget = { letter: Letter; path: string } | { about: AboutField };
@@ -339,6 +344,10 @@ function aboutIsDefault(h: AppHousehold, f: AboutField): boolean {
     case "prices": return true;
   }
 }
+/** Two offers' inputs, as one "From your inputs". */
+const joinInputs = (a: { inputs: InputRef[]; uses: MetricId[] }, b: { inputs: InputRef[]; uses: MetricId[] }) =>
+  ({ inputs: [...a.inputs, ...b.inputs], uses: [...a.uses, ...b.uses] });
+
 /** The ids that show the same number as (stay, basis): the hero, its stay cell and its pipeline step. */
 function sameFigure(ctx: WorkContext, n: number, basis: Basis): MetricId[] {
   const v = res(ctx).view;
@@ -494,7 +503,7 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
         { op: "=", label: "After-tax pay", value: figure(pv.afterTaxComp), rule: "double" },
       ],
       notes: [discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`],
-      ties: [], uses: [`in.${letter}.salary.annual`, `in.${letter}.bonus.amount`, `in.${letter}.costOfLiving.area`, `in.${letter}.startDate`],
+      ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter), "startDate", "costOfLiving.area"]),
     };
   }
   const healthExtra = ben.healthNet - pv.premiums;
@@ -514,10 +523,10 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
       ],
       notes: [
         adds.length ? "Total rewards adds the benefits that are worth money to you and takes out health costs beyond the premiums."
-          : `Nothing to add: offer ${letter} has no 401(k), perks or health costs entered (quick mode doesn't ask for them yet).`,
+          : `Nothing to add: offer ${letter} has no 401(k), perks or health costs entered.`,
         discountNote,
       ],
-      ties: [], uses: [`in.${letter}.also`],
+      ties: [], ...fromInputs(ctx, letter, ["retirement", "health", "perks"]),
     };
   }
   const col = w.costOfLiving?.presentValue;
@@ -563,11 +572,11 @@ function perHourWork(ctx: WorkContext, letter: L): Work {
     lines: [
       { label: `${row.years}-year total ${BASIS_PHRASE[of]}, as paid`, value: figure(row.nominal[of]![i]) },
       { op: "÷", label: "Hours worked in the window", value: figure(row.hours[i]), ...(hours?.weekly ? {
-        note: `${hours.weekly.base} a week × ${hours.weeksPerYear ?? 50} weeks a year`, ref: `in.${letter}.also` as MetricId } : {}) },
+        note: `${hours.weekly.base} a week × ${hours.weeksPerYear ?? 50} weeks a year` } : {}) },
       { op: "=", label: "Per hour worked", value: cents(row.values.perHour[i]), rule: "double" },
     ],
     notes: ["Per hour isn't discounted: dollars as paid over the stay, divided by the hours worked in it. A later start means fewer hours in the window."],
-    ties: [], uses: [`in.${letter}.also`],
+    ties: [], ...fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"]),
   };
 }
 
@@ -579,11 +588,11 @@ function averageWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
     title: `${letter} · per hour worked, ${BASIS_PHRASE[basis]}`, scope: `Base case · stay ${years(row.years)} · nominal`,
     lines: [
       { label: `${row.years}-year total ${BASIS_PHRASE[basis]}, as paid`, value: figure(row.nominal[basis]![i]) },
-      { op: "÷", label: "Hours worked in the window", value: figure(row.hours[i]), ref: `in.${letter}.also` },
+      { op: "÷", label: "Hours worked in the window", value: figure(row.hours[i]) },
       { op: "=", label: "Per hour worked, on average", value: cents(row.nominal[basis]![i] / row.hours[i]), rule: "double" },
     ],
     notes: ["The average over every hour worked, to set against what the extra hours pay."],
-    ties: [], uses: [`in.${letter}.also`],
+    ties: [], ...fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"]),
   };
 }
 
@@ -654,8 +663,8 @@ function extraWork(ctx: WorkContext, more: L, fewer: L, focus: "hours" | ValueBa
   if (!pair || !row.hours) throw new Error("These offers' hours don't differ enough to compare.");
   const n = row.years;
   const lines: WorkLine[] = [
-    { label: `${more}: hours worked in your stay`, value: figure(row.hours[m]), ref: `in.${more}.also` },
-    { op: "−", label: `${fewer}: hours worked`, value: figure(row.hours[f]), ref: `in.${fewer}.also` },
+    { label: `${more}: hours worked in your stay`, value: figure(row.hours[m]) },
+    { op: "−", label: `${fewer}: hours worked`, value: figure(row.hours[f]) },
     { op: "=", label: "Extra hours", value: figure(row.hours[m] - row.hours[f]), rule: "single" },
     { op: "÷", label: `${n} ${n === 1 ? "year" : "years"}`, value: String(n) },
     { op: "=", label: "Extra hours a year", value: figure(pair.hoursPerYear), rule: "double" },
@@ -681,7 +690,7 @@ function extraWork(ctx: WorkContext, more: L, fewer: L, focus: "hours" | ValueBa
   }
   return {
     title: `${more}'s extra hours, against ${fewer}`, scope: `Base case · stay ${years(n)} (${windowText(row)}) · nominal`,
-    lines, notes, ties: [], uses: [`in.${more}.also`, `in.${fewer}.also`],
+    lines, notes, ties: [], ...joinInputs(fromInputs(ctx, more, ["hours.weekly"]), fromInputs(ctx, fewer, ["hours.weekly"])),
   };
 }
 
@@ -752,11 +761,11 @@ function yearWork(ctx: WorkContext, letter: L, n: number): Work {
       title: `${letter} · year ${n} · per hour worked`, scope,
       lines: [
         { label: `Year ${n} ${BASIS_PHRASE[of]}`, value: figure(total), ref: br(BASIS_TOTAL_LINE[of]) },
-        { op: "÷", label: "Hours worked in the year", value: figure(y.hours), ref: `in.${letter}.also` },
+        { op: "÷", label: "Hours worked in the year", value: figure(y.hours) },
         { op: "=", label: "Per hour worked", value: cents(total / y.hours), rule: "double" },
       ],
       notes: ["Each year is in that year's dollars; the verdict's figures are for the whole stay."],
-      ties: [], uses: [],
+      ties: [], ...fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"]),
     };
   }
   const value = yearValue(y, basis, r.sweep.perHourOf)!;
@@ -960,12 +969,13 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         lines: [
           { label: "Salary at the year's start", value: figure(q.salary), ref: `in.${letter}.salary.annual` },
           ...(q.bonus ? [{ op: "+" as const, label: "Target bonus on it", value: figure(q.bonus), ref: `in.${letter}.bonus.amount` as MetricId }] : []),
-          ...(q.cash ? [{ op: "+" as const, label: "Cash awards paid in the year", value: figure(q.cash), ref: `in.${letter}.also` as MetricId }] : []),
-          ...(q.rsu ? [{ op: "+" as const, label: "New-hire RSUs due in the year, at grant value", value: figure(q.rsu), ref: `in.${letter}.also` as MetricId }] : []),
+          ...(q.cash ? [{ op: "+" as const, label: "Cash awards paid in the year", value: figure(q.cash), ref: `in.${letter}.cashAwards` as MetricId }] : []),
+          ...(q.rsu ? [{ op: "+" as const, label: "New-hire RSUs due in the year, at grant value", value: figure(q.rsu),
+            ref: `in.${letter}.equity.grants` as MetricId }] : []),
           { op: "=", label: "The offer letter's year", value: figure(y.quotedTC), rule: "double" },
         ],
         notes: ["What an offer letter quotes: no proration, payout timing, company vest dates, share-price growth or refreshers. The lines under it in the bridge are those differences."],
-        ties: [], uses: [`in.${letter}.salary.annual`, `in.${letter}.bonus.amount`],
+        ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter), ...(q.cash ? ["cashAwards"] : []), ...(q.rsu ? ["equity.grants"] : [])]),
       };
     }
     case "salary": case "cash":
@@ -978,7 +988,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         ],
         notes: [line === "salary" ? "Salary accrues by calendar month at the rate in effect, so a raise during the year shows here."
           : "Cash awards count in the year they're paid."],
-        ties: [], uses: [],
+        ties: [], ...fromInputs(ctx, letter, line === "salary" ? ["salary.annual", "salary.raise", "salary.raiseOn", "salary.promotions"] : ["cashAwards"]),
       };
     case "bonus": {
       const paid = d.bonuses.filter((x) => x.ey === n);
@@ -994,7 +1004,8 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         notes: [
           "Bonuses are paid once a year for the work before it, so the first one covers only the months you've worked, and each year's payout is for the year before.",
         ],
-        ties: [], uses: [`in.${letter}.bonus.amount`],
+        ties: [], ...fromInputs(ctx, letter, [bonusPath(ctx, letter), "bonus.payOn", "bonus.periodStart",
+          ...(o?.draft.bonus.cutoff ? ["bonus.cutoff"] : [])]),
       };
     }
     case "rsu": {
@@ -1007,12 +1018,12 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
             note: v.nominalDate ? `due ${shortDate(v.nominalDate)}; vests on the company's next vest date` : v.priceFactor !== 1 ? `× ${v.priceFactor.toFixed(4)} price growth` : undefined,
             value: figure(v.gross) })),
           ...(vests.length ? [] : [{ label: `RSUs vested in year ${n}`, value: "0" }]),
-          { op: "−", label: "New-hire RSUs due in the letter's year", value: figure(y.quoted.rsu), ref: `in.${letter}.also`, rule: "single" },
+          { op: "−", label: "New-hire RSUs due in the letter's year", value: figure(y.quoted.rsu), ref: `in.${letter}.equity.grants`, rule: "single" },
           { op: "=", label: "Difference", value: signed(y.gross.rsu - y.quoted.rsu), rule: "double" },
         ],
         notes: ["RSUs count as pay on the day they vest and are assumed sold then. The letter counts each tranche on its schedule's date at grant value; "
           + "the company vests on its own dates, with share-price growth, and refreshers come on top."],
-        ties: [], uses: [`in.${letter}.also`],
+        ties: [], ...fromInputs(ctx, letter, equityPaths(ctx, letter)),
       };
     }
     case "clawback":
@@ -1038,16 +1049,17 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
             + `Social Security and Medicare ${rate2(t.parts.fica / t.gross)}, ${st} ${rate2(t.parts.state / t.gross)}`
             + `${t.parts.local ? `, ${local} ${rate2(t.parts.local / t.gross)}` : ""}${t.projectedLaw ? " (tax law projected from 2026)" : ""}.`),
         ],
-        ties: [], uses: [`in.${letter}.costOfLiving.area`],
+        ties: [], ...fromInputs(ctx, letter, ["costOfLiving.area"]),
       };
     }
     case "premiums": case "perks": case "hsa": case "oop": {
       const v = line === "premiums" ? y.health.premiums : line === "perks" ? y.perks.face : line === "hsa" ? y.health.employerHsa : y.health.outOfPocket;
       const what = { premiums: "your health premiums", perks: "perks", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
       return {
-        title: title(what), scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(v), ref: `in.${letter}.also`, tick: "traced" }],
+        title: title(what), scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(v), ref: `in.${letter}.${line === "perks" ? "perks" : "health"}`,
+          tick: "traced" }],
         notes: [traced, line === "oop" ? "Your own estimate at medium usage, capped at the out-of-pocket maximum; held flat each year." : "Held flat each year."],
-        ties: [], uses: [`in.${letter}.also`],
+        ties: [], ...fromInputs(ctx, letter, [line === "perks" ? "perks" : "health"]),
       };
     }
     case "retirement": {
@@ -1063,7 +1075,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         notes: [ret?.code === "retirement"
           ? `Employer money is ${percent(ret.params.vestedShare)} vested after ${ret.params.completedYears} completed ${ret.params.completedYears === 1 ? "year" : "years"} by the end of your stay; unvested money is forfeited.`
           : "Only the vested share counts."],
-        ties: [], uses: [`in.${letter}.also`],
+        ties: [], ...fromInputs(ctx, letter, ["retirement"]),
       };
     }
     case "rent": {
@@ -1080,7 +1092,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
           : [{ label: `Rent paid in year ${n}`, value: figure(rent), ref: `in.${letter}.costOfLiving.monthlyRent` }],
         notes: [`The first lease year's rent is ${dollars(info.monthlyRent)} a month, rising ${percent(info.rentGrowth)} at each anniversary of your start date `
           + `(${info.rentGrowthSource === "inflation" ? "the inflation rate" : "as entered"}). It's paid only while you work there.`],
-        ties: [], uses: [`in.${letter}.costOfLiving.monthlyRent`],
+        ties: [], ...fromInputs(ctx, letter, ["costOfLiving.monthlyRent", "costOfLiving.rentGrowth"]),
       };
     }
     case "prices": {
@@ -1127,6 +1139,50 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
 }
 
 // ---- inputs ---------------------------------------------------------------------------------------
+
+/**
+ * The inputs a figure is built from, for "From your inputs" and the highlighter: each path as a figure
+ * that opens its own work. Quick mode's "Also counted" row lights up too, where the input is hidden.
+ */
+function fromInputs(ctx: WorkContext, letter: L, paths: string[]): { inputs: InputRef[]; uses: MetricId[] } {
+  const o = offerByLetter(ctx, letter);
+  if (!o) return { inputs: [], uses: [] };
+  const inputs = paths.map((path): InputRef => ({ ref: `in.${letter}.${path}`, label: inputLabel(path), value: inputValue(ctx, o, path) }));
+  return { inputs, uses: [...inputs.map((x) => x.ref), `in.${letter}.also`] };
+}
+
+const inputLabel = (path: string) => {
+  const name = READ_ONLY_NAME[path] ?? HELP[helpKey(path)]?.label ?? path;
+  return name[0].toUpperCase() + name.slice(1);
+};
+
+/** An input's value as it reads in a sentence: "Mar 15", "3% / 5% / 7%", "$120,000". */
+function inputValue(ctx: WorkContext, o: AppOffer, path: string): string {
+  const d = o.draft;
+  if (path === "costOfLiving.area") return shortCity(cityName(d.costOfLiving.area)) || "—";
+  if (path === "costOfLiving.monthlyRent") {
+    const rent = d.costOfLiving.monthlyRent ?? rentEstimate(ctx, o)?.monthlyRent;
+    return rent === undefined || rent === null ? "—" : `${dollars(rent)} a month`;
+  }
+  if (path === "also") return alsoCounted(d).join(", ") || "none";
+  const def = defaultFor(path);
+  if (def && isDefault(d, path)) return def.shown(d);
+  const lines = inputLines(d, path);
+  if (lines.length === 3 && /bear case$/.test(lines[0].label)) return lines.map((l) => l.value).join(" / ");
+  return lines.map((l) => (lines.length > 1 ? `${l.label} ${l.value}` : l.value ?? "")).join("; ");
+}
+
+/** The bonus input that sets its amounts: a target, or dollars by year. */
+const bonusPath = (ctx: WorkContext, letter: L) =>
+  (bonusBasis(offerByLetter(ctx, letter)?.draft.bonus ?? { basis: null } as AppOffer["draft"]["bonus"]) === "byEmploymentYear" ? "bonus.amounts" : "bonus.amount");
+
+/** An offer's RSU inputs: each grant's value and vesting, then share-price growth and refreshers. */
+function equityPaths(ctx: WorkContext, letter: L): string[] {
+  const e = offerByLetter(ctx, letter)?.draft.equity;
+  if (!e) return [];
+  return [...e.grants.flatMap((_, i) => [`equity.grants.${i}.value`, `equity.grants.${i}.schedule`]), "equity.priceGrowth",
+    ...(e.refreshers ? ["equity.refreshers"] : [])];
+}
 
 const SAMPLE_NOTE = "Traced to a sample input (illustrative, not market data).";
 

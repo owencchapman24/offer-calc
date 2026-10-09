@@ -146,6 +146,38 @@ describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
   });
 });
 
+describe("show the work reaches every detailed input (step 0.4)", () => {
+  const ctx = context();
+  const refs = (id: MetricId, c = ctx) => (derive(id, c).inputs ?? []).map((x) => `${x.ref} = ${x.value}`);
+  it("the bridge's RSU line points to each grant and its vesting, share-price growth and refreshers", () => {
+    expect(refs("br.C.2.rsu")).toEqual([
+      "in.C.equity.grants.0.value = $120,000", "in.C.equity.grants.0.schedule = 5/15/40/40, semiannual after a 1-year cliff; on company dates",
+      "in.C.equity.priceGrowth = 0%", "in.C.equity.refreshers = $10,000 / $25,000 / $40,000 a year, from month 12",
+    ]);
+    expect(derive("br.C.2.rsu", ctx).uses).toContain("in.C.also"); // quick mode's row lights up where the inputs are hidden
+  });
+  it("the bridge's bonus line points to the amount and the payout date; the salary line to raises and promotions", () => {
+    expect(refs("br.A.1.bonus")).toEqual(["in.A.bonus.amounts = Year 1 $56,000 / $70,000 / $84,000; Year 2 $68,000 / $85,000 / $102,000; "
+      + "Year 3 $80,000 / $100,000 / $120,000; Year 4 $92,000 / $115,000 / $138,000; Year 5, and after $104,000 / $130,000 / $156,000",
+      "in.A.bonus.payOn = Jan 31", "in.A.bonus.periodStart = Jan 1"]);
+    expect(metricKind("in.A.bonus.periodStart", ctx)).toBe("default");
+    expect(metricKind("in.A.bonus.payOn", ctx)).toBe("traced");
+  });
+  it("per hour points to weekly hours, and weeks a year shows its default and why", () => {
+    const c = context("perHour");
+    expect(refs("ph.A", c)).toEqual(["in.A.hours.weekly = 80 hours a week", "in.A.hours.weeksPerYear = 50"]);
+    const weeks = derive("in.A.hours.weeksPerYear", c);
+    expect([weeks.kind, weeks.lines[0].value, weeks.notes[0]]).toEqual(["default", "50", "A default, not something you entered. Two weeks off a year."]);
+    expect(weeks.edit).toEqual({ letter: "A", path: "hours.weeksPerYear" });
+  });
+  it("a range reads bear / base / bull; a promotion that isn't certain says so", () => {
+    expect(derive("in.B.bonus.amount", ctx).lines.map((l) => [l.label, l.value])).toEqual([
+      ["Bonus, bear case", "5%"], ["Bonus, base case", "10%"], ["Bonus, bull case", "12%"]]);
+    expect(derive("in.A.salary.promotions", ctx).lines.map((l) => [l.label, l.value, l.note]))
+      .toEqual([["Promotion 1", "+35%", "on Jul 13, 2029, base and bull only"]]);
+  });
+});
+
 describe("L-1 by year", () => {
   it("the years add up to the stay as paid; a later start's last year runs past it and is reconciled", () => {
     const a = byYear(context(), "A");
@@ -190,7 +222,7 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
         expect(d.title, id).toBeTruthy();
         expect(d.lines.length, id).toBeGreaterThan(0);
         // Every drill-down a derivation offers works too.
-        if (depth < 3) for (const l of d.lines) if (l.ref) check(l.ref, depth + 1);
+        if (depth < 3) for (const ref of [...d.lines.flatMap((l) => (l.ref ? [l.ref] : [])), ...(d.inputs ?? []).map((x) => x.ref)]) check(ref, depth + 1);
       };
       for (const id of ids) check(id, 0);
       expect(seen.size).toBeGreaterThan(15);
