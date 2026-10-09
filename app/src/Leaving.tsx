@@ -330,7 +330,8 @@ function Reconciled({ letter, panel, basis, ctx }: { letter: Letter; panel: Leav
     return <p className="leave-recon">Switch to after tax to see how leaving on your stay's last day squares with the stay.</p>;
   }
   const x = reconcile(panel, detail.window);
-  const diff = x.kept - x.stay;
+  // As displayed: the difference between the two rounded figures, like its derivation.
+  const diff = Math.round(x.kept) - Math.round(x.stay);
   const same = Math.abs(diff) < 0.5;
   const others = [
     Math.abs(x.pay) >= 0.5 && `${x.pay > 0 ? "pay after you leave" : "pay the stay counts after you leave"} (${dollars(Math.abs(x.pay))})`,

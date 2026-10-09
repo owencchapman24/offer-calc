@@ -130,11 +130,11 @@ are merged; L-5 (stop C) is next.
     samples in Node, 57-67 ms in headless Edge (32 before L-2). L-4's jobs run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 342 passing.
+**Tests:** 343 passing.
 - `test/offer.test.ts` 119, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 11,
+  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 12,
   `scripts/lib/bundle.test.ts` 3.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
