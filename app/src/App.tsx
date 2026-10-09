@@ -11,7 +11,7 @@ import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
-import { type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
+import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
 import type { EditTarget, WorkContext } from "./metrics";
 import { localToday } from "./text";
 import { WorkProvider } from "./Tickmarks";
@@ -25,6 +25,8 @@ const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.are
 const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-filing" } as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
+// The Data page (export, import, delete) loads when it's opened too.
+const DataPage = lazy(() => import("./Data"));
 
 function storage(): KeyValueStore | undefined {
   try {
@@ -40,8 +42,9 @@ const themeOverride = (): Theme | null => {
   return t === "light" || t === "dark" ? t : null;
 };
 
-/** Hash routes, so static hosting needs no rewrites: #/ (compare) and #/method or #/method/M-7.2 (methodology). */
-function parseRoute(hash: string): { page: "compare" } | { page: "method"; section: SectionId | null } {
+/** Hash routes, so static hosting needs no rewrites: #/ (compare), #/method or #/method/M-7.2 (methodology), #/data (your data). */
+function parseRoute(hash: string): { page: "compare" } | { page: "data" } | { page: "method"; section: SectionId | null } {
+  if (/^#\/data/.test(hash)) return { page: "data" };
   const m = hash.match(/^#\/method(?:\/(M-[\d.]+))?/);
   if (!m) return { page: "compare" };
   return { page: "method", section: m[1] && m[1] in SECTIONS ? (m[1] as SectionId) : null };
@@ -95,7 +98,7 @@ export function App() {
     const state = o.draft.residence.state;
     return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
   })).values()];
-  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) });
+  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) }, session.revision ?? 0);
   // The validator's problems, by offer: the engine checks the complete offers, in order.
   const issues: Partial<Record<Letter, OfferIssue[]>> = {};
   complete.forEach((x, i) => { if (engine.issues[i]?.length) issues[x.o.letter] = engine.issues[i]; });
@@ -155,12 +158,17 @@ export function App() {
         <nav className="pages" aria-label="Pages">
           <a href="#/" aria-current={route.page === "compare" ? "page" : undefined}>Compare</a>
           <a href="#/method" aria-current={route.page === "method" ? "page" : undefined}>Methodology</a>
+          <a href="#/data" aria-current={route.page === "data" ? "page" : undefined}>Data</a>
         </nav>
       </header>
 
       {route.page === "method" ? (
         <Suspense fallback={<p className="note">Loading the methodology…</p>}>
           <Methodology ctx={work} section={route.section} sample={sample} />
+        </Suspense>
+      ) : route.page === "data" ? (
+        <Suspense fallback={<p className="note">Loading…</p>}>
+          <DataPage session={session} dispatch={dispatch} today={today} saved={saved} clear={() => { clearSession(storage()); }} />
         </Suspense>
       ) : (
         <>

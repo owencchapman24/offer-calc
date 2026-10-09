@@ -36,6 +36,8 @@ export interface Session {
   household: AppHousehold;
   offers: AppOffer[];
   ui: UiState;
+  /** Counts imports and resets, which replace every offer: results computed before one don't apply after it. */
+  revision?: number;
 }
 
 export const STORAGE_KEY = "offer-calc:v1";
@@ -55,7 +57,11 @@ export type Action =
   | { type: "basis"; basis: Basis }
   | { type: "theme"; theme: Theme }
   | { type: "dismiss"; hint: Hint }
-  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor">> };
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor">> }
+  /** An import: replaces every offer and About you, and takes the file's view choices, if any. */
+  | { type: "replace"; household: AppHousehold; offers: AppOffer[]; ui?: Partial<UiState> }
+  /** "Delete all data": back to the first visit, with the samples. */
+  | { type: "reset"; today: string };
 
 export function reducer(s: Session, a: Action): Session {
   switch (a.type) {
@@ -75,13 +81,16 @@ export function reducer(s: Session, a: Action): Session {
     case "theme": return { ...s, ui: { ...s.ui, theme: a.theme } };
     case "dismiss": return { ...s, ui: { ...s.ui, dismissed: { ...s.ui.dismissed, [a.hint]: true } } };
     case "ui": return { ...s, ui: { ...s.ui, ...a.patch } };
+    case "replace":
+      return { ...s, household: a.household, offers: a.offers, ui: { ...s.ui, ...a.ui, section: null, editor: null }, revision: (s.revision ?? 0) + 1 };
+    case "reset": return { ...initialSession(a.today), revision: (s.revision ?? 0) + 1 };
   }
 }
 
 const byLetter = (x: AppOffer, y: AppOffer) => x.letter.localeCompare(y.letter);
 
 /** Storage that may be missing or blocked (private windows, previews): reads and writes never throw. */
-export interface KeyValueStore { getItem(key: string): string | null; setItem(key: string, value: string): void }
+export interface KeyValueStore { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem?(key: string): void }
 
 export function loadSession(store: KeyValueStore | undefined, today: string): Session {
   try {
@@ -92,6 +101,16 @@ export function loadSession(store: KeyValueStore | undefined, today: string): Se
     }
   } catch { /* unreadable or blocked: start fresh */ }
   return initialSession(today);
+}
+
+/** Deletes what this browser holds for the app. True when done (or nothing was stored). */
+export function clearSession(store: KeyValueStore | undefined): boolean {
+  try {
+    store?.removeItem?.(STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** True when saved; false when storage is unavailable (the app then keeps state in memory only). */
