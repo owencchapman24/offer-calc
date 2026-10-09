@@ -14,7 +14,8 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - raises and promotions; bear/base/bull scenarios; PV;
   - `compareOffers`, and `breakeven`, including the "alreadyAhead" outcome, over a window the caller
     passes (`comparisonWindow`: the earliest start of every offer), and as resumable steps
-    (`breakevenSteps`); `rentFlip`, the rent that ties, closed form;
+    (`breakevenSteps`); `rentFlip`, the rent that ties, closed form (and `rentFlipFrom`, the same from
+    projections already made);
   - 401(k), health, perks, hours;
   - cost of living (BEA RPPs), the COL-adjusted total, rent growth;
   - `cliffs` / `nextCliff`, `withholdingShortfall`, and `horizonSweep` (window hours,
@@ -31,9 +32,26 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1-5 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
-`docs/ui-slices-4-8-plan.md`; slices 4 and 5 versus the design: `docs/ui-design.md` §12). Slice 8 is
+**UI: slices 1-5 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
+`docs/ui-slices-4-8-plan.md`; slices 4, 5 and 8 versus the design: `docs/ui-design.md` §12). Slice 7 is
 next.
+- **Prices in a city you know** (slice 8): About you's "Prices in" is the U.S. average (`D`) or any city
+  in the list (Change, then a search; "Use the U.S. average" goes back). It's the engine's
+  `household.costOfLiving.reference`: that city's own price factor is 1, every offer's spending money
+  scales by the same ratio and savings stay at face value. Every after-rent label follows ("after rent,
+  at Charlotte prices", "Charlotte $", "today's Charlotte dollars", "priced as in Charlotte"): the lead,
+  L-1, the bridge, L-2, L-3, the derivations, M-1, M-6.1, M-6.3 (its title too), M-7.4 and M-12. The words
+  come from `app/src/prices.ts`. Saved with the session (schema 3) and in JSON exports (schema 3; older
+  files and sessions migrate to the U.S. average).
+- **The rent note** (slice 8): under the verdict, on the after-rent basis, "This depends on rent: at HUD's
+  estimate for New York ($2,729), A wins", when an offer's entered rent and its estimate lie on either
+  side of the rent that flips the verdict (L-3's rent lever; for the winner, the rent at which its lead
+  goes). One clause per offer, each on its own. The fast lane works the flips out from your stay's
+  projections (`rentFlipFrom`, no extra projection), so it shows without L-3 on screen. The figure is
+  the estimate (`E`); its derivation goes from the gap to the rent that ties and on to the estimate.
+- **BEA indexes in derivations** (slice 8): worked exactly from BEA's all items and housing (the engine
+  reports them to 3 decimals), so the extra decimals a product needs to foot are real ("97.2933"), and
+  there are no padded zeros ("105.696", not "105.696000").
 - **L-3, What it would take** (slice 4): for each offer behind the winner, the starting salary, the first
   cash award (by its own label and date; with none, a sign-on 30 days in, no clawback) and, after rent,
   the rent that would tie it ("C still wins unless your New York rent for A is under $3,290 a month");
@@ -134,8 +152,9 @@ next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 357.9 / 109.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 5 ended at 355.7 / 109.1;
+  - **Main thread:** 362.7 / 111.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 4 ended at 357.9 / 109.7;
+    slice 5 at 355.7 / 109.1;
     slice 3 at 351.8 /
     107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 120 kB gzipped by the check, which CI runs
     after the build (110 kB until 2026-10-09; see Decisions). Slices 4, 8 and 7 add to the main thread
@@ -148,11 +167,11 @@ next.
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
     more gzip on every visit).
-  - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
-    text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
-    methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB, L-2
-    9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 13 / 5 KB plus its view model 4 / 2 KB
-    (each view model shared with the derivations), L-5 5 / 2 KB.
+  - **Loaded on first use** (raw / gzip, 2026-10-09): detailed mode 54 / 14 KB (sections, editors,
+    controls, its help text), the derivations 69 / 22 KB (when a tickmark is hovered, focused or
+    opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
+    L-2 9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 14 / 5 KB plus its view model 4 / 2 KB
+    (each view model shared with the derivations), L-5 6 / 3 KB.
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
@@ -162,13 +181,16 @@ next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 379 passing.
-- `test/offer.test.ts` 124, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 30,
+**Tests:** 397 passing.
+- `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+  `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6,
+  `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
+  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13,
   `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2.
+- `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
+  prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
+  against L-3's rent lever to the cent.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
@@ -220,12 +242,11 @@ next.
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 8: prices in a city you know** (§5, item 6). L-3's rent sentence and its derivations say
-   "at U.S. prices" too: they follow the choice.
-2. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
+1. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
    and axe in CI (any WCAG A/AA violation fails; exceptions need a reason), a screen-reader
-   walkthrough the user runs from a script.
-3. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+   walkthrough the user runs from a script. The ledger's city field drops focus to the page after a
+   pick (its search input unmounts); "Prices in" in About you returns it to Change, so do the same.
+2. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
 
@@ -268,7 +289,8 @@ build them in.
   - `project.ts`: `projectScenario`, `leaveDateSweep`, `leaveDaySweep` (any last days, so a
     step lands on its own date), `keptIfLeaving`.
   - `compare.ts`: `projectOffer`, `compareOffers`, `comparisonWindow`, `breakeven` (and
-    `breakevenSteps`, the same search a projection at a time), `rentFlip`, `horizonSweep`,
+    `breakevenSteps`, the same search a projection at a time), `rentFlip` (and `rentFlipFrom`, its closed
+    form from projections already made), `horizonSweep`,
     `monthlyEquivalent`.
   - `cliffs.ts`: `cliffs`, `nextCliff` (optionally past some cliffs: L-4 skips a prorated
     clawback's monthly steps, which say `prorated: true`).
@@ -298,7 +320,9 @@ build them in.
     its default or blank) ↔ `OfferInput`; the samples, moved to start on or after
     today.
   - `src/session.ts`: state, reducer (drafts edited by path, imports, resets), localStorage;
-    schema 2, with the v1 migration. `revision` counts imports and resets.
+    schema 3 ("Prices in", `household.pricesIn`), migrating v1 and v2. `revision` counts imports and resets.
+  - `src/prices.ts`: "Prices in" and its words ("after rent, at Charlotte prices", "Charlotte $"),
+    `US_PRICES`, and `shortCity` (a metro's first principal city, by the Census title rules).
   - Inputs: `help.ts` (every field's name and place, and quick mode's help text),
     `helpText.ts` (detailed mode's help text, loaded with it), `defaults.ts` (the defaults
     registry), `fields.tsx` (rows and their help, problems at the field: what quick mode
@@ -315,8 +339,8 @@ build them in.
     (the Data page).
   - `src/engine.worker.ts` and `src/useEngine.ts`: the engine in a Web Worker, debounced
     200 ms, stale generations dropped. `src/compute.ts` is what it computes per request:
-    `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms and
-    rent estimates. Only the worker and tests import it.
+    `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms, the rent
+    note's rent flips (from those projections) and rent estimates. Only the worker and tests import it.
   - **Bundles:** only the worker holds the engine and the BEA/HUD tables. The main thread
     imports engine types and `src/col/cities.ts` only. `src/protocol.ts` holds the
     message types and `rentKey`: never import values from `engine.worker.ts` or

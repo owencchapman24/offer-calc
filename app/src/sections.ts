@@ -31,3 +31,6 @@ export const SECTIONS = {
 } as const;
 
 export type SectionId = keyof typeof SECTIONS;
+
+/** A section's title. M-6.3's names the prices picked under Prices in: "After rent, at Charlotte prices". */
+export const sectionTitle = (id: SectionId, place = "U.S."): string => (id === "M-6.3" ? `After rent, at ${place} prices` : SECTIONS[id]);

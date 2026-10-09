@@ -65,6 +65,11 @@ export interface StayDetail {
   changes: number;
   /** Each stay's month-end discount factors (they sum to its row's annuityFactor), by stay length. */
   annuity: Record<number, AnnuityTerm[]>;
+  /**
+   * After rent (every offer has a city): each offer's rent lever over your stay, as in L-3: the first lease year's rent at
+   * which it ties `against` (the winner; for the winner, the runner-up). The lead's rent note reads it.
+   */
+  rentFlips?: Array<{ against: number; flip: RentFlipResult }>;
 }
 
 export type EngineResponse = {

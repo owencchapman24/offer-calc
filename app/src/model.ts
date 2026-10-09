@@ -5,6 +5,7 @@ import type {
 import type { FilingStatus } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
+import { US_PRICES } from "./prices";
 
 // The app's state for each offer: a draft of everything you can enter, quick and detailed.
 // toOfferInput() turns it into the engine's input.
@@ -186,11 +187,16 @@ export interface AppHousehold {
    * The name is older than that rule; it's kept so saved sessions still load.
    */
   otherWagesThisYear: number;
+  /**
+   * "Prices in": the BEA area whose prices every after-rent figure is stated in (the engine's reference location).
+   * "00000", the U.S. average, is the default; a city in the list instead (slice 8, session schema 3).
+   */
+  pricesIn: string;
 }
 
-export const DEFAULT_HOUSEHOLD: AppHousehold = { filingStatus: "single", stayYears: 4, otherWagesThisYear: 0 };
+export const DEFAULT_HOUSEHOLD: AppHousehold = { filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: US_PRICES };
 export const NYC_METRO = "35620";
-export const ASSUMPTIONS = { inflation: 0.025, discountRate: 0.05, reference: "00000" } as const;
+export const ASSUMPTIONS = { inflation: 0.025, discountRate: 0.05 } as const;
 
 /**
  * Engine defaults the draft fills in for null fields (the engine's own defaults are used where it has
@@ -498,7 +504,7 @@ export function toHousehold(h: AppHousehold, year: number): Household {
   return {
     filingStatus: h.filingStatus,
     healthUsage: h.healthUsage ?? "medium",
-    costOfLiving: { reference: ASSUMPTIONS.reference, savingsRate: 0 },
+    costOfLiving: { reference: h.pricesIn, savingsRate: 0 },
     ...(h.otherWagesThisYear > 0 ? { otherWages: { [year]: h.otherWagesThisYear } } : {}),
   };
 }

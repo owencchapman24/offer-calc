@@ -133,6 +133,7 @@ const META: Record<string, FieldMeta> = {
   "about.stay": { label: "How long do you expect to stay?", section: "M-7.3", group: "about" },
   "about.wages": { label: "Other wages", section: "M-4", group: "about" },
   "about.healthUsage": { label: "Health use", section: "M-5.2", group: "about" },
+  "about.prices": { label: "Prices in", section: "M-6.1", group: "about" },
 };
 
 /** Quick mode's and About you's text. */
@@ -181,6 +182,12 @@ const QUICK_TEXT: Record<string, FieldText> = {
     hint: "An internship or the job you're leaving.",
     help: "Pay you earn in the year the earliest offer starts, before the new job begins. It's taxed in the same year, so it changes "
       + "the new job's first-year tax. Leave it at $0 if there's none.",
+  },
+  "about.prices": {
+    hint: "Show after-rent figures in a city's dollars you know.",
+    help: "After rent, every offer's spending money is priced as in one place, so offers in different cities compare in the same "
+      + "dollars. The U.S. average is the default. Pick a city you know, such as where you live now, to read the figures in its "
+      + "dollars: its own price factor is 1. Spending scales by the same ratio for every offer; savings stay at face value.",
   },
   "about.healthUsage": {
     hint: "Which of your out-of-pocket estimates counts.",

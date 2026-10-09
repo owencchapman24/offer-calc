@@ -1,6 +1,8 @@
-import { type Dispatch, useRef } from "react";
+import { type Dispatch, useEffect, useRef, useState } from "react";
+import { CITIES } from "../../src/col/cities";
 import type { FilingStatus } from "../../src/tax/types";
 import { ASSUMPTIONS } from "./model";
+import { priceWords, US_PRICES } from "./prices";
 import type { Action, Session } from "./session";
 import { dollars, longDate } from "./text";
 import { HELP } from "./help";
@@ -65,8 +67,12 @@ export function About({ session, dispatch, today, wagesYear }: {
           <AboutHelp k="about.healthUsage" />
         </Trace>
         <Trace id="about.prices" className="about-field">
-          <span className="about-label">Prices in<TickButton id="about.prices" label="prices in the U.S. average" /></span>
-          <span className="about-static">U.S. average</span>
+          <span className="about-label">
+            <label htmlFor="about-prices">Prices in</label>
+            {h.pricesIn === US_PRICES && <TickButton id="about.prices" label="prices in the U.S. average" />}
+          </span>
+          <PricesField code={h.pricesIn} set={(pricesIn) => dispatch({ type: "household", patch: { pricesIn } })} />
+          <AboutHelp k="about.prices" />
         </Trace>
       </div>
       <p className="assumptions">
@@ -74,6 +80,55 @@ export function About({ session, dispatch, today, wagesYear }: {
         rate · present values as of today, {longDate(today)} · base case.
       </p>
     </section>
+  );
+}
+
+const US_NAME = "U.S. average";
+const PLACE_BY_NAME = new Map([[US_NAME.toLowerCase(), US_PRICES], ...CITIES.map((c) => [c.name.toLowerCase(), c.code] as [string, string])]);
+
+/**
+ * "Prices in" (docs/ui-design.md §5, item 6): the U.S. average, or a city you know. It shows the place with a Change
+ * button, as the ledger's city does; Change opens a search of the city list, with the U.S. average first.
+ */
+function PricesField({ code, set }: { code: string; set: (code: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  // After a pick, Escape or "Use the U.S. average", focus goes to Change (what had it is gone); not after clicking elsewhere.
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (editing || !refocus.current) return;
+    refocus.current = false;
+    document.getElementById("about-prices")?.focus();
+  }, [editing, code]);
+  const close = () => { refocus.current = true; setEditing(false); };
+  const p = priceWords(code);
+  const current = p.us ? US_NAME : p.name;
+  if (!editing) {
+    return (
+      <span className="about-static prices-in">
+        {current}{" "}
+        <button id="about-prices" type="button" className="link" data-help="about.prices" aria-describedby="hint-about-prices"
+          onClick={() => { setDraft(""); setEditing(true); }} aria-label={`Change the prices figures are in, now ${current}`}>Change</button>
+        {!p.us && <>{" · "}<button type="button" className="link" onClick={() => { refocus.current = true; set(US_PRICES); }}>Use the U.S. average</button></>}
+      </span>
+    );
+  }
+  return (
+    <span className="prices-in">
+      <input id="about-prices" list="price-places" placeholder="Search a metro area" value={draft} autoFocus data-help="about.prices"
+        aria-describedby="hint-about-prices"
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const match = PLACE_BY_NAME.get(e.target.value.trim().toLowerCase());
+          if (match) { set(match); close(); }
+        }}
+        onKeyDown={(e) => { if (e.key === "Escape") close(); }}
+        onBlur={() => setEditing(false)} />
+      <datalist id="price-places">
+        <option value={US_NAME} />
+        {CITIES.map((c) => <option key={c.code} value={c.name} />)}
+      </datalist>
+    </span>
   );
 }
 

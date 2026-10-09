@@ -1,8 +1,10 @@
+import { cityByCode } from "../../src/col/cities";
 import type { Basis, OfferInput } from "../../src/offer/types";
 import {
   all, type AppHousehold, type AppOffer, blankDraft, blankOffer, completeSample, DEFAULT_HOUSEHOLD, fromOfferInput, type Letter, LETTERS,
   type OfferDraft, sampleOffers, setPath,
 } from "./model";
+import { US_PRICES } from "./prices";
 
 // Everything the user has entered, plus UI choices. Serializable: saved in this browser only.
 
@@ -32,7 +34,7 @@ export interface UiState {
 }
 
 export interface Session {
-  schemaVersion: 2;
+  schemaVersion: 3;
   household: AppHousehold;
   offers: AppOffer[];
   ui: UiState;
@@ -43,7 +45,7 @@ export interface Session {
 export const STORAGE_KEY = "offer-calc:v1";
 
 export function initialSession(today: string): Session {
-  return { schemaVersion: 2, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
+  return { schemaVersion: 3, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
 }
 
 export type Action =
@@ -140,15 +142,31 @@ export interface V1Offer {
   base?: OfferInput;
 }
 
-export interface V1Session { schemaVersion: 1; household: AppHousehold; offers: V1Offer[]; ui: UiState }
+/** About you before slice 8: no "Prices in" (the U.S. average). */
+export type V2Household = Omit<AppHousehold, "pricesIn"> & { pricesIn?: string };
+export interface V1Session { schemaVersion: 1; household: V2Household; offers: V1Offer[]; ui: UiState }
+/** Slices 3 to 5: offers as drafts, prices always the U.S. average. */
+export interface V2Session { schemaVersion: 2; household: V2Household; offers: AppOffer[]; ui: UiState }
 
 /** A saved session in the current shape, migrating older ones; null if it isn't one. */
 export function migrate(s: unknown): Session | null {
-  const x = s as Partial<Session> | Partial<V1Session> | null;
+  const x = s as Partial<Session> | Partial<V2Session> | Partial<V1Session> | null;
   if (!x || !Array.isArray(x.offers) || !x.household || !x.ui) return null;
-  if (x.schemaVersion === 2) return x as Session;
-  if (x.schemaVersion === 1) return { ...(x as V1Session), schemaVersion: 2, offers: (x as V1Session).offers.map(migrateOffer) };
+  if (x.schemaVersion === 3) return { ...(x as Session), household: migrateHousehold(x.household) };
+  if (x.schemaVersion === 2) return { ...(x as V2Session), schemaVersion: 3, household: migrateHousehold(x.household) };
+  if (x.schemaVersion === 1) {
+    return { ...(x as V1Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: (x as V1Session).offers.map(migrateOffer) };
+  }
   return null;
+}
+
+/**
+ * About you, from any schema: "Prices in" arrived with schema 3 (the U.S. average before it). A place no longer in
+ * the city list (BEA or the Census can recode a metro) falls back to the U.S. average rather than failing.
+ */
+export function migrateHousehold(h: V2Household): AppHousehold {
+  const p = h.pricesIn;
+  return { ...h, pricesIn: p && (p === US_PRICES || cityByCode(p)) ? p : US_PRICES };
 }
 
 /**

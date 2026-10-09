@@ -17,8 +17,9 @@ import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowRespons
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
-import { type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
-import type { WorkContext } from "./metrics";
+import { type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
+import { rentNotes, type WorkContext } from "./metrics";
+import { priceWords } from "./prices";
 import { initialSession, type UiState } from "./session";
 import { derivations, WorkProvider } from "./Tickmarks";
 import { verdict } from "./verdict";
@@ -34,8 +35,9 @@ derivations.provide(Derive);
 /** The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's. */
 export const VALUATION = "2026-07-13";
 
-/** The offers compared, by letter, and the comparison's work context. */
-export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4): WorkContext {
+/** The offers compared, by letter, and the comparison's work context. `about` changes About you (Prices in, say). */
+export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4,
+  about: Partial<AppHousehold> = {}): WorkContext {
   const offers = tweak(sampleOffers(VALUATION));
   const inputs = offers.map((o) => {
     const r = toOfferInput(o);
@@ -43,14 +45,14 @@ export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]
     return r.offer;
   });
   const letters = offers.map((o) => o.letter);
-  const household = DEFAULT_HOUSEHOLD;
+  const household = { ...DEFAULT_HOUSEHOLD, ...about };
   const out = compute({
     compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: stay, valuationDate: VALUATION,
       inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
   if (!out.sweep) throw new Error(`The samples don't compare: ${JSON.stringify(out.issues)}`);
-  const view = verdict(out.sweep, letters, basis, stay, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter))!;
+  const view = verdict(out.sweep, letters, basis, stay, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter), priceWords(household.pricesIn))!;
   return { today: VALUATION, household: { ...household, stayYears: stay }, wagesYear: 2026, offers, rents: out.rents,
     results: { sweep: out.sweep, detail: out.detail, view, letters } };
 }
@@ -160,7 +162,7 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: opts.ui ?? { mode: "quick" }, dispatch: noop }),
     createElement(Lead, { key: "s", view: ctx.results!.view, letters: ctx.results!.letters, stayYears: ctx.household.stayYears, updating: false, error: null, notes: [],
       sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText),
-      flip: flip ? { row: flip.rows[0].salary, updating: false, error: null } : null }),
+      flip: flip ? { row: flip.rows[0].salary, updating: false, error: null } : null, rentNotes: rentNotes(ctx) }),
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
     createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
     ...(opts.ties ? [createElement(Breakeven, { key: "b", ctx, ...opts.ties })] : []),

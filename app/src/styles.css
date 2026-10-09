@@ -102,6 +102,9 @@ a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 2p
 .about-field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
 .about-label { font-size: 13px; color: var(--graphite); }
 .about-static { padding: 6px 0; }
+/* Prices in: the place, then Change (and the way back to the U.S. average); Change opens a search of the city list. */
+.prices-in { max-width: 320px; line-height: 1.4; }
+.prices-in input { width: 100%; min-width: 220px; }
 .assumptions { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 
 select, input:not([type="checkbox"]) {
@@ -191,6 +194,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .close .fig { transition: opacity 120ms; }
 .close.is-updating .fig { opacity: 0.6; }
 .close .updating { margin-left: 4px; }
+/* The rent note (slice 8): the verdict turns on an entered rent against its estimate. */
+.rent-note { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
 
 /* An offer's letter: ink text, identified by an offer-color underline (text never wears the series color). */
 .who { font-weight: 700; padding: 0 2px; box-shadow: inset 0 -3px 0 var(--offer); }

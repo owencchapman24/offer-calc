@@ -4,6 +4,7 @@ import type { OfferIssue } from "../../src/offer/validate";
 import { exportSession, type ImportResult, readImport } from "./exchange";
 import { fieldName } from "./help";
 import { type AppOffer, type Missing, toOfferInput } from "./model";
+import { priceWords } from "./prices";
 import type { EngineResponse } from "./protocol";
 import { type Action, type Session, STORAGE_KEY } from "./session";
 import { dollars, localToday, longDate } from "./text";
@@ -195,7 +196,7 @@ function Review({ box, name, c, current, replace, cancel }: {
       <p className="stale-head">{name}{c.migratedFrom ? ` (an older export, schema ${c.migratedFrom}, updated as it's read)` : ""}</p>
       <ul>
         <li>Replaces your {current.offers.length} {current.offers.length === 1 ? "offer" : "offers"} ({offers(current.offers)}) with {c.offers.length} from the file: {offers(c.offers)}.</li>
-        <li>Replaces About you: {FILING[h.filingStatus]}, a stay of {h.stayYears} {h.stayYears === 1 ? "year" : "years"}, other wages of {dollars(h.otherWagesThisYear)}, {h.healthUsage ?? "medium"} health use.</li>
+        <li>Replaces About you: {FILING[h.filingStatus]}, a stay of {h.stayYears} {h.stayYears === 1 ? "year" : "years"}, other wages of {dollars(h.otherWagesThisYear)}, {h.healthUsage ?? "medium"} health use, prices in {priceWords(h.pricesIn).name}.</li>
         {c.ui && Object.keys(c.ui).length > 0 && <li>Takes the file's view choices: {Object.keys(c.ui).map((k) => UI_WORDS[k] ?? k).join(", ")}.</li>}
         {c.note && <li>{c.note}</li>}
       </ul>

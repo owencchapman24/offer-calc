@@ -8,6 +8,7 @@ import {
   toOfferInput, withBase,
 } from "./model";
 import { PRESETS, presetOf } from "./presets";
+import { priceWords, US_PRICES } from "./prices";
 import { type KeyValueStore, initialSession, loadSession, reducer, saveSession, STORAGE_KEY, type V1Offer, type V1Session } from "./session";
 import { localToday, parseMoney, parsePercent } from "./text";
 import { disagreement, type StepView, totalsCaption, verdict } from "./verdict";
@@ -112,7 +113,7 @@ describe("session", () => {
   const s0 = initialSession(TODAY);
   it("starts with the samples, a 4-year stay and the after-rent basis", () => {
     expect(s0.offers.map((o) => o.letter)).toEqual(["A", "B", "C"]);
-    expect(s0.household).toEqual({ filingStatus: "single", stayYears: 4, otherWagesThisYear: 0 });
+    expect(s0.household).toEqual({ filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: "00000" });
     expect(s0.ui.basis).toBe("colAdjustedTotal");
   });
   it("letters stay with their offers: remove B, add one, and it's B again", () => {
@@ -198,8 +199,8 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
   it("keeps the household and view choices, and every offer gives the engine the same input", () => {
     const mem = new Map([[STORAGE_KEY, JSON.stringify(v1)]]);
     const s = loadSession({ getItem: (k) => mem.get(k) ?? null, setItem: () => {} }, TODAY);
-    expect(s.schemaVersion).toBe(2);
-    expect(s.household).toEqual(v1.household);
+    expect(s.schemaVersion).toBe(3);
+    expect(s.household).toEqual({ ...v1.household, pricesIn: "00000" }); // prices in the U.S. average, as before slice 8
     expect(s.ui).toEqual(v1.ui);
     expect(s.offers.map((o) => [o.id, o.letter, o.sample])).toEqual([["sample-A", "A", "edited"], ["sample-B", "B", "edited"], ["C-1", "C", null]]);
     s.offers.forEach((o, i) => {
@@ -215,6 +216,18 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
     const s = loadSession({ getItem: () => JSON.stringify({ ...v1, offers: [blank] }), setItem: () => {} }, TODAY);
     expect(toOfferInput(s.offers[0])).toEqual({ missing: ["salary", "city"] });
     expect(s.offers[0].draft).toMatchObject({ label: "Mine", startDate: "2027-06-01", bonus: { basis: null, amount: null } });
+  });
+  it("a slice 3-5 save (schema 2) gains Prices in at the U.S. average; a schema 3 one keeps its place, unless it's gone", () => {
+    const v2 = { ...initialSession(TODAY), schemaVersion: 2, household: { filingStatus: "joint", stayYears: 5, otherWagesThisYear: 0 } };
+    const load = (x: unknown) => loadSession({ getItem: () => JSON.stringify(x), setItem: () => {} }, TODAY);
+    const s = load(v2);
+    expect(s.schemaVersion).toBe(3);
+    expect(s.household).toEqual({ filingStatus: "joint", stayYears: 5, otherWagesThisYear: 0, pricesIn: "00000" });
+    expect(s.offers).toEqual(v2.offers);
+    const clt = { ...initialSession(TODAY), household: { ...DEFAULT_HOUSEHOLD, pricesIn: "16740" } };
+    expect(load(clt).household.pricesIn).toBe("16740");
+    // A place the city list no longer has (BEA recodes metros now and then) falls back rather than failing.
+    expect(load({ ...clt, household: { ...clt.household, pricesIn: "99999" } }).household.pricesIn).toBe("00000");
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)
@@ -248,9 +261,13 @@ describe("verdict", () => {
     expect(w.basis).toBe("cash"); // the chosen basis can't be shown, so the first available one is
   });
   it("the rank list says what its totals are: the stay, the basis, the dollars", () => {
-    expect(totalsCaption("colAdjustedTotal", 4, "colAdjustedTotal")).toBe("4-year total after rent, in today's U.S.-average dollars, present value");
-    expect(totalsCaption("cash", 2, "colAdjustedTotal")).toBe("2-year total after tax, in today's dollars, present value");
-    expect(totalsCaption("perHour", 1, "totalRewards")).toBe("Per hour worked over 1 year, in total rewards, nominal");
+    const us = priceWords(US_PRICES);
+    expect(totalsCaption("colAdjustedTotal", 4, "colAdjustedTotal", us)).toBe("4-year total after rent, in today's U.S.-average dollars, present value");
+    expect(totalsCaption("cash", 2, "colAdjustedTotal", us)).toBe("2-year total after tax, in today's dollars, present value");
+    expect(totalsCaption("perHour", 1, "totalRewards", us)).toBe("Per hour worked over 1 year, in total rewards, nominal");
+    // Prices in Charlotte (slice 8): the dollars follow.
+    expect(totalsCaption("colAdjustedTotal", 4, "colAdjustedTotal", priceWords("16740"))).toBe("4-year total after rent, in today's Charlotte dollars, present value");
+    expect(totalsCaption("perHour", 3, "colAdjustedTotal", priceWords("16740"))).toBe("Per hour worked over 3 years, after rent, in Charlotte dollars, nominal");
   });
 });
 

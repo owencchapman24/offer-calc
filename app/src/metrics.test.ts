@@ -71,7 +71,7 @@ describe("show the work: an offer's totals", () => {
     // The two BEA indexes, not a factor: the product foots to the dollar as displayed (here at 3 decimals).
     const us = d.lines.find((l) => l.label === "U.S. non-housing prices (BEA)")!;
     const ny = d.lines.find((l) => l.label === "New York non-housing prices (BEA)")!;
-    expect([us.op, us.value, us.ref, ny.op, ny.value, ny.ref]).toEqual(["×", "99.880", "rpp.A.us", "÷", "105.696", "rpp.A.area"]);
+    expect([us.op, us.value, us.ref, ny.op, ny.value, ny.ref]).toEqual(["×", "99.880", "rpp.A.ref", "÷", "105.696", "rpp.A.area"]);
     expect(Math.abs((v("Spending money after rent") * parse(us.value)) / parse(ny.value) - v("The same spending"))).toBeLessThan(1);
     const total = v("The same spending") - v("Out-of-pocket") + v("Saved, at face value");
     expect(Math.abs(total - v("After rent, at U.S. prices"))).toBeLessThanOrEqual(2);
@@ -285,6 +285,8 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       : { ...o, sample: null, draft: quickOnly(o.draft) })))],
     // A close call: the flip line in the lead.
     ["after rent, a 5-year stay", context("colAdjustedTotal", undefined, 5)],
+    // Prices in Charlotte (slice 8): B's city is the reference, its factor 1; A's indexes need 4 decimals. The rent note shows.
+    ["after rent, prices in Charlotte", context("colAdjustedTotal", undefined, 4, { pricesIn: "16740" })],
   ];
 
   for (const [name, plain] of contexts) {

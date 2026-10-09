@@ -1,5 +1,7 @@
+import { cityByCode } from "../../src/col/cities";
 import { type AppHousehold, type AppOffer, type Letter, LETTERS, type OfferDraft } from "./model";
-import { migrateOffer, type Session, type UiState, type V1Offer } from "./session";
+import { US_PRICES } from "./prices";
+import { migrateHousehold, migrateOffer, type Session, type UiState, type V1Offer, type V2Household } from "./session";
 
 // JSON export and import (docs/ui-design.md §10; moved into slice 3): one versioned file with
 // everything you've entered. Import rejects other formats, migrates older schema versions, and checks
@@ -7,7 +9,7 @@ import { migrateOffer, type Session, type UiState, type V1Offer } from "./sessio
 // with the engine's validateOffer (in the worker) and shows what would be replaced.
 
 export const FORMAT = "offer-calc";
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 const SAMPLE_NOTE = "Includes sample offers: illustrative inputs, not market data.";
 
 export interface ExportFile {
@@ -48,11 +50,11 @@ export function readImport(text: string): ImportResult {
   if (!f || typeof f !== "object" || f.format !== FORMAT) {
     return { ok: false, problems: ["This isn't an Offer Calc export: it doesn't say \"format\": \"offer-calc\"."] };
   }
-  if (f.schemaVersion !== 1 && f.schemaVersion !== 2) {
-    return { ok: false, problems: [`This export's schema version (${String(f.schemaVersion)}) is newer than this app knows: 1 or 2.`] };
+  if (f.schemaVersion !== 1 && f.schemaVersion !== 2 && f.schemaVersion !== 3) {
+    return { ok: false, problems: [`This export's schema version (${String(f.schemaVersion)}) is newer than this app knows: 1 to 3.`] };
   }
   const problems: string[] = [];
-  const household = checkHousehold(f.household, problems);
+  const household = checkHousehold(f.household, f.schemaVersion as 1 | 2 | 3, problems);
   if (!Array.isArray(f.offers)) problems.push("offers: missing, or not a list.");
   const list = Array.isArray(f.offers) ? f.offers : [];
   if (Array.isArray(f.offers) && (list.length < 1 || list.length > 3)) problems.push(`offers: ${list.length} offers; the app holds 1 to 3.`);
@@ -91,11 +93,18 @@ export function readImport(text: string): ImportResult {
   };
 }
 
-function checkHousehold(h: unknown, problems: string[]): AppHousehold | null {
+/** About you. "Prices in" arrived with schema 3: older files are at the U.S. average. */
+function checkHousehold(h: unknown, schema: 1 | 2 | 3, problems: string[]): AppHousehold | null {
   const before = problems.length;
   check(h, HOUSEHOLD, "household", problems);
-  return problems.length === before ? (h as AppHousehold) : null;
+  if (schema === 3) check((h as Partial<AppHousehold> | null)?.pricesIn, PRICES_IN, "household.pricesIn", problems);
+  return problems.length === before ? migrateHousehold(h as V2Household) : null;
 }
+
+/** A place in the city list, by its BEA code, or "00000" for the U.S. average. */
+const PRICES_IN: Shape = (v, p, ps) => {
+  if (typeof v !== "string" || (v !== US_PRICES && !cityByCode(v))) fail(ps, p, `"${US_PRICES}" (the U.S. average) or a BEA area code from the city list`);
+};
 
 /** Only the view choices the app knows, each checked; anything else is left as it is. */
 function pickUi(u: Partial<UiState>): Partial<UiState> {
