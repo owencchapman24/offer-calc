@@ -51,6 +51,7 @@ export type MetricId =
   | `nextown.${L}` // L-4: the next cliff's own part of that
   | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
   | `recon.${L}` // L-4: leaving on your stay's last day vs the stay
+  | `wh.${L}.${number}` // L-5: federal tax a calendar year's withholding falls short of, owed the next April
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 

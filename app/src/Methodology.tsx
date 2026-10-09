@@ -2,10 +2,12 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { DATA_YEARS } from "../../src/col/cities";
 import { formatAssumption } from "../../src/format/index";
 import type { ValueBasis } from "../../src/offer/types";
-import { ASSUMPTIONS, type Letter } from "./model";
+import { CASES, changeText, riskView } from "./cases";
+import { addMonthsIso, forfeits } from "./leaveModel";
+import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
 import { BASIS_PHRASE, bridge, type WorkContext } from "./metrics";
 import { SECTIONS, type SectionId } from "./sections";
-import { dayBefore, dollars, figure, longDate, percent } from "./text";
+import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import { TICKS, type TickKind } from "./ui";
 
 // The methodology (docs/ui-design.md §8): how every number is worked out, in plain language, with
@@ -316,6 +318,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             holds up best, who wins each, and which of your inputs differ in the bear case. An offer without a range shows one value
             and says so, rather than looking safe.
           </p>
+          <Scenarios ctx={ctx} sample={sample} />
         </Section>
 
         <Section id="M-9">
@@ -344,6 +347,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             what staying until it is worth. On your stay's last day it squares leaving then with the stay: the stay taxes its last
             year as though pay continued through December (<Ref id="M-7.3" />), so leaving that day keeps a little more after tax.
           </p>
+          <LeavingEarly ctx={ctx} sample={sample} />
         </Section>
 
         <Section id="M-10">
@@ -556,6 +560,102 @@ function PerMonth({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
     </Live>
   );
 }
+
+/** M-8: each offer's bear, base and bull cases over your stay, and what differs in the bear case. */
+function Scenarios({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
+  const r = ctx.results;
+  if (!r?.detail || r.detail.years !== r.view.row.years) return <p className="method-note">Fill in two offers to see this with your numbers.</p>;
+  let v: ReturnType<typeof riskView>;
+  try {
+    v = riskView(ctx);
+  } catch {
+    return null;
+  }
+  const head = `${BASIS_PHRASE[r.view.basis]}, ${v.years}-year ${v.perHour ? "per hour worked, nominal" : "total, present value"}`;
+  if (!v.anyRange) {
+    return (
+      <Live>
+        <p className="live-head">Your numbers, {head} <Illustrative sample={sample} /></p>
+        <p>No ranges are entered, so each offer's bear, base and bull cases are the same. Add one in detailed mode (+ range) and L-2 shows them.</p>
+      </Live>
+    );
+  }
+  const fmt = (x: number) => (v.perHour ? cents(x) : figure(x));
+  const rows = [...v.rows].sort((a, b) => a.letter.localeCompare(b.letter));
+  return (
+    <Live>
+      <p className="live-head">Your numbers, {head} <Illustrative sample={sample} /></p>
+      <table className="method-table">
+        <thead><tr><th scope="col">Offer</th>{CASES.map((c) => <th key={c} scope="col">{c[0].toUpperCase() + c.slice(1)}</th>)}<th scope="col">In the bear case</th></tr></thead>
+        <tbody>
+          {rows.map((x) => (
+            <tr key={x.letter}>
+              <th scope="row">{x.letter}</th>
+              {CASES.map((c) => <td key={c} className="num">{fmt(x.values[c])}</td>)}
+              <td>{x.changes.length ? x.changes.map(changeText).join("; ") : x.ranged ? "nothing within your stay" : "no ranges entered"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>{v.holdsUp} holds up best: it has the highest bear case. <a href="#/">See L-2 on the comparison</a></p>
+    </Live>
+  );
+}
+
+/** M-9: what leaving early would cost under your offers' terms, and L-4's panel when it has worked one out. */
+function LeavingEarly({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
+  const r = ctx.results;
+  if (!r?.detail || r.detail.years !== r.view.row.years) return <p className="method-note">Fill in two offers to see this with your numbers.</p>;
+  const leave = r.leave;
+  return (
+    <Live>
+      <p className="live-head">Your offers, if you left early <Illustrative sample={sample} /></p>
+      <ul className="method-list">
+        {r.letters.map((letter, i) => {
+          const app = ctx.offers.find((o) => o.letter === letter);
+          const input = app ? toOfferInput(app) : null;
+          const o = input && "offer" in input ? input.offer : null;
+          const d = r.detail!.offers[i];
+          if (!o) return null;
+          const facts: string[] = [];
+          const bonus = d.bonuses[0];
+          if (bonus) {
+            facts.push(`its first bonus is paid ${longDate(bonus.date)}; ${o.bonus?.mustBeEmployedOnPayDate === false
+              ? "leaving before a payout still pays the part earned by your last day" : "you must be employed on each payout date"}`);
+          }
+          for (const a of o.cashAwards ?? []) {
+            if (!a.clawback) continue;
+            const paid = typeof a.paidOn === "string" ? a.paidOn : addDaysIso(o.startDate, a.paidOn.daysAfterStart);
+            const clock = (a.clawback.from ?? "start") === "payment" ? paid : o.startDate;
+            const clear = dayBefore(addMonthsIso(clock, a.clawback.months));
+            facts.push(a.clawback.kind === "full"
+              ? `the ${dollars(a.amount)} ${a.label} is repaid in full if you leave before ${longDate(clear)}`
+              : `the ${dollars(a.amount)} ${a.label} is repaid in part, less each month, until ${longDate(clear)}`);
+          }
+          const vest = d.rsus[0];
+          if (vest) facts.push(`its first RSU vest is ${longDate(vest.date)} (${dollars(vest.gross)})`);
+          const v = o.retirement?.vesting;
+          if (v && v.kind === "cliff") facts.push(`its employer 401(k) money vests after ${v.years} ${v.years === 1 ? "year" : "years"} of service`);
+          if (v && v.kind === "graded") facts.push("its employer 401(k) money vests in steps with service");
+          const p = leave?.panels[i];
+          const lost = p ? forfeits(p.warnings, o.startDate).reduce((sum, f) => sum + f.earned, 0) : 0;
+          return (
+            <li key={letter}>
+              <strong>{letter}</strong>: {facts.length ? `${facts.join("; ")}.` : "nothing is lost by leaving early beyond the pay itself."}
+              {p && (
+                <> At the last day picked in L-4, {longDate(p.leaveDate)}, it keeps {dollars(p.afterTaxCompKept)} after tax
+                  {p.clawbackOwed >= 0.5 ? `, repays ${dollars(p.clawbackOwed)}` : ""}{lost >= 0.5 ? ` and forfeits ${dollars(lost)} earned toward bonuses` : ""}.</>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p>{leave ? "" : "L-4 works out what you'd keep for any last day. "}<a href="#/">See L-4 on the comparison</a></p>
+    </Live>
+  );
+}
+
+const addDaysIso = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** M-12: each offer's live assumptions, in words. */
 function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {

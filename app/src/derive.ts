@@ -13,6 +13,7 @@ import {
 import type { OfferDetail } from "./protocol";
 import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
 import { cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
+import { withholdingParts } from "./warningAt";
 import type { SectionId } from "./sections";
 import {
   bonusText, cashAwardsText, employerStateText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText, retirementText,
@@ -100,6 +101,7 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "risk": case "drop": case "win": return "M-8";
     case "kept": case "repay": case "forfeit": case "forgone": case "next": case "nextown": return "M-9";
     case "stayafter": case "recon": return "M-7.3";
+    case "wh": return "M-4";
   }
   throw new Error(`Unknown figure: ${id}`);
 }
@@ -140,6 +142,7 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "nextown": return nextOwnWork(ctx, a as L);
       case "stayafter": return stayAfterWork(ctx, a as L);
       case "recon": return reconWork(ctx, a as L);
+      case "wh": return withholdingWork(ctx, a as L, Number(b));
     }
     throw new Error(`Unknown figure: ${id}`);
   }
@@ -176,6 +179,7 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "nextown": return `${a}'s next cliff`;
     case "stayafter": return `${a}'s stay after tax`;
     case "recon": return `${a}'s difference from the stay`;
+    case "wh": return `${a}'s ${b} withholding`;
   }
   return id;
 }
@@ -802,6 +806,34 @@ function reconWork(ctx: WorkContext, letter: L): Work {
         + `leaving taxes only what was paid in ${r.year}, at the lower rate a part year brings.`,
     ],
     ties: [], uses: [`kept.${letter}`, `stayafter.${letter}`],
+  };
+}
+
+// ---- L-5: withholding ---------------------------------------------------------------------------------
+
+/** L-5: federal tax a year's withholding falls short of: due the next April. */
+function withholdingWork(ctx: WorkContext, letter: L, year: number): Work {
+  const y = detailOf(ctx, letter).withholding.years.find((x) => x.year === year);
+  if (!y) throw new Error(`No ${year} withholding for ${letter} in your stay.`);
+  const p = withholdingParts(y);
+  const status = { single: "single", joint: "married filing jointly", headOfHousehold: "head of household" }[ctx.household.filingStatus];
+  return {
+    title: `${letter} · federal withholding on ${year} pay`, scope: `Base case · ${year} · federal income tax only`,
+    lines: [
+      { label: `Federal income tax on the offer's ${year} pay`, note: "household tax with the offer, less without it", value: figure(p.tax) },
+      { op: "−", label: "Withheld from salary", note: `the IRS percentage method, a ${status} Form W-4 with nothing else on it`, value: figure(p.regular) },
+      { op: "−", label: "Withheld from bonuses, RSU vests and cash awards", note: "22% (37% on supplemental pay over $1 million)",
+        value: figure(p.supplemental) },
+      { op: "=", label: p.short >= 0 ? `Owed when you file, April ${year + 1}` : `Refunded when you file, April ${year + 1}`, value: figure(Math.abs(p.short)),
+        rule: "double" },
+    ],
+    notes: [
+      "Totals elsewhere count the tax you owe, not what's withheld: this is about cash timing. Bonuses and RSU vests are withheld at the flat "
+        + "supplemental rate, often below your real rate on them, so the difference comes due in April.",
+      "Raising your withholding on Form W-4, or paying estimated tax, spreads it out. State withholding, other jobs' withholding and the "
+        + "estimated-tax safe harbors aren't estimated here.",
+    ],
+    ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter)]),
   };
 }
 

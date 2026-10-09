@@ -1,6 +1,7 @@
 # UI slices 4-8 plan (approved 2026-10-09)
 
-**Status (2026-10-09): approved; slice 5 in progress** (review stops A and B merged).
+**Status (2026-10-09): approved; slice 5 done** (review stops A, B and C merged; how it differs from the
+design is in `docs/ui-design.md` §12, "UI slice 5 versus this design"). Slice 4 is next.
 
 The plan for the UI slices after slice 3, with the decisions made in review on 2026-10-09. A fresh
 session should be able to execute it from this file, `CLAUDE.md` and `docs/ui-design.md` (rev 3,

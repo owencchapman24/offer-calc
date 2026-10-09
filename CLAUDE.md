@@ -29,9 +29,9 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1 to 3 are complete and live at https://offer-calc.vercel.app. Slice 5 is in
-progress** (plan: `docs/ui-slices-4-8-plan.md`): review stops A (groundwork and L-2) and B (L-4)
-are merged; L-5 (stop C) is next.
+**UI: slices 1, 2, 3 and 5 are complete and live at https://offer-calc.vercel.app** (plan for
+slices 4-8: `docs/ui-slices-4-8-plan.md`; slice 5 versus the design: `docs/ui-design.md` §12).
+Slice 4 is next.
 - **L-2, If things go badly** (slice 5, stop A): the sentence (who holds up best, the biggest
   drop, who wins only if things go well), a range chart (bear and bull dots, base diamond), who
   wins each scenario, what goes wrong in the bear case (generated from the inputs), a ticked
@@ -46,13 +46,23 @@ are merged; L-5 (stop C) is next.
   - The last day: a date field, a month at a time, "Your stay's last day", or dragged on the chart
     (a keyboard slider: arrows a month, Shift a day).
   - The panel per offer: keep, repay, left behind; the next real cliff (past a prorated clawback's
-    monthly steps) and what staying until it is worth; the leave-date warnings (bonus forfeited, FICA
-    on a later-year clawback); on your stay's last day, the reconciliation with the stay in words
-    (the stay taxes its last year as though pay continued through December).
+    monthly steps) and what staying until it is worth; the leave-date warnings (a forfeited bonus as
+    what was earned toward it by the last day, beside its target; FICA on a later-year clawback); on
+    your stay's last day, the reconciliation with the stay in words (the stay taxes its last year as
+    though pay continued through December).
   - Its numbers come from the worker's slow lane: the curves when the inputs change (~0.5 s for the
     samples, in ~8 ms chunks), the panel when the last day moves (~50 ms), only while L-4 is on
-    screen and the comparison is current. About 0.8-1 s from a keystroke to L-4 filled in, on a
+    screen and the comparison is current. About 0.7-1 s from a keystroke to L-4 filled in, on a
     desktop.
+- **L-5, Warnings** (slice 5, stop C): every warning for your stay in three kinds: changes your
+  numbers (limits, the bonus cutoff), not modeled (the convenience-of-employer rule), and cash timing
+  (the federal withholding shortfall, estimated in the fast lane). A recurring warning is one line with
+  its years, and each has "Show at the field". The lead points to L-5 when a warning changes the numbers
+  (the worker counts them).
+- **Stale schedules:** L-1, L-2, L-4 and L-5 dim their figures while they're from earlier inputs and say
+  "Updating…" or "Last valid results" (`StaleNote` in `ui.tsx`).
+- **Methodology live numbers:** M-8 lists your bear, base and bull cases; M-9 each offer's leaving-early
+  terms, and L-4's panel once it has run.
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -109,10 +119,11 @@ are merged; L-5 (stop C) is next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 354.3 / 108.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Stop A of slice 5 was 352.4 /
-    108.0; slice 3 ended at 351.8 / 107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB
-    gzipped by the check (decided 2026-10-09), which CI runs after the build.
+  - **Main thread:** 355.7 / 109.1 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 3 ended at 351.8 /
+    107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB gzipped by the check (decided
+    2026-10-09), which CI runs after the build. Under 1 kB is left: slices 4, 8 and 7 add to the main
+    thread (the close-call line, the prices control, tabs and sticky bars), so plan room for them.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
@@ -121,20 +132,21 @@ are merged; L-5 (stop C) is next.
     text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
     methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB, L-2
     9 / 3 KB plus its view model 4 / 2 KB, L-4 13 / 5 KB plus its view model 4 / 2 KB (each view
-    model shared with the derivations).
+    model shared with the derivations), L-5 5 / 2 KB.
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
-  - **Worker:** 247 KB. Per edit it runs `validateOffer` on each offer, then `horizonSweep`, your
-    stay's full projection per offer, and its bear and bull totals (L-2): about 46 ms warm on the
-    samples in Node, 57-67 ms in headless Edge (32 before L-2). L-4's jobs run in the slow lane.
+  - **Worker:** ~250 KB. Per edit it runs `validateOffer` on each offer, then `horizonSweep`, your
+    stay's full projection per offer, its bear and bull totals (L-2) and its withholding (L-5): about
+    50 ms warm on the samples in Node, 35-65 ms in headless Edge (32 before slice 5). L-4's jobs run
+    in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 346 passing.
+**Tests:** 352 passing.
 - `test/offer.test.ts` 120, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 14,
+  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 14, `app/src/l5.test.ts` 6,
   `scripts/lib/bundle.test.ts` 3.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
@@ -178,18 +190,14 @@ are merged; L-5 (stop C) is next.
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 5: leaving early and downside risk:** L-2, "If things go badly" (§4.4); L-4 with the
-   next-cliff panel (§4.5); L-5, the warnings roll-up (§4.7). Groundwork: bear and bull in the
-   worker's fast lane, the slow lane, a leave sweep by day, and the CI bundle check. Review stops
-   A (L-2), B (L-4) and C (L-5).
-2. **Slice 4: close calls and breakeven:** L-3 (§4.6) with the winner's cushion and the rent
+1. **Slice 4: close calls and breakeven:** L-3 (§4.6) with the winner's cushion and the rent
    lever, and the close-call flip line (§4.1). Step 0 fixes the breakeven window (the comparison
    window of every offer), tested against the rank list to the cent.
-3. **Slice 8: prices in a city you know** (§5, item 6).
-4. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
+2. **Slice 8: prices in a city you know** (§5, item 6).
+3. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
    and axe in CI (any WCAG A/AA violation fails; exceptions need a reason), a screen-reader
    walkthrough the user runs from a script.
-5. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+4. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
 
@@ -301,6 +309,9 @@ build them in.
     `src/slowJobs.ts` (worker only) holds them: L-4's curves (`leaveJob`, sampled by `sweepDays`)
     and its panel at the last day (`cursorJob`). `useEngine` sends them (`requestSlow`, skipping a
     request identical to the last) and reports `updating` from the render that changes the inputs.
+  - `src/Warnings.tsx` is L-5. `src/warningAt.ts`: the field each engine warning is about (detailed
+    mode and "Show at the field"), and the withholding figure as displayed; `src/warningKinds.ts`: L-5's
+    kinds, your stay's warnings grouped, and the count the lead points with (the worker computes it).
   - `src/Leaving.tsx` is L-4; `src/leaveModel.ts` its view model (the axis by calendar date, the
     curves, markers and clawback segments, the panel's words, the reconciliation with the stay),
     shared with `derive.ts`. `src/axes.ts`: the charts' tick helpers.

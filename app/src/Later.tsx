@@ -10,6 +10,7 @@ import type { Stale } from "./ui";
 
 const riskSchedule = lazyModule(() => import("./Risk"));
 const leavingSchedule = lazyModule(() => import("./Leaving"));
+const warningsSchedule = lazyModule(() => import("./Warnings"));
 
 /** L-2, once its code has loaded. */
 export function RiskSlot({ ctx, sample, status }: { ctx: WorkContext; sample: boolean; status: Stale }) {
@@ -25,4 +26,12 @@ export function LeavingSlot(props: LeavingProps) {
   const ref = useRef<HTMLDivElement>(null);
   useLoadNear(leavingSchedule, ref, m !== null);
   return m ? <m.Leaving {...props} /> : <div ref={ref} className="later" />;
+}
+
+/** L-5, once its code has loaded. Its place keeps the id the lead's pointer scrolls to. */
+export function WarningsSlot({ ctx, sample, status }: { ctx: WorkContext; sample: boolean; status: Stale }) {
+  const m = useLazyModule(warningsSchedule);
+  const ref = useRef<HTMLDivElement>(null);
+  useLoadNear(warningsSchedule, ref, m !== null);
+  return m ? <m.Warnings ctx={ctx} sample={sample} status={status} /> : <div ref={ref} id="l5" className="later" />;
 }

@@ -20,11 +20,14 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [] }: {
+export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [], changes = 0,
+  onWarnings }: {
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
   /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
   cautions?: string[];
+  /** How many warnings change these numbers (L-5 lists them), and how to get there. */
+  changes?: number; onWarnings?: () => void;
   /** Problems with the latest inputs: the results are the last valid ones until they're fixed. */
   issues?: Partial<Record<Letter, OfferIssue[]>>; onFix?: (t: EditTarget) => void;
 }) {
@@ -60,7 +63,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
         </div>
       )}
       {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
-      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions} />
+      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions}
+        changes={changes} onWarnings={onWarnings} />
         : !error && notes.length === 0 && problems.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
@@ -69,7 +73,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions }: {
+function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings }: {
+  changes: number; onWarnings?: () => void;
   view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf } = view;
@@ -116,6 +121,13 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions }: {
           {pv ? " · today's dollars" : " · nominal"}
         </p>
         {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
+        {changes > 0 && (
+          <p className="lead-pointer">
+            <span className="warn-icon" aria-hidden="true">⚠</span> {changes === 1 ? "A warning changes" : `${changes} warnings change`} these
+            numbers.{" "}
+            {onWarnings && <button type="button" className="link" onClick={onWarnings}>See L-5</button>}
+          </p>
+        )}
         {cautions.length > 0 && (
           <div className="caution" role="note" aria-label="Not counted for every offer">
             <p className="caution-head"><span aria-hidden="true">⚠</span> Not counted for every offer</p>

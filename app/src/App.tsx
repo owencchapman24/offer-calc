@@ -5,7 +5,7 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
-import { LeavingSlot, RiskSlot } from "./Later";
+import { LeavingSlot, RiskSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -135,6 +135,18 @@ export function App() {
   // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
   const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
   if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
+  // Warnings that change your numbers: the lead points to L-5, which lists every warning.
+  const changes = view ? engine.detail?.changes ?? 0 : 0;
+  const toWarnings = () => {
+    document.getElementById("l5")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // L-5 loads as it nears the screen: its heading takes focus once it's there.
+    const focus = (tries: number) => {
+      const h = document.getElementById("l5-title");
+      if (h) h.focus({ preventScroll: true });
+      else if (tries) setTimeout(() => focus(tries - 1), 100);
+    };
+    focus(20);
+  };
   // A cost or benefit counted for some offers but not others: the lead schedule says so.
   const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
 
@@ -191,7 +203,7 @@ export function App() {
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
-                cautions={cautions} />
+                cautions={cautions} changes={changes} onWarnings={toWarnings} />
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
@@ -201,6 +213,7 @@ export function App() {
               leave={engine.leave} cursor={engine.cursor} requestSlow={engine.requestSlow} at={leaveAt} basis={leaveBasis} onAt={setLeaveAt}
               onBasis={setLeaveBasis} />
           )}
+          {work.results && <WarningsSlot ctx={work} sample={sample} status={stale} />}
         </>
       )}
 

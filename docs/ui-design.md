@@ -1328,6 +1328,57 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   shrink (the 401(k) match, vesting steps) and otherwise scrolls inside the editor (promotions, bonus by
   year).
 
+- **UI slice 5** (2026-10-09; plan in `docs/ui-slices-4-8-plan.md`), in three review stops:
+  - **A:** the groundwork (the leave sweep by day, engine item 13; the worker's two lanes; the CI bundle
+    check) and L-2 (§4.4).
+  - **B:** L-4 (§4.5) with the next-cliff panel; then, from its review, forfeited bonuses as earned
+    amounts and the updating note on the schedules after the lead.
+  - **C:** L-5 (§4.7), the lead's pointer to it, the withholding estimate in the worker's fast lane, and
+    live numbers in M-8 and M-9.
+
+**UI slice 5 versus this design:**
+- **Placement:** L-1, L-2, L-4 and L-5 sit full width under the two columns, each loaded as you scroll
+  toward it; L-3 will go between L-2 and L-4.
+- **L-2:**
+  - "Who wins" shows each scenario's winner with its margin a month, not the letter alone.
+  - "What goes wrong" is generated wording ("bonus 10% of salary instead of 15%", whole dollars).
+  - The axis sits under the chart, and on a phone the per-offer labels move under it.
+  - A popover names only the figures on the page, so the base case is named only with the table view
+    open.
+- **L-4:**
+  - The axis runs to the longer of five years and your stay.
+  - "$" marks any payment, a sign-on included.
+  - Several RSU vests on one day are added up in the panel.
+  - The stay's-end reconciliation shows in after-tax view only (total rewards asks you to switch). Its
+    difference is between the two figures as displayed, like every derivation in L-2 and L-4: each
+    column foots as shown.
+  - A forfeited bonus is what was earned toward it by the last day, beside its target, or "all of it
+    earned" once its period has ended (a first period counts from your start). A period with no days
+    worked isn't listed.
+  - Its curves take about 0.4-0.6 s in the worker's slow lane on a desktop, and L-4 fills in about 0.7-1
+    s after a keystroke; the panel about 50 ms after the last day moves.
+  - After rent isn't available in L-4 yet (engine item 12).
+- **L-5:**
+  - Three kinds:
+    - "Changes your numbers": the 401(k), HSA and perk limits, and the bonus cutoff.
+    - "Not modeled: may cost you": the convenience-of-employer rule.
+    - "Cash timing": the withholding shortfall.
+  - A warning that recurs is one line per offer with its years ("2027 to 2030"), and only your stay's
+    years are listed (the projection runs on past the stay).
+  - The samples raise withholding shortfalls (A in its later years, C in its last two), so their L-5
+    isn't empty, unlike W7b's example.
+  - The lead's pointer counts a recurring warning once. Its count comes from the worker, so the main
+    thread doesn't carry L-5's grouping.
+- **Stale schedules:** L-1, L-2, L-4 and L-5 dim their figures while they're from earlier inputs and say
+  "Updating…" (or "Last valid results" while the inputs have a problem) in their heads, as the lead does.
+- **Bundles:** the main thread stays one chunk only if the schedules that load on first use import their
+  figures from `figures.tsx` (React and `ui.tsx` only): when a lazy chunk reached `react-dom` or
+  `metrics.ts`' run-time code through `Tickmarks.tsx`, Rolldown split React and the shared modules out of
+  the entry.
+- **The methodology:** M-8 lists your offers' bear, base and bull cases and what differs in the bear case.
+  M-9 states what leaving early would cost under each offer's terms (the first bonus's date and rule, each
+  clawback's window, the first RSU vest, the 401(k) vesting), and L-4's panel once it has worked one out.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
