@@ -1,5 +1,5 @@
 import type { RentEstimate } from "../../src/col/rent";
-import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, ValueBasis } from "../../src/offer/types";
+import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, Scenario, ValueBasis } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
@@ -39,6 +39,9 @@ export type MetricId =
   | `run.${L}.${number}` // L-1: the running total through a year
   | `eysum.${L}` // L-1's table: the years, footed
   | `br.${L}.${number}.${BridgeLine}` // the bridge
+  | `risk.${L}.${Scenario}` // L-2: an offer's total (or per hour) in a scenario, over your stay
+  | `drop.${L}` // L-2: the base case less the bear case, a month (or an hour)
+  | `win.${Scenario}` // L-2: who leads in a scenario, by how much a month (or an hour)
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
@@ -127,6 +130,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "about": return aboutIsDefault(ctx.household, a as AboutField) ? "default" : "traced";
     case "rpp": return "traced";
     case "run": case "eysum": return "footed";
+    case "risk": return b === "base" ? "crossFooted" : "recomputed";
     case "br":
       switch (c as BridgeLine) {
         case "letter": case "premiums": case "perks": case "hsa": case "oop": return "traced";

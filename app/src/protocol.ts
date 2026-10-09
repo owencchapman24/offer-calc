@@ -32,6 +32,8 @@ export interface EngineRequest {
 /** One offer's base-scenario projection over your stay's window: what Show the work, L-1 and the bridge explain. */
 export interface OfferDetail {
   window: WindowTotals;
+  /** The same window in the bear and bull scenarios: L-2's range (docs/ui-design.md §4.4). */
+  cases: { bear: WindowTotals; bull: WindowTotals };
   employmentYears: EmploymentYearResult[];
   costOfLiving?: CostOfLivingInfo;
   assumptions: Assumption[];

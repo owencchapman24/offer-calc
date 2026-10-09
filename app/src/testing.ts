@@ -7,6 +7,7 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { compute } from "./compute";
 import { HELP, LEDGER_SECTIONS } from "./help";
 import { Lead } from "./Lead";
+import { Risk } from "./Risk";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
@@ -28,7 +29,7 @@ derivations.provide(Derive);
 export const VALUATION = "2026-07-13";
 
 /** The offers compared, by letter, and the comparison's work context. */
-export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o): WorkContext {
+export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4): WorkContext {
   const offers = tweak(sampleOffers(VALUATION));
   const inputs = offers.map((o) => {
     const r = toOfferInput(o);
@@ -38,13 +39,14 @@ export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]
   const letters = offers.map((o) => o.letter);
   const household = DEFAULT_HOUSEHOLD;
   const out = compute({
-    compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: 4, valuationDate: VALUATION,
+    compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: stay, valuationDate: VALUATION,
       inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
   if (!out.sweep) throw new Error(`The samples don't compare: ${JSON.stringify(out.issues)}`);
-  const view = verdict(out.sweep, letters, basis, 4, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter))!;
-  return { today: VALUATION, household, wagesYear: 2026, offers, rents: out.rents, results: { sweep: out.sweep, detail: out.detail, view, letters } };
+  const view = verdict(out.sweep, letters, basis, stay, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter))!;
+  return { today: VALUATION, household: { ...household, stayYears: stay }, wagesYear: 2026, offers, rents: out.rents,
+    results: { sweep: out.sweep, detail: out.detail, view, letters } };
 }
 
 const noop = () => {};
@@ -74,7 +76,7 @@ export function renderAllInputs(ctx: WorkContext): string {
   return parts.join("\n");
 }
 
-/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open) and the bridge for one offer. */
+/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, and L-2 (table view open). */
 export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor"> } = {}): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
   const ui = { ...session.ui, byYear: { mode: opts.running ? "running" as const : "each" as const, table: true },
@@ -82,8 +84,9 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
   return renderToStaticMarkup(tree(ctx, [
     createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: opts.ui ?? { mode: "quick" }, dispatch: noop }),
-    createElement(Lead, { key: "s", view: ctx.results!.view, letters: ctx.results!.letters, stayYears: 4, updating: false, error: null, notes: [],
+    createElement(Lead, { key: "s", view: ctx.results!.view, letters: ctx.results!.letters, stayYears: ctx.household.stayYears, updating: false, error: null, notes: [],
       sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText) }),
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
+    createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
   ]));
 }

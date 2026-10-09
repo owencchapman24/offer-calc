@@ -1,8 +1,9 @@
-import type { ByScenario, CashTotals, HorizonRow, RppUsed, ValueBasis, WindowTotals, Basis } from "../../src/offer/types";
+import type { ByScenario, CashTotals, HorizonRow, RppUsed, Scenario, ValueBasis, WindowTotals, Basis } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { HELP, helpKey } from "./help";
 import {
   alsoCounted, type AppOffer, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft,
+  toOfferInput,
 } from "./model";
 import {
   aboutIsDefault, type AboutField, BASIS_PHRASE, bridge, type BridgeLine, byYear, cityName, type Derivation, detailOf, type EditTarget, eyOfDate,
@@ -10,6 +11,7 @@ import {
   type WorkContext, type WorkLine, workedFrom, yearOf, yearValue,
 } from "./metrics";
 import type { OfferDetail } from "./protocol";
+import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
 import type { SectionId } from "./sections";
 import {
   bonusText, cashAwardsText, employerStateText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText, retirementText,
@@ -94,11 +96,11 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "br": return BRIDGE_SECTION[c as BridgeLine];
     case "in": return inputSection(pathOf(id));
     case "about": return ABOUT_SECTION[a as AboutField];
+    case "risk": case "drop": case "win": return "M-8";
   }
   throw new Error(`Unknown figure: ${id}`);
 }
 
-/** Builds a figure's derivation with the current values. Throws if the figure isn't on the page. */
 /** Builds a figure's derivation with the current values. Throws if the figure isn't on the page. */
 export function derive(id: MetricId, ctx: WorkContext): Derivation {
   const [head, a, b, c] = id.split(".");
@@ -124,6 +126,9 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "br": return bridgeWork(ctx, a as L, Number(b), c as BridgeLine);
       case "in": return inputWork(ctx, a as L, pathOf(id));
       case "about": return aboutWork(ctx, a as AboutField);
+      case "risk": return caseWork(ctx, a as L, b as Scenario);
+      case "drop": return dropWork(ctx, a as L);
+      case "win": return caseLeadWork(ctx, a as Scenario);
     }
     throw new Error(`Unknown figure: ${id}`);
   }
@@ -149,6 +154,9 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "br": return `the bridge's ${BRIDGE_NAME[c as BridgeLine]}`;
     case "in": return `${a}'s ${inputName(pathOf(id))}`;
     case "about": return ABOUT_NAME[a as AboutField];
+    case "risk": return `${a}'s ${b} case`;
+    case "drop": return `${a}'s drop to the bear case`;
+    case "win": return `the ${a}-case lead`;
   }
   return id;
 }
@@ -210,8 +218,10 @@ function indexDigits(d: OfferDetail): number {
   if (!info) return 3;
   const f = info.nonHousingFactor;
   const checks: Array<[number, number]> = [];
-  const pv = d.window.costOfLiving?.presentValue;
-  if (pv) checks.push([pv.nonHousingLocal, pv.discretionaryReference], [pv.outOfPocketReference / f, pv.outOfPocketReference]);
+  for (const w of [d.window, d.cases.bear, d.cases.bull]) {
+    const pv = w.costOfLiving?.presentValue;
+    if (pv) checks.push([pv.nonHousingLocal, pv.discretionaryReference], [pv.outOfPocketReference / f, pv.outOfPocketReference]);
+  }
   for (const y of d.employmentYears) {
     const c = y.costOfLiving;
     if (c) checks.push([c.nonHousingLocal - c.outOfPocketReference / f, c.discretionaryReference - c.outOfPocketReference]);
@@ -324,50 +334,60 @@ function annuityWork(ctx: WorkContext, n: number): Work {
 
 // ---- an offer's totals ---------------------------------------------------------------------------
 
-function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
+/**
+ * An offer's total over your stay, present value, line by line. In the base case each part opens its own
+ * work; in the bear or bull case (L-2) the parts are that scenario's, and a note says which inputs differ.
+ */
+function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis, scenario: Scenario = "base"): Work {
   const r = res(ctx);
   const d = detailOf(ctx, letter);
-  const w = d.window;
+  const base = scenario === "base";
+  const w = base ? d.window : d.cases[scenario];
   const n = r.view.row.years;
   const pv = w.presentValue!;
   const ben = w.benefits.presentValue!;
-  const scope = `Base case · stay ${years(n)} (${windowText(r.view.row)}) · present value as of ${longDate(r.sweep.valuationDate)}`;
-  const title = `${letter} · ${n}-year ${TOTAL_NAME[basis]}`;
+  const scope = `${CASE_NAME[scenario]} · stay ${years(n)} (${windowText(r.view.row)}) · present value as of ${longDate(r.sweep.valuationDate)}`;
+  const title = `${letter} · ${n}-year ${TOTAL_NAME[basis]}${base ? "" : `, ${scenario} case`}`;
   const discountNote = `Present value: each payment is discounted from its date to today at ${percent(r.sweep.discountRate)} a year, so later pay counts for less.`;
+  /** A part opens its own work in the base case only: the parts' derivations are the base case's. */
+  const link = (id: MetricId) => (base ? { ref: id } : {});
+  const other = base ? null : caseNotes(ctx, letter, scenario);
+  const inputs = (paths: string[]) => other?.inputs ?? fromInputs(ctx, letter, paths);
   if (basis === "cash") {
     return {
       title, scope,
       lines: [
-        { label: PART.gross.label, value: figure(pv.gross), ref: `part.${letter}.gross` },
-        { op: "−", label: PART.tax.label, value: figure(pv.tax), ref: `part.${letter}.tax` },
-        ...(pv.premiums ? [{ op: "−" as const, label: PART.premiums.label, value: figure(pv.premiums), ref: `part.${letter}.premiums` as MetricId }] : []),
+        { label: PART.gross.label, value: figure(pv.gross), ...link(`part.${letter}.gross`) },
+        { op: "−", label: PART.tax.label, value: figure(pv.tax), ...link(`part.${letter}.tax`) },
+        ...(pv.premiums ? [{ op: "−" as const, label: PART.premiums.label, value: figure(pv.premiums), ...link(`part.${letter}.premiums`) }] : []),
         { op: "=", label: "After-tax pay", value: figure(pv.afterTaxComp), rule: "double" },
       ],
-      notes: [discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`],
-      ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter), "startDate", "costOfLiving.area"]),
+      notes: [...(other?.notes ?? []), discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`],
+      ties: [], ...inputs(["salary.annual", bonusPath(ctx, letter), "startDate", "costOfLiving.area"]),
     };
   }
   const healthExtra = ben.healthNet - pv.premiums;
   if (basis === "totalRewards") {
     const adds: WorkLine[] = [
-      ...(ben.retirement ? [{ op: "+" as const, label: PART.retirement.label, value: figure(ben.retirement), ref: `part.${letter}.retirement` as MetricId }] : []),
-      ...(ben.perks ? [{ op: "+" as const, label: PART.perks.label, value: figure(ben.perks), ref: `part.${letter}.perks` as MetricId }] : []),
+      ...(ben.retirement ? [{ op: "+" as const, label: PART.retirement.label, value: figure(ben.retirement), ...link(`part.${letter}.retirement`) }] : []),
+      ...(ben.perks ? [{ op: "+" as const, label: PART.perks.label, value: figure(ben.perks), ...link(`part.${letter}.perks`) }] : []),
       ...(Math.abs(healthExtra) >= 0.5 ? [{ op: healthExtra > 0 ? "−" as const : "+" as const, label: PART.healthExtra.label,
-        value: figure(Math.abs(healthExtra)), ref: `part.${letter}.healthExtra` as MetricId }] : []),
+        value: figure(Math.abs(healthExtra)), ...link(`part.${letter}.healthExtra`) }] : []),
     ];
     return {
       title, scope,
       lines: [
-        { label: "After-tax pay", value: figure(pv.afterTaxComp), ref: `pv.${letter}.cash` },
+        { label: "After-tax pay", value: figure(pv.afterTaxComp), ...link(`pv.${letter}.cash`) },
         ...adds,
         { op: "=", label: "Total rewards", value: figure(w.totalRewards.presentValue!), rule: "double" },
       ],
       notes: [
+        ...(other?.notes ?? []),
         adds.length ? "Total rewards adds the benefits that are worth money to you and takes out health costs beyond the premiums."
           : `Nothing to add: offer ${letter} has no 401(k), perks or health costs entered.`,
         discountNote,
       ],
-      ties: [], ...fromInputs(ctx, letter, ["retirement", "health", "perks.section127", "perks.commuterMonthly"]),
+      ties: [], ...inputs(["retirement", "health", "perks.section127", "perks.commuterMonthly"]),
     };
   }
   const col = w.costOfLiving?.presentValue;
@@ -380,44 +400,163 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
   return {
     title, scope: `${scope} · U.S.-average dollars`,
     lines: [
-      { label: PART.takeHome.label, value: figure(pv.takeHome), ref: `part.${letter}.takeHome` },
-      ...(col.savings ? [{ op: "−" as const, label: PART.savings.label, value: figure(col.savings), ref: `part.${letter}.savings` as MetricId }] : []),
-      { op: "−", label: PART.rent.label, value: figure(col.rent), ref: `part.${letter}.rent` },
+      { label: PART.takeHome.label, value: figure(pv.takeHome), ...link(`part.${letter}.takeHome`) },
+      ...(col.savings ? [{ op: "−" as const, label: PART.savings.label, value: figure(col.savings), ...link(`part.${letter}.savings`) }] : []),
+      { op: "−", label: PART.rent.label, value: figure(col.rent), ...link(`part.${letter}.rent`) },
       { op: "=", label: `Spending money after rent, at ${x.city} prices`, value: figure(col.nonHousingLocal), rule: "single" },
       ...priceLines(d, letter),
       { op: "=", label: "The same spending, at U.S. prices", value: figure(col.discretionaryReference), rule: "single" },
       ...(col.outOfPocketReference ? [{ op: "−" as const, label: "Out-of-pocket health costs, at U.S. prices", value: figure(col.outOfPocketReference),
         note: `${figure(oopLocal)} × ${x.us} ÷ ${x.area}` }] : []),
-      { op: "+", label: PART.faceValue.label, value: figure(col.faceValue), ref: `part.${letter}.faceValue` },
+      { op: "+", label: PART.faceValue.label, value: figure(col.faceValue), ...link(`part.${letter}.faceValue`) },
       { op: "=", label: "After rent, at U.S. prices", value: figure(col.total), rule: "double" },
     ],
     notes: [
+      ...(other?.notes ?? []),
       "Spending money is local; saved money isn't. What's left to spend after rent is priced as in an average U.S. city; what you save counts at face value.",
       `It ties to total rewards: ${figure(w.totalRewards.presentValue!)} − rent ${figure(col.rent)} + (${x.us} ÷ ${x.area} − 1) × `
         + `(spending ${figure(col.nonHousingLocal)} − out-of-pocket ${figure(oopLocal)}) = ${figure(check)}.`,
       discountNote,
     ],
-    ties: [], uses: [`in.${letter}.costOfLiving.monthlyRent`, `in.${letter}.costOfLiving.area`],
+    ties: [], ...(other
+      ? { inputs: other.inputs.inputs, uses: [...other.inputs.uses, `in.${letter}.costOfLiving.monthlyRent`, `in.${letter}.costOfLiving.area`] }
+      : { uses: [`in.${letter}.costOfLiving.monthlyRent`, `in.${letter}.costOfLiving.area`] }),
   };
 }
 
-function perHourWork(ctx: WorkContext, letter: L): Work {
+function perHourWork(ctx: WorkContext, letter: L, scenario: Scenario = "base"): Work {
   const r = res(ctx);
   const row = r.view.row;
   const i = indexOf(ctx, letter);
   if (!row.hours || !row.values.perHour) throw new Error("Per hour needs hours for every offer.");
   const of = r.sweep.perHourOf;
   const hours = offerByLetter(ctx, letter)?.draft.hours;
+  // The base case is the horizon sweep's row; a bear or bull case is that scenario's window (L-2).
+  const w = scenario === "base" ? null : detailOf(ctx, letter).cases[scenario];
+  const total = w ? (of === "colAdjustedTotal" ? w.costOfLiving!.nominal.total : w.totalRewards.nominal) : row.nominal[of]![i];
+  const worked = w ? w.hours ?? 0 : row.hours[i];
+  const value = w ? w.perHour?.[of] ?? 0 : row.values.perHour[i];
+  const weekly = hours?.weekly ? hours.weekly[scenario] : null;
+  const other = w ? caseNotes(ctx, letter, scenario) : null;
   return {
-    title: `${letter} · per hour worked`, scope: `Base case · stay ${years(row.years)} (${windowText(row)}) · nominal`,
+    title: `${letter} · per hour worked${w ? `, ${scenario} case` : ""}`,
+    scope: `${CASE_NAME[scenario]} · stay ${years(row.years)} (${windowText(row)}) · nominal`,
     lines: [
-      { label: `${row.years}-year total ${BASIS_PHRASE[of]}, as paid`, value: figure(row.nominal[of]![i]) },
-      { op: "÷", label: "Hours worked in the window", value: figure(row.hours[i]), ...(hours?.weekly ? {
-        note: `${hours.weekly.base} a week × ${hours.weeksPerYear ?? 50} weeks a year` } : {}) },
-      { op: "=", label: "Per hour worked", value: cents(row.values.perHour[i]), rule: "double" },
+      { label: `${row.years}-year total ${BASIS_PHRASE[of]}, as paid`, value: figure(total) },
+      { op: "÷", label: "Hours worked in the window", value: figure(worked), ...(weekly !== null ? {
+        note: `${weekly} a week × ${hours!.weeksPerYear ?? 50} weeks a year` } : {}) },
+      { op: "=", label: "Per hour worked", value: cents(value), rule: "double" },
     ],
-    notes: ["Per hour isn't discounted: dollars as paid over the stay, divided by the hours worked in it. A later start means fewer hours in the window."],
-    ties: [], ...fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"]),
+    notes: [...(other?.notes ?? []),
+      "Per hour isn't discounted: dollars as paid over the stay, divided by the hours worked in it. A later start means fewer hours in the window."],
+    ties: [], ...(other?.inputs ?? fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"])),
+  };
+}
+
+// ---- L-2: if things go badly ---------------------------------------------------------------------
+
+const CASE_NAME: Record<Scenario, string> = { bear: "Bear case", base: "Base case", bull: "Bull case" };
+/** The input each kind of change comes from: what "From your inputs" opens. */
+function changePath(ctx: WorkContext, letter: L, kind: CaseChange["kind"]): string {
+  switch (kind) {
+    case "bonus": case "bonusByYear": return bonusPath(ctx, letter);
+    case "raise": return "salary.raise";
+    case "promotion": return "salary.promotions";
+    case "priceGrowth": return "equity.priceGrowth";
+    case "refreshers": return "equity.refreshers";
+    case "hours": return "hours.weekly";
+  }
+}
+const caseFigure = (basis: Basis, v: number) => (basis === "perHour" ? cents(v) : figure(v));
+
+/** A scenario's note, and the inputs that differ from the base case in it, each opening its own work. */
+function caseNotes(ctx: WorkContext, letter: L, scenario: Scenario): { notes: string[]; inputs: { inputs: InputRef[]; uses: MetricId[] } } {
+  const r = res(ctx);
+  const o = offerByLetter(ctx, letter);
+  const input = o ? toOfferInput(o) : null;
+  const changes = input && "offer" in input ? caseChanges(input.offer, scenario, r.view.row.window.end, r.view.basis === "perHour") : [];
+  const notes = changes.length
+    ? [`The ${scenario} case sets every uncertain input to its ${scenario} value at once. For ${letter}: ${changes.map(changeText).join("; ")}.`]
+    : [`Nothing entered for ${letter} changes within your stay in the ${scenario} case, so it equals the base case.`];
+  return { notes, inputs: fromInputs(ctx, letter, [...new Set(changes.map((c) => changePath(ctx, letter, c.kind)))]) };
+}
+
+/** L-2: an offer's value in a scenario. The base case is the rank list's figure; bear and bull are worked out like it. */
+function caseWork(ctx: WorkContext, letter: L, scenario: Scenario): Work {
+  const r = res(ctx);
+  const basis = r.view.basis;
+  if (scenario !== "base") return basis === "perHour" ? perHourWork(ctx, letter, scenario) : pvWork(ctx, letter, basis, scenario);
+  const n = r.view.row.years;
+  const twin: MetricId = basis === "perHour" ? `ph.${letter}` : `pv.${letter}.${basis}`;
+  return {
+    title: `${letter} · base case · ${BASIS_PHRASE[basis]}`,
+    scope: `Base case · stay ${years(n)} (${windowText(r.view.row)}) · ${basis === "perHour" ? "nominal" : "today's dollars"}`,
+    lines: [{
+      label: basis === "perHour" ? `${letter}: per hour worked, in the rank list` : `${letter}: ${n}-year total, in the rank list`,
+      value: caseFigure(basis, caseValue(ctx, letter, "base")), ref: twin,
+    }],
+    notes: ["The base case is the one the verdict uses, so this is the same figure as the rank list's, and it opens the same work."],
+    ties: [twin], uses: [],
+  };
+}
+
+/** L-2: how far an offer falls from its base case to its bear case, a month (or an hour). */
+function dropWork(ctx: WorkContext, letter: L): Work {
+  const r = res(ctx);
+  const v = riskView(ctx);
+  const x = v.rows.find((row) => row.letter === letter);
+  if (!x) throw new Error(`Offer ${letter} isn't in the comparison yet.`);
+  const basis = r.view.basis;
+  const n = v.years;
+  const months = 12 * n;
+  return {
+    title: `${letter} · from the base case to the bear case · ${BASIS_PHRASE[basis]}`,
+    scope: `Stay ${years(n)} (${windowText(r.view.row)}) · ${v.perHour ? "nominal" : "today's dollars"}`,
+    lines: [
+      { label: `${letter}: base case`, value: caseFigure(basis, x.values.base), ref: `risk.${letter}.base` },
+      { op: "−", label: `${letter}: bear case`, value: caseFigure(basis, x.values.bear), ref: `risk.${letter}.bear` },
+      ...(v.perHour
+        ? [{ op: "=" as const, label: "Less per hour worked in the bear case", value: cents(x.drop), rule: "double" as const }]
+        : [
+          { op: "=" as const, label: "Present-value drop", value: figure(x.drop), rule: "single" as const },
+          { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
+            ref: `af.${n}` as MetricId },
+          { op: "=" as const, label: `A month, for ${months} months`, value: dollars(x.drop / v.factor), rule: "double" as const },
+        ]),
+    ],
+    notes: [`That's ${Math.round(x.share * 100)}% of ${letter}'s base case.`, ...caseNotes(ctx, letter, "bear").notes],
+    ties: [], uses: [`risk.${letter}.base`, `risk.${letter}.bear`],
+  };
+}
+
+/** L-2: who leads in a scenario, and by how much a month (or an hour). The base case is the verdict. */
+function caseLeadWork(ctx: WorkContext, scenario: Scenario): Work {
+  const r = res(ctx);
+  const v = riskView(ctx);
+  const basis = r.view.basis;
+  const { winner: W, runnerUp: R, margin } = v.leads[scenario];
+  const value = (l: L) => v.rows.find((x) => x.letter === l)!.values[scenario];
+  const n = v.years;
+  const months = 12 * n;
+  return {
+    title: `${W} over ${R} · ${scenario} case · ${BASIS_PHRASE[basis]}`,
+    scope: `${CASE_NAME[scenario]} · stay ${years(n)} (${windowText(r.view.row)}) · ${v.perHour ? "nominal" : "today's dollars"}`,
+    lines: [
+      { label: `${W}: ${scenario} case`, value: caseFigure(basis, value(W)), ref: `risk.${W}.${scenario}` },
+      { op: "−", label: `${R}: ${scenario} case`, value: caseFigure(basis, value(R)), ref: `risk.${R}.${scenario}` },
+      ...(v.perHour
+        ? [{ op: "=" as const, label: "More per hour worked", value: cents(margin), rule: "double" as const }]
+        : [
+          { op: "=" as const, label: "Present-value gap", value: figure(margin), rule: "single" as const },
+          { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
+            ref: `af.${n}` as MetricId },
+          { op: "=" as const, label: `A month, for ${months} months`, value: dollars(margin / v.factor), rule: "double" as const },
+        ]),
+    ],
+    notes: scenario === "base"
+      ? ["The base case is the verdict's, so this is the verdict's lead."]
+      : [`Each offer's ${scenario} case sets every uncertain input to its ${scenario} value at once; ${W} leads ${R} there.`],
+    ties: scenario === "base" ? sameFigure(ctx, n, basis) : [], uses: [`risk.${W}.${scenario}`, `risk.${R}.${scenario}`],
   };
 }
 

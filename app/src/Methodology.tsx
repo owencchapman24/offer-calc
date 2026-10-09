@@ -312,7 +312,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             Uncertain inputs (bonus, raises, share price, refreshers, promotions) can have a bear, base and bull value. The three
             are joint scenarios: the bear case sets every uncertain input to its bear value at once, a coherent bad story rather
-            than the worst case. The verdict uses the base case; the risk view comes in a later update.
+            than the worst case. The verdict uses the base case. L-2, If things go badly, shows all three for your stay: which offer
+            holds up best, who wins each, and which of your inputs differ in the bear case. An offer without a range shows one value
+            and says so, rather than looking safe.
           </p>
         </Section>
 

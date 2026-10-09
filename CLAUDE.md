@@ -29,7 +29,14 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1 to 3 are complete and live at https://offer-calc.vercel.app.**
+**UI: slices 1 to 3 are complete and live at https://offer-calc.vercel.app. Slice 5 is in
+progress** (plan: `docs/ui-slices-4-8-plan.md`): review stop A (groundwork and L-2) is merged;
+L-4 (stop B) and L-5 (stop C) are next.
+- **L-2, If things go badly** (slice 5, stop A): the sentence (who holds up best, the biggest
+  drop, who wins only if things go well), a range chart (bear and bull dots, base diamond), who
+  wins each scenario, what goes wrong in the bear case (generated from the inputs), a ticked
+  table view, and one line pointing to "+ range" when no offer has a range. Below L-1; it loads
+  as you scroll toward it.
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -86,24 +93,31 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 351.8 / 108.7 KB for a quick-mode visit (346 / 106 KB in slice 2,
-    276 / 85 KB in slice 1). Before lazy loading, slice 3 had it at 418.4 / 127.6 KB. Target:
-    under ~110 KB gzipped.
+  - **Main thread:** 352.4 / 108.0 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report says 109.0, as Rolldown's compressor reads ~1 kB higher). Slice 3 ended
+    at 351.8 / 107.7 (Vite: 108.7); slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB gzipped
+    by the check, which CI runs after the build.
+  - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
+    `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
+    its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
+    more gzip on every visit).
   - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
     text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
-    methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB.
+    methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB, L-2
+    10 / 3 KB plus its view model 4 / 2 KB (shared with the derivations).
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
-  - **Worker:** 240 / 63 KB. Per edit it runs `validateOffer` on each offer, then
-    `horizonSweep` plus your stay's three full projections, ~29 ms warm in dev.
+  - **Worker:** 241 / 63 KB. Per edit it runs `validateOffer` on each offer, then
+    `horizonSweep`, your stay's full projection per offer, and its bear and bull totals (L-2): about
+    46 ms warm on the samples (32 before L-2's six projections).
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 310 passing.
-- `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 21,
+**Tests:** 330 passing.
+- `test/offer.test.ts` 118, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6.
+  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `scripts/lib/bundle.test.ts` 3.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
@@ -172,6 +186,8 @@ build them in.
   `app/vite.config.ts`), built to `dist/`.
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
   engine changes; the UI's live-update budget depends on them.
+- `npm run check-bundle`: after `npm run build`, the JS a quick-mode visit loads, gzipped, against
+  the 110 kB budget (`scripts/lib/bundle.ts`). CI runs it.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
 - `npm run fetch-fmr [-- <FY>] [--file <FY27_FMRs.xlsx>]`: re-download HUD Fair Market Rents
@@ -189,7 +205,8 @@ build them in.
   - `federal.ts`, `state.ts`, `local.ts`.
 - `src/offer/`
   - `types.ts`.
-  - `project.ts`: `projectScenario`, `leaveDateSweep`, `keptIfLeaving`.
+  - `project.ts`: `projectScenario`, `leaveDateSweep`, `leaveDaySweep` (any last days, so a
+    step lands on its own date), `keptIfLeaving`.
   - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`, `horizonSweep`,
     `monthlyEquivalent`.
   - `cliffs.ts`: `cliffs`, `nextCliff`.
@@ -251,19 +268,27 @@ build them in.
     - `src/derive.ts` (loaded on first use): the derivations and their words, beside
       `src/format`'s. Pure. The BEA indexes show the fewest decimals (3-6) at which every
       product foots to the dollar (`indexDigits`).
-  - `src/Tickmarks.tsx`: `WorkProvider`, `Fig` (a figure and its tickmark, one button),
-    `TickButton` (a lone mark), `Trace` (an input derivations can light up),
-    `useRovingTicks`, and the popover.
+  - `src/figures.tsx`: `Fig` (a figure and its tickmark, one button), `TickButton` (a lone
+    mark), `Trace` (an input derivations can light up), `useRovingTicks`, and the context they
+    read. No `react-dom`, nothing from `metrics.ts` at run time (see Bundles).
+  - `src/Tickmarks.tsx`: `WorkProvider` (it provides that context, with each figure's tickmark
+    kind), the popover, and the derivations' lazy module; it re-exports the figures.
   - `src/ByYear.tsx`: L-1 (the hand-built SVG chart, notes, table view) and the bridge.
+  - `src/Later.tsx`: the schedules after L-1, each loaded as you scroll toward it
+    (`useLoadNear` in `lazy.ts`). `src/Risk.tsx` is L-2; `src/cases.ts` its view model (values by
+    scenario, the leads, what differs in a scenario, in words), shared with `derive.ts`.
+  - `src/jobs.ts`: the worker's two lanes. Edits run ahead of the next chunk of any slow job;
+    slow jobs are keyed generators, replaced by a newer job with the same key.
   - `src/Methodology.tsx`: `#/method`, lazy-loaded. Routes are hashes (`App.tsx`):
     `#/`, `#/method`, `#/method/M-7.2`.
   - `About.tsx`, `Ledger.tsx`, `Lead.tsx` (with the first-use note and the tickmark hint),
     `ui.tsx` (the tickmark table, stamps, inputs), `styles.css` (the workpaper tokens).
-  - Windows: `metrics.ts` and `Tickmarks.tsx` are named apart on purpose; `work.ts` and
+  - Windows: `cases.ts` and `Risk.tsx` are named apart on purpose, like `metrics.ts` and
+    `Tickmarks.tsx`; `work.ts` and
     `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
-  `offer-table.ts`, `bench.ts`, `check-engine.ts`, `fetch-rpp.ts`, `fetch-fmr.ts`, and
-  `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
+  `offer-table.ts`, `bench.ts`, `check-engine.ts`, `check-bundle.ts` (with `lib/bundle.ts`),
+  `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 
 ## Working agreements
 - **Pull requests** (adopted 2026-10-08, by agreement; not enforced): one branch per slice or

@@ -9,6 +9,10 @@ import { SECTIONS } from "./sections";
 import { context, renderAllInputs, renderPage } from "./testing";
 import { figure } from "./text";
 import { extraHoursView } from "./verdict";
+import type { OfferInput } from "../../src/offer/types";
+import { caseChanges, changeText, hasRanges, riskView } from "./cases";
+import { Risk } from "./Risk";
+import { WorkProvider } from "./Tickmarks";
 
 const LETTERS: Letter[] = ["A", "B", "C"];
 
@@ -176,6 +180,83 @@ describe("show the work reaches every detailed input (step 0.4)", () => {
       ["Bonus, bear case", "5%"], ["Bonus, base case", "10%"], ["Bonus, bull case", "12%"]]);
     expect(derive("in.A.salary.promotions", ctx).lines.map((l) => [l.label, l.value, l.note]))
       .toEqual([["Promotion 1", "+35%", "on Jul 13, 2029, base and bull only"]]);
+  });
+});
+
+describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
+  const ctx = context();
+  const page = (c: WorkContext) => renderToStaticMarkup(createElement(WorkProvider, { ctx: c, children: createElement(Risk, { ctx: c, sample: true }) }));
+  const text = (html: string) => html.replace(/<[^>]+>/g, "").replace(/✓/g, "").replace(/&#x27;/g, "'");
+
+  it("each offer's bear, base and bull values are §4.4's, and the base case is the rank list's figure to the cent", () => {
+    const v = riskView(ctx);
+    const rounded = Object.fromEntries(v.rows.map((r) => [r.letter, [r.values.bear, r.values.base, r.values.bull].map(Math.round)]));
+    expect(rounded).toEqual({ A: [258_793, 313_175, 347_199], B: [187_316, 196_270, 199_847], C: [313_862, 334_357, 355_704] });
+    for (const r of v.rows) expect(r.values.base).toBe(ctx.results!.view.ranks.find((x) => x.letter === r.letter)!.value);
+    expect(v.rows.map((r) => r.letter)).toEqual(["C", "A", "B"]); // sorted by the bear case
+  });
+
+  it("the sentence: C holds up best and wins every scenario; A has the most to lose, $1,250 a month (−17%)", () => {
+    // Bear: C 313,862 - A 258,793 = 55,070 / 43.5191 = $1,265 a month. A's drop: 313,175 - 258,793 = 54,382 / 43.5191 = $1,250 (17%).
+    expect(text(page(ctx))).toContain("C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month. "
+      + "A has the most to lose: $1,250 a month below its base case (−17%), because its bonuses and promotion carry the risk.");
+  });
+
+  it("at 5 years A wins only the bull case, and the sentence says so", () => {
+    expect(text(page(context("colAdjustedTotal", (o) => o, 5))))
+      .toContain("C holds up best: it wins the bear and base cases, and A the bull case.");
+    expect(text(page(context("colAdjustedTotal", (o) => o, 5)))).toContain("A comes out ahead only if things go well.");
+  });
+
+  it("what goes wrong lists exactly the inputs whose bear value differs from base", () => {
+    expect(text(page(ctx))).toContain("What goes wrong in the bear caseA bonuses 20% under target; no promotion in 2029"
+      + "B bonus 5% of salary instead of 10%C bonus 10% of salary instead of 15%; refreshers $10,000 instead of $25,000");
+  });
+
+  it("only what can move the figure: a promotion after your stay, price growth without equity, hours off the per-hour basis", () => {
+    const base: OfferInput = { label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13", salary: { annual: 100_000,
+      raise: { bear: 0.01, base: 0.03, bull: 0.05 }, promotions: [{ on: "2031-01-01", stepUp: 0.2, scenarios: ["base", "bull"] }] },
+      equity: { grants: [], priceGrowth: { bear: -0.1, base: 0, bull: 0.1 } }, hours: { weekly: { bear: 60, base: 50, bull: 50 } } };
+    expect(caseChanges(base, "bear", "2030-07-13", false)).toEqual([{ kind: "raise", value: 0.01, base: 0.03 }]);
+    expect(caseChanges(base, "bear", "2031-07-13", true).map((c) => c.kind)).toEqual(["raise", "promotion", "hours"]);
+    // A bull-only range has no bear changes, but it's still a range.
+    const bullOnly: OfferInput = { ...base, salary: { annual: 100_000, raise: { bear: 0.03, base: 0.03, bull: 0.05 } }, equity: undefined, hours: undefined };
+    expect(caseChanges(bullOnly, "bear", "2030-07-13", false)).toEqual([]);
+    expect(hasRanges(bullOnly)).toBe(true);
+    expect(changeText({ kind: "priceGrowth", value: -0.1, base: 0 })).toBe("share price −10% a year instead of +0%");
+  });
+
+  it("an offer without ranges shows one value and says so", () => {
+    const flat = context("colAdjustedTotal", (os) => os.map((o) => (o.letter !== "B" ? o
+      : { ...o, draft: { ...o.draft, bonus: { ...o.draft.bonus, amount: { bear: 0.1, base: 0.1, bull: 0.1 } } } })));
+    const html = page(flat);
+    expect(html).toContain('data-metric="risk.B.base"');
+    expect(html).not.toContain('data-metric="risk.B.bear"');
+    expect(text(html)).toContain("B no ranges entered");
+  });
+
+  it("with no ranges anywhere, L-2 is one line pointing to + range", () => {
+    const none = context("colAdjustedTotal", (os) => os.map((o) => ({ ...o, sample: null, draft: quickOnly(o.draft) })));
+    const html = page(none);
+    expect(text(html)).toContain("No ranges entered, so there's no downside to show. Add a range (+ range)");
+    expect(html).not.toContain("risk-chart");
+    expect(html).not.toContain("data-metric=");
+  });
+
+  it("the derivations foot: A's drop, the bear-case lead, and the base case's tie to the rank list and the verdict", () => {
+    const drop = derive("drop.A", ctx);
+    expect(drop.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "313,175"], ["−", "258,793"], ["=", "54,382"], ["÷", "43.5191"], ["=", "$1,250"]]);
+    expect(drop.notes[0]).toBe("That's 17% of A's base case.");
+    expect(derive("win.bear", ctx).lines.at(-1)!.value).toBe("$1,265");
+    const base = derive("risk.C.base", ctx);
+    expect([base.kind, base.section, base.ties]).toEqual(["crossFooted", "M-8", ["pv.C.colAdjustedTotal"]]);
+    expect(derive("win.base", ctx).ties).toEqual(["hero", "stay.4", "step.colAdjustedTotal"]);
+    expect(derive("win.base", ctx).lines.at(-1)!.value).toBe("$487"); // the verdict
+    // A's bear case is worked like its base case, with the bear inputs named and traced.
+    const bear = derive("risk.A.bear", ctx);
+    expect(bear.lines.at(-1)!.value).toBe("258,793");
+    expect(bear.notes[0]).toBe("The bear case sets every uncertain input to its bear value at once. For A: bonuses 20% under target; no promotion in 2029.");
+    expect(bear.inputs!.map((x) => x.ref)).toEqual(["in.A.bonus.amounts", "in.A.salary.promotions"]);
   });
 });
 
