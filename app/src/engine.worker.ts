@@ -1,20 +1,28 @@
 import { compute } from "./compute";
 import { createRunner } from "./jobs";
-import type { EngineRequest, EngineResponse } from "./protocol";
+import type { EngineRequest, EngineResponse, SlowRequest, SlowResponse } from "./protocol";
+import { cursorJob, leaveJob } from "./slowJobs";
 
 // The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). It
 // also holds the full BEA and HUD tables: the main thread ships only the slim city list and asks
 // here for rent estimates. Requests carry a generation number; while one runs, only the newest
 // waiting request is kept. Edits take the fast lane (jobs.ts): they run ahead of any slow job's
-// next chunk.
+// next chunk. L-4's leave sweep and its panel at the cursor are slow jobs (slowJobs.ts), each replaced
+// by a newer request of its kind.
 
 const scope = self as unknown as {
-  postMessage(message: EngineResponse): void;
-  onmessage: ((e: MessageEvent<EngineRequest>) => void) | null;
+  postMessage(message: EngineResponse | SlowResponse): void;
+  onmessage: ((e: MessageEvent<EngineRequest | SlowRequest>) => void) | null;
 };
 
 const runner = createRunner(run);
-scope.onmessage = (e) => runner.fast(e.data);
+const post = (r: SlowResponse) => scope.postMessage(r);
+scope.onmessage = (e) => {
+  const m = e.data;
+  if (m.lane === "leave") runner.slow("leave", leaveJob(m, post));
+  else if (m.lane === "cursor") runner.slow("cursor", cursorJob(m, post));
+  else runner.fast(m);
+};
 
 function run(req: EngineRequest) {
   const t = performance.now();
@@ -22,11 +30,11 @@ function run(req: EngineRequest) {
     const { sweep, detail, rents, issues } = compute(req);
     const ms = performance.now() - t;
     // Problems with the inputs: nothing was compared, and the results keep the last valid state.
-    if (issues.some((x) => x.length)) scope.postMessage({ gen: req.gen, ok: false, error: null, issues, rents, ms });
-    else scope.postMessage({ gen: req.gen, ok: true, sweep, detail, rents, issues, ms });
+    if (issues.some((x) => x.length)) scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error: null, issues, rents, ms });
+    else scope.postMessage({ lane: "compare", gen: req.gen, ok: true, sweep, detail, rents, issues, ms });
   } catch (err) {
     // Rent estimates don't depend on the comparison, so they still come back.
     const { rents } = compute({ ...req, compare: null, check: [] });
-    scope.postMessage({ gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), issues: [], rents, ms: performance.now() - t });
+    scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), issues: [], rents, ms: performance.now() - t });
   }
 }
