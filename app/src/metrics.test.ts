@@ -6,8 +6,8 @@ import { blankDraft, type Letter, type OfferDraft } from "./model";
 import { derive, highlightedSentence, metricSection } from "./derive";
 import { bridge, byYear, type MetricId, metricKind, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
-import { context, renderAllInputs, renderPage } from "./testing";
-import { figure } from "./text";
+import { context, renderAllInputs, renderPage, withLeave } from "./testing";
+import { dayBefore, figure } from "./text";
 import { extraHoursView } from "./verdict";
 import type { OfferInput } from "../../src/offer/types";
 import { caseChanges, changeText, hasRanges, riskView } from "./cases";
@@ -285,9 +285,17 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       : { ...o, sample: null, draft: quickOnly(o.draft) })))],
   ];
 
-  for (const [name, ctx] of contexts) {
+  for (const [name, plain] of contexts) {
     it(name, () => {
-      const html = render(ctx) + render(ctx, true, "C") + renderAllInputs(ctx);
+      // L-4 with its panel six months in, and again on your stay's last day (the reconciliation).
+      const six = withLeave(plain);
+      const end = withLeave(plain, dayBefore(plain.results!.view.row.window.end));
+      checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx) + renderPage(six.ctx, { leave: six.props }));
+      checkAll(end.ctx, renderPage(end.ctx, { leave: end.props }));
+    });
+  }
+  function checkAll(ctx: WorkContext, html: string) {
+    {
       expect(html).toContain('id="bridge"');
       const ids = [...new Set([...html.matchAll(/data-(?:tick|metric|trace)="([^"]+)"/g)].map((m) => m[1] as MetricId))];
       const ticks = [...html.matchAll(/<button[^>]*class="[^"]*\btick-btn\b[^"]*"[^>]*>/g)];
@@ -308,7 +316,7 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       };
       for (const id of ids) check(id, 0);
       expect(seen.size).toBeGreaterThan(15);
-    });
+    }
   }
 
   it("every methodology section a popover can name has its anchor on the methodology page, with live numbers", () => {

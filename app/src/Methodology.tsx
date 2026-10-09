@@ -327,8 +327,15 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             A repayment in the same calendar year reverses the wages, so its tax comes back exactly. A repayment in a later year over
             $3,000 gets the federal IRC 1341 credit; Social Security and Medicare on it usually aren't refunded, and state relief
-            isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit. The view of
-            what leaving early costs comes in a later update.
+            isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit.
+          </p>
+          <p>
+            L-4, Leaving early, shows what you keep for any last day, as paid: each offer's curve by calendar date, so offers that
+            start on different days line up, with a step on the day of each payment, vest or clawback step. A prorated clawback's
+            monthly steps are drawn as one segment. For the last day you pick it shows what you keep, repay and leave behind, and the
+            next cliff (a payment, a vest, a full clawback's end, 401(k) money vesting; not a prorated clawback's monthly step) with
+            what staying until it is worth. On your stay's last day it squares leaving then with the stay: the stay taxes its last
+            year as though pay continued through December (<Ref id="M-7.3" />), so leaving that day keeps a little more after tax.
           </p>
         </Section>
 

@@ -561,7 +561,9 @@ export interface Cliff {
   date: ISODate;
   kind: CliffKind;
   /** The payment's detail, the award whose clawback steps down, or the vesting step reached. */
-  detail: EventDetail | { kind: "clawbackStep"; award: string } | { kind: "retirementVest"; vestedShare: number; serviceYears: number };
+  /** A clawback's steps say whether the award is prorated by month (a step every month) or repaid in full (one step). */
+  detail: EventDetail | { kind: "clawbackStep"; award: string; prorated: boolean }
+    | { kind: "retirementVest"; vestedShare: number; serviceYears: number };
   /** Gross: the payment or vest, the repayment no longer owed, or the employer 401(k) money that vests. */
   amount: number;
 }

@@ -1,8 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
-import type { EngineRequest, EngineResponse, StayDetail } from "./protocol";
+import type {
+  CursorRequest, EngineRequest, EngineResponse, LeaveCurve, LeavePanel, LeaveRequest, SlowRequest, SlowResponse, StayDetail,
+} from "./protocol";
+
+/** A slow-lane result (L-4): the latest one back, the request it answers, and whether a newer one is on its way. */
+export interface SlowState<T> {
+  result: T | null;
+  /** The request `result` answers (requestSlow's key). */
+  key: string | null;
+  updating: boolean;
+  error: string | null;
+  /** From the request reaching the worker to its result, the wait for edits included. */
+  ms: number | null;
+}
 
 export interface EngineState {
   /** The latest comparison for the current inputs, or the previous one while recomputing. */
@@ -18,48 +31,98 @@ export interface EngineState {
   /** The latest inputs have problems: `sweep` and `detail` are from the last valid ones. */
   invalid: boolean;
   ms: number | null;
+  /** L-4's curves and its panel at the cursor (docs/ui-design.md §4.5). */
+  leave: SlowState<LeaveCurve[]>;
+  cursor: SlowState<Array<LeavePanel | null>>;
+}
+
+type Body<T> = T extends unknown ? Omit<T, "gen"> : never;
+/** A slow job to run: L-4's curves or its panel. A request with the same key as the last of its lane is skipped. */
+export type SlowJob = Body<SlowRequest>;
+
+export interface Engine extends EngineState {
+  requestSlow(job: SlowJob, key: string): void;
 }
 
 const DEBOUNCE_MS = 200;
+const noSlow = { result: null, key: null, updating: false, error: null, ms: null };
 
 /**
  * Runs the engine in a Web Worker. Inputs are debounced; each request gets a generation number and
  * any response for an older generation is dropped, so a slow result never overwrites a newer one.
- * While recomputing, the previous result stays on screen (dimmed by the caller).
+ * While recomputing, the previous result stays on screen (dimmed by the caller). Slow jobs (L-4) go
+ * to the same worker's slow lane, each lane with its own generations.
  */
-export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when the offers are replaced wholesale: older results then don't apply. */ revision = 0): EngineState {
+export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when the offers are replaced wholesale: older results then don't apply. */ revision = 0): Engine {
   const worker = useRef<Worker | null>(null);
   const gen = useRef(0);
-  const [state, setState] = useState<EngineState>({ sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null });
+  /** The inputs each comparison request was for, and the ones the latest result answers. */
+  const sent = useRef(new Map<number, string>());
+  const [answered, setAnswered] = useState<string | null>(null);
+  const slow = useRef({ leave: { gen: 0, key: null as string | null }, cursor: { gen: 0, key: null as string | null } });
+  /** Slow jobs asked for before the worker started. */
+  const queued = useRef<SlowRequest[]>([]);
+  const [state, setState] = useState<EngineState>({
+    sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null, leave: noSlow, cursor: noSlow,
+  });
   // An import or "Delete all data" replaces every offer: the last valid results were for offers that are gone.
   const seen = useRef(revision);
   useEffect(() => {
     if (seen.current === revision) return;
     seen.current = revision;
-    setState((s) => ({ ...s, sweep: null, detail: null }));
+    slow.current.leave.key = null;
+    slow.current.cursor.key = null;
+    setState((s) => ({ ...s, sweep: null, detail: null, leave: noSlow, cursor: noSlow }));
   }, [revision]);
 
   useEffect(() => {
     const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });
-    w.onmessage = (e: MessageEvent<EngineResponse>) => {
+    w.onmessage = (e: MessageEvent<EngineResponse | SlowResponse>) => {
       const r = e.data;
+      if (r.lane !== "compare") {
+        const lane = slow.current[r.lane];
+        if (r.gen !== lane.gen) return; // a newer job replaced it
+        setState((s) => ({ ...s, [r.lane]: {
+          result: r.ok ? ("curves" in r ? r.curves : r.panels) : s[r.lane].result, key: r.ok ? lane.key : s[r.lane].key,
+          updating: false, error: r.ok ? null : r.error, ms: r.ms,
+        } }));
+        return;
+      }
       if (r.gen !== gen.current) return; // stale
+      setAnswered(sent.current.get(r.gen) ?? null);
+      sent.current.clear();
       setState((s) => r.ok
-        ? { sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, issues: r.issues, invalid: false, ms: r.sweep ? r.ms : s.ms }
+        ? { ...s, sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, issues: r.issues, invalid: false, ms: r.sweep ? r.ms : s.ms }
         : { ...s, rents: r.rents, updating: false, error: r.error, issues: r.issues, invalid: r.error === null });
     };
     worker.current = w;
+    for (const m of queued.current.splice(0)) w.postMessage(m);
     return () => w.terminate();
   }, []);
 
   const key = JSON.stringify(request);
   useEffect(() => {
     setState((s) => ({ ...s, updating: true }));
-    const t = setTimeout(() => worker.current?.postMessage({ ...request, gen: ++gen.current }), DEBOUNCE_MS);
+    const t = setTimeout(() => {
+      sent.current.set(++gen.current, key);
+      worker.current?.postMessage({ ...request, lane: "compare", gen: gen.current });
+    }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // The request is compared by value (key), not identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return state;
+  const requestSlow = useCallback((job: SlowJob, jobKey: string) => {
+    const lane = slow.current[job.lane];
+    if (lane.key === jobKey) return;
+    lane.key = jobKey;
+    const message = { ...job, gen: ++lane.gen } as LeaveRequest | CursorRequest;
+    setState((s) => ({ ...s, [job.lane]: { ...s[job.lane], updating: true } }));
+    if (worker.current) worker.current.postMessage(message);
+    else queued.current.push(message);
+  }, []);
+
+  // Updating from the render that changes the inputs, not only once the effect above has run: what waits on a
+  // current result (L-4's slow jobs) mustn't start on the old one.
+  return { ...state, updating: state.updating || answered !== key, requestSlow };
 }

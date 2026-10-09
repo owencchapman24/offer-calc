@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Scenario } from "../../src/offer/types";
+import { rangeTicks } from "./axes";
 import { BASIS_PHRASE, join, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { CASES, changeText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
@@ -12,19 +13,6 @@ import { Stamp, TickLegend } from "./ui";
 // and a table view. Loaded when it nears the screen (App.tsx), like the schedules after it.
 
 const CASE_WORD: Record<Scenario, string> = { bear: "Bear", base: "Base", bull: "Bull" };
-
-/** Axis ticks over a range that needn't start at 0: 1, 2, 2.5 or 5 times a power of ten, about five of them. */
-export function rangeTicks(lo: number, hi: number): number[] {
-  if (!(hi > lo)) {
-    const pad = Math.max(Math.abs(hi) * 0.1, 1);
-    [lo, hi] = [lo - pad, hi + pad];
-  }
-  const raw = (hi - lo) / 4;
-  const pow = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((x) => x >= raw)!;
-  const first = Math.floor(lo / step) * step;
-  return Array.from({ length: Math.round((Math.ceil(hi / step) * step - first) / step) + 1 }, (_, i) => first + i * step);
-}
 
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : Math.abs(x) >= 1_000_000 ? `${+(x / 1e6).toFixed(2)}M` : Math.abs(x) >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;

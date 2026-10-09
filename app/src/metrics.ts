@@ -3,7 +3,8 @@ import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, Scenario, V
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
-import { type OfferDetail, rentKey, type StayDetail } from "./protocol";
+import type { LeaveBasis } from "./leaveModel";
+import { type LeavePanel, type OfferDetail, rentKey, type StayDetail } from "./protocol";
 import type { SectionId } from "./sections";
 import { dollars, monthName, percent, shortDate } from "./text";
 import type { TickKind } from "./ui";
@@ -42,6 +43,13 @@ export type MetricId =
   | `risk.${L}.${Scenario}` // L-2: an offer's total (or per hour) in a scenario, over your stay
   | `drop.${L}` // L-2: the base case less the bear case, a month (or an hour)
   | `win.${Scenario}` // L-2: who leads in a scenario, by how much a month (or an hour)
+  | `kept.${L}` // L-4: what you keep if your last day is the one picked (after tax, or total rewards)
+  | `repay.${L}` // L-4: clawbacks owed on that last day
+  | `forfeit.${L}.${"rsu" | "k401"}` // L-4: RSUs or employer 401(k) money not vested by then
+  | `next.${L}` // L-4: what staying until the next cliff is worth
+  | `nextown.${L}` // L-4: the next cliff's own part of that
+  | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
+  | `recon.${L}` // L-4: leaving on your stay's last day vs the stay
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
@@ -101,8 +109,13 @@ export interface WorkContext {
     view: VerdictView;
     /** Engine order to letters: the offers compared. */
     letters: Letter[];
+    /** L-4's panel at the last day picked, once the worker has sent it. */
+    leave?: LeaveContext;
   };
 }
+
+/** L-4 for Show the work: what it counts, your stay's last day, and each offer's panel (null before its start). */
+export interface LeaveContext { basis: LeaveBasis; stayEnd: string; panels: Array<LeavePanel | null> }
 
 /** How a basis reads inside a sentence or a line. */
 export const BASIS_PHRASE: Record<Basis, string> = {

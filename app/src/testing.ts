@@ -7,7 +7,11 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { compute } from "./compute";
 import { HELP, LEDGER_SECTIONS } from "./help";
 import { Lead } from "./Lead";
+import { Leaving, type LeavingProps } from "./Leaving";
+import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
+import { cursorJob, leaveJob } from "./slowJobs";
+import type { CompareRequest, LeaveCurve, LeavePanel, SlowResponse } from "./protocol";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
@@ -76,8 +80,52 @@ export function renderAllInputs(ctx: WorkContext): string {
   return parts.join("\n");
 }
 
-/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, and L-2 (table view open). */
-export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor"> } = {}): string {
+/** The comparison's request for the context's offers, as the app sends it. */
+export function compareOf(ctx: WorkContext): CompareRequest {
+  return {
+    offers: ctx.results!.letters.map((l) => (toOfferInput(ctx.offers.find((o) => o.letter === l)!) as { offer: CompareRequest["offers"][number] }).offer),
+    household: toHousehold(ctx.household, 2026), stays: [2, 3, 4, 5], stayYears: ctx.household.stayYears, valuationDate: VALUATION,
+    inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
+  };
+}
+
+/** Runs a slow job to the end, as the worker's runner would, and returns what it posts. */
+export function runJob(job: (post: (r: SlowResponse) => void) => Generator<void>): SlowResponse {
+  let out: SlowResponse | null = null;
+  const g = job((r) => { out = r; });
+  while (!g.next().done) { /* every chunk */ }
+  return out!;
+}
+
+/**
+ * L-4 with its slow jobs run, as the worker would: the context with the panel at `at` (default: six months
+ * in), and the schedule's props.
+ */
+export function withLeave(ctx: WorkContext, at?: string, basis: LeaveBasis = "cash"): { ctx: WorkContext; props: LeavingProps } {
+  const r = ctx.results!;
+  const axis = leaveAxis(r.view.row.window.start, r.view.row.years);
+  const compare = compareOf(ctx);
+  const base = { offers: compare.offers, household: compare.household, inflation: compare.inflation };
+  const day = at ?? firstLastDay(axis);
+  const leave = runJob((post) => leaveJob({ lane: "leave", gen: 1, ...base, end: axis.end }, post));
+  const cursor = runJob((post) => cursorJob({ lane: "cursor", gen: 1, ...base, leaveDate: day }, post));
+  if (!leave.ok || !cursor.ok || !("curves" in leave) || !("panels" in cursor)) throw new Error("L-4's jobs failed");
+  const panels: Array<LeavePanel | null> = cursor.panels;
+  const curves: LeaveCurve[] = leave.curves;
+  const next = { ...ctx, results: { ...r, leave: { basis, stayEnd: axis.stayEnd, panels } } };
+  // Keyed as the schedule keys its requests, so it renders as up to date.
+  const slow = <T,>(result: T, key: string) => ({ result, key, updating: false, error: null, ms: 0 });
+  return {
+    ctx: next,
+    props: { ctx: next, sample: true, compare, ready: true, leave: slow(curves, JSON.stringify({ lane: "leave", ...base, end: axis.end })),
+      cursor: slow(panels, JSON.stringify({ lane: "cursor", ...base, leaveDate: day })), requestSlow: noop, at: day, basis,
+      onAt: noop, onBasis: noop },
+  };
+}
+
+/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), and L-4 when given. */
+export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor">;
+  leave?: LeavingProps } = {}): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
   const ui = { ...session.ui, byYear: { mode: opts.running ? "running" as const : "each" as const, table: true },
     bridge: { letter: opts.bridgeOf ?? "A", year: opts.running ? 2 : 1 } };
@@ -88,5 +136,6 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
       sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText) }),
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
     createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
+    ...(opts.leave ? [createElement(Leaving, { key: "v", ...opts.leave })] : []),
   ]));
 }

@@ -30,13 +30,29 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
 **UI: slices 1 to 3 are complete and live at https://offer-calc.vercel.app. Slice 5 is in
-progress** (plan: `docs/ui-slices-4-8-plan.md`): review stop A (groundwork and L-2) is merged;
-L-4 (stop B) and L-5 (stop C) are next.
+progress** (plan: `docs/ui-slices-4-8-plan.md`): review stops A (groundwork and L-2) and B (L-4)
+are merged; L-5 (stop C) is next.
 - **L-2, If things go badly** (slice 5, stop A): the sentence (who holds up best, the biggest
   drop, who wins only if things go well), a range chart (bear and bull dots, base diamond), who
   wins each scenario, what goes wrong in the bear case (generated from the inputs), a ticked
   table view, and one line pointing to "+ range" when no offer has a range. Below L-1; it loads
   as you scroll toward it.
+- **L-4, Leaving early** (slice 5, stop B): what each offer keeps for any last day, after tax or
+  in total rewards, as paid.
+  - A stepped chart by calendar date (offers with different start dates line up), steps on their
+    own dates, cliff markers ($ payment, ▲ vest, ✓ clawback ends, ◆ 401(k) vests), the stay's end
+    dashed, and each prorated clawback as one segment ("Sign-on clawback shrinks $833 a month until
+    Jul 12, 2027").
+  - The last day: a date field, a month at a time, "Your stay's last day", or dragged on the chart
+    (a keyboard slider: arrows a month, Shift a day).
+  - The panel per offer: keep, repay, left behind; the next real cliff (past a prorated clawback's
+    monthly steps) and what staying until it is worth; the leave-date warnings (bonus forfeited, FICA
+    on a later-year clawback); on your stay's last day, the reconciliation with the stay in words
+    (the stay taxes its last year as though pay continued through December).
+  - Its numbers come from the worker's slow lane: the curves when the inputs change (~0.5 s for the
+    samples, in ~8 ms chunks), the panel when the last day moves (~50 ms), only while L-4 is on
+    screen and the comparison is current. About 0.8-1 s from a keystroke to L-4 filled in, on a
+    desktop.
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -93,10 +109,10 @@ L-4 (stop B) and L-5 (stop C) are next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 352.4 / 108.0 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report says 109.0, as Rolldown's compressor reads ~1 kB higher). Slice 3 ended
-    at 351.8 / 107.7 (Vite: 108.7); slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB gzipped
-    by the check, which CI runs after the build.
+  - **Main thread:** 354.3 / 108.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Stop A of slice 5 was 352.4 /
+    108.0; slice 3 ended at 351.8 / 107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB
+    gzipped by the check (decided 2026-10-09), which CI runs after the build.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
@@ -104,20 +120,22 @@ L-4 (stop B) and L-5 (stop C) are next.
   - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
     text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
     methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB, L-2
-    10 / 3 KB plus its view model 4 / 2 KB (shared with the derivations).
+    9 / 3 KB plus its view model 4 / 2 KB, L-4 13 / 5 KB plus its view model 4 / 2 KB (each view
+    model shared with the derivations).
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
-  - **Worker:** 241 / 63 KB. Per edit it runs `validateOffer` on each offer, then
-    `horizonSweep`, your stay's full projection per offer, and its bear and bull totals (L-2): about
-    46 ms warm on the samples (32 before L-2's six projections).
+  - **Worker:** 247 KB. Per edit it runs `validateOffer` on each offer, then `horizonSweep`, your
+    stay's full projection per offer, and its bear and bull totals (L-2): about 46 ms warm on the
+    samples in Node, 57-67 ms in headless Edge (32 before L-2). L-4's jobs run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 330 passing.
-- `test/offer.test.ts` 118, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+**Tests:** 342 passing.
+- `test/offer.test.ts` 119, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `scripts/lib/bundle.test.ts` 3.
+  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 11,
+  `scripts/lib/bundle.test.ts` 3.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
@@ -209,7 +227,8 @@ build them in.
     step lands on its own date), `keptIfLeaving`.
   - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`, `horizonSweep`,
     `monthlyEquivalent`.
-  - `cliffs.ts`: `cliffs`, `nextCliff`.
+  - `cliffs.ts`: `cliffs`, `nextCliff` (optionally past some cliffs: L-4 skips a prorated
+    clawback's monthly steps, which say `prorated: true`).
   - `withholding.ts`: `withholdingShortfall`.
   - `validate.ts`: `validateOffer`, every input problem as `{ code, path, params }` (words:
     `formatIssue` in `src/format`).
@@ -279,6 +298,12 @@ build them in.
     scenario, the leads, what differs in a scenario, in words), shared with `derive.ts`.
   - `src/jobs.ts`: the worker's two lanes. Edits run ahead of the next chunk of any slow job;
     slow jobs are keyed generators, replaced by a newer job with the same key.
+    `src/slowJobs.ts` (worker only) holds them: L-4's curves (`leaveJob`, sampled by `sweepDays`)
+    and its panel at the last day (`cursorJob`). `useEngine` sends them (`requestSlow`, skipping a
+    request identical to the last) and reports `updating` from the render that changes the inputs.
+  - `src/Leaving.tsx` is L-4; `src/leaveModel.ts` its view model (the axis by calendar date, the
+    curves, markers and clawback segments, the panel's words, the reconciliation with the stay),
+    shared with `derive.ts`. `src/axes.ts`: the charts' tick helpers.
   - `src/Methodology.tsx`: `#/method`, lazy-loaded. Routes are hashes (`App.tsx`):
     `#/`, `#/method`, `#/method/M-7.2`.
   - `About.tsx`, `Ledger.tsx`, `Lead.tsx` (with the first-use note and the tickmark hint),
