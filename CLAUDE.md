@@ -80,7 +80,8 @@ and show the work. Correctness and a clear methodology page matter more than fea
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo (going public
   is deferred; see Decisions). CI (`.github/workflows/ci.yml`, job `check`) runs `npm ci`,
-  `npm test`, `npm run typecheck` and `npm run build` on every push and pull request.
+  `npm test`, `npm run typecheck` and `npm run build` on every pull request and every push
+  to `main` (not on other branches' pushes, so a pull request runs it once).
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
