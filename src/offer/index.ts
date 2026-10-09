@@ -3,7 +3,8 @@ export { keptIfLeaving, leaveDateSweep, leaveDaySweep, projectScenario } from ".
 export { cliffs, nextCliff } from "./cliffs";
 export { withholdingShortfall } from "./withholding";
 export {
-  annuityFactor, annuityTerms, breakeven, CLOSE_CALL_SHARE, compareOffers, EXTRA_HOURS_MIN, extraHours, horizonSweep, monthlyEquivalent, projectOffer,
+  annuityFactor, annuityTerms, breakeven, breakevenSteps, CLOSE_CALL_SHARE, compareOffers, comparisonWindow, EXTRA_HOURS_MIN, extraHours, horizonSweep,
+  monthlyEquivalent, projectOffer, rentFlip,
 } from "./compare";
 export { clawbackFraction } from "./clawback";
 export { byYear, VESTING_PRESETS } from "./vesting";

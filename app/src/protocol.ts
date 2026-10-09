@@ -1,11 +1,11 @@
 import type { RentEstimate } from "../../src/col/rent";
 import type {
-  Assumption, ClawbackResult, Cliff, CostOfLivingInfo, EmploymentYearResult, HorizonSweep, Household, ISODate, LeaveDayRow, NextCliffResult,
-  OfferInput, OfferWarning, WindowTotals, WithholdingYear,
+  Assumption, BreakevenResult, ClawbackResult, Cliff, CostOfLivingInfo, EmploymentYearResult, HorizonSweep, Household, ISODate, LeaveDayRow,
+  NextCliffResult, OfferInput, OfferWarning, RentFlipResult, ValueBasis, WindowTotals, WithholdingYear,
 } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 
-// Messages between the main thread and the engine worker. Types and one key helper only: importing
+// Messages between the main thread and the engine worker. Types and two small helpers only: importing
 // a value from engine.worker.ts would pull the engine and its data tables into the main bundle.
 
 export interface CompareRequest {
@@ -79,7 +79,8 @@ export type EngineResponse = {
 
 export const rentKey = (area: string, state: string) => `${area}|${state}`;
 
-// ---- the slow lane (jobs.ts): L-4's leave sweep and its panel at the cursor ------------------------
+// ---- the slow lane (jobs.ts): L-4's leave sweep and its panel at the cursor, and breakeven (L-3 and the
+// close-call line) ------------------------------------------------------------------------------------
 
 /** What every slow job projects: the compared offers, in the comparison's order. */
 interface SlowBase { gen: number; offers: OfferInput[]; household: Household; inflation: number }
@@ -122,9 +123,50 @@ export interface LeavePanel {
   warnings: OfferWarning[];
 }
 
-export type SlowRequest = LeaveRequest | CursorRequest;
+/**
+ * Breakeven over your stay (docs/ui-design.md §4.6, §4.1): base case, present value on `basis`, over the
+ * comparison window (the earliest start of every offer, for your stay). "flip": the close-call line's one,
+ * the runner-up's starting salary that ties the winner. "breakeven": L-3, every offer behind the winner
+ * (its salary, its first cash award, and on the after-rent basis its rent), then the winner's cushion
+ * against the runner-up.
+ */
+export interface BreakevenRequest extends SlowBase {
+  lane: "flip" | "breakeven";
+  valuationDate: ISODate;
+  discountRate: number;
+  stayYears: number;
+  basis: ValueBasis;
+  /** Indexes into `offers`: who leads on `basis`, and who's second. */
+  winner: number;
+  runnerUp: number;
+}
+/** What it would take for offer `offer` to tie offer `against` (indexes in the comparison's order). */
+export interface TieRow {
+  offer: number;
+  against: number;
+  salary: BreakevenResult;
+  /** Its first cash award, or a sign-on paid 30 days after the start (L-3 only). */
+  cash?: BreakevenResult;
+  /** Its first lease year's rent (L-3, after rent only). */
+  rent?: RentFlipResult;
+}
+export interface Ties { basis: ValueBasis; rows: TieRow[] }
+
+/**
+ * A breakeven request for a comparison, a basis and its lead. The lead schedule and L-3 build theirs here
+ * alike, so the worker can reuse the close-call line's result in L-3.
+ */
+export const tieJob = (lane: BreakevenRequest["lane"], c: CompareRequest, basis: ValueBasis, lead: { winner: number; runnerUp: number }):
+  Omit<BreakevenRequest, "gen"> => ({
+  lane, offers: c.offers, household: c.household, inflation: c.inflation, valuationDate: c.valuationDate, discountRate: c.discountRate,
+  stayYears: c.stayYears, basis, winner: lead.winner, runnerUp: lead.runnerUp,
+});
+
+export type SlowRequest = LeaveRequest | CursorRequest | BreakevenRequest;
+export type SlowLane = SlowRequest["lane"];
 export type SlowResponse = { gen: number; /** From the request's arrival to the result: the wait included. */ ms: number } & (
   | { lane: "leave"; ok: true; curves: LeaveCurve[] }
   | { lane: "cursor"; ok: true; panels: Array<LeavePanel | null> }
-  | { lane: "leave" | "cursor"; ok: false; error: string }
+  | { lane: "flip" | "breakeven"; ok: true; ties: Ties }
+  | { lane: SlowLane; ok: false; error: string }
 );

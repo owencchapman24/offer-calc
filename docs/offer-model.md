@@ -363,6 +363,18 @@ changes no total.
     - **`outcome: "alreadyAhead"`** (with `increase` and `to` null) means B leads even at a
       $0 salary or sign-on. It's a result, not an error.
     - **`aheadBy`** always gives B's PV lead as entered.
+    - **The window** (UI slice 4, engine item 14): pass `window: comparisonWindow(offers,
+      years)`, the earliest start of every offer compared, so the target is the rank list's
+      figure. Without it, it's the two offers' own window, which starts later when a third
+      offer starts first.
+    - **`breakevenSteps`** is the same search as a generator, one projection per step, so the
+      UI's worker can run it in ~8 ms chunks.
+  - `rentFlip(A, B, …)` (UI slice 4, engine item 11): the first lease year's monthly rent at
+    which B ties A on the COL-adjusted total. Closed form, since the total is linear in rent:
+    to = from + aheadBy / (nonHousingFactor × rentFactor), where rentFactor is the PV of $1 a
+    month of B's first-year rent over its months there in the window. "rentFree" when B
+    trails even at $0 rent; "noRent" when B pays none inside the window. Hand-checked, and
+    against a bisection on rent.
 - **API for the UI (2026-10-08):**
   - **Window hours:** `WindowTotals.hours` counts each employment year's hours for its days
     inside the window, so it ties to the yearly figures.

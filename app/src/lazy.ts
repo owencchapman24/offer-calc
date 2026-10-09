@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useSyncExternalStore } from "react";
+import { type RefObject, useEffect, useState, useSyncExternalStore } from "react";
 
 // A module that loads the first time it's needed (a separate chunk), which components then read
 // synchronously. Quick-mode visitors who never open detailed mode or a tickmark never download them.
@@ -59,4 +59,17 @@ export function useLoadNear<T>(m: LazyModule<T>, ref: RefObject<Element | null>,
     io.observe(el);
     return () => io.disconnect();
   }, [m, ref, loaded]);
+}
+
+/** Whether the element is on screen or near it: a schedule's slow jobs (L-3, L-4) run only then. */
+export function useOnScreen(ref: RefObject<Element | null>): boolean {
+  const [on, setOn] = useState(typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => setOn(entries.some((e) => e.isIntersecting)), { rootMargin: "50% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+  return on;
 }

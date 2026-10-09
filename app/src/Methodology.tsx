@@ -3,6 +3,7 @@ import { DATA_YEARS } from "../../src/col/cities";
 import { formatAssumption } from "../../src/format/index";
 import type { ValueBasis } from "../../src/offer/types";
 import { CASES, changeText, riskView } from "./cases";
+import { cashLever, changeText as tieChangeText } from "./breakevenModel";
 import { addMonthsIso, forfeits } from "./leaveModel";
 import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
 import { BASIS_PHRASE, bridge, type WorkContext } from "./metrics";
@@ -308,6 +309,43 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             clawbacks here; leaving early is <Ref id="M-9" />. The row under the verdict shows the winner for stays of 2 to 5 years.
           </p>
           <p>Today, the valuation date, is your device's date when the page loads.</p>
+        </Section>
+        <Section id="M-7.4">
+          <p>
+            L-3 asks what one change would tie an offer behind the winner: its starting salary, its first cash award (or, with none, a
+            sign-on paid 30 days after the start, with no clawback), and on the after-rent basis its rent. Each changes one input and
+            leaves the rest as entered. It's the base case, in present value over your stay, on the verdict's basis. Per hour can't be
+            tied by one number, so on that basis L-3 ties the total per hour divides.
+          </p>
+          <p>
+            The window is the rank list's: from the earliest start of every offer, for your stay (<Ref id="M-7.3" />). So the target is
+            the winner's figure in the rank list, to the cent. Two offers compared over their own window would start later whenever a
+            third offer starts first, and miss it.
+          </p>
+          <p>
+            Salary and cash awards are found by search (bisection), to the cent. A dollar of salary adds less than a dollar to the
+            total: tax takes part of it, later pay is discounted, and what scales with salary moves with it. Raises, promotions, a
+            percent-of-salary bonus and the 401(k) match scale with it; a bonus entered in dollars or by year doesn't, and neither do
+            RSUs, cash awards or perks. L-3 says which apply to each offer. A cash award is paid once and taxed that year, so it ties
+            dollar for dollar less that tax, discounted to its date.
+          </p>
+          <p>
+            Rent is worked out directly, since the after-rent total is linear in rent (<Ref id="M-6.3" />): each $1 of rent is $1 less to
+            spend there, worth that city's price factor at U.S. prices. Rent's present-value factor is what $1 a month of first-year
+            rent is worth over the months you'd work there in your stay, rising at each lease anniversary.
+          </p>
+          <p className="formula">
+            rent that ties = rent now − (winner's total − the offer's total) ÷ (U.S. ÷ city non-housing prices × rent's present-value
+            factor)
+          </p>
+          <p>
+            Rent is the softest input, and often an estimate, so this says how much the verdict leans on it. The winner's cushion runs
+            the other way, against the runner-up: how far its starting salary could fall, whether it would still lead without its
+            sign-on, and the rent at which its lead would go. When the verdict's lead is under 3% of the winner's value, a close call
+            (<Ref id="M-7.2" />), the lead schedule says how much more starting salary the runner-up would need to tie. These are what
+            it would take to tie, not advice on what to ask for.
+          </p>
+          <WhatItWouldTake ctx={ctx} sample={sample} />
         </Section>
 
         <Section id="M-8">
@@ -651,6 +689,48 @@ function LeavingEarly({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
         })}
       </ul>
       <p>{leave ? "" : "L-4 works out what you'd keep for any last day. "}<a href="#/">See L-4 on the comparison</a></p>
+    </Live>
+  );
+}
+
+/** M-7.4: L-3's numbers, once it has worked them out. */
+function WhatItWouldTake({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
+  const r = ctx.results;
+  const t = r?.ties?.l3;
+  if (!r || !t || t.rows.length < 2) {
+    return <p className="method-note">L-3 works these out on the comparison, once it's on screen. <a href="#/">See the comparison</a></p>;
+  }
+  const offerOf = (i: number) => {
+    const app = ctx.offers.find((o) => o.letter === r.letters[i]);
+    const input = app ? toOfferInput(app) : null;
+    return input && "offer" in input ? input.offer : null;
+  };
+  const W = r.letters[t.rows[0].against];
+  const cushion = t.rows[t.rows.length - 1];
+  return (
+    <Live>
+      <p className="live-head">Your offers, to tie {W}, {BASIS_PHRASE[t.basis]} <Illustrative sample={sample} /></p>
+      <ul className="method-list">
+        {t.rows.slice(0, -1).map((row) => {
+          const o = offerOf(row.offer);
+          const L = r.letters[row.offer];
+          if (!o) return null;
+          const parts = [
+            row.salary.outcome === "tie" ? `a starting salary of ${dollars(row.salary.to)} (${tieChangeText(row.salary)})` : null,
+            row.cash?.outcome === "tie" ? `${cashLever(o).added ? "a new sign-on" : cashLever(o).name} of ${dollars(row.cash.to)}` : null,
+            row.rent?.outcome === "tie" ? `rent under ${dollars(row.rent.to)} a month` : row.rent?.outcome === "rentFree" ? "no rent would do it" : null,
+          ].filter(Boolean) as string[];
+          return <li key={L}><strong>{L}</strong>: {parts.join("; or ")}.</li>;
+        })}
+        <li>
+          <strong>{W}</strong>, against {r.letters[cushion.against]}:{" "}
+          {cushion.salary.outcome === "tie" ? `its salary could fall to ${dollars(cushion.salary.to)}` : "it leads even at a $0 salary"}
+          {cushion.cash ? (cushion.cash.outcome === "tie" ? `; it needs ${dollars(cushion.cash.to)} of its ${cashLever(offerOf(cushion.offer)!).label}`
+            : "; it leads without its sign-on") : ""}
+          {cushion.rent?.outcome === "tie" ? `; its lead goes above ${dollars(cushion.rent.to)} a month of rent` : ""}.
+        </li>
+      </ul>
+      <p><a href="#/">See L-3 on the comparison</a></p>
     </Live>
   );
 }

@@ -186,7 +186,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .verdict-lede { margin: 0; font-size: 19px; }
 .hero { margin: 2px 0; font-size: clamp(40px, 5vw, 56px); line-height: 1.1; font-weight: 650; letter-spacing: -0.01em; }
 .scope { margin: 8px 0 0; font-size: 13.5px; color: var(--graphite); }
-.close { margin: 8px 0 0; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.close { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.close .stamp { margin-right: 6px; }
+.close .fig { transition: opacity 120ms; }
+.close.is-updating .fig { opacity: 0.6; }
+.close .updating { margin-left: 4px; }
 
 /* An offer's letter: ink text, identified by an offer-color underline (text never wears the series color). */
 .who { font-weight: 700; padding: 0 2px; box-shadow: inset 0 -3px 0 var(--offer); }
@@ -647,6 +651,24 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .risk-table { max-width: 760px; }
 .risk-wrong ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .later { min-height: 1px; }
+
+/* ---- L-3 what it would take ------------------------------------------------------------------------- */
+
+.ties { margin-top: 24px; }
+.ties > :not(.schedule-head) { transition: opacity 120ms; }
+.ties.is-updating > :not(.schedule-head) { opacity: 0.6; }
+.tie-scope { margin: 2px 0 10px; font-size: 14.5px; line-height: 1.55; max-width: 96ch; font-variant-numeric: tabular-nums; }
+.tie-offers { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 14px; }
+.tie-offer { font-size: 14.5px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
+.tie-offer.is-winner { padding-top: 12px; border-top: 1px solid var(--rule); }
+.tie-line { margin: 0; }
+.tie-or { padding-left: 30px; }
+.tie-lever { font-weight: 600; }
+.tie-change { color: var(--graphite); }
+.tie-note { margin: 2px 0 0; padding-left: 30px; font-size: 13px; color: var(--graphite); }
+@media (max-width: 759px) {
+  .tie-or, .tie-note { padding-left: 16px; }
+}
 
 /* ---- L-4 leaving early --------------------------------------------------------------------------- */
 

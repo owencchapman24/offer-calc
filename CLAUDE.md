@@ -4,7 +4,7 @@ A job-offer comparison calculator. Differentiator: do the math correctly, in one
 gross comp -> after-tax -> location-adjusted -> per hour of your life, year by year (years 1-5),
 and show the work. Correctness and a clear methodology page matter more than features.
 
-## Status (2026-10-08)
+## Status (2026-10-09)
 **Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
 - **Tax engine:** 2026 law, validated against PolicyEngine-US. Projected later years come
   from `paramsForYear`, cached and frozen.
@@ -12,7 +12,9 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - salary, bonus and cash awards; RSUs and refreshers;
   - leave date, clawbacks and the leave-date sweep;
   - raises and promotions; bear/base/bull scenarios; PV;
-  - `compareOffers`, and `breakeven`, including the "alreadyAhead" outcome;
+  - `compareOffers`, and `breakeven`, including the "alreadyAhead" outcome, over a window the caller
+    passes (`comparisonWindow`: the earliest start of every offer), and as resumable steps
+    (`breakevenSteps`); `rentFlip`, the rent that ties, closed form;
   - 401(k), health, perks, hours;
   - cost of living (BEA RPPs), the COL-adjusted total, rent growth;
   - `cliffs` / `nextCliff`, `withholdingShortfall`, and `horizonSweep` (window hours,
@@ -27,11 +29,22 @@ and show the work. Correctness and a clear methodology page matter more than fea
 - **Speed** (`npm run bench`, median of warm runs; the machine is noisy, so compare
   branches side by side, not with these):
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
-  - one breakeven 55 ms; a 60-month leave sweep 92 ms.
+  - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1, 2, 3 and 5 are complete and live at https://offer-calc.vercel.app** (plan for
-slices 4-8: `docs/ui-slices-4-8-plan.md`; slice 5 versus the design: `docs/ui-design.md` §12).
-Slice 4 is next.
+**UI: slices 1-5 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
+`docs/ui-slices-4-8-plan.md`; slices 4 and 5 versus the design: `docs/ui-design.md` §12). Slice 8 is
+next.
+- **L-3, What it would take** (slice 4): for each offer behind the winner, the starting salary, the first
+  cash award (by its own label and date; with none, a sign-on 30 days in, no clawback) and, after rent,
+  the rent that would tie it ("C still wins unless your New York rent for A is under $3,290 a month");
+  then the winner's cushion against the runner-up (how far its salary could fall, "still leads A with no
+  sign-on", the rent at which its lead goes); and per offer, what scales with its salary. Base case, PV
+  over the comparison window, on the verdict's basis (per hour ties the total it divides). Its target is
+  the rank list's figure, shown and cross-footed. Between L-2 and L-4; the slow lane works it out while
+  it's on screen (0.3-0.7 s on a desktop). M-7.4 explains it.
+- **The close-call line** (slice 4): when the verdict's lead is under 3%, "… $2,867 more starting salary
+  for A would tie" (dollar bases only), from one breakeven that runs ahead of L-3's and L-4's jobs and
+  that L-3 reuses (the worker's memo).
 - **L-2, If things go badly** (slice 5, stop A): the sentence (who holds up best, the biggest
   drop, who wins only if things go well), a range chart (bear and bull dots, base diamond), who
   wins each scenario, what goes wrong in the bear case (generated from the inputs), a ticked
@@ -59,10 +72,10 @@ Slice 4 is next.
   (the federal withholding shortfall, estimated in the fast lane). A recurring warning is one line with
   its years, and each has "Show at the field". The lead points to L-5 when a warning changes the numbers
   (the worker counts them).
-- **Stale schedules:** L-1, L-2, L-4 and L-5 dim their figures while they're from earlier inputs and say
+- **Stale schedules:** L-1 to L-5 dim their figures while they're from earlier inputs and say
   "Updating…" or "Last valid results" (`StaleNote` in `ui.tsx`).
-- **Methodology live numbers:** M-8 lists your bear, base and bull cases; M-9 each offer's leaving-early
-  terms, and L-4's panel once it has run.
+- **Methodology live numbers:** M-7.4 L-3's ties once it has run; M-8 lists your bear, base and bull
+  cases; M-9 each offer's leaving-early terms, and L-4's panel once it has run.
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -121,8 +134,9 @@ Slice 4 is next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 355.7 / 109.1 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 3 ended at 351.8 /
+  - **Main thread:** 357.9 / 109.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 5 ended at 355.7 / 109.1;
+    slice 3 at 351.8 /
     107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 120 kB gzipped by the check, which CI runs
     after the build (110 kB until 2026-10-09; see Decisions). Slices 4, 8 and 7 add to the main thread
     (the close-call line, the prices control, tabs and sticky bars).
@@ -137,22 +151,23 @@ Slice 4 is next.
   - **Loaded on first use:** detailed mode 55 / 14 KB (sections, editors, controls, its help
     text), the derivations 41 / 13 KB (when a tickmark is hovered, focused or opened), the
     methodology 37 / 13 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB, L-2
-    9 / 3 KB plus its view model 4 / 2 KB, L-4 13 / 5 KB plus its view model 4 / 2 KB (each view
-    model shared with the derivations), L-5 5 / 2 KB.
+    9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 13 / 5 KB plus its view model 4 / 2 KB
+    (each view model shared with the derivations), L-5 5 / 2 KB.
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
   - **Worker:** ~250 KB. Per edit it runs `validateOffer` on each offer, then `horizonSweep`, your
     stay's full projection per offer, its bear and bull totals (L-2) and its withholding (L-5): about
-    50 ms warm on the samples in Node, 35-65 ms in headless Edge (32 before slice 5). L-4's jobs run
-    in the slow lane.
+    50 ms warm on the samples in Node, 35-65 ms in headless Edge (32 before slice 5). L-3's and L-4's
+    jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 354 passing.
-- `test/offer.test.ts` 120, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
+**Tests:** 379 passing.
+- `test/offer.test.ts` 124, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 30,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 14, `app/src/l5.test.ts` 6,
+  `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
+  `app/src/l5.test.ts` 6,
   `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
@@ -205,14 +220,12 @@ Slice 4 is next.
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 4: close calls and breakeven:** L-3 (§4.6) with the winner's cushion and the rent
-   lever, and the close-call flip line (§4.1). Step 0 fixes the breakeven window (the comparison
-   window of every offer), tested against the rank list to the cent.
-2. **Slice 8: prices in a city you know** (§5, item 6).
-3. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
+1. **Slice 8: prices in a city you know** (§5, item 6). L-3's rent sentence and its derivations say
+   "at U.S. prices" too: they follow the choice.
+2. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
    and axe in CI (any WCAG A/AA violation fails; exceptions need a reason), a screen-reader
    walkthrough the user runs from a script.
-4. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+3. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
 
@@ -254,7 +267,8 @@ build them in.
   - `types.ts`.
   - `project.ts`: `projectScenario`, `leaveDateSweep`, `leaveDaySweep` (any last days, so a
     step lands on its own date), `keptIfLeaving`.
-  - `compare.ts`: `projectOffer`, `compareOffers`, `breakeven`, `horizonSweep`,
+  - `compare.ts`: `projectOffer`, `compareOffers`, `comparisonWindow`, `breakeven` (and
+    `breakevenSteps`, the same search a projection at a time), `rentFlip`, `horizonSweep`,
     `monthlyEquivalent`.
   - `cliffs.ts`: `cliffs`, `nextCliff` (optionally past some cliffs: L-4 skips a prorated
     clawback's monthly steps, which say `prorated: true`).
@@ -326,13 +340,19 @@ build them in.
     (`useLoadNear` in `lazy.ts`). `src/Risk.tsx` is L-2; `src/cases.ts` its view model (values by
     scenario, the leads, what differs in a scenario, in words), shared with `derive.ts`.
   - `src/jobs.ts`: the worker's two lanes. Edits run ahead of the next chunk of any slow job;
-    slow jobs are keyed generators, replaced by a newer job with the same key.
+    slow jobs are keyed generators, replaced by a newer job with the same key; a higher priority runs
+    first (the close-call line's breakeven).
     `src/slowJobs.ts` (worker only) holds them: L-4's curves (`leaveJob`, sampled by `sweepDays`)
-    and its panel at the last day (`cursorJob`). `useEngine` sends them (`requestSlow`, skipping a
+    and its panel at the last day (`cursorJob`); breakevens (`breakevenJob`: L-3's, or the close-call
+    line's one), remembered by their inputs so L-3 reuses the line's. `tieJob` in `protocol.ts` builds
+    both requests alike. `useEngine` sends them (`requestSlow`, skipping a
     request identical to the last) and reports `updating` from the render that changes the inputs.
   - `src/Warnings.tsx` is L-5. `src/warningAt.ts`: the field each engine warning is about (detailed
     mode and "Show at the field"), and the withholding figure as displayed; `src/warningKinds.ts`: L-5's
     kinds, your stay's warnings grouped, and the count the lead points with (the worker computes it).
+  - `src/Breakeven.tsx` is L-3; `src/breakevenModel.ts` its view model (the rows, the cash lever's name,
+    what scales with salary), shared with `derive.ts` and the methodology. `useOnScreen` (in `lazy.ts`)
+    starts L-3's and L-4's slow jobs.
   - `src/Leaving.tsx` is L-4; `src/leaveModel.ts` its view model (the axis by calendar date, the
     curves, markers and clawback segments, the panel's words, the reconciliation with the stay),
     shared with `derive.ts`. `src/axes.ts`: the charts' tick helpers.

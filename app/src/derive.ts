@@ -12,6 +12,8 @@ import {
 } from "./metrics";
 import type { OfferDetail } from "./protocol";
 import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
+import { cashLever, inSentence, scalesText } from "./breakevenModel";
+import type { Ties, TieRow } from "./protocol";
 import { cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
 import { withholdingParts } from "./warningAt";
 import type { SectionId } from "./sections";
@@ -102,6 +104,7 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "kept": case "repay": case "forfeit": case "forgone": case "next": case "nextown": return "M-9";
     case "stayafter": case "recon": return "M-7.3";
     case "wh": return "M-4";
+    case "flip": case "tie": return "M-7.4";
   }
   throw new Error(`Unknown figure: ${id}`);
 }
@@ -143,6 +146,8 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "stayafter": return stayAfterWork(ctx, a as L);
       case "recon": return reconWork(ctx, a as L);
       case "wh": return withholdingWork(ctx, a as L, Number(b));
+      case "flip": return flipWork(ctx);
+      case "tie": return a === "target" ? tieTargetWork(ctx) : tieWork(ctx, a as L, b as "salary" | "cash" | "rent");
     }
     throw new Error(`Unknown figure: ${id}`);
   }
@@ -180,6 +185,8 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "stayafter": return `${a}'s stay after tax`;
     case "recon": return `${a}'s difference from the stay`;
     case "wh": return `${a}'s ${b} withholding`;
+    case "flip": return "the close-call line";
+    case "tie": return a === "target" ? "L-3's target" : `${a}'s ${b === "cash" ? "cash award" : b === "salary" ? "starting salary" : b} to tie`;
   }
   return id;
 }
@@ -580,6 +587,211 @@ function caseLeadWork(ctx: WorkContext, scenario: Scenario): Work {
       ? ["The base case is the verdict's, so this is the verdict's lead."]
       : [`Each offer's ${scenario} case sets every uncertain input to its ${scenario} value at once; ${W} leads ${R} there.`],
     ties: scenario === "base" ? sameFigure(ctx, n, basis) : [], uses: [`risk.${W}.${scenario}`, `risk.${R}.${scenario}`],
+  };
+}
+
+// ---- L-3 and the close-call line: what it would take -------------------------------------------------
+
+/** The breakevens on screen: L-3's, or the close-call line's. */
+function tiesOf(ctx: WorkContext, which: "flip" | "l3"): Ties {
+  const t = res(ctx).ties?.[which];
+  if (!t) throw new Error("Still working this out…");
+  return t;
+}
+
+/** A row of breakevens, its two offers, and whether it's the winner's cushion (the last of L-3's rows). */
+function tieContext(ctx: WorkContext, t: Ties, row: TieRow) {
+  const r = res(ctx);
+  const me = r.letters[row.offer];
+  const other = r.letters[row.against];
+  const o = me ? offerByLetter(ctx, me) : undefined;
+  const input = o ? toOfferInput(o) : null;
+  if (!me || !other || !input || !("offer" in input)) throw new Error("These offers have changed: still working this out…");
+  const cushion = t.rows.length > 1 && t.rows[t.rows.length - 1] === row;
+  // The rank list's totals are on the page only on the basis the verdict uses.
+  const onPage = t.basis === r.view.basis;
+  const n = r.view.row.years;
+  return {
+    me, other, offer: input.offer, cushion, n,
+    title: cushion ? `${me}'s cushion over ${other} · ${BASIS_PHRASE[t.basis]}` : `${me} to tie ${other} · ${BASIS_PHRASE[t.basis]}`,
+    scope: `Base case · stay ${years(n)} (${windowText(r.view.row)}) · today's dollars`,
+    pv: (l: L): Partial<WorkLine> => (onPage ? { ref: `pv.${l}.${t.basis}` } : {}),
+    uses: onPage ? [`pv.${other}.${t.basis}` as MetricId, `pv.${me}.${t.basis}` as MetricId] : [],
+  };
+}
+type TieContext = ReturnType<typeof tieContext>;
+
+/** The target, the offer's own total, and the gap between them, as displayed (the column foots). */
+function gapLines(x: TieContext, basis: ValueBasis, r: { targetPV: number; aheadBy: number }): WorkLine[] {
+  const own = r.targetPV + r.aheadBy;
+  return [
+    { label: `${x.other}: ${x.n}-year total ${BASIS_PHRASE[basis]}, the target`, value: figure(r.targetPV), ...x.pv(x.other) },
+    { op: "−", label: `${x.me}: the same, as entered`, value: figure(own), ...x.pv(x.me) },
+    { op: "=", label: x.cushion ? `${x.me}'s lead` : "The gap to close", value: figure(Math.abs(Math.round(r.targetPV) - Math.round(own))), rule: "single" },
+  ];
+}
+
+const searched = (x: TieContext, what: string, to: number, target: number) =>
+  `Found by search (bisection), to the cent: with ${what} at ${cents(to)} and everything else as entered, ${x.me}'s ${x.n}-year total meets `
+  + `${x.other}'s ${figure(target)}, to within a few cents.`;
+const sameWindow = (x: TieContext) =>
+  `Over your stay, from the earliest start of every offer: the rank list's window, so the target is ${x.other}'s figure there.`;
+
+/** A starting salary that ties: L-3's, the winner's cushion, or the close-call line's. */
+function salaryWork(ctx: WorkContext, t: Ties, row: TieRow, extra: string[] = []): Work {
+  const x = tieContext(ctx, t, row);
+  const r = row.salary;
+  const lines = gapLines(x, t.basis, r);
+  const inputs = fromInputs(ctx, x.me, ["salary.annual"]);
+  if (r.outcome !== "tie") {
+    return {
+      title: x.title, scope: x.scope, lines,
+      notes: [`Even at a $0 starting salary, ${x.me}'s total stays above ${x.other}'s, so no salary ties: what keeps ${x.me} ahead is paid apart `
+        + "from salary.", sameWindow(x)],
+      ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
+    };
+  }
+  return {
+    title: x.title, scope: x.scope,
+    lines: [
+      ...lines,
+      { label: `${x.me}'s starting salary, as entered`, value: dollars(r.from), ref: `in.${x.me}.salary.annual` },
+      { op: r.increase >= 0 ? "+" : "−", label: x.cushion ? `What ${x.other} catching up takes off it` : "The increase that closes the gap",
+        value: dollars(Math.abs(r.increase)) },
+      { op: "=", label: x.cushion ? `Starting salary at which ${x.other} ties` : "Starting salary that ties", value: dollars(r.to), rule: "double" },
+    ],
+    notes: [
+      ...extra,
+      searched(x, "the starting salary", r.to, r.targetPV),
+      `A dollar of salary adds less than a dollar to the total: tax takes part of it, and later years' pay is discounted to today. ${scalesText(x.me, x.offer, t.basis)}`,
+      sameWindow(x),
+    ],
+    ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
+  };
+}
+
+/** The close-call line: the runner-up's starting salary that ties the verdict. */
+function flipWork(ctx: WorkContext): Work {
+  const t = tiesOf(ctx, "flip");
+  const lead = res(ctx).view.lead;
+  return salaryWork(ctx, t, t.rows[0],
+    lead ? [`The lead is under 3% of ${lead.winnerLetter}'s value, a close call: this is the change to ${lead.runnerUpLetter}'s offer that would tie it.`] : []);
+}
+
+/** L-3: the winner's total, which every offer behind it ties to. It's the rank list's figure. */
+function tieTargetWork(ctx: WorkContext): Work {
+  const t = tiesOf(ctx, "l3");
+  const r = res(ctx);
+  const row = t.rows[0];
+  if (!row) throw new Error("Still working this out…");
+  const W = r.letters[row.against];
+  const twin: MetricId = `pv.${W}.${t.basis}`;
+  const onPage = t.basis === r.view.basis;
+  return {
+    title: `${W} · L-3's target · ${BASIS_PHRASE[t.basis]}`, scope: `Base case · stay ${years(r.view.row.years)} (${windowText(r.view.row)}) · today's dollars`,
+    lines: [{ label: `${W}: ${r.view.row.years}-year total ${BASIS_PHRASE[t.basis]}`, value: figure(row.salary.targetPV), ...(onPage ? { ref: twin } : {}) }],
+    notes: [
+      `Every line in L-3 ties to this figure: each offer behind ${W}, with one input changed, comes within a cent of it.`,
+      "It's the rank list's figure: the same window (the earliest start of every offer, for your stay), base case, valued today. A breakeven over "
+        + "only two offers' own window would miss a third offer's earlier start.",
+    ],
+    ties: onPage ? [twin] : [], uses: [],
+  };
+}
+
+function tieWork(ctx: WorkContext, letter: L, lever: "salary" | "cash" | "rent"): Work {
+  const t = tiesOf(ctx, "l3");
+  const i = indexOf(ctx, letter);
+  const row = t.rows.find((x) => x.offer === i);
+  if (!row) throw new Error("Still working this out…");
+  if (lever === "salary") return salaryWork(ctx, t, row);
+  return lever === "cash" ? cashWork(ctx, t, row) : rentWork(ctx, t, row);
+}
+
+/** L-3: the first cash award (or a sign-on) that ties, or the winner's at which the runner-up ties. */
+function cashWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
+  const x = tieContext(ctx, t, row);
+  const r = row.cash;
+  if (!r) throw new Error("Still working this out…");
+  const lever = cashLever(x.offer);
+  const name = lever.label[0].toUpperCase() + lever.label.slice(1);
+  const lines = gapLines(x, t.basis, r);
+  const inputs = lever.added ? { inputs: [], uses: [] } : fromInputs(ctx, x.me, ["cashAwards.0.amount"]);
+  if (r.outcome !== "tie") {
+    return {
+      title: x.title, scope: x.scope, lines,
+      notes: [`With no ${inSentence(lever.label)} at all, ${x.me}'s total stays above ${x.other}'s, so no amount ties: ${x.me} doesn't need it to lead.`,
+        sameWindow(x)],
+      ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
+    };
+  }
+  return {
+    title: x.title, scope: x.scope,
+    lines: [
+      ...lines,
+      lever.added ? { label: `No cash award: ${lever.name}`, value: "$0" }
+        : { label: `${lever.name}, as entered`, value: dollars(r.from), ref: `in.${x.me}.cashAwards.0.amount` as MetricId },
+      { op: r.increase >= 0 ? "+" : "−", label: x.cushion ? `What ${x.other} catching up takes off it` : "The increase that closes the gap",
+        value: dollars(Math.abs(r.increase)) },
+      { op: "=", label: x.cushion ? `${name} at which ${x.other} ties` : `${name} that ties`, value: dollars(r.to), rule: "double" },
+    ],
+    notes: [
+      ...(lever.added ? [`${x.me} has no cash award, so this adds one: a sign-on paid 30 days after the start, with no clawback.`] : []),
+      searched(x, `the ${inSentence(lever.label)}`, r.to, r.targetPV),
+      "A cash award is paid once, on its date, and taxed that year with the rest of your pay, so it ties dollar for dollar less that tax, "
+        + "discounted to today. Salary moves more: it's paid every year, and what scales with it moves too.",
+      sameWindow(x),
+    ],
+    ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
+  };
+}
+
+/** L-3's rent lever: closed form, since the total is linear in rent (the engine's rentFlip). */
+function rentWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
+  const x = tieContext(ctx, t, row);
+  const f = row.rent;
+  if (!f || f.outcome === "noRent") throw new Error(`${x.me} pays no rent inside your stay.`);
+  const d = detailOf(ctx, x.me);
+  const ix = indexes(d);
+  const info = ix.info;
+  const gap = Math.abs(Math.round(f.targetPV) - Math.round(f.targetPV + f.aheadBy));
+  const local = Math.abs(f.aheadBy) / f.nonHousingFactor;
+  const change = Math.abs(f.change);
+  const inputs = fromInputs(ctx, x.me, ["costOfLiving.monthlyRent"]);
+  const estimated = info.rentSource !== "input";
+  const lines: WorkLine[] = [
+    ...gapLines(x, "colAdjustedTotal", f).slice(0, 2),
+    { op: "=", label: x.cushion ? `${x.me}'s lead` : "The gap to close", value: figure(gap), rule: "single" },
+    { op: "×", label: `${ix.city} non-housing prices (BEA)`, value: ix.area, ref: `rpp.${x.me}.area` },
+    { op: "÷", label: "U.S. non-housing prices (BEA)", value: ix.us, ref: `rpp.${x.me}.us` },
+    { op: "=", label: `The same in ${ix.city} dollars`, value: figure(local), rule: "single" },
+    { op: "÷", label: "Rent's present-value factor", value: f.rentFactor.toFixed(4),
+      note: `$1 a month of first-year rent, each month you'd work there in your stay, rising ${percent(info.rentGrowth)} at each lease anniversary` },
+    { op: "=", label: x.cushion ? "More rent a month it can carry" : "Less rent a month, first lease year", value: dollars(change), rule: "single" },
+  ];
+  const notes = [
+    `Closed form, since the total is linear in rent: each $1 of ${ix.city} rent is $1 less to spend there, worth ${f.nonHousingFactor.toFixed(4)} at U.S. `
+      + `prices. So the gap, restated in ${ix.city} dollars, is divided by what $1 a month of rent is worth over your stay.`,
+    `First lease year: the lease starts on ${x.me}'s start date, and rent rises ${percent(info.rentGrowth)} at each anniversary `
+      + `(${info.rentGrowthSource === "input" ? "as entered" : "inflation, the default"}).`,
+    ...(estimated ? [`${x.me}'s rent is an estimate (HUD Fair Market Rent): enter yours to see how far it is from this line.`] : []),
+  ];
+  const how = estimated ? "estimated" : "as entered";
+  if (f.outcome === "rentFree") {
+    return {
+      title: x.title, scope: x.scope,
+      lines: [...lines, { op: "=", label: `Rent that ties: ${dollars(f.from)} ${how} − ${dollars(change)}`, value: "below $0", rule: "double" }],
+      notes: [`Even rent-free, ${x.me} trails ${x.other}: the rent that would tie is below zero.`, ...notes],
+      ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
+    };
+  }
+  return {
+    title: x.title, scope: x.scope,
+    lines: [...lines, {
+      op: "=", label: `${x.cushion ? `Rent at which ${x.other} ties` : "Rent that ties"}: ${dollars(f.from)} ${how} ${x.cushion ? "+" : "−"} ${dollars(change)}`,
+      value: dollars(f.to), rule: "double",
+    }],
+    notes, ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
   };
 }
 

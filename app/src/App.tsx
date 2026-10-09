@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useReducer, useState } from "react";
 import { DATA_YEARS } from "../../src/col/cities";
-import { rentKey } from "./protocol";
+import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
-import { LeavingSlot, RiskSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, LeavingSlot, RiskSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -164,9 +164,31 @@ export function App() {
     ? { leave: { basis: leaveBasis, stayEnd: dayBefore(view.row.window.end), panels } } : {};
   // The schedules after the lead show their figures from earlier inputs dimmed, and say why.
   const stale: Stale = engine.updating ? "updating" : engine.invalid ? "invalid" : null;
+  const ready = !engine.updating && !engine.invalid && !!engine.sweep;
+  // The close-call line (docs/ui-design.md §4.1): the runner-up's salary that ties, from the slow lane, ahead of L-3 and L-4.
+  // Breakeven isn't defined per hour, so the line is for the dollar bases only.
+  const lead = view?.lead;
+  const flipJob = compare && view && lead?.closeCall && lead.margin > 0 && view.basis !== "perHour" ? tieJob("flip", compare, view.basis, lead) : null;
+  const flipKey = flipJob && JSON.stringify(flipJob);
+  const { requestSlow } = engine;
+  useEffect(() => {
+    if (ready && flipJob) requestSlow(flipJob, flipKey!);
+    // The job is compared by value (its key).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, flipKey, requestSlow]);
+  const flipRow = engine.flip.result?.basis === view?.basis ? engine.flip.result?.rows[0] : undefined;
+  const flip = flipJob && lead ? {
+    // The last one worked out, while it's for this pair of offers.
+    row: flipRow && flipRow.offer === lead.runnerUp && flipRow.against === lead.winner ? flipRow.salary : null,
+    updating: engine.flip.key !== flipKey || engine.flip.updating, error: engine.flip.error,
+  } : null;
+  const ties = {
+    ...(flip?.row && engine.flip.result ? { flip: engine.flip.result } : {}),
+    ...(engine.breakeven.result ? { l3: engine.breakeven.result } : {}),
+  };
   const work: WorkContext = {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
-    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave } } : {}),
+    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties } } : {}),
   };
 
   return (
@@ -203,13 +225,16 @@ export function App() {
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
-                cautions={cautions} changes={changes} onWarnings={toWarnings} />
+                cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} />
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
           {work.results && <RiskSlot ctx={work} sample={sample} status={stale} />}
           {work.results && (
-            <LeavingSlot ctx={work} sample={sample} compare={compare} ready={!engine.updating && !engine.invalid && !!engine.sweep} status={stale}
+            <BreakevenSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale} ties={engine.breakeven} requestSlow={requestSlow} />
+          )}
+          {work.results && (
+            <LeavingSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale}
               leave={engine.leave} cursor={engine.cursor} requestSlow={engine.requestSlow} at={leaveAt} basis={leaveBasis} onAt={setLeaveAt}
               onBasis={setLeaveBasis} />
           )}

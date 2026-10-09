@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, keptIfLeaving, leaveDateSweep, leaveDaySweep, nextCliff, projectOffer,
+  breakeven, breakevenSteps, byYear, cliffs, compareOffers, comparisonWindow, convenienceRuleWarning, keptIfLeaving, leaveDateSweep, leaveDaySweep,
+  nextCliff, projectOffer, rentFlip,
   projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, annuityTerms, type AnnualBonus, type Household,
   type Cliff, type OfferInput,
 } from "../src/offer/index";
@@ -887,6 +888,77 @@ describe("cost of living (BEA RPPs)", () => {
     expect(breakeven(tx("19100", 1_500), tx("35620", 2_000), "salary", single, opts).increase).toBeCloseTo(0, 1);
     expect(() => breakeven(tx("19100", 1_500), { ...tx("35620", 0), costOfLiving: undefined }, "salary", single,
       { ...opts, basis: "colAdjustedTotal" })).toThrow(/costOfLiving/);
+  });
+  it("the rent flip: NYC rent must fall to $1,224.34 to tie Dallas at $1,500; Dallas's lead holds to $2,235.88 (hand-checked)", () => {
+    // As above: take-home 79,180 a year = 6,598.33 a month, every month alike, so discounting doesn't move the tie.
+    // fA / fB = NYC 105.69576 / Dallas 100.27400 = 1.0540694. NYC ties when 6,598.33 - R = (6,598.33 - 1,500) x 1.0540694,
+    // R = 1,224.34. Dallas, ahead, ties NYC at $2,000 when 6,598.33 - R' = (6,598.33 - 2,000) / 1.0540694, R' = 2,235.88.
+    const tx = (area: string, monthlyRent: number): OfferInput => ({ label: area, residence: { state: "TX" }, employerState: "TX",
+      startDate: "2026-01-01", salary: { annual: 100_000 }, costOfLiving: { area, monthlyRent } });
+    const opts = { valuationDate: "2026-01-01", horizonYears: 1, years: 1 };
+    const behind = rentFlip(tx("19100", 1_500), tx("35620", 2_000), single, opts);
+    expect(behind).toMatchObject({ outcome: "tie", from: 2_000 });
+    expect(behind.to!).toBeCloseTo(1_224.34, 1);
+    expect(behind.change!).toBeCloseTo(-775.66, 1);
+    // The factor is NYC's: $1 less NYC rent is $0.9449 more spending at U.S. prices. Rent's factor: 12 months, discounted.
+    expect(behind.nonHousingFactor).toBeCloseTo(99.88 / 105.69576, 3);
+    expect(behind.rentFactor).toBeGreaterThan(11.6);
+    expect(behind.rentFactor).toBeLessThan(12);
+    const ahead = rentFlip(tx("35620", 2_000), tx("19100", 1_500), single, opts);
+    expect(ahead).toMatchObject({ outcome: "tie", from: 1_500 });
+    expect(ahead.to!).toBeCloseTo(2_235.88, 1);
+    // Even rent-free, a $60,000 salary in NYC trails $100,000 in Dallas.
+    const free = rentFlip(tx("19100", 1_500), { ...tx("35620", 2_000), salary: { annual: 60_000 } }, single, opts);
+    expect(free).toMatchObject({ outcome: "rentFree", to: null });
+    expect(free.from + free.change!).toBeLessThan(0);
+  });
+  it("the rent flip matches a bisection on rent to the cent: sample A's NYC rent that ties C, with rent growth and discounting", () => {
+    const options = { valuationDate: "2026-07-13", inflation: 0.025, window: comparisonWindow(SAMPLE_OFFERS, 4) };
+    const [A, , C] = SAMPLE_OFFERS;
+    const flip = rentFlip(C, A, SAMPLE_HOUSEHOLD, options);
+    expect(flip.outcome).toBe("tie");
+    const total = (rent: number) => projectScenario({ ...A, costOfLiving: { ...A.costOfLiving!, monthlyRent: rent } }, SAMPLE_HOUSEHOLD,
+      { ...options, scenario: "base" }).window.costOfLiving!.presentValue!.total;
+    let lo = 0;
+    let hi = 3_800;
+    while (hi - lo > 0.0001) {
+      const mid = (lo + hi) / 2;
+      if (total(mid) > flip.targetPV) lo = mid; else hi = mid;
+    }
+    expect(Math.abs(flip.to! - lo)).toBeLessThan(0.01);
+    // Re-entering it ties C to the cent (the totals are rounded to cents; a cent of rent moves A's total about 43 cents).
+    expect(Math.abs(total(flip.to!) - flip.targetPV)).toBeLessThan(0.5);
+  });
+});
+
+describe("breakeven over the comparison window (engine item 14)", () => {
+  // B starts first, so the three offers' window starts on B's day; A and C start later. Valued on B's start.
+  const [A0, B0, C0] = SAMPLE_OFFERS;
+  const offers = [{ ...A0, startDate: "2026-09-01" }, { ...B0, startDate: "2026-07-13" }, { ...C0, startDate: "2026-10-05" }];
+  const options = { valuationDate: "2026-07-13", inflation: 0.025 };
+  const row = horizonSweep(offers, SAMPLE_HOUSEHOLD, [4], options).rows[0];
+  const lead = row.leads.colAdjustedTotal!;
+
+  it("with the window of every offer, the target is the rank list's figure to the cent; with the pair's own window, it isn't", () => {
+    const window = comparisonWindow(offers, 4);
+    expect(window).toEqual({ start: "2026-07-13", years: 4 });
+    const [W, R] = [offers[lead.winner], offers[lead.runnerUp]];
+    const r = breakeven(W, R, "salary", SAMPLE_HOUSEHOLD, { ...options, window, basis: "colAdjustedTotal" });
+    expect(r.targetPV).toBe(row.values.colAdjustedTotal![lead.winner]);
+    expect(r.aheadBy).toBeCloseTo(row.values.colAdjustedTotal![lead.runnerUp] - row.values.colAdjustedTotal![lead.winner], 6);
+    expect(r.window).toEqual(row.window);
+    const pair = breakeven(W, R, "salary", SAMPLE_HOUSEHOLD, { ...options, horizonYears: 4, basis: "colAdjustedTotal" });
+    expect(Math.abs(pair.targetPV - r.targetPV)).toBeGreaterThan(100);
+  });
+  it("runs as steps, one projection each, to the same result", () => {
+    const window = comparisonWindow(offers, 4);
+    const args = [offers[lead.winner], offers[lead.runnerUp], "salary", SAMPLE_HOUSEHOLD, { ...options, window, basis: "cash" }] as const;
+    const steps = breakevenSteps(...args);
+    let n = 0;
+    let r = steps.next();
+    while (!r.done) { n++; r = steps.next(); }
+    expect(n).toBeGreaterThan(20);
+    expect(r.value).toEqual(breakeven(...args));
   });
 });
 

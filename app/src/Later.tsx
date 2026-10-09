@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import type { BreakevenProps } from "./Breakeven";
 import type { LeavingProps } from "./Leaving";
 import { lazyModule, useLazyModule, useLoadNear } from "./lazy";
 import type { WorkContext } from "./metrics";
@@ -9,6 +10,7 @@ import type { Stale } from "./ui";
 // (`npm run check-bundle`). They import figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
 
 const riskSchedule = lazyModule(() => import("./Risk"));
+const breakevenSchedule = lazyModule(() => import("./Breakeven"));
 const leavingSchedule = lazyModule(() => import("./Leaving"));
 const warningsSchedule = lazyModule(() => import("./Warnings"));
 
@@ -18,6 +20,14 @@ export function RiskSlot({ ctx, sample, status }: { ctx: WorkContext; sample: bo
   const ref = useRef<HTMLDivElement>(null);
   useLoadNear(riskSchedule, ref, m !== null);
   return m ? <m.Risk ctx={ctx} sample={sample} status={status} /> : <div ref={ref} className="later" />;
+}
+
+/** L-3, once its code has loaded. */
+export function BreakevenSlot(props: BreakevenProps) {
+  const m = useLazyModule(breakevenSchedule);
+  const ref = useRef<HTMLDivElement>(null);
+  useLoadNear(breakevenSchedule, ref, m !== null);
+  return m ? <m.Breakeven {...props} /> : <div ref={ref} className="later" />;
 }
 
 /** L-4, once its code has loaded. */

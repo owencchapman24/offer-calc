@@ -65,3 +65,17 @@ describe("the worker's lanes", () => {
     expect(h.log).toEqual(["fast 1", "a 1", "a done"]);
   });
 });
+
+describe("priority", () => {
+  it("a higher-priority job runs before the others' next chunks, to the end; edits still go first", () => {
+    const h = harness();
+    h.runner.slow("l4", h.job("l4", 3));
+    h.runner.slow("l3", h.job("l3", 2));
+    h.tick(); // l4's first chunk
+    h.runner.slow("flip", h.job("flip", 3), 1);
+    h.tick(); // flip 1
+    h.runner.fast("edit");
+    h.drain();
+    expect(h.log).toEqual(["l4 1", "flip 1", "fast edit", "flip 2", "flip 3", "flip done", "l3 1", "l4 2", "l3 2", "l3 done", "l4 3", "l4 done"]);
+  });
+});
