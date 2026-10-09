@@ -30,7 +30,7 @@ methodology page matter more than features.
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 55 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1 and 2 are live at https://offer-calc.vercel.app.**
+**UI: slices 1 and 2, and slice 3's step 0 and group 1, are live at https://offer-calc.vercel.app.**
 - **App:** `app/`, React 19 and Vite 8.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
@@ -56,22 +56,40 @@ methodology page matter more than features.
   - The first-use note for the after-rent basis (remembered), and **the methodology** at
     `#/method` (M-1 to M-13, code-split), with live numbers in M-1, M-6.3, M-7.2 and M-12.
   - light and dark themes.
+  - **Detailed mode** (slice 3, in progress; step 0 and group 1 done 2026-10-08): the
+    Quick / Detailed switch, nine sections one open at a time, row editors beneath their row.
+    - Every input has its hint, ⓘ help and "How this is used →" (`app/src/help.ts`), a default
+      with a `D` tickmark and its reason, or a blank where decided (`defaults.ts`), its problems
+      at the field (`validateOffer` in the worker), and "Show the work" from the figures it
+      affects ("From your inputs"; "Edit it" opens the section and editor).
+    - Group 1 is editable: raises, raise timing, promotions; bonus basis, target, by year,
+      payout date, bonus year, cutoff, guarantee, must-be-employed; RSU grants (presets or your
+      own tranches, company vest dates), share-price growth, refreshers; weekly hours and weeks.
+      Ranges are opt-in ("+ range"). Group 2's sections show what's counted, read only.
+    - Problems keep the last valid results, said in the lead schedule with "Fix it". A cost or
+      benefit counted for some offers but not others is named under the verdict. Per hour shows
+      only when every offer has hours.
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 346 / 106 KB (276 / 85 KB in slice 1; the derivations, the popover,
-    L-1 and the bridge added the rest). It was 437 / 122 KB before the slim city list.
-  - **Methodology chunk:** 37 / 12 KB, loaded when `#/method` opens.
-  - **Worker:** 234 / 62 KB. Per edit it runs `horizonSweep` plus your stay's three full
-    projections, ~29 ms warm in dev.
+  - **Main thread:** 418 / 127 KB (346 / 106 KB in slice 2, 276 / 85 KB in slice 1; detailed
+    mode, its help text, and `src/format` now on the main thread added the rest). It was
+    437 / 122 KB before the slim city list.
+  - **Methodology chunk:** 32 / 11 KB, loaded when `#/method` opens.
+  - **Worker:** 240 / 63 KB. Per edit it runs `validateOffer` on each offer, then
+    `horizonSweep` plus your stay's three full projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 178 passing.
+**Tests:** 259 passing.
 - `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
-  `app/src/app.test.ts` 15, `app/src/metrics.test.ts` 17.
+  `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 21,
+  `app/src/comparability.test.ts` 7, `app/src/help.test.ts` 5.
+- `validate.test.ts` checks each problem at its path, and whether the engine also throws for
+  it. `help.test.ts` renders every view of the inputs (each section, each row editor) and fails
+  on an input without help, or help that's too long, too short or unused.
 - `metrics.test.ts` renders the schedules, L-1 and the bridge (react-dom/server) and fails if
   any tickmark's figure lacks a tickmark kind, a methodology section or a derivation,
   drill-downs included, or if a section has no anchor on the methodology page. It also
@@ -95,6 +113,8 @@ methodology page matter more than features.
 ## Next steps
 1. **UI slice 3: detailed mode. Execute `docs/slice-3-plan.md`** (approved 2026-10-08). It
    has the build order, the decisions and every input's default, check and figures:
+   - **Done (2026-10-08): step 0 and group 1**, merged and deployed for the checkpoint review.
+     Next: group 2.
    - **Step 0, groundwork:** engine item 7 (`validateOffer`: every problem at once, with its
      input path; words in `src/format`); offers as editable detailed data (session schema
      v2, with a migration); `app/help.ts` and its coverage test; a defaults registry; the
@@ -150,6 +170,8 @@ methodology page matter more than features.
     `monthlyEquivalent`.
   - `cliffs.ts`: `cliffs`, `nextCliff`.
   - `withholding.ts`: `withholdingShortfall`.
+  - `validate.ts`: `validateOffer`, every input problem as `{ code, path, params }` (words:
+    `formatIssue` in `src/format`).
   - `streams.ts`: salary path, bonus, cash.
   - `vesting.ts`: `byYear`, presets, snapping, refreshers.
   - `clawback.ts`.
@@ -169,9 +191,17 @@ methodology page matter more than features.
 - `src/samples.ts`: the three sample offers (illustrative), shared by the table script,
   the benchmark and the UI.
 - `app/`: the UI (React 19, Vite 8; its own `tsconfig.json`).
-  - `src/model.ts`: quick fields ↔ `OfferInput`; the samples, moved to start on or after
+  - `src/model.ts`: the offer draft (`OfferDraft`: `OfferInput` field by field, null = at
+    its default or blank) ↔ `OfferInput`; the samples, moved to start on or after
     today.
-  - `src/session.ts`: state, reducer, localStorage.
+  - `src/session.ts`: state, reducer (drafts edited by path), localStorage; schema 2, with
+    the v1 migration.
+  - Detailed mode: `help.ts` (help by input path), `defaults.ts` (the defaults registry),
+    `fields.tsx` (rows, the "+ range" control, the row editor), `rows.tsx` (quick mode's
+    fields), `Detailed.tsx` (the sections), `editors.tsx` (promotions, bonus by year, grants,
+    refreshers), `summary.ts` (one-line summaries), `presets.ts` (the vesting presets, checked
+    against the engine's), `comparability.ts` (the asymmetry warning). `testing.ts` is shared
+    by the tests only.
   - `src/engine.worker.ts` and `src/useEngine.ts`: the engine in a Web Worker, debounced
     200 ms, stale generations dropped. `src/compute.ts` is what it computes per request:
     `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms and
