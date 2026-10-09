@@ -1,7 +1,7 @@
 import { type Dispatch, type KeyboardEvent, type PointerEvent, useLayoutEffect, useRef, useState } from "react";
 import type { Basis, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
-import { BASIS_PHRASE, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, type WorkContext } from "./metrics";
+import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext } from "./metrics";
 import type { Action, UiState } from "./session";
 import { niceTicks } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
@@ -12,9 +12,9 @@ import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
 // hairline grid, a legend plus direct end labels, and a crosshair readout of every offer at a year.
 
-const UNIT: Record<Basis, string> = {
-  cash: "$, as paid", totalRewards: "$, as paid", colAdjustedTotal: "U.S.-avg $, as paid", perHour: "$ an hour, as paid",
-};
+/** A chart's units: after rent, in the dollars of the prices picked ("U.S.-avg $", "Charlotte $"). */
+const unit = (basis: Basis, ctx: WorkContext): string => (basis === "colAdjustedTotal" ? `${pricesOf(ctx).unit}, as paid`
+  : basis === "perHour" ? "$ an hour, as paid" : "$, as paid");
 
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
@@ -41,14 +41,14 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
       <div className="by-year-grid">
         <div className="by-year-chart">
           <div className="chart-bar">
-            <p className="chart-title">{BASIS_PHRASE[basis][0].toUpperCase() + BASIS_PHRASE[basis].slice(1)}, each employment year</p>
+            <p className="chart-title">{basisPhrase(pricesOf(ctx))[basis][0].toUpperCase() + basisPhrase(pricesOf(ctx))[basis].slice(1)}, each employment year</p>
             <div className="segmented" role="group" aria-label="Chart shows">
               <button type="button" className={mode === "each" ? "is-on" : ""} aria-pressed={mode === "each"} onClick={() => setView({ mode: "each" })}>Each year</button>
               <button type="button" className={mode === "running" ? "is-on" : ""} aria-pressed={mode === "running"} disabled={basis === "perHour"}
                 title={basis === "perHour" ? "Per hour doesn't add up across years" : undefined} onClick={() => setView({ mode: "running" })}>Running total</button>
             </div>
           </div>
-          <Chart offers={offers} basis={basis} running={mode === "running" && basis !== "perHour"} />
+          <Chart offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} />
           <Notes ctx={ctx} />
           <p className="caption">
             Each year is in that year's dollars, as paid; the verdict discounts them to today.{sample ? " (Sample inputs.)" : ""}{" "}
@@ -56,7 +56,7 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
               {table ? "Hide the table view" : "Table view"}
             </button>
           </p>
-          {table && <YearTable offers={offers} basis={basis} running={mode === "running" && basis !== "perHour"} years={r.view.row.years}
+          {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years}
             pv={(l) => r.view.row.values[basis]?.[r.letters.indexOf(l)]} />}
         </div>
         <Bridge ctx={ctx} ui={ui} dispatch={dispatch} />
@@ -71,7 +71,7 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
 const H = 240;
 const M = { top: 14, right: 132, bottom: 30, left: 52 };
 
-function Chart({ offers, basis, running }: { offers: ByYearData[]; basis: Basis; running: boolean }) {
+function Chart({ offers, basis, units, running }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [hover, setHover] = useState<number | null>(null);
@@ -124,7 +124,7 @@ function Chart({ offers, basis, running }: { offers: ByYearData[]; basis: Basis;
     <div className="chart" ref={box}>
       <ul className="chart-legend" aria-label="Offers">
         {series.map((s) => <li key={s.letter} className={`offer-${s.letter}`}><span className="line-key" aria-hidden="true" />{s.letter}</li>)}
-        <li className="chart-unit">{running ? UNIT[basis].replace("as paid", "running total, as paid") : UNIT[basis]}</li>
+        <li className="chart-unit">{running ? units.replace("as paid", "running total, as paid") : units}</li>
       </ul>
       <div className="chart-plot" style={{ height: M.top + H + M.bottom }}>
         <svg width={width} height={M.top + H + M.bottom} aria-hidden="true">
@@ -202,14 +202,14 @@ function Notes({ ctx }: { ctx: WorkContext }) {
 
 // ---- the table view -----------------------------------------------------------------------------
 
-function YearTable({ offers, basis, running, years, pv }: {
-  offers: ByYearData[]; basis: Basis; running: boolean; years: number; /** The rank list's present value for an offer. */ pv: (l: Letter) => number | undefined;
+function YearTable({ offers, basis, units, running, years, pv }: {
+  offers: ByYearData[]; basis: Basis; units: string; running: boolean; years: number; /** The rank list's present value for an offer. */ pv: (l: Letter) => number | undefined;
 }) {
   const perHour = basis === "perHour";
   const fmt = (v: number) => (perHour ? cents(v) : figure(v));
   return (
     <table className="year-table" id="l1-table">
-      <caption className="sr-only">Each offer by employment year, {UNIT[basis]}</caption>
+      <caption className="sr-only">Each offer by employment year, {units}</caption>
       <thead>
         <tr><th scope="col">Year</th>{offers.map((o) => <th key={o.letter} scope="col" className={`offer-${o.letter}`}><span className="who">{o.letter}</span></th>)}</tr>
       </thead>

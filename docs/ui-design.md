@@ -748,9 +748,9 @@ $62,595. Unexplained, that reads as a bug.
    above the verdict reads: "This is much lower than your salary on purpose. It's what's
    left to spend after tax and rent, priced as in an average U.S. city, plus what you save.
    [See how we get there] [Got it]". It's remembered in this browser.
-6. **Prices in a place you know** (slice 8). "at U.S. prices" is a control. Switching it to "at
-   Charlotte prices" (your current city, say) restates every figure in dollars you
-   recognize. The factor for that city becomes 1.
+6. **Prices in a place you know** (slice 8, done 2026-10-09). "at U.S. prices" is a control. Switching it
+   to "at Charlotte prices" (your current city, say) restates every figure in dollars you recognize. The
+   factor for that city becomes 1.
 7. **Methodology M-6.3** has the formula, the reconciliation with total rewards, and a link
    back to these numbers.
 
@@ -1415,6 +1415,38 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   screen, on a desktop (four to six bisections of ~55 ms each, plus a rent flip of ~5 ms per offer).
 - **The methodology:** a new subsection, M-7.4 What it would take, with L-3's numbers once it has run.
 
+- **UI slice 8** (2026-10-09; plan in `docs/ui-slices-4-8-plan.md`), one review stop: "Prices in" in About
+  you (§5, item 6), every after-rent label following it, and, added with it, the rent note under the verdict
+  and exact BEA indexes in the derivations.
+
+**UI slice 8 versus this design:**
+- **The control** works like the ledger's city: the place, then Change, which opens a search of the city list
+  with the U.S. average first; "Use the U.S. average" goes back. The `D` tickmark shows only at the default.
+  It's saved with the session (schema 3) and in JSON exports (schema 3); older sessions and files migrate to
+  the U.S. average, and a place the city list no longer has falls back to it.
+- **The words:** "after rent, at Charlotte prices", "Charlotte $" (a chart's units), "today's Charlotte
+  dollars" (the rank list), "priced as in Charlotte" (the subtitle and the first-use note), and in the bridge
+  "non-housing prices 8.64% above Charlotte's". M-6.3's title follows too ("After rent, at Charlotte prices").
+  A place is named by its metro's first principal city, by the Census title rules ("Scranton--Wilkes-Barre"
+  is Scranton; "Winston-Salem" is one city), and an area outside metros reads "nonmetro Maine".
+- **The bridge at the place's own city:** its price line stays, at 0, glossed "the prices you picked under
+  Prices in: a factor of 1".
+- **The gaps can move, a little:** spending money scales by the same ratio for every offer, but savings count
+  at face value, so the margins (and, rarely, the order) shift; M-6.1 says so. The samples' order holds.
+- **Exports:** JSON only for now; CSV and print come with slice 6 and will carry the words.
+- **The rent note** (added with this slice, at review): under the verdict, on the after-rent basis, "This
+  depends on rent: at HUD's estimate for New York ($2,729), A wins", when an offer's entered rent and its
+  estimate lie on either side of the rent that flips the verdict (L-3's rent lever; for the winner's own rent,
+  the rent at which its lead goes). One clause per offer, each taken on its own; it names the offer ("for C's
+  rent in Seattle") when the rent isn't the would-be winner's own, or two offers share a city. The fast lane
+  works the flips out from your stay's projections (the engine's `rentFlipFrom`, `rentFlip`'s closed form),
+  so the note doesn't wait for L-3. Its figure is the estimate (`E`); the derivation goes from the gap to the
+  rent that ties, on to the estimate, and the lead at it (M-7.4).
+- **BEA indexes in derivations:** worked exactly from BEA's all items and housing (the engine reports them to 3
+  decimals), so the extra decimals a product needs to foot (slice 2's rule) are the index's own digits
+  ("97.2933"), and there are no padded zeros ("105.696", not "105.696000"). The steps of an index's own
+  derivation are exact too ("0.16 × 148.616 = 23.77856"), so it foots.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
@@ -1438,7 +1470,7 @@ build order differs (below). The engine prerequisites came first and aren't numb
    phone tabs and sticky bars moved to slice 7.)
 7. **Mobile and accessibility** (rev 3, out of slice 6): phone tabs, the sticky verdict bars
    (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough.
-8. **Prices in a city you know** (rev 3): §5, item 6.
+8. **Prices in a city you know** (rev 3; done 2026-10-09): §5, item 6, with the rent note.
 
 **Build order** (rev 3; plan in `docs/ui-slices-4-8-plan.md`): 5, 4, 8, 7, 6.
 

@@ -2,7 +2,7 @@ import { addMonths, fromDays, toDays } from "./dates";
 import { projectScenario } from "./project";
 import type {
   Basis, BreakevenResult, Comparison, ExtraHours, HorizonRow, HorizonSweep, Household, ISODate, Lead, OfferInput, OfferProjection,
-  RentFlipResult, Scenario, ValuedOptions, ValueBasis,
+  RentFlipResult, Scenario, ScenarioResult, ValuedOptions, ValueBasis,
 } from "./types";
 
 const SCENARIOS: Scenario[] = ["bear", "base", "bull"];
@@ -234,13 +234,25 @@ export function rentFlip(
   needsCostOfLiving([offerA, offerB], "colAdjustedTotal");
   const target = basisPV(offerA, household, options, window, "colAdjustedTotal");
   const run = (o: OfferInput) => projectScenario(o, household, { ...options, scenario: "base", window });
-  const b = run(offerB);
-  const info = b.costOfLiving!;
+  return rentFlipFrom(run(offerB), target, window,
+    () => run({ ...offerB, costOfLiving: { ...offerB.costOfLiving!, monthlyRent: 1000 } }).window.costOfLiving!.presentValue!.rent / 1000);
+}
+
+/**
+ * rentFlip's closed form, from B's base-scenario projection over the window and A's COL-adjusted present value
+ * there (the target), so a caller that has already projected both (the UI's fast lane) gets the same figure
+ * without projecting again. `rentFactorAtZero` is rent's present value per $1 of monthly rent, asked for only
+ * when B's rent is $0 (it then takes a projection at some rent).
+ */
+export function rentFlipFrom(
+  b: ScenarioResult, target: number, window: { start: ISODate; years: number }, rentFactorAtZero: () => number,
+): RentFlipResult {
+  const info = b.costOfLiving;
+  const pvB = b.window.costOfLiving?.presentValue;
+  if (!info || !pvB) throw new Error(`The rent lever needs costOfLiving and a valuation date on "${b.label}".`);
   const from = info.monthlyRent;
-  const pvB = b.window.costOfLiving!.presentValue!;
-  // Rent's present value per $1 of monthly rent; with no rent, from a projection at $1,000 a month.
-  const rentFactor = from > 0 ? pvB.rent / from
-    : run({ ...offerB, costOfLiving: { ...offerB.costOfLiving!, monthlyRent: 1000 } }).window.costOfLiving!.presentValue!.rent / 1000;
+  // Rent's present value per $1 of monthly rent; with no rent, from a projection at another rent.
+  const rentFactor = from > 0 ? pvB.rent / from : rentFactorAtZero();
   const aheadBy = pvB.total - target;
   const common = {
     from, aheadBy, targetPV: target, nonHousingFactor: info.nonHousingFactor, rentFactor,

@@ -1,8 +1,9 @@
 import type { RentEstimate } from "../../src/col/rent";
-import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, Scenario, ValueBasis } from "../../src/offer/types";
+import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
+import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
 import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties } from "./protocol";
 import type { SectionId } from "./sections";
@@ -34,7 +35,7 @@ export type MetricId =
   | `avg.${L}.${ValueBasis}` // per hour worked on one dollar basis (pay per extra hour's comparison)
   | `af.${number}` // the annuity factor for a stay
   | `part.${L}.${PvPart}` // one part of a total, as paid and in present value
-  | `rpp.${L}.${"us" | "area"}` // a BEA non-housing price index
+  | `rpp.${L}.${"ref" | "area"}` // a BEA non-housing price index: the prices picked (Prices in), or the offer's city's
   | `extra.${L}${L}.${"hours" | ValueBasis}` // pay per extra hour: more-hours offer, other offer
   | `ey.${L}.${number}` // L-1: one employment year on the selected basis
   | `run.${L}.${number}` // L-1: the running total through a year
@@ -55,6 +56,7 @@ export type MetricId =
   | "flip" // the close-call line: the runner-up's starting salary increase that ties the verdict
   | "tie.target" // L-3: the winner's total, which each offer behind it ties to
   | `tie.${L}.${"salary" | "cash" | "rent"}` // L-3: the starting salary, cash award or rent that ties (the winner's: where the runner-up ties)
+  | `rentnote.${L}` // the lead's rent note: an offer's rent estimate, on the other side of the rent that flips the verdict
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
@@ -124,15 +126,17 @@ export interface WorkContext {
 /** L-4 for Show the work: what it counts, your stay's last day, and each offer's panel (null before its start). */
 export interface LeaveContext { basis: LeaveBasis; stayEnd: string; panels: Array<LeavePanel | null> }
 
-/** How a basis reads inside a sentence or a line. */
-export const BASIS_PHRASE: Record<Basis, string> = {
-  cash: "after tax", totalRewards: "in total rewards", colAdjustedTotal: "after rent, at U.S. prices", perHour: "per hour worked",
-};
+/** How a basis reads inside a sentence or a line: "after rent, at Charlotte prices" follows "Prices in". */
+export const basisPhrase = (p: PriceWords): Record<Basis, string> => ({
+  cash: "after tax", totalRewards: "in total rewards", colAdjustedTotal: p.phrase, perHour: "per hour worked",
+});
+/** The words for the prices the figures are in ("Prices in", About you). */
+export const pricesOf = (ctx: WorkContext): PriceWords => priceWords(ctx.household.pricesIn);
 /** An input's path within its metric id: "in.A.equity.grants.0.value" -> "equity.grants.0.value". */
 export const pathOf = (id: string) => id.split(".").slice(2).join(".");
 export const cityName = (code: string | null) => (code ? CITIES.find((c) => c.code === code)?.name ?? code : "");
 /** A metro's first city: "New York-Newark-Jersey City, NY-NJ" -> "New York". */
-export const shortCity = (name: string) => name.split(/[-,]/)[0].trim();
+export { shortCity };
 export const join = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
 // ---- the registry ------------------------------------------------------------------------------
@@ -152,6 +156,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "run": case "eysum": return "footed";
     case "risk": return b === "base" ? "crossFooted" : "recomputed";
     case "tie": return a === "target" ? "crossFooted" : "recomputed";
+    case "rentnote": return "estimate";
     case "br":
       switch (c as BridgeLine) {
         case "letter": case "premiums": case "perks": case "hsa": case "oop": return "traced";
@@ -202,7 +207,7 @@ export function aboutIsDefault(h: AppHousehold, f: AboutField): boolean {
     case "stay": return h.stayYears === DEFAULT_HOUSEHOLD.stayYears;
     case "wages": return h.otherWagesThisYear === DEFAULT_HOUSEHOLD.otherWagesThisYear;
     case "healthUsage": return !h.healthUsage;
-    case "prices": return true;
+    case "prices": return h.pricesIn === US_PRICES;
   }
 }
 // ---- L-1: by year ------------------------------------------------------------------------------
@@ -266,7 +271,7 @@ export interface Bridge {
   start: string;
   end: string;
   rows: BridgeRow[];
-  /** A month: spending money after rent at U.S. prices, and what's saved. Present with a city. */
+  /** A month: spending money after rent at the prices picked, and what's saved. Present with a city. */
   spend?: number;
   saved?: number;
 }
@@ -352,9 +357,54 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
   // The identity, so the bridge foots: after rent = total rewards - rent + (factor - 1) x (local spending - out-of-pocket).
   const prices = col.total - (y.totalRewards - col.rent);
   const above = 1 / info.nonHousingFactor - 1;
+  const p = pricesOf(ctx);
   rows.push({ id: id("prices"), line: "prices", kind: prices < 0 ? "less" : "plus", label: `${shortCity(info.area.name)} prices`, value: prices,
-    gloss: `non-housing prices ${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} the U.S. average` });
-  rows.push({ id: id("total"), line: "total", kind: "total", label: "After rent, at U.S. prices", value: col.total });
+    gloss: info.area.code === info.reference.code ? `the prices you picked under Prices in: a factor of 1`
+      : `non-housing prices ${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} ${p.average}` });
+  rows.push({ id: id("total"), line: "total", kind: "total", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: col.total });
   return { letter, year: n, start: y.start, end: y.end, rows,
     spend: (col.discretionaryReference - col.outOfPocketReference) / 12, saved: col.faceValue / 12 };
+}
+
+// ---- the rent note under the verdict ---------------------------------------------------------------
+
+/**
+ * "This depends on rent: at HUD's estimate for New York ($2,729), A wins." An offer whose rent you entered, where the rent
+ * that would flip the verdict (L-3's rent lever, worked out with your stay's projections) lies between that rent and the
+ * estimate: the verdict turns on which is nearer what you'd pay. After rent only, base case, your stay.
+ */
+export interface RentNote {
+  /** Whose rent. */
+  letter: L;
+  /** Who wins with that rent at the estimate: the offer itself, or for the winner's own rent, the runner-up. */
+  wins: L;
+  /** The offer it would tie at the rent that flips: the winner, or for the winner, the runner-up. */
+  against: L;
+  /** The rent as entered (the first lease year's), a month. */
+  entered: number;
+  estimate: RentEstimate;
+  /** The rent that ties `against`, a month, first lease year. */
+  flip: Extract<RentFlipResult, { outcome: "tie" }>;
+  /** "New York": the estimate's place. */
+  city: string;
+}
+
+export function rentNotes(ctx: WorkContext): RentNote[] {
+  const r = ctx.results;
+  const lead = r?.view.lead;
+  if (!r || r.view.basis !== "colAdjustedTotal" || !lead || !(lead.margin > 0) || !r.detail || r.detail.years !== r.view.row.years) return [];
+  const flips = r.detail.rentFlips;
+  if (!flips) return [];
+  return r.letters.flatMap((letter, i): RentNote[] => {
+    const f = flips[i];
+    const info = r.detail!.offers[i]?.costOfLiving;
+    const o = offerByLetter(ctx, letter);
+    const estimate = rentEstimate(ctx, o);
+    // Your own rent, as the projection used it, and the estimate for the same place.
+    if (!f || f.flip.outcome !== "tie" || !info || info.rentSource !== "input" || !estimate || o?.draft.costOfLiving.area !== info.area.code) return [];
+    const to = f.flip.to;
+    if (!((info.monthlyRent - to) * (estimate.monthlyRent - to) < 0)) return [];
+    return [{ letter, wins: letter === lead.winnerLetter ? lead.runnerUpLetter : letter, against: r.letters[f.against], entered: info.monthlyRent,
+      estimate, flip: f.flip, city: shortCity(info.area.name) }];
+  });
 }

@@ -1,10 +1,10 @@
 import { estimateRent, type RentEstimate } from "../../src/col/rent";
-import { annuityTerms, horizonSweep } from "../../src/offer/compare";
+import { annuityTerms, horizonSweep, rentFlipFrom } from "../../src/offer/compare";
 import { projectScenario } from "../../src/offer/project";
 import { withholdingShortfall } from "../../src/offer/withholding";
 import { changingWarnings } from "./warningKinds";
 import { type OfferIssue, validateOffer } from "../../src/offer/validate";
-import type { HorizonSweep } from "../../src/offer/types";
+import type { HorizonSweep, ScenarioResult } from "../../src/offer/types";
 import { type CompareRequest, type EngineRequest, type OfferDetail, rentKey, type StayDetail } from "./protocol";
 
 // What the worker computes for each request. Engine values: import this only from the worker (and
@@ -25,16 +25,18 @@ export function compute(req: Omit<EngineRequest, "gen">): {
   if (!c || issues.some((x) => x.length)) return { sweep: null, detail: null, rents, issues };
   const sweep = horizonSweep(c.offers, c.household, c.stays,
     { valuationDate: c.valuationDate, inflation: c.inflation, discountRate: c.discountRate });
-  return { sweep, detail: stayDetail(c, sweep.rows[0].window.start), rents, issues };
+  return { sweep, detail: stayDetail(c, sweep), rents, issues };
 }
 
 /**
  * Your stay, projected in full for each offer (base case), its bear and bull totals, its withholding, how many
- * warnings change the numbers, and every stay's annuity terms.
+ * warnings change the numbers, every stay's annuity terms, and after rent each offer's rent lever.
  */
-function stayDetail(c: CompareRequest, start: string): StayDetail {
+function stayDetail(c: CompareRequest, sweep: HorizonSweep): StayDetail {
   const options = { valuationDate: c.valuationDate, inflation: c.inflation, discountRate: c.discountRate };
+  const start = sweep.rows[0].window.start;
   const window = { start, years: c.stayYears };
+  const projections: ScenarioResult[] = [];
   // The calendar years your stay touches: from its start to its last day (the window's end is exclusive).
   const [y, m, d] = start.split("-").map(Number);
   const firstYear = y;
@@ -42,6 +44,7 @@ function stayDetail(c: CompareRequest, start: string): StayDetail {
   const inStay = (year: number) => year >= firstYear && year <= lastYear;
   const offers = c.offers.map((o): OfferDetail => {
       const r = projectScenario(o, c.household, { ...options, scenario: "base", window });
+      projections.push(r);
       const cases = {
         bear: projectScenario(o, c.household, { ...options, scenario: "bear", window }).window,
         bull: projectScenario(o, c.household, { ...options, scenario: "bull", window }).window,
@@ -83,10 +86,20 @@ function stayDetail(c: CompareRequest, start: string): StayDetail {
             tranches: e.detail.tranches, priceFactor: e.detail.priceFactor, ...(e.detail.nominalDate ? { nominalDate: e.detail.nominalDate } : {}) }] : [])),
       };
   });
+  // The rent lever (L-3's, the same closed form) from these projections: for the lead's rent note, at no extra projection.
+  const lead = sweep.rows.find((row) => row.years === c.stayYears)?.leads.colAdjustedTotal;
+  const rentFlips = lead && projections.every((p) => p.costOfLiving) ? projections.map((p, i) => {
+    const against = i === lead.winner ? lead.runnerUp : lead.winner;
+    const target = projections[against].window.costOfLiving!.presentValue!.total;
+    const atRent = (rent: number) => projectScenario({ ...c.offers[i], costOfLiving: { ...c.offers[i].costOfLiving!, monthlyRent: rent } }, c.household,
+      { ...options, scenario: "base", window }).window.costOfLiving!.presentValue!.rent / rent;
+    return { against, flip: rentFlipFrom(p, target, window, () => atRent(1000)) };
+  }) : undefined;
   return {
     years: c.stayYears,
     offers,
     changes: changingWarnings(offers, lastYear),
     annuity: Object.fromEntries(c.stays.map((years) => [years, annuityTerms({ start, years }, c.valuationDate, c.discountRate)])),
+    ...(rentFlips ? { rentFlips } : {}),
   };
 }

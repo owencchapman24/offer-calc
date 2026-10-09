@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
   breakeven, breakevenSteps, byYear, cliffs, compareOffers, comparisonWindow, convenienceRuleWarning, keptIfLeaving, leaveDateSweep, leaveDaySweep,
-  nextCliff, projectOffer, rentFlip,
+  nextCliff, projectOffer, rentFlip, rentFlipFrom,
   projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, annuityTerms, type AnnualBonus, type Household,
   type Cliff, type OfferInput,
 } from "../src/offer/index";
@@ -837,6 +837,29 @@ describe("cost of living (BEA RPPs)", () => {
     expect(y.totalRewards - y.costOfLiving!.rent + (f - 1) * (y.costOfLiving!.nonHousingLocal - y.health.outOfPocket))
       .toBeCloseTo(y.costOfLiving!.total, 2);
   });
+  it("prices in Charlotte (slice 8): spending scales by Charlotte ÷ U.S., savings stay at face value; $64,580.27 (hand-checked)", () => {
+    // Non-housing prices: U.S. 99.880190, Charlotte 97.293333, Dallas 100.274000. Dallas's factor goes from 99.880190 / 100.274
+    // = 0.996073 to 97.293333 / 100.274 = 0.970275: every converted dollar by the same ratio, Charlotte ÷ U.S. = 0.974100.
+    // Discretionary 47,657.07 x 0.970275 = 46,240.45 (= 47,469.90 x 0.974100); out-of-pocket 1,500 -> 1,455.41. Face value,
+    // savings, rent and local spending don't move: 46,240.45 - 1,455.41 + 19,795.23 = 64,580.27.
+    const us = projectScenario(dallas, saver, { years: 1 });
+    const r = projectScenario(dallas, { ...saver, costOfLiving: { ...saver.costOfLiving, reference: "16740" } }, { years: 1 });
+    const [a, b] = [us.employmentYears[0].costOfLiving!, r.employmentYears[0].costOfLiving!];
+    const ratio = nonHousingRpp(rppArea("16740")) / nonHousingRpp(rppArea("00000"));
+    expect(ratio).toBeCloseTo(0.9741, 4);
+    expect(r.costOfLiving!.nonHousingFactor / us.costOfLiving!.nonHousingFactor).toBeCloseTo(ratio, 12);
+    expect(r.costOfLiving!.reference).toMatchObject({ code: "16740", nonHousing: 97.293 }); // reported to 3 decimals
+    expect(b).toEqual({ savings: a.savings, rent: a.rent, nonHousingLocal: a.nonHousingLocal, discretionaryReference: 46_240.45,
+      outOfPocketReference: 1_455.41, faceValue: a.faceValue, total: 64_580.27 });
+    expect(b.discretionaryReference / a.discretionaryReference).toBeCloseTo(ratio, 6);
+    // The same ratio for an offer in another city: New York's spending scales alike, and total rewards don't move at all.
+    const ny: OfferInput = { ...dallas, residence: { state: "NY" }, employerState: "NY", costOfLiving: { area: "35620", monthlyRent: 3_000 } };
+    const [nyUs, nyClt] = [us, r].map((x) => projectScenario(ny, { ...saver, costOfLiving: { ...saver.costOfLiving,
+      reference: x.costOfLiving!.reference.code } }, { years: 1 }).employmentYears[0]);
+    expect(nyClt.costOfLiving!.discretionaryReference / nyUs.costOfLiving!.discretionaryReference).toBeCloseTo(ratio, 6);
+    expect(nyClt.costOfLiving!.faceValue).toBe(nyUs.costOfLiving!.faceValue);
+    expect(nyClt.totalRewards).toBe(nyUs.totalRewards);
+  });
   it("at a factor of 1 with no rent, the COL-adjusted total equals total rewards, whatever the savings rate", () => {
     for (const savingsRate of [0, 0.25]) {
       const r = projectScenario({ ...dallas, costOfLiving: { area: "19100", monthlyRent: 0 } },
@@ -928,6 +951,21 @@ describe("cost of living (BEA RPPs)", () => {
     expect(Math.abs(flip.to! - lo)).toBeLessThan(0.01);
     // Re-entering it ties C to the cent (the totals are rounded to cents; a cent of rent moves A's total about 43 cents).
     expect(Math.abs(total(flip.to!) - flip.targetPV)).toBeLessThan(0.5);
+  });
+  it("rentFlipFrom, from projections already made, is rentFlip exactly; it projects again only for a $0 rent", () => {
+    const window = comparisonWindow(SAMPLE_OFFERS, 4);
+    const options = { valuationDate: "2026-07-13", inflation: 0.025, window };
+    const [A, , C] = SAMPLE_OFFERS;
+    const run = (o: OfferInput) => projectScenario(o, SAMPLE_HOUSEHOLD, { ...options, scenario: "base" });
+    const target = run(C).window.costOfLiving!.presentValue!.total;
+    let asked = 0;
+    const atZero = () => { asked++; return 40; };
+    expect(rentFlipFrom(run(A), target, window, atZero)).toEqual(rentFlip(C, A, SAMPLE_HOUSEHOLD, options));
+    expect(asked).toBe(0);
+    const free = { ...A, costOfLiving: { ...A.costOfLiving!, monthlyRent: 0 } };
+    expect(rentFlipFrom(run(free), target, window, atZero).rentFactor).toBe(40);
+    expect(asked).toBe(1);
+    expect(() => rentFlipFrom(run({ ...A, costOfLiving: undefined }), target, window, atZero)).toThrow(/costOfLiving/);
   });
 });
 

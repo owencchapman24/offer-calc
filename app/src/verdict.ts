@@ -1,26 +1,32 @@
 import type { Basis, HorizonRow, HorizonSweep, Lead, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
+import { type PriceWords, priceWords } from "./prices";
 
 // Turns the engine's horizon sweep into what the lead schedule shows. Pure: no React, no formatting.
 
-export const PIPELINE: Array<{ basis: Basis; step: string; title: string; phrase: string; counted: string }> = [
-  { basis: "cash", step: "After tax", title: "After-tax pay", phrase: "after tax", counted: "on pay" },
-  { basis: "totalRewards", step: "+ Benefits", title: "Total rewards", phrase: "in total rewards", counted: "once benefits are counted" },
-  { basis: "colAdjustedTotal", step: "− Rent & prices", title: "After rent, at U.S. prices", phrase: "after rent, at U.S. prices",
-    counted: "once rent and prices are counted" },
-  // "Per hour", not "÷ Hours": at 13px the font's ÷ reads as +.
-  { basis: "perHour", step: "Per hour", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
-];
+export interface PipelineStep { basis: Basis; step: string; title: string; phrase: string; counted: string }
+
+/** The basis pipeline's steps. The after-rent step names the prices picked under Prices in ("After rent, at Charlotte prices"). */
+export function pipeline(p: PriceWords = priceWords(undefined)): PipelineStep[] {
+  return [
+    { basis: "cash", step: "After tax", title: "After-tax pay", phrase: "after tax", counted: "on pay" },
+    { basis: "totalRewards", step: "+ Benefits", title: "Total rewards", phrase: "in total rewards", counted: "once benefits are counted" },
+    { basis: "colAdjustedTotal", step: "− Rent & prices", title: p.phrase[0].toUpperCase() + p.phrase.slice(1), phrase: p.phrase,
+      counted: "once rent and prices are counted" },
+    // "Per hour", not "÷ Hours": at 13px the font's ÷ reads as +.
+    { basis: "perHour", step: "Per hour", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
+  ];
+}
 
 /** The rank list's caption: what the totals are, over how long, in which dollars. */
-export function totalsCaption(basis: Basis, years: number, perHourOf: "colAdjustedTotal" | "totalRewards"): string {
+export function totalsCaption(basis: Basis, years: number, perHourOf: "colAdjustedTotal" | "totalRewards", p: PriceWords): string {
   const stay = `${years}-year`;
   switch (basis) {
     case "cash": return `${stay} total after tax, in today's dollars, present value`;
     case "totalRewards": return `${stay} total rewards, in today's dollars, present value`;
-    case "colAdjustedTotal": return `${stay} total after rent, in today's U.S.-average dollars, present value`;
+    case "colAdjustedTotal": return `${stay} total after rent, in today's ${p.dollars}, present value`;
     case "perHour": return `Per hour worked over ${years} ${years === 1 ? "year" : "years"}, ${
-      perHourOf === "colAdjustedTotal" ? "after rent, in U.S.-average dollars" : "in total rewards"}, nominal`;
+      perHourOf === "colAdjustedTotal" ? `after rent, in ${p.dollars}` : "in total rewards"}, nominal`;
   }
 }
 
@@ -36,6 +42,8 @@ export interface StepView {
 export interface VerdictView {
   row: HorizonRow;
   basis: Basis;
+  /** The prices after-rent figures are in (Prices in). */
+  prices: PriceWords;
   /** What the per-hour step divides by hours. */
   perHourOf: HorizonSweep["perHourOf"];
   lead: StepView["lead"];
@@ -57,10 +65,12 @@ const withLetters = (lead: Lead | undefined, letters: Letter[]) =>
  * Picks the stay row and basis; falls back to the first available basis when the chosen one can't be shown.
  * `noHours` names the offers without weekly hours: per hour needs hours for every offer, and says whose are missing.
  */
-export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, stayYears: number, noHours: Letter[] = []): VerdictView | null {
+export function verdict(
+  sweep: HorizonSweep, letters: Letter[], basis: Basis, stayYears: number, noHours: Letter[] = [], prices: PriceWords = priceWords(undefined),
+): VerdictView | null {
   const row = sweep.rows.find((r) => r.years === stayYears);
   if (!row) return null;
-  const steps: StepView[] = PIPELINE.map((p) => ({
+  const steps: StepView[] = pipeline(prices).map((p) => ({
     basis: p.basis, step: p.step, title: p.title,
     lead: withLetters(row.leads[p.basis], letters),
     unavailable: row.leads[p.basis] ? null
@@ -72,6 +82,7 @@ export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, st
   return {
     row,
     basis: chosen.basis,
+    prices,
     perHourOf: sweep.perHourOf,
     lead: chosen.lead,
     ranks: values.map((value, i) => ({ letter: letters[i], value })).sort((a, b) => b.value - a.value),
@@ -123,9 +134,10 @@ export function disagreement(steps: StepView[]): string {
   if (shown.length === 0) return "";
   const winners = shown.map((s) => s.lead!.winnerLetter);
   if (winners.every((w) => w === winners[0])) return `${winners[0]} leads on every basis.`;
-  const parts = [`${winners[0]} leads ${PIPELINE.find((p) => p.basis === shown[0].basis)!.counted}`];
+  const steps0 = pipeline();
+  const parts = [`${winners[0]} leads ${steps0.find((p) => p.basis === shown[0].basis)!.counted}`];
   for (let i = 1; i < shown.length; i++) {
-    if (winners[i] !== winners[i - 1]) parts.push(`${winners[i]} leads ${PIPELINE.find((p) => p.basis === shown[i].basis)!.counted}`);
+    if (winners[i] !== winners[i - 1]) parts.push(`${winners[i]} leads ${steps0.find((p) => p.basis === shown[i].basis)!.counted}`);
   }
   return `${parts.join("; ")}.`;
 }

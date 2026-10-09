@@ -3,7 +3,7 @@ import type { RentFlipResult } from "../../src/offer/types";
 import { changeText, inSentence, rentCity, rentTies, type TieLine, type TieView, tieView } from "./breakevenModel";
 import { Fig, useRovingTicks } from "./figures";
 import { useOnScreen } from "./lazy";
-import { BASIS_PHRASE, type WorkContext } from "./metrics";
+import { basisPhrase, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, tieJob, type Ties } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
@@ -65,13 +65,13 @@ export function Breakeven(p: BreakevenProps) {
       {!v ? <p className="note">{p.ties.error ?? "Working out what would tie…"}</p> : (
         <>
           <p className="tie-scope">
-            To tie <Who l={v.winner} />: its {years}-year total {BASIS_PHRASE[v.basis]},{" "}
+            To tie <Who l={v.winner} />: its {years}-year total {basisPhrase(pricesOf(p.ctx))[v.basis]},{" "}
             <Fig id="tie.target" label={`${figure(v.target)}, ${v.winner}'s total`}>{figure(v.target)}</Fig> in today's dollars, base case, over your
             stay ({longDate(row.window.start)} – {longDate(dayBefore(row.window.end))}). Each line changes one input and leaves the rest as entered.
           </p>
           {r.view.basis === "perHour" && (
             <p className="note">
-              Per hour can't be tied by one number, so these tie the total it divides by your hours: {BASIS_PHRASE[v.basis]}.
+              Per hour can't be tied by one number, so these tie the total it divides by your hours: {basisPhrase(pricesOf(p.ctx))[v.basis]}.
             </p>
           )}
           <ul className="tie-offers">

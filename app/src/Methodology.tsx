@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef } from "react";
 import { DATA_YEARS } from "../../src/col/cities";
 import { formatAssumption } from "../../src/format/index";
 import type { ValueBasis } from "../../src/offer/types";
@@ -6,8 +6,8 @@ import { CASES, changeText, riskView } from "./cases";
 import { cashLever, changeText as tieChangeText } from "./breakevenModel";
 import { addMonthsIso, forfeits } from "./leaveModel";
 import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
-import { BASIS_PHRASE, bridge, type WorkContext } from "./metrics";
-import { SECTIONS, type SectionId } from "./sections";
+import { basisPhrase, bridge, pricesOf, shortCity, type WorkContext } from "./metrics";
+import { SECTIONS, type SectionId, sectionTitle } from "./sections";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import { TICKS, type TickKind } from "./ui";
 
@@ -32,7 +32,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
   }, [section]);
 
   const toc = (Object.keys(SECTIONS) as SectionId[]);
+  const p = pricesOf(ctx);
   return (
+    <Place.Provider value={p.place}>
     <div className="method">
       <nav className="method-toc" aria-label="Methodology contents">
         <p className="strip-title">Contents</p>
@@ -40,7 +42,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           {toc.map((id) => (
             <li key={id} className={id.includes(".") ? "toc-sub" : ""}>
               <a href={`#/method/${id}`} aria-current={section === id ? "location" : undefined}>
-                <span className="toc-ref">{id.includes(".") ? id.slice(2) : id}</span> {SECTIONS[id]}
+                <span className="toc-ref">{id.includes(".") ? id.slice(2) : id}</span> {sectionTitle(id, p.place)}
               </a>
             </li>
           ))}
@@ -70,8 +72,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               premiums (<Ref id="M-4" />).</li>
             <li><strong>+ Benefits (total rewards)</strong>: plus the employer 401(k) money you'd keep, perks and employer HSA money,
               minus the health costs you'd pay out of pocket (<Ref id="M-5" />).</li>
-            <li><strong>− Rent &amp; prices (after rent, at U.S. prices)</strong>: minus rent, with what's left to spend priced as in
-              an average U.S. city, plus what you save at face value (<Ref id="M-6.3" />). This is the default verdict.</li>
+            <li><strong>− Rent &amp; prices ({p.phrase})</strong>: minus rent, with what's left to spend priced as in
+              {" "}{p.city}, plus what you save at face value (<Ref id="M-6.3" />). This is the default verdict.</li>
             <li><strong>Per hour</strong>: the step-3 total, as paid, divided by the hours you'd work (<Ref id="M-5.4" />).</li>
           </ol>
           <p>
@@ -234,8 +236,14 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             Prices come from the Bureau of Economic Analysis's Regional Price Parities ({DATA_YEARS.rpp}, released February 19,
             2026), which give each metro area's price level against the U.S. average (all items = 100). Rent is counted separately,
             at what you'd pay, so we use prices other than rent: (all items − 0.16 × housing rents) ÷ 0.84, where 16% is housing
-            rents' share of BEA's price weights. Spending money is restated by U.S. non-housing prices ÷ the city's: New York's
-            are about 5.8% above the U.S. average, so a dollar spent there buys about $0.945 of U.S.-average goods.
+            rents' share of BEA's price weights. Spending money is restated by {p.place} non-housing prices ÷ the city's: <PriceExample ctx={ctx} />
+          </p>
+          <p>
+            Prices in, under About you, picks the place whose prices the after-rent figures are in: the U.S. average by default, or a
+            city you know, such as where you live now, so the figures read in dollars you recognize. That place's own price factor is
+            1. Switching it scales every offer's spending money by the same ratio, the new place's non-housing prices ÷ the old
+            one's, while what you save counts at face value either way. So every total moves, and since savings don't scale, the
+            gaps between offers can move a little too. Prices are now in {p.name}.
           </p>
         </Section>
         <Section id="M-6.2">
@@ -254,17 +262,17 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         </Section>
         <Section id="M-6.3">
           <p>
-            "After rent, at U.S. prices" is spending money after rent, priced as in an average U.S. city, plus what you save.
-            Spending money is local; saved money isn't:
+            "{p.phrase[0].toUpperCase() + p.phrase.slice(1)}" is spending money after rent, priced as in {p.city}, plus what you
+            save. Spending money is local; saved money isn't:
           </p>
           <p className="formula">
-            (take-home − planned savings − rent − out-of-pocket health costs) × U.S. ÷ city non-housing prices
+            (take-home − planned savings − rent − out-of-pocket health costs) × {p.place} ÷ city non-housing prices
             <br />+ planned savings + your 401(k) and HSA + vested employer 401(k) + employer HSA + perks
           </p>
           <p>
-            It ties to total rewards: total rewards − rent + (U.S. ÷ city prices − 1) × (spending − out-of-pocket). At U.S.-average
-            prices with no rent, it equals total rewards. It's much lower than a salary on purpose: it's what's left after tax and
-            rent.
+            It ties to total rewards: total rewards − rent + ({p.place} ÷ city prices − 1) × (spending − out-of-pocket). At a price
+            factor of 1 (an offer {p.us ? "in a city priced at the U.S. average" : `in ${p.place}`}) with no rent, it equals total rewards. It's
+            much lower than a salary on purpose: it's what's left after tax and rent. The place is yours to pick (<Ref id="M-6.1" />).
           </p>
           <YearOne ctx={ctx} sample={sample} />
         </Section>
@@ -331,12 +339,18 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           </p>
           <p>
             Rent is worked out directly, since the after-rent total is linear in rent (<Ref id="M-6.3" />): each $1 of rent is $1 less to
-            spend there, worth that city's price factor at U.S. prices. Rent's present-value factor is what $1 a month of first-year
+            spend there, worth that city's price factor at {p.place} prices. Rent's present-value factor is what $1 a month of first-year
             rent is worth over the months you'd work there in your stay, rising at each lease anniversary.
           </p>
           <p className="formula">
-            rent that ties = rent now − (winner's total − the offer's total) ÷ (U.S. ÷ city non-housing prices × rent's present-value
+            rent that ties = rent now − (winner's total − the offer's total) ÷ ({p.place} ÷ city non-housing prices × rent's present-value
             factor)
+          </p>
+          <p>
+            The lead schedule uses the same figure, worked out from your stay's projections on every edit: when you've entered an
+            offer's rent and the rent that would flip the verdict lies between it and the estimate (HUD's Fair Market Rent, <Ref id="M-6.2" />),
+            it says so under the verdict ("This depends on rent: at HUD's estimate for New York ($2,729), A wins"). Each such rent is
+            taken on its own, with the other offers' rents as entered.
           </p>
           <p>
             Rent is the softest input, and often an estimate, so this says how much the verdict leans on it. The winner's cushion runs
@@ -490,17 +504,41 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         </Section>
       </article>
     </div>
+    </Place.Provider>
   );
 }
 
+/** The place picked under Prices in: M-6.3's title names it. */
+const Place = createContext("U.S.");
+
 function Section({ id, children }: { id: SectionId; children: ReactNode }) {
+  const place = useContext(Place);
   const sub = id.includes(".");
   const Heading = sub ? "h3" : "h2";
   return (
     <section id={sectionAnchor(id)} className={`method-section${sub ? " is-sub" : ""}`} aria-labelledby={`${sectionAnchor(id)}-h`}>
-      <Heading id={`${sectionAnchor(id)}-h`} tabIndex={-1}><span className="ref">{id}</span> {SECTIONS[id]}</Heading>
+      <Heading id={`${sectionAnchor(id)}-h`} tabIndex={-1}><span className="ref">{id}</span> {sectionTitle(id, place)}</Heading>
       {children}
     </section>
+  );
+}
+
+/**
+ * M-6.1's example: the first of your offers priced apart from the place picked, or New York against the U.S. average before
+ * there's a comparison.
+ */
+function PriceExample({ ctx }: { ctx: WorkContext }) {
+  const p = pricesOf(ctx);
+  const goods = p.us ? "U.S.-average goods" : `${p.place} goods`;
+  const info = ctx.results?.detail?.offers.map((o) => o.costOfLiving).find((c) => c && c.area.code !== c.reference.code);
+  if (!info) {
+    return p.us ? <>New York's are about 5.8% above the U.S. average, so a dollar spent there buys about $0.945 of U.S.-average goods.</>
+      : <>a city whose prices are 5% above {p.average} restates each dollar spent there as about $0.952 of {goods}.</>;
+  }
+  const above = 1 / info.nonHousingFactor - 1;
+  return (
+    <>{shortCity(info.area.name)}'s are about {(Math.abs(above) * 100).toFixed(1)}% {above >= 0 ? "above" : "below"} {p.average}, so a dollar spent
+      there buys about ${info.nonHousingFactor.toFixed(3)} of {goods}.</>
   );
 }
 
@@ -522,7 +560,7 @@ function PipelineExample({ ctx, sample }: { ctx: WorkContext; sample: boolean })
     const at = (line: string) => b.rows.find((x) => x.line === line)?.value;
     const steps: Array<[string, number | undefined]> = [
       ["the offer letter", at("letter")], ["paid in year 1", at("paid")], ["after tax", at("afterTax")],
-      ["total rewards", at("totalRewards")], ["after rent, at U.S. prices", at("total")],
+      ["total rewards", at("totalRewards")], [pricesOf(ctx).phrase, at("total")],
     ];
     return (
       <Live>
@@ -536,7 +574,7 @@ function PipelineExample({ ctx, sample }: { ctx: WorkContext; sample: boolean })
   }
 }
 
-/** M-6.3: each offer's year 1 after rent, at U.S. prices. */
+/** M-6.3: each offer's year 1 after rent, at the prices picked. */
 function YearOne({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const r = ctx.results;
   if (!r?.detail) return null;
@@ -547,7 +585,7 @@ function YearOne({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   if (!rows.length) return null;
   return (
     <Live>
-      <p className="live-head">Your numbers, year 1, after rent at U.S. prices <Illustrative sample={sample} /></p>
+      <p className="live-head">Your numbers, year 1, {pricesOf(ctx).phrase} <Illustrative sample={sample} /></p>
       <p>{rows.map(([l, v]) => `${l} ${figure(v)}`).join(" · ")}</p>
     </Live>
   );
@@ -569,7 +607,7 @@ function PerMonth({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const terms = r.detail?.annuity[row.years];
   return (
     <Live>
-      <p className="live-head">The verdict, {BASIS_PHRASE[basis]}, stay {row.years} years <Illustrative sample={sample} /></p>
+      <p className="live-head">The verdict, {basisPhrase(pricesOf(ctx))[basis]}, stay {row.years} years <Illustrative sample={sample} /></p>
       <table className="method-table work-like">
         <tbody>
           <tr><th scope="row">{W}'s {row.years}-year total, present value</th><td>{figure(values[lead.winner])}</td></tr>
@@ -609,7 +647,7 @@ function Scenarios({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   } catch {
     return null;
   }
-  const head = `${BASIS_PHRASE[r.view.basis]}, ${v.years}-year ${v.perHour ? "per hour worked, nominal" : "total, present value"}`;
+  const head = `${basisPhrase(pricesOf(ctx))[r.view.basis]}, ${v.years}-year ${v.perHour ? "per hour worked, nominal" : "total, present value"}`;
   if (!v.anyRange) {
     return (
       <Live>
@@ -709,7 +747,7 @@ function WhatItWouldTake({ ctx, sample }: { ctx: WorkContext; sample: boolean })
   const cushion = t.rows[t.rows.length - 1];
   return (
     <Live>
-      <p className="live-head">Your offers, to tie {W}, {BASIS_PHRASE[t.basis]} <Illustrative sample={sample} /></p>
+      <p className="live-head">Your offers, to tie {W}, {basisPhrase(pricesOf(ctx))[t.basis]} <Illustrative sample={sample} /></p>
       <ul className="method-list">
         {t.rows.slice(0, -1).map((row) => {
           const o = offerOf(row.offer);
@@ -744,8 +782,8 @@ function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
     <>
       <p>
         Everywhere: inflation {percent(ASSUMPTIONS.inflation)} a year (tax law and rent growth, never pay); discount rate{" "}
-        {percent(ASSUMPTIONS.discountRate)}; present values as of today, {longDate(ctx.today)}; health usage medium; no savings
-        beyond the 401(k); prices in U.S.-average dollars; base case.
+        {percent(ASSUMPTIONS.discountRate)}; present values as of today, {longDate(ctx.today)}; health usage {ctx.household.healthUsage ?? "medium"};
+        no savings beyond the 401(k); prices in {pricesOf(ctx).dollars}; base case.
       </p>
       {!r?.detail ? <p className="method-note">Fill in two offers to see each one's assumptions.</p> : r.letters.map((l, i) => {
         const offer = ctx.offers.find((o) => o.letter === l);

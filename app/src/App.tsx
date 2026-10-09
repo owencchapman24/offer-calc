@@ -14,7 +14,8 @@ import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
 import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
-import type { EditTarget, WorkContext } from "./metrics";
+import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
+import { priceWords } from "./prices";
 import { dayBefore, localToday } from "./text";
 import type { Stale } from "./ui";
 import { WorkProvider } from "./Tickmarks";
@@ -25,7 +26,7 @@ import { verdict } from "./verdict";
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
 const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.area", "startDate", "costOfLiving.monthlyRent", "label"]);
-const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-filing" } as const;
+const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-prices" } as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
 // The Data page (export, import, delete) loads when it's opened too.
@@ -131,7 +132,7 @@ export function App() {
   const letters = complete.map((x) => x.o.letter);
   const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
-    ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours) : null;
+    ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours, priceWords(session.household.pricesIn)) : null;
   // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
   const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
   if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
@@ -225,7 +226,7 @@ export function App() {
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
-                cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} />
+                cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} />
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}

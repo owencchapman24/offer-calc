@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Scenario } from "../../src/offer/types";
 import { rangeTicks } from "./axes";
-import { BASIS_PHRASE, join, type WorkContext } from "./metrics";
+import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { CASES, changeText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
 import { cents, dollars, figure } from "./text";
@@ -35,7 +35,7 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
   }
   const basis = r.view.basis;
   const title = v.perHour ? `Per hour worked over your stay (${v.years} ${v.years === 1 ? "year" : "years"}), nominal`
-    : `${BASIS_PHRASE[basis][0].toUpperCase()}${BASIS_PHRASE[basis].slice(1)}, ${v.years}-year total, present value`;
+    : `${basisPhrase(pricesOf(ctx))[basis][0].toUpperCase()}${basisPhrase(pricesOf(ctx))[basis].slice(1)}, ${v.years}-year total, present value`;
   return (
     <section ref={ref} className={`schedule risk${status ? " is-updating" : ""}`} aria-labelledby="l2-title" aria-busy={status === "updating"}>
       <header className="schedule-head">

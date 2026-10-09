@@ -33,7 +33,7 @@ describe("export", () => {
     const { fileName, text } = exportSession(initialSession(TODAY), TODAY, NOW);
     expect(fileName).toBe("offer-calc-2026-10-08-sample.json");
     const file = JSON.parse(text);
-    expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 2, exportedAt: "2026-10-08T15:00:00.000Z",
+    expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 3, exportedAt: "2026-10-08T15:00:00.000Z",
       note: "Includes sample offers: illustrative inputs, not market data." });
     expect(Object.keys(file)).toEqual(["format", "schemaVersion", "exportedAt", "note", "household", "offers", "ui"]);
     const mine = { ...initialSession(TODAY), offers: [blankOffer("A"), blankOffer("B")] };
@@ -46,7 +46,8 @@ describe("import", () => {
   it("a round trip gives the same offers, About you and results", () => {
     let s = initialSession(TODAY);
     s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "hours.weeksPerYear": 48 } });
-    s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high" } });
+    s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
+    expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
     const r = readImport(exportSession(s, TODAY, NOW).text);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -63,7 +64,11 @@ describe("import", () => {
     const cases: Array<[string, string, string]> = [
       ["not JSON", "{oops", "This file isn't JSON, so it isn't an Offer Calc export."],
       ["another format", JSON.stringify({ format: "something", offers: [] }), "This isn't an Offer Calc export: it doesn't say \"format\": \"offer-calc\"."],
-      ["a newer schema", bad((x) => { x.schemaVersion = 9; }), "This export's schema version (9) is newer than this app knows: 1 or 2."],
+      ["a newer schema", bad((x) => { x.schemaVersion = 9; }), "This export's schema version (9) is newer than this app knows: 1 to 3."],
+      ["prices in a place that isn't in the list", bad((x) => { x.household.pricesIn = "Charlotte"; }),
+        "household.pricesIn: should be \"00000\" (the U.S. average) or a BEA area code from the city list."],
+      ["prices in missing (schema 3)", bad((x) => { delete x.household.pricesIn; }),
+        "household.pricesIn: should be \"00000\" (the U.S. average) or a BEA area code from the city list."],
       ["a salary that isn't a number", bad((x) => { x.offers[0].draft.salary.annual = "lots"; }), "offers.0.draft.salary.annual: should be a number."],
       ["a missing field", bad((x) => { delete x.offers[1].draft.hours; }), "offers.1.draft.hours: should be present."],
       ["a letter twice", bad((x) => { x.offers[1].letter = "A"; }), "offers.1.letter: A appears twice."],
@@ -77,6 +82,17 @@ describe("import", () => {
       if (!r.ok) expect(r.problems, name).toContain(problem);
     }
     // Nothing is replaced unless the import is ok: the page dispatches "replace" only for an ok file.
+  });
+
+  it("a schema 2 export (slices 3-5) migrates: prices in the U.S. average, everything else as it was", () => {
+    const file = JSON.parse(exportSession(initialSession(TODAY), TODAY, NOW).text);
+    delete file.household.pricesIn;
+    const r = readImport(JSON.stringify({ ...file, schemaVersion: 2 }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.migratedFrom).toBe(2);
+    expect(r.household).toEqual(initialSession(TODAY).household);
+    expect(r.offers).toEqual(initialSession(TODAY).offers);
   });
 
   it("an older (schema 1) export migrates: each offer as the v1 app would have computed it", () => {
@@ -93,6 +109,7 @@ describe("import", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.migratedFrom).toBe(1);
+    expect(r.household.pricesIn).toBe("00000"); // before slice 8, prices were always the U.S. average
     expect(r.offers).toEqual([migrateOffer(mine), migrateOffer(v1)]); // sorted by letter
     expect(r.offers[1].draft.salary.annual).toBe(85_000);
   });

@@ -8,9 +8,10 @@ import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Stamp, TickLegend } from "./ui";
-import { BASIS_PHRASE } from "./metrics";
+import { basisPhrase, type RentNote } from "./metrics";
+import type { PriceWords } from "./prices";
 import { Fig, useRovingTicks } from "./Tickmarks";
-import { extraHoursView, type ExtraHoursLine, PIPELINE, type StepView, totalsCaption, type VerdictView } from "./verdict";
+import { extraHoursView, type ExtraHoursLine, pipeline, type StepView, totalsCaption, type VerdictView } from "./verdict";
 
 // L · Lead schedule: the verdict, the "winner if you stay" row and the basis pipeline (docs/ui-design.md §4.1-4.2).
 
@@ -24,9 +25,11 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
 export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [], changes = 0,
-  onWarnings, flip = null }: {
+  onWarnings, flip = null, rentNotes = [] }: {
   /** A close call's flip line: present while the lead is a close call on a dollar basis. */
   flip?: FlipLine | null;
+  /** Rents the verdict turns on: an entered rent and its estimate on either side of the rent that flips it (after rent only). */
+  rentNotes?: RentNote[];
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
   /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
@@ -69,7 +72,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
       {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions}
-        changes={changes} onWarnings={onWarnings} flip={flip} />
+        changes={changes} onWarnings={onWarnings} flip={flip} rentNotes={rentNotes} />
         : !error && notes.length === 0 && problems.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
@@ -78,12 +81,12 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings, flip }: {
-  changes: number; onWarnings?: () => void; flip: FlipLine | null;
+function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings, flip, rentNotes }: {
+  changes: number; onWarnings?: () => void; flip: FlipLine | null; rentNotes: RentNote[];
   view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
-  const { lead, basis, row, perHourOf } = view;
-  const step = PIPELINE.find((p) => p.basis === basis)!;
+  const { lead, basis, row, perHourOf, prices } = view;
+  const step = pipeline(prices).find((p) => p.basis === basis)!;
   const pv = basis !== "perHour";
   const extra = extraHoursView(view, letters);
   return (
@@ -92,8 +95,8 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
         // The first time this basis is shown (docs/ui-design.md §5, item 5): an inline note, not a modal.
         <div className="first-use" role="note">
           <p>
-            This is much lower than your salary on purpose. It's what's left to spend after tax and rent, priced as in an average
-            U.S. city, plus what you save.
+            This is much lower than your salary on purpose. It's what's left to spend after tax and rent, priced as in {prices.city},
+            plus what you save.
           </p>
           <p className="first-use-actions">
             <button type="button" className="link" onClick={() => {
@@ -119,7 +122,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
           <p className="verdict-lede">The offers tie {step.phrase}.</p>
         )}
         {basis === "colAdjustedTotal" && (
-          <p className="subtitle">Spending money after rent, priced as in an average U.S. city, plus what you save.</p>
+          <p className="subtitle">Spending money after rent, priced as in {prices.city}, plus what you save.</p>
         )}
         <p className="scope">
           Base case · stay {stayYears} {stayYears === 1 ? "year" : "years"} ({longDate(row.window.start)} – {longDate(dayBefore(row.window.end))})
@@ -136,6 +139,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
             {flip?.row && flip.updating && <span className="updating"> Updating…</span>}
           </p>
         )}
+        {rentNotes.length > 0 && <RentNoteLine notes={rentNotes} />}
         {changes > 0 && (
           <p className="lead-pointer">
             <span className="warn-icon" aria-hidden="true">⚠</span> {changes === 1 ? "A warning changes" : `${changes} warnings change`} these
@@ -158,7 +162,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
       </div>
 
       <div className="ranks">
-        <p className="ranks-caption" id="ranks-caption">{totalsCaption(basis, stayYears, perHourOf)}</p>
+        <p className="ranks-caption" id="ranks-caption">{totalsCaption(basis, stayYears, perHourOf, prices)}</p>
         <ol aria-labelledby="ranks-caption">
           {view.ranks.map((r) => {
             const text = basis === "perHour" ? cents(r.value) : figure(r.value);
@@ -223,18 +227,47 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
       {extra.length > 0 && (
         <div className="extra">
           <p className="extra-title">Extra hours</p>
-          {extra.map((x) => <ExtraLine key={`${x.more}${x.fewer}`} x={x} />)}
+          {extra.map((x) => <ExtraLine key={`${x.more}${x.fewer}`} x={x} prices={prices} />)}
         </div>
       )}
     </>
   );
 }
 
-const LOWER_PHRASE = { cash: "On after-tax pay", totalRewards: "In total rewards", colAdjustedTotal: "After rent, at U.S. prices" } as const;
+/**
+ * "This depends on rent: at HUD's estimate for New York ($2,729), A wins." One clause per offer whose rent the verdict turns on,
+ * each on its own (the others keep their rents). It names the offer when the rent isn't the winner-to-be's own, or two offers
+ * share the city.
+ */
+function RentNoteLine({ notes }: { notes: RentNote[] }) {
+  const shared = (n: RentNote) => notes.some((m) => m !== n && m.city === n.city);
+  return (
+    <p className="rent-note">
+      This depends on rent:{" "}
+      {notes.map((n, i) => {
+        const whose = n.wins !== n.letter || shared(n);
+        const where = n.estimate.source === "fmr" ? "HUD's estimate" : "the estimate";
+        const text = dollars(n.estimate.monthlyRent);
+        return (
+          <span key={n.letter}>
+            {i > 0 && "; "}at {where} for {whose ? <><strong className={`who offer-${n.letter}`}>{n.letter}</strong>'s rent in {n.city}</> : n.city}{" "}
+            (<Fig id={`rentnote.${n.letter}`} label={`${where} for ${whose ? `${n.letter}'s rent in ` : ""}${n.city}, ${text} a month`}>
+              {text}</Fig>), <strong className={`who offer-${n.wins}`}>{n.wins}</strong> wins
+          </span>
+        );
+      })}
+      .
+    </p>
+  );
+}
+
+const LOWER_PHRASE = { cash: "On after-tax pay", totalRewards: "In total rewards" } as const;
 const AVERAGE_PHRASE = { cash: "after tax", totalRewards: "in total rewards", colAdjustedTotal: "after rent" } as const;
 
 /** "A asks 1,750 more hours a year than C and leaves you $5,577 a year less after rent, at U.S. prices: more hours for less pay." */
-function ExtraLine({ x }: { x: ExtraHoursLine }) {
+function ExtraLine({ x, prices }: { x: ExtraHoursLine; prices: PriceWords }) {
+  const phrase = basisPhrase(prices);
+  const lowerPhrase = (b: ExtraHoursLine["basis"]) => (b === "colAdjustedTotal" ? prices.phrase[0].toUpperCase() + prices.phrase.slice(1) : LOWER_PHRASE[b]);
   const pair = `${x.more}${x.fewer}` as `${Letter}${Letter}`;
   const hoursText = figure(x.hoursPerYear);
   const asks = (
@@ -246,7 +279,7 @@ function ExtraLine({ x }: { x: ExtraHoursLine }) {
     const rate = cents(x.perExtraHour);
     return (
       <p className="extra-line">
-        {asks} and pays <Fig id={`extra.${pair}.${x.basis}`} label={`${rate} for each extra hour`}>{rate}</Fig> for each, {BASIS_PHRASE[x.basis]}.
+        {asks} and pays <Fig id={`extra.${pair}.${x.basis}`} label={`${rate} for each extra hour`}>{rate}</Fig> for each, {phrase[x.basis]}.
       </p>
     );
   }
@@ -254,11 +287,11 @@ function ExtraLine({ x }: { x: ExtraHoursLine }) {
   const lower = x.lower;
   return (
     <p className="extra-line">
-      {asks} and leaves you <Fig id={`extra.${pair}.${x.basis}`} label={`${gap} a year less`}>{gap}</Fig> a year less {BASIS_PHRASE[x.basis]}: more
+      {asks} and leaves you <Fig id={`extra.${pair}.${x.basis}`} label={`${gap} a year less`}>{gap}</Fig> a year less {phrase[x.basis]}: more
       hours for less pay.
       {lower && (
         <>
-          {" "}{LOWER_PHRASE[lower.basis]}, those extra hours pay{" "}
+          {" "}{lowerPhrase(lower.basis)}, those extra hours pay{" "}
           <Fig id={`extra.${pair}.${lower.basis}`} label={`${cents(lower.perExtraHour)} each`}>{cents(lower.perExtraHour)}</Fig> each, against {x.more}'s
           average of <Fig id={`avg.${x.more}.${lower.basis}`} label={`${cents(lower.average)} an hour`}>{cents(lower.average)}</Fig> an hour{" "}
           {AVERAGE_PHRASE[lower.basis]}.

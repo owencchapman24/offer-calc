@@ -1,10 +1,10 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Api, Fig, useApi, useRovingTicks, type WorkApi } from "./figures";
-import { SECTIONS } from "./sections";
+import { sectionTitle } from "./sections";
 import { TICKS, type TickKind } from "./ui";
 import { lazyModule, useLazyModule } from "./lazy";
-import { type Derivation, type EditTarget, type MetricId, metricKind, type WorkContext } from "./metrics";
+import { type Derivation, type EditTarget, type MetricId, metricKind, pricesOf, type WorkContext } from "./metrics";
 
 // The figures themselves (Fig, TickButton, Trace, the roving tabindex) are in figures.tsx.
 export { Fig, TickButton, Trace, useRovingTicks } from "./figures";
@@ -208,7 +208,7 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
         </p>
       )}
       <p className="work-foot">
-        <a href={`#/method/${d.section}`} onClick={() => close(false)}>Methodology {d.section} · {SECTIONS[d.section]}</a>
+        <a href={`#/method/${d.section}`} onClick={() => close(false)}>Methodology {d.section} · {sectionTitle(d.section, pricesOf(ctx).place)}</a>
         {d.edit && (
           <button type="button" className="link" onClick={() => {
             close(false);
