@@ -1,7 +1,7 @@
 import type { RentEstimate } from "../../src/col/rent";
 import type {
   Assumption, ClawbackResult, Cliff, CostOfLivingInfo, EmploymentYearResult, HorizonSweep, Household, ISODate, LeaveDayRow, NextCliffResult,
-  OfferInput, OfferWarning, WindowTotals,
+  OfferInput, OfferWarning, WindowTotals, WithholdingYear,
 } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 
@@ -37,6 +37,8 @@ export interface OfferDetail {
   window: WindowTotals;
   /** The same window in the bear and bull scenarios: L-2's range (docs/ui-design.md §4.4). */
   cases: { bear: WindowTotals; bull: WindowTotals };
+  /** Federal withholding vs the offer's federal income tax, each calendar year of your stay, and the years short by $1,000 or more (L-5). */
+  withholding: { years: WithholdingYear[]; warnings: OfferWarning[] };
   employmentYears: EmploymentYearResult[];
   costOfLiving?: CostOfLivingInfo;
   assumptions: Assumption[];
@@ -59,6 +61,8 @@ export interface StayDetail {
   years: number;
   /** In the order of the request's offers. */
   offers: OfferDetail[];
+  /** How many warnings change the numbers over your stay (warningKinds.ts): the lead schedule points to L-5 when any do. */
+  changes: number;
   /** Each stay's month-end discount factors (they sum to its row's annuityFactor), by stay length. */
   annuity: Record<number, AnnuityTerm[]>;
 }

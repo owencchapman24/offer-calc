@@ -10,6 +10,7 @@ import { Lead } from "./Lead";
 import { Leaving, type LeavingProps } from "./Leaving";
 import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
+import { Warnings } from "./Warnings";
 import { cursorJob, leaveJob } from "./slowJobs";
 import type { CompareRequest, LeaveCurve, LeavePanel, SlowResponse } from "./protocol";
 import * as Derive from "./derive";
@@ -123,7 +124,7 @@ export function withLeave(ctx: WorkContext, at?: string, basis: LeaveBasis = "ca
   };
 }
 
-/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), and L-4 when given. */
+/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), L-4 when given, and L-5. */
 export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor">;
   leave?: LeavingProps } = {}): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
@@ -137,5 +138,6 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
     createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
     ...(opts.leave ? [createElement(Leaving, { key: "v", ...opts.leave })] : []),
+    createElement(Warnings, { key: "w", ctx, sample: true }),
   ]));
 }

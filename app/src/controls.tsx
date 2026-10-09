@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { formatWarning } from "../../src/format/warnings";
+import { WARNING_AT } from "./warningAt";
 import type { ByScenario, MonthDay, OfferWarning } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { DefaultTick, fieldId, hintId, issuesAt, useLedger } from "./fields";
@@ -62,12 +63,7 @@ export function PlanField<T>({ o, path, label, has, none, start }: {
   );
 }
 
-/** The engine's warnings at a field: the remote-work rule under employer state, the limits under the HSA, perks and 401(k). */
-const WARNING_AT: Partial<Record<OfferWarning["code"], string>> = {
-  convenienceRule: "employerState", hsaCap: "health.employeeHsa", section127Cap: "perks.section127", commuterCap: "perks.commuterMonthly",
-  k401Cap: "retirement.contributionPct", bonusCutoff: "bonus.cutoff",
-};
-
+/** The engine's warnings at a field (warningAt.ts): the remote-work rule under employer state, the limits under the HSA, perks and 401(k). */
 export function Warnings({ o, path }: { o: AppOffer; path: string }) {
   const api = useLedger();
   const list = (api.warnings?.[o.letter] ?? []).filter((w) => WARNING_AT[w.code] === path);

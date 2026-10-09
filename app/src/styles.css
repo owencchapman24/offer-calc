@@ -684,3 +684,20 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .leave-warnings { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--graphite); }
 .leave-warnings .warn-icon { color: var(--warning); }
 .leave-recon { margin: 6px 0 0; padding: 6px 10px; background: var(--band); border-left: 3px solid var(--rule); font-size: 14px; }
+
+/* ---- L-5 warnings, and the lead's pointer to it -------------------------------------------------------- */
+
+.warnings { margin-top: 24px; }
+.warnings > :not(.schedule-head) { transition: opacity 120ms; }
+.warnings.is-updating > :not(.schedule-head) { opacity: 0.6; }
+.warn-none { margin: 2px 0 6px; font-size: 14.5px; max-width: 76ch; }
+.warn-group { margin: 6px 0 14px; }
+.warn-head { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
+.warn-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.warn-item { font-size: 14.5px; line-height: 1.55; max-width: 96ch; font-variant-numeric: tabular-nums; }
+.warn-icon { color: var(--graphite); font-weight: 700; }
+.warn-changes .warn-icon, .lead-pointer .warn-icon { color: var(--warning); }
+.lead-pointer { margin: 10px 0 0; font-size: 14px; }
+.method-list { margin: 6px 0; padding-left: 18px; }
+.method-list li { margin: 4px 0; }
+.method-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
