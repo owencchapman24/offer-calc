@@ -107,14 +107,26 @@ describe("L-4's panel (W6)", () => {
     const tr = derive("kept.C", withLeave(ctx, undefined, "totalRewards").ctx);
     expect(tr.title).toBe("C · total rewards kept");
   });
+  it("what staying until the next cliff is worth foots as displayed, for every offer and both bases", () => {
+    const num = (v: string | undefined) => Number((v ?? "").replace(/[,+]/g, "").replace("−", "-"));
+    for (const basis of ["cash", "totalRewards"] as const) {
+      const L = withLeave(ctx, undefined, basis);
+      for (const l of ["A", "B", "C"] as const) {
+        const v = derive(`next.${l}`, L.ctx).lines.map((x) => num(x.value));
+        expect(v[0] - v[1]).toBe(v[2]); // kept at the cliff - kept now = worth staying for
+        expect(v[2] - v[3]).toBe(v[4]); // = the cliff itself + pay for the days between
+      }
+    }
+  });
 });
 
 describe("L-4 at your stay's last day: the reconciliation with the stay", () => {
   const ctx = context();
   const end = dayBefore(ctx.results!.view.row.window.end);
 
-  it("leaving on Jul 12, 2030 keeps $2,511 more than the 4-year stay counts for A: the last year's tax", () => {
-    expect(page(ctx, end)).toContain("Leaving that day, A keeps $550,908 after tax, $2,511 more than the $548,398 that L-1 counts for your stay "
+  it("leaving on Jul 12, 2030 keeps $2,510 more than the 4-year stay counts for A, as displayed: the last year's tax", () => {
+    // 550,908.41 - 548,397.54 = 2,510.87; the figures are shown rounded, and the difference is theirs: 550,908 - 548,398 = 2,510.
+    expect(page(ctx, end)).toContain("Leaving that day, A keeps $550,908 after tax, $2,510 more than the $548,398 that L-1 counts for your stay "
       + "(after tax, as paid). It's tax: the stay taxes 2030 as though pay continued through December, at a similar next job, while leaving taxes "
       + "only what was paid in 2030, at a part year's lower rate.");
   });
@@ -126,7 +138,7 @@ describe("L-4 at your stay's last day: the reconciliation with the stay", () => 
       expect(Math.abs(r.stay + r.pay + r.tax + r.premiums - r.clawback - r.kept)).toBeLessThan(0.5);
     });
     const d = derive("recon.C", L.ctx);
-    expect(d.lines.map((l) => l.value)).toEqual(["486,402", "481,282", "5,121", "5,121", "5,121"]);
+    expect(d.lines.map((l) => l.value)).toEqual(["486,402", "481,282", "5,120", "5,120", "5,120"]); // foots as displayed
     expect(d.section).toBe("M-7.3");
   });
   it("a curve's value between samples is a straight line", () => {

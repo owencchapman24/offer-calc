@@ -535,7 +535,7 @@ function dropWork(ctx: WorkContext, letter: L): Work {
       ...(v.perHour
         ? [{ op: "=" as const, label: "Less per hour worked in the bear case", value: cents(x.drop), rule: "double" as const }]
         : [
-          { op: "=" as const, label: "Present-value drop", value: figure(x.drop), rule: "single" as const },
+          { op: "=" as const, label: "Present-value drop", value: figure(Math.round(x.values.base) - Math.round(x.values.bear)), rule: "single" as const },
           { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
             ref: `af.${n}` as MetricId },
           { op: "=" as const, label: `A month, for ${months} months`, value: dollars(x.drop / v.factor), rule: "double" as const },
@@ -564,7 +564,7 @@ function caseLeadWork(ctx: WorkContext, scenario: Scenario): Work {
       ...(v.perHour
         ? [{ op: "=" as const, label: "More per hour worked", value: cents(margin), rule: "double" as const }]
         : [
-          { op: "=" as const, label: "Present-value gap", value: figure(margin), rule: "single" as const },
+          { op: "=" as const, label: "Present-value gap", value: figure(Math.round(value(W)) - Math.round(value(R))), rule: "single" as const },
           { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
             ref: `af.${n}` as MetricId },
           { op: "=" as const, label: `A month, for ${months} months`, value: dollars(margin / v.factor), rule: "double" as const },
@@ -592,11 +592,15 @@ function panelOf(ctx: WorkContext, letter: L) {
 function keptWork(ctx: WorkContext, letter: L): Work {
   const { leave, panel: p, scope } = panelOf(ctx, letter);
   const repaid = p.repaid >= 0.5;
+  const premiums = p.premiums >= 0.5;
+  // The column foots as displayed: the tax line is what the other rounded figures leave.
+  const R = Math.round;
+  const tax = R(p.paid) - (repaid ? R(p.repaid) : 0) - (premiums ? R(p.premiums) : 0) - R(p.afterTaxCompKept);
   const afterTax: WorkLine[] = [
     { label: "Pay received", note: "salary to your last day, bonuses and cash awards paid by then, RSUs vested by then", value: figure(p.paid) },
     ...(repaid ? [{ op: "−" as const, label: "Clawbacks repaid", value: figure(p.repaid), ref: `repay.${letter}` as MetricId }] : []),
-    { op: "−", label: repaid ? "Tax, less the relief on what's repaid" : "Tax on it", value: figure(p.tax) },
-    ...(p.premiums >= 0.5 ? [{ op: "−" as const, label: "Health premiums", value: figure(p.premiums) }] : []),
+    { op: "−", label: repaid ? "Tax, less the relief on what's repaid" : "Tax on it", value: figure(tax) },
+    ...(premiums ? [{ op: "−" as const, label: "Health premiums", value: figure(p.premiums) }] : []),
   ];
   const notes = [
     "Leaving is your last day of work, a voluntary exit. Pay stops that day; a bonus not yet paid is forfeited if you must be employed on its "
@@ -641,7 +645,7 @@ function repayWork(ctx: WorkContext, letter: L): Work {
         note: c.basis === "net" ? "repaid net of tax" : "repaid gross, as paid", value: figure(c.owed) })),
       ...(owed.length > 1 ? [{ op: "=" as const, label: "Repaid", value: figure(p.clawbackOwed), rule: "single" as const }] : []),
       { op: "−", label: "Tax relief", value: figure(relief) },
-      { op: "=", label: "What repaying costs you", value: figure(p.clawbackOwed - relief), rule: "double" },
+      { op: "=", label: "What repaying costs you", value: figure(Math.round(p.clawbackOwed) - Math.round(relief)), rule: "double" },
     ],
     notes: [
       ...owed.map((c) => `${c.award}: ${RELIEF[c.treatment]}.`),
@@ -676,8 +680,10 @@ function nextWork(ctx: WorkContext, letter: L): Work {
   const n = p.next;
   if (!n) throw new Error(`Nothing else pays, vests or steps down for ${letter} within the projection.`);
   const cash = leave.basis === "cash";
-  const now = cash ? p.afterTaxCompKept : p.totalRewardsKept;
-  const value = cash ? n.valueOfStaying.afterTaxComp : n.valueOfStaying.totalRewards;
+  // Rounded first, so the column foots as displayed (the panel shows the same rounded figures).
+  const now = Math.round(cash ? p.afterTaxCompKept : p.totalRewardsKept);
+  const value = Math.round(cash ? n.valueOfStaying.afterTaxComp : n.valueOfStaying.totalRewards);
+  const own = Math.round(n.cliffValue);
   const what = cash ? "after-tax pay" : "total rewards";
   return {
     title: `${letter} · staying until ${longDate(n.date)}`, scope,
@@ -685,8 +691,8 @@ function nextWork(ctx: WorkContext, letter: L): Work {
       { label: `Kept if your last day is ${longDate(n.date)}`, value: figure(now + value) },
       { op: "−", label: `Kept if it's ${longDate(p.leaveDate)}`, value: figure(now), ref: `kept.${letter}` },
       { op: "=", label: `Worth staying for, in ${what}`, value: figure(value), rule: "single" },
-      { label: "of which the cliff itself", value: figure(n.cliffValue), ref: `nextown.${letter}` },
-      { label: `and pay for the ${figure(n.daysAway)} more days`, value: signed(value - n.cliffValue) },
+      { label: "of which the cliff itself", value: figure(own), ref: `nextown.${letter}` },
+      { label: `and pay for the ${figure(n.daysAway)} more days`, value: signed(value - own) },
     ],
     notes: [`The next cliff is ${cliffsText(n.cliffs)}, ${figure(n.daysAway)} days after your last day. A prorated clawback's `
       + "monthly steps on the way count in what staying is worth; they aren't counted as the next cliff."],
@@ -738,10 +744,11 @@ function reconWork(ctx: WorkContext, letter: L): Work {
   const { leave, panel: p } = panelOf(ctx, letter);
   if (p.leaveDate !== leave.stayEnd) throw new Error("Move the last day to the end of your stay to see this.");
   const r = reconcile(p, detailOf(ctx, letter).window);
-  const diff = r.kept - r.stay;
+  const R = Math.round;
+  const diff = R(r.kept) - R(r.stay);
   const shown = (x: number) => Math.abs(x) >= 0.5;
-  // The tax line is the remainder, so the column foots as displayed (the stay's totals are rounded to cents).
-  const tax = diff - (shown(r.pay) ? r.pay : 0) - (shown(r.premiums) ? r.premiums : 0) + (shown(r.clawback) ? r.clawback : 0);
+  // The tax line is the remainder of the displayed figures, so the column foots as displayed.
+  const tax = diff - (shown(r.pay) ? R(r.pay) : 0) - (shown(r.premiums) ? R(r.premiums) : 0) + (shown(r.clawback) ? R(r.clawback) : 0);
   return {
     title: `${letter} · leaving on ${longDate(p.leaveDate)} vs your stay`, scope: `Your stay's last day · after tax, as paid`,
     lines: [
