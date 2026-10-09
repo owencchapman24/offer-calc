@@ -58,7 +58,8 @@ Slice numbers are stable IDs (`docs/ui-design.md` §12); this is the order to bu
 
 - **One pull request per review stop.** Each is complete on its own.
 - **New schedules load on first use** (when they near the viewport, or when opened). The quick-mode
-  main thread is 108.7 KB gzipped against a 110 KB budget; a CI check (slice 5 step 0) fails above it.
+  main thread is 109.1 KB gzipped against a 120 KB budget (110 KB until 2026-10-09); a CI check (slice
+  5 step 0) fails above it, and a Lighthouse check fails if a throttled phone's LCP passes 2.5 s.
 - **Every new figure** gets a tickmark kind, a methodology section and a derivation;
   `app/src/metrics.test.ts` fails otherwise. New controls get help (`app/src/help.ts`).
 - **Hand-check the edges:** the day before vs the day of a vest, payout, clawback step or window end.

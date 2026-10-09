@@ -1,6 +1,6 @@
 # Tests, the engine's formatting guard, the type check, the build and its size budget, on every pull
-# request and every push to main. Pushes to other branches run only through their pull request, so CI
-# runs once per push.
+# request and every push to main; beside them, Lighthouse on the production build. Pushes to other
+# branches run only through their pull request, so CI runs once per push.
 # The PolicyEngine comparison (npm run oracle) stays manual: it needs Python and PolicyEngine and takes
 # minutes.
 name: CI
@@ -28,3 +28,26 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm run check-bundle
+
+  # The bundle check catches regressions in what we ship; this measures what users feel: the Largest
+  # Contentful Paint on Lighthouse's mobile profile (simulated slow 4G, 4x CPU slowdown), median of three
+  # runs, at most 2.5 s (scripts/lib/lighthouse.ts). The runner's preinstalled Chrome runs it.
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lighthouse
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: .lighthouse/
+          include-hidden-files: true
+          retention-days: 14
