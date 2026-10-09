@@ -112,18 +112,24 @@ Slice 4 is next.
     everything") and "Delete all data".
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo (going public
-  is deferred; see Decisions). CI (`.github/workflows/ci.yml`, job `check`) runs `npm ci`,
-  `npm test`, `npm run typecheck` and `npm run build` on every pull request and every push
-  to `main` (not on other branches' pushes, so a pull request runs it once).
+  is deferred; see Decisions). CI (`.github/workflows/ci.yml`) runs on every pull request and every
+  push to `main` (not on other branches' pushes, so a pull request runs it once), in two jobs:
+  - `check`: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, `npm run check-bundle`;
+  - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); the median run's report is
+    uploaded as the `lighthouse-report` artifact.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
   - **Main thread:** 355.7 / 109.1 kB for a quick-mode visit by `npm run check-bundle` (Node's
     gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 3 ended at 351.8 /
-    107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 110 kB gzipped by the check (decided
-    2026-10-09), which CI runs after the build. Under 1 kB is left: slices 4, 8 and 7 add to the main
-    thread (the close-call line, the prices control, tabs and sticky bars), so plan room for them.
+    107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 120 kB gzipped by the check, which CI runs
+    after the build (110 kB until 2026-10-09; see Decisions). Slices 4, 8 and 7 add to the main thread
+    (the close-call line, the prices control, tabs and sticky bars).
+  - **Load time** (`npm run lighthouse`, Lighthouse 13 mobile: simulated slow 4G, 4x CPU slowdown,
+    median of 3 runs): LCP at most 2.5 s, checked in CI. 2026-10-09: the production build 1.86 s,
+    performance 98; the live site 1.47 s, performance 100. The LCP element is About you's assumptions
+    line, which renders before the worker answers, so the main chunk's download and parse set LCP.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
@@ -142,12 +148,12 @@ Slice 4 is next.
     in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 352 passing.
+**Tests:** 354 passing.
 - `test/offer.test.ts` 120, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 29,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
   `app/src/exchange.test.ts` 6, `app/src/jobs.test.ts` 5, `app/src/leave.test.ts` 14, `app/src/l5.test.ts` 6,
-  `scripts/lib/bundle.test.ts` 3.
+  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
@@ -185,6 +191,15 @@ Slice 4 is next.
   strings and no sensitive files; re-run it before switching the visibility.
 - **Pull requests by agreement** (see Working agreements). Not enforced: rulesets and branch
   protection on a private repo may need a paid plan.
+- **Bundle budget 120 kB, with Lighthouse beside it** (2026-10-09). The bundle check catches
+  regressions: it fails as soon as what we ship grows past the budget, whatever the cause. Lighthouse
+  measures what users feel: the Largest Contentful Paint on a throttled phone, at most 2.5 s (Google's
+  "good" threshold). Kilobytes are a proxy for that, so the proxy's ceiling rose 10 kB while Lighthouse
+  holds the outcome.
+  - Lighthouse runs from the `lighthouse` package (13.5), not `@lhci/cli`: that one's last release
+    (June 2025) pins Lighthouse 12.6 and brought 17 npm advisories.
+  - `scripts/lib/serve.ts` serves `dist/` compressed, with `vercel.json`'s headers, as Vercel does;
+    `vite preview` sends files uncompressed.
 
 ## Next steps (in this order)
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
@@ -213,7 +228,13 @@ build them in.
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
   engine changes; the UI's live-update budget depends on them.
 - `npm run check-bundle`: after `npm run build`, the JS a quick-mode visit loads, gzipped, against
-  the 110 kB budget (`scripts/lib/bundle.ts`). CI runs it.
+  the 120 kB budget (`scripts/lib/bundle.ts`). CI runs it.
+- `npm run lighthouse [-- <url>]`: after `npm run build`, Lighthouse's mobile profile on the
+  production build, three runs; fails if the median run's LCP is over 2.5 s
+  (`scripts/lib/lighthouse.ts`). With a URL it audits that page instead (the live site). It needs
+  Chrome or `CHROME_PATH`; on Windows without Chrome it uses Edge and closes it over the DevTools
+  protocol (Edge relaunches itself, so killing the launched process leaves the browser running).
+  The median run's report goes to `.lighthouse/report.html`.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
 - `npm run fetch-fmr [-- <FY>] [--file <FY27_FMRs.xlsx>]`: re-download HUD Fair Market Rents
@@ -324,6 +345,7 @@ build them in.
     `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
   `offer-table.ts`, `bench.ts`, `check-engine.ts`, `check-bundle.ts` (with `lib/bundle.ts`),
+  `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`),
   `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 
 ## Working agreements

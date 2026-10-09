@@ -1,14 +1,18 @@
 import { gzipSync } from "node:zlib";
 
 // The bundle budget (docs/ui-design.md §10): the JS a quick-mode visit loads on the main thread, gzipped,
-// stays at or under 110 kB. Everything else (detailed mode, the derivations, the methodology, the later
+// stays at or under 120 kB. Everything else (detailed mode, the derivations, the methodology, the later
 // schedules) loads on first use, and the engine lives in the worker.
+//
+// This check catches regressions in what we ship; Lighthouse (scripts/lib/lighthouse.ts) measures what
+// users feel, the Largest Contentful Paint on a throttled phone. The budget was 110 kB until 2026-10-09,
+// when it rose to 120 kB with the Lighthouse check beside it.
 //
 // Sizes are Node's gzip at its default level (6), in kB of 1,000 bytes. Vite 8's build report uses
 // Rolldown's own compressor, which reads about 1 kB higher (108.71 kB vs 107.70 kB for the same chunk on
 // 2026-10-09).
 
-export const BUDGET_KB = 110;
+export const BUDGET_KB = 120;
 
 /** The JS that index.html loads up front: its module scripts and the chunks it preloads, as written. */
 export function entryScripts(html: string): string[] {

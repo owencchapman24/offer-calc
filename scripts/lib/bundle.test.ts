@@ -14,16 +14,16 @@ describe("the bundle budget", () => {
   });
   it("passes at the budget and fails above it, or with nothing measured", () => {
     const kb = (gzipKb: number) => ({ file: "x.js", rawKb: 3 * gzipKb, gzipKb });
-    expect(verdict([kb(60), kb(50)]).ok).toBe(true); // exactly 110
-    expect(verdict([kb(60), kb(50.01)]).ok).toBe(false);
+    expect(verdict([kb(60), kb(60)]).ok).toBe(true); // exactly 120
+    expect(verdict([kb(60), kb(60.01)]).ok).toBe(false);
     expect(verdict([]).ok).toBe(false);
   });
   it("measures an oversized file as over budget", () => {
-    // Random bytes don't compress: 120 kB of them is over a 110 kB budget.
-    const bytes = new Uint8Array(120_000).map(() => Math.floor(Math.random() * 256));
+    // Random bytes don't compress: 130 kB of them is over a 120 kB budget.
+    const bytes = new Uint8Array(130_000).map(() => Math.floor(Math.random() * 256));
     const m = measure("big.js", bytes);
-    expect(m.rawKb).toBe(120);
-    expect(m.gzipKb).toBeGreaterThan(110);
+    expect(m.rawKb).toBe(130);
+    expect(m.gzipKb).toBeGreaterThan(120);
     expect(verdict([m]).ok).toBe(false);
   });
 });

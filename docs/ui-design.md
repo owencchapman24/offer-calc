@@ -1175,8 +1175,12 @@ font requests.
 - **Size:** the engine with tax params is about 44 KB of source; the RPP JSON is about
   98 KB. Code-split the methodology page.
 - **Bundle budget** (rev 3): the JS a quick-mode visit loads on the main thread stays at or
-  under 110 KB gzipped, checked in CI. Every schedule after the lead loads on first use (when it
-  nears the viewport, or when opened). Only the worker holds the engine and the data tables.
+  under 120 KB gzipped (110 KB until 2026-10-09), checked in CI. Every schedule after the lead loads
+  on first use (when it nears the viewport, or when opened). Only the worker holds the engine and
+  the data tables.
+- **Load time** (2026-10-09): Lighthouse's mobile profile on the production build, in CI; the
+  median of three runs' Largest Contentful Paint is at most 2.5 s. The bundle check catches
+  regressions in what we ship; Lighthouse measures what users feel.
 - **Today:** the app takes the local date when it loads, and again on focus after midnight.
   It passes that date as `valuationDate`.
 - **Accessibility:** WCAG 2.2 AA.
