@@ -1,5 +1,5 @@
 export * from "./types";
-export { keptIfLeaving, leaveDateSweep, projectScenario } from "./project";
+export { keptIfLeaving, leaveDateSweep, leaveDaySweep, projectScenario } from "./project";
 export { cliffs, nextCliff } from "./cliffs";
 export { withholdingShortfall } from "./withholding";
 export {

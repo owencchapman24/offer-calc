@@ -603,9 +603,15 @@ export interface WithholdingResult {
 }
 
 /** One row of leaveDateSweep: what you keep if your last day is after `months` months. */
-export interface LeaveSweepRow {
+export interface LeaveSweepRow extends LeaveDayRow {
   months: number;
   /** start + months - 1 day: you work exactly `months` months. */
+  leaveDate: ISODate;
+}
+
+/** One point of leaveDaySweep: what you keep if `leaveDate` is your last day. Nominal. */
+export interface LeaveDayRow {
+  /** Your last day of work, inclusive. */
   leaveDate: ISODate;
   /** Salary, bonus, cash and vested RSUs paid, before tax and clawbacks. */
   paid: number;
