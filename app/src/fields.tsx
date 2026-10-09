@@ -297,13 +297,30 @@ export function EditorRow({ row, title, children }: { row: string; title: string
   );
 }
 
-/** A column heading inside an editor, with its own hint and help. */
-export function EditorHead({ k }: { k: string }) {
+/** A column heading inside an editor, with its own hint and help, and "Reset to the default" for the rows that changed it. */
+export function EditorHead({ k, o, rows = [] }: { k: string; o?: AppOffer; /** The column's fields, by row: [label, path]. */ rows?: Array<[string, string]> }) {
   const h = HELP[k];
   return (
     <div className="editor-col">
       <span className="editor-col-name">{h.label}</span>
-      <Help hint={h.hint} hintId={hintId(k)} section={h.section}>{h.help}</Help>
+      <Help hint={h.hint} hintId={hintId(k)} section={h.section} extra={o ? <ResetFields o={o} fields={rows} /> : null}>{h.help}</Help>
     </div>
+  );
+}
+
+/** "Reset to the default (...)": for each field given that has a default and isn't at it. */
+export function ResetFields({ o, fields }: { o: AppOffer; fields: Array<[string, string]> }) {
+  const api = useLedger();
+  const changed = fields.filter(([, path]) => defaultFor(path) && !isDefault(o.draft, path));
+  if (!changed.length) return null;
+  const d = defaultFor(changed[0][1])!;
+  return (
+    <p className="reset">
+      Reset to the default ({d.shown(o.draft)}):{" "}
+      {changed.map(([label, path], i) => (
+        <span key={path}>{i ? " · " : ""}<button type="button" className="link" onClick={() => api.set(o, { [path.endsWith(".schedule") ? `${path}.tranches` : path]: null })}>
+          {label}</button></span>
+      ))}
+    </p>
   );
 }
