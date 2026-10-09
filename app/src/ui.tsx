@@ -117,3 +117,11 @@ export const toPercent = (f: number) => +(f * 100).toFixed(8);
 export function PercentInput(props: Omit<Parameters<typeof NumberInput>[0], "kind">) {
   return <NumberInput {...props} kind="percent" />;
 }
+
+/** Why a schedule's figures aren't for the current inputs: being worked out, or the inputs have a problem. */
+export type Stale = "updating" | "invalid" | null;
+
+/** A schedule's note while its figures are from earlier inputs (the schedule dims them meanwhile). */
+export function StaleNote({ status }: { status: Stale }) {
+  return <span className="updating" aria-hidden={!status}>{status === "updating" ? "Updating…" : status === "invalid" ? "Last valid results" : ""}</span>;
+}

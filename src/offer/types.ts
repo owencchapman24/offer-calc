@@ -277,6 +277,9 @@ export type RsuGrantRef =
   | { kind: "grant"; label: string }
   | { kind: "refresher"; label?: string; number: number; grantDate: ISODate };
 
+/** How a bonus payment was worked out. */
+export type BonusDetail = Extract<EventDetail, { kind: "bonus" }>;
+
 /** How a payment was worked out. */
 export type EventDetail =
   /** annual / 12 x days / daysInMonth, for [from, to] (inclusive). */
@@ -310,7 +313,10 @@ export type BenefitDetail =
 export type OfferWarning =
   | { code: "convenienceRule"; params: { residenceState: string; employerState: string } }
   | { code: "bonusCutoff"; params: { start: ISODate; cutoff: MonthDay; periodFrom: ISODate; periodTo: ISODate } }
-  | { code: "bonusForfeited"; params: { leaveDate: ISODate; periodFrom: ISODate; periodTo: ISODate; payDate: ISODate } }
+  /** `earned`: what the period's bonus comes to for the work done by the leave date; `full`: what it pays if you stay
+   *  through the payout (a first period counts from your start); each with how it was worked out. */
+  | { code: "bonusForfeited"; params: { leaveDate: ISODate; periodFrom: ISODate; periodTo: ISODate; payDate: ISODate; earned: number;
+      full: number; detail: BonusDetail; fullDetail: BonusDetail } }
   | { code: "k401Cap"; params: { year: number; limit: number } }
   | { code: "hsaCap"; params: { year: number; limit: number } }
   | { code: "section127Cap"; params: { year: number; limit: number } }

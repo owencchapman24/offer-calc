@@ -1,5 +1,7 @@
 import { addMonths, dayIn, daysInMonth, fromDays, jan1, nextMonthStart, nextOccurrence, toDays, yearOfDay } from "./dates";
-import type { AnnualBonus, CashAward, Component, EventDetail, OfferWarning, Salary, SalaryChangeReason, Scenario } from "./types";
+import type { AnnualBonus, BonusDetail, CashAward, Component, EventDetail, OfferWarning, Salary, SalaryChangeReason, Scenario } from "./types";
+
+const round2 = (x: number) => Math.round(x * 100) / 100;
 
 // Each stream turns part of an offer into dated payments (unrounded). Days are day numbers;
 // ranges are half-open [from, to).
@@ -150,27 +152,33 @@ export function bonusEvents(
         continue;
       }
     }
-    if (leave !== undefined && payDay > leave && mustBeEmployed) {
-      warnings.push({ code: "bonusForfeited", params: { leaveDate: fromDays(leave), ...period, payDate: fromDays(payDay) } });
-      continue;
-    }
     const pick = (v: { bear: number; base: number; bull: number }) =>
       (first && bonus.firstPayoutGuaranteed ? v.base : v[scenario]);
     const workedFrom = Math.max(from, start);
-    const workedTo = leave !== undefined ? Math.min(to, leave + 1) : to;
-    const common = { kind: "bonus" as const, ...period, proratedToLeave: workedTo < to };
-    if (bonus.basis === "percentOfSalary") {
-      const rate = pick(bonus.amount);
-      const salaryEarned = earned(workedFrom, workedTo);
-      out.push({ day: payDay, component: "bonus", gross: rate * salaryEarned,
-        detail: { ...common, basis: "percentOfSalary", rate, salaryEarned } });
-    } else {
+    /** The period's bonus for work from `workedFrom` up to (not including) `workedTo`. */
+    const forWork = (workedTo: number): { gross: number; detail: BonusDetail } => {
+      const common = { kind: "bonus" as const, ...period, proratedToLeave: workedTo < to };
+      if (bonus.basis === "percentOfSalary") {
+        const rate = pick(bonus.amount);
+        const salaryEarned = earned(workedFrom, workedTo);
+        return { gross: rate * salaryEarned, detail: { ...common, basis: "percentOfSalary", rate, salaryEarned } };
+      }
       const n = bonus.basis === "byEmploymentYear" ? Math.min(employmentYearOf(to - 1), bonus.amounts.length) : 0;
       const amount = pick(bonus.basis === "byEmploymentYear" ? bonus.amounts[n - 1] : bonus.amount);
-      out.push({ day: payDay, component: "bonus", gross: (amount * (workedTo - workedFrom)) / (to - from),
-        detail: { ...common, basis: bonus.basis, amount, ...(n ? { employmentYear: n } : {}),
-          daysEmployed: workedTo - workedFrom, periodDays: to - from } });
+      return { gross: (amount * (workedTo - workedFrom)) / (to - from),
+        detail: { ...common, basis: bonus.basis, amount, ...(n ? { employmentYear: n } : {}), daysEmployed: workedTo - workedFrom,
+          periodDays: to - from } };
+    };
+    if (leave !== undefined && payDay > leave && mustBeEmployed) {
+      // Forfeited: say what was earned toward it by the last day, and what it pays if you stay through the payout.
+      const now = forWork(Math.min(to, leave + 1));
+      const full = forWork(to);
+      warnings.push({ code: "bonusForfeited", params: { leaveDate: fromDays(leave), ...period, payDate: fromDays(payDay),
+        earned: round2(now.gross), full: round2(full.gross), detail: now.detail, fullDetail: full.detail } });
+      continue;
     }
+    const b = forWork(leave !== undefined ? Math.min(to, leave + 1) : to);
+    out.push({ day: payDay, component: "bonus", gross: b.gross, detail: b.detail });
   }
   return out;
 }

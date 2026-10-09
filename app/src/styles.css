@@ -651,8 +651,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* ---- L-4 leaving early --------------------------------------------------------------------------- */
 
 .leaving { margin-top: 24px; }
-.leaving .leave-chart, .leaving .leave-panel { transition: opacity 120ms; }
-.leaving.is-updating .leave-chart, .leaving.is-updating .leave-panel { opacity: 0.6; }
+/* The schedules after the lead dim their figures while they're from earlier inputs; the head says why (StaleNote). */
+.by-year .by-year-grid, .risk > :not(.schedule-head), .leaving .leave-chart, .leaving .leave-panel { transition: opacity 120ms; }
+.by-year.is-updating .by-year-grid, .risk.is-updating > :not(.schedule-head), .leaving.is-updating .leave-chart,
+.leaving.is-updating .leave-panel { opacity: 0.6; }
 .leave-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 6px 0 10px; font-size: 14px; }
 .leave-controls label { font-weight: 700; }
 .leave-controls input[type="date"] { min-height: 32px; padding: 2px 6px; font: inherit; font-variant-numeric: tabular-nums; color: var(--ink);
@@ -680,5 +682,5 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .leave-line { margin: 0; }
 .leave-worked { color: var(--graphite); }
 .leave-warnings { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--graphite); }
-.leave-warnings span { color: var(--warning); }
+.leave-warnings .warn-icon { color: var(--warning); }
 .leave-recon { margin: 6px 0 0; padding: 6px 10px; background: var(--band); border-left: 3px solid var(--rule); font-size: 14px; }

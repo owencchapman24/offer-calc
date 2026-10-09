@@ -325,6 +325,13 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             months worked, inside a window from your start date, and repaid gross by default.
           </p>
           <p>
+            A forfeited bonus is counted as what you'd earned toward it by your last day: the bonus for the days (or the salary) worked
+            in its period so far, beside what it pays if you stay through the payout. Leaving twelve days into a year forfeits twelve
+            days' worth, not the whole bonus; a period with no days worked isn't counted at all. A first period that began before your
+            start counts from your start, as its payout does. An offer that pays bonuses prorated to your last day (Bonus › must be
+            employed on the pay date: no) pays the earned part instead of forfeiting it.
+          </p>
+          <p>
             A repayment in the same calendar year reverses the wages, so its tax comes back exactly. A repayment in a later year over
             $3,000 gets the federal IRC 1341 credit; Social Security and Medicare on it usually aren't refunded, and state relief
             isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit.

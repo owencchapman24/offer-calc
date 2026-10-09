@@ -12,7 +12,7 @@ import {
 } from "./metrics";
 import type { OfferDetail } from "./protocol";
 import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
-import { cliffsText, cliffText, reconcile } from "./leaveModel";
+import { cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
 import type { SectionId } from "./sections";
 import {
   bonusText, cashAwardsText, employerStateText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText, retirementText,
@@ -98,7 +98,7 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "in": return inputSection(pathOf(id));
     case "about": return ABOUT_SECTION[a as AboutField];
     case "risk": case "drop": case "win": return "M-8";
-    case "kept": case "repay": case "forfeit": case "next": case "nextown": return "M-9";
+    case "kept": case "repay": case "forfeit": case "forgone": case "next": case "nextown": return "M-9";
     case "stayafter": case "recon": return "M-7.3";
   }
   throw new Error(`Unknown figure: ${id}`);
@@ -135,6 +135,7 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "kept": return keptWork(ctx, a as L);
       case "repay": return repayWork(ctx, a as L);
       case "forfeit": return forfeitWork(ctx, a as L, b as "rsu" | "k401");
+      case "forgone": return forgoneWork(ctx, a as L, Number(b));
       case "next": return nextWork(ctx, a as L);
       case "nextown": return nextOwnWork(ctx, a as L);
       case "stayafter": return stayAfterWork(ctx, a as L);
@@ -170,6 +171,7 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "kept": return `${a}'s pay kept`;
     case "repay": return `${a}'s clawback`;
     case "forfeit": return `${a}'s unvested ${b === "rsu" ? "RSUs" : "401(k) money"}`;
+    case "forgone": return `${a}'s forfeited bonus`;
     case "next": return `${a}'s value of staying`;
     case "nextown": return `${a}'s next cliff`;
     case "stayafter": return `${a}'s stay after tax`;
@@ -604,7 +606,7 @@ function keptWork(ctx: WorkContext, letter: L): Work {
   ];
   const notes = [
     "Leaving is your last day of work, a voluntary exit. Pay stops that day; a bonus not yet paid is forfeited if you must be employed on its "
-      + "payout date; unvested RSUs and employer 401(k) money stay behind.",
+      + "payout date (the panel says what you'd earned toward it); unvested RSUs and employer 401(k) money stay behind.",
     "The tax is the offer's share of each calendar year's household tax, on the pay actually received.",
   ];
   if (leave.basis === "cash") {
@@ -673,6 +675,39 @@ function forfeitWork(ctx: WorkContext, letter: L, which: "rsu" | "k401"): Work {
     ties: [], ...fromInputs(ctx, letter, ["retirement.vesting", "retirement.vestingService"]),
   };
 }
+
+/** L-4: a bonus that leaving forfeits: what was earned toward it by the last day, and what it pays if you stay. */
+function forgoneWork(ctx: WorkContext, letter: L, index: number): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const w = p.warnings.flatMap((x) => (x.code === "bonusForfeited" ? [x.params] : []))[index];
+  if (!w) throw new Error(`No forfeited bonus ${index + 1} for ${letter} on that day.`);
+  const period = periodText(w.periodFrom, w.periodTo);
+  const d = w.detail;
+  const lines: WorkLine[] = d.basis === "percentOfSalary"
+    ? [{ label: "Salary earned in the period by your last day", value: figure(d.salaryEarned) }, { op: "×", label: "Bonus rate", value: percent(d.rate) },
+      { op: "=", label: "Earned toward the bonus", value: figure(w.earned), rule: "double" }]
+    : [{ label: d.basis === "byEmploymentYear" ? `Bonus for employment year ${d.employmentYear}` : "Bonus for the year", value: figure(d.amount) },
+      { op: "×", label: `${figure(d.daysEmployed)} of the period's ${figure(d.periodDays)} days, worked by your last day`,
+        value: (d.daysEmployed / d.periodDays).toFixed(4) },
+      { op: "=", label: "Earned toward the bonus", value: figure(w.earned), rule: "double" }];
+  const full = w.fullDetail.basis === "percentOfSalary"
+    ? `${percent(w.fullDetail.rate)} of the ${dollars(w.fullDetail.salaryEarned)} salary for the period`
+    : `${dollars(w.fullDetail.amount)} × ${figure(w.fullDetail.daysEmployed)} / ${figure(w.fullDetail.periodDays)} days`;
+  return {
+    title: `${letter} · the ${period} bonus, earned by ${longDate(p.leaveDate)}`, scope,
+    lines,
+    notes: [
+      `If you stayed through its payout on ${longDate(w.payDate)} it would pay ${dollars(w.full)}: ${full}`
+        + `${w.periodFrom < (compareStart(ctx, letter) ?? w.periodFrom) ? ", counting from your start" : ""}.`,
+      "It's forfeited because the offer pays bonuses only to those employed on the payout date (Bonus › must be employed on the pay date). "
+        + "An offer that pays it prorated to your last day would pay the earned part.",
+    ],
+    ties: [], ...fromInputs(ctx, letter, [bonusPath(ctx, letter), "bonus.payOn", "bonus.mustBeEmployedOnPayDate"]),
+  };
+}
+
+/** An offer's start date, as entered. */
+const compareStart = (ctx: WorkContext, letter: L) => offerByLetter(ctx, letter)?.draft.startDate ?? null;
 
 /** L-4: what staying until the next cliff is worth, and how much of it is the cliff itself. */
 function nextWork(ctx: WorkContext, letter: L): Work {
