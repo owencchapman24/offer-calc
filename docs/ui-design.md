@@ -1,4 +1,4 @@
-# UI design (rev 2, approved)
+# UI design (rev 3, approved)
 
 Roadmap item 6. It covers:
 - who the app is for;
@@ -13,6 +13,15 @@ Roadmap item 6. It covers:
 - pay per extra hour;
 - the stay length as an input, with a "winner if you stay" row;
 - a revised visual direction, with audit tickmarks as the signature element.
+
+Rev 3 (2026-10-09) records the changes approved with the plan for slices 4-8
+(`docs/ui-slices-4-8-plan.md`), after slices 1-3 shipped:
+- the slice scopes and build order (§12);
+- the later schedules' placement (§4) and the worker's two lanes (§3.4);
+- L-2, L-3, L-4 and L-5 revised (§4.4-§4.7);
+- the sticky verdict bars and WCAG 2.4.11 (§3.2);
+- tests, charts and the bundle budget (§10);
+- W1 dropped (§7).
 
 No UI code is written until the engine prerequisites in §11 are done and timed.
 
@@ -100,9 +109,11 @@ Offer Calc
 │   ├── Offers (2-3)      quick or detailed; one column per offer
 │   └── Results           schedules, each with a workpaper reference:
 │                          L    lead schedule: verdict, if-you-stay row, basis, extra hours
+│                               (the results column, pinned)
 │                          L-1  by year           L-2  if things go badly
 │                          L-3  what it would take L-4  leaving early
 │                          L-5  warnings          L-6  the work (full tables)
+│                               (L-1 to L-6: full width under the two columns, in order)
 ├── Methodology  (#/method)  sections M-1 … M-13; every tickmark leads here
 └── Data  (#/data)        what's stored (this browser only), export, import, delete all
 ```
@@ -121,6 +132,8 @@ cites a workpaper.
   at the top.
 - **Phone (< 760 px):** one offer at a time (tabs A | B | C), results below, the verdict as
   a sticky bar at the bottom (W9).
+- **The sticky bars (slice 7)** never hide the focused field (WCAG 2.2, 2.4.11): the page gets
+  scroll padding for the bar, and on phones the bar hides while the keyboard is up.
 
 ### 3.3 Quick mode and detailed mode
 
@@ -223,12 +236,15 @@ tickmark.
   - **Breakeven and the leave sweep** add 60-300 ms when those schedules are open.
   - **In a worker,** typing stays at frame rate and stale requests can be dropped.
 
-  The work is staged:
-  1. `compareOffers` and the if-you-stay row on every edit. They feed the lead schedule,
-     L-1 and L-2.
-  2. Breakeven for the selected basis only, when L-3 is on screen.
-  3. The leave sweep only when L-4 is open. It runs at the cliff months first, then fills
-     in months 1-60.
+  The work is staged in **one worker with two lanes** (rev 3). A worker can't interrupt its
+  own work, so a slow job must never sit in front of an edit:
+  1. **Fast lane, every edit:** the if-you-stay row, your stay's projections, and bear and bull
+     over your stay. They feed the lead schedule, L-1 and L-2.
+  2. **Slow lane:** jobs that run in small chunks, yielding between them so a new edit runs
+     next (it waits at most one chunk); jobs from older generations are dropped.
+     - Breakeven for the selected basis, while L-3 is on screen, and the close-call line's one
+       breakeven when there's a close call.
+     - The leave sweep, while L-4 is on screen.
 - **Stale results:**
   - Each request carries a generation number, and any older result is dropped.
   - While new results compute, the previous ones stay at 60% opacity: no skeletons, no
@@ -282,7 +298,9 @@ why. Editing removes it, and "Reset to default" sits in the help.
 
 ## 4. Results
 
-The results are schedules, each with an on-screen workpaper reference:
+The results are schedules, each with an on-screen workpaper reference. The lead schedule is the
+results column's only schedule, pinned beside the inputs. L-1 to L-6 sit full width under the
+two columns, in order (as L-1 has since slice 2):
 - **L:** lead schedule (pinned)
 - **L-1:** by year
 - **L-2:** if things go badly
@@ -531,6 +549,10 @@ L-2 · IF THINGS GO BADLY
 5. **Honesty notes:**
    - An offer without ranges shows a single dot and "no ranges entered", rather than
      looking safe.
+   - **No ranges anywhere** (every quick-mode offer): L-2 is one line instead of a chart of
+     single dots: "No ranges entered, so there's no downside to show. Add a range (+ range) to
+     a bonus, raise, share price or refreshers, or limit a promotion to some scenarios, in
+     detailed mode." (rev 3)
    - Scenarios are joint (M-8).
 
 Sample values, PV, 4-year stay:
@@ -547,19 +569,37 @@ The sweep answers "what do I keep if I leave after N months"; the next-cliff pan
 "what do I give up by leaving now instead of a little later".
 
 **The chart:**
-- **Axes:** months worked (1-60) on x; after-tax pay kept, after clawbacks, nominal, on y.
-  It's stepped, one line per offer.
+- **Axes:** your last day on x, as a calendar date, from the earliest start through five years
+  (or your stay, if longer); after-tax pay kept, after clawbacks, nominal, on y. It's stepped,
+  one line per offer, and each line starts at its offer's own start date. (Rev 3: dates, not
+  months worked, so one cursor is one date for every offer, even when start dates differ.)
+- **Steps on their real dates:** the sweep takes each month end, plus the day before and the
+  day of each cliff that isn't on a month end (a leave sweep by day, §11), so a Jan 31 bonus
+  steps on Jan 31.
 - **Cliff markers:** $ bonus paid, ▲ RSU vest, ✓ clawback window ends, ◆ 401(k) vests.
+  - **A prorated clawback** steps down every month (sample C: $833 for a year, so 12 cliffs).
+    It's drawn as one segment with one label, "clawback shrinks $833 a month until Jul 12,
+    2027", not a marker per month.
 - **Cursor:** a draggable "last day", also a date field and a ± month stepper.
 - **Basis:** after-tax pay kept by default; total rewards is a toggle (both come from
-  `leaveDateSweep`). The COL basis isn't available here yet, and the view says so.
+  the leave sweep). The COL basis isn't available here yet, and the view says so.
 
 **The next-cliff panel,** for the cursor date, per offer:
 - what you'd keep;
 - what you'd repay;
 - what's forfeited (unvested RSUs at grant value, unvested 401(k));
 - the next cliff, with the after-tax value of staying until it, split into the extra pay
-  and the cliff itself (`nextCliff`, §11).
+  and the cliff itself (`nextCliff`, §11);
+- **when the next cliff is a clawback step,** also the next cliff that isn't one, so a $833
+  step doesn't hide a bonus three months away (rev 3);
+- **the warnings that depend on the leave date** (a bonus forfeited, FICA not refunded on a
+  repayment in a later year), here at the cursor rather than in L-5 (rev 3).
+
+**Your stay's end** (rev 3). Leaving on the last day of your stay keeps more after tax than the
+stay counts: for the samples at 4 years, $2,511 (A), $2,219 (B) and $5,121 (C). The stay taxes
+its last calendar year as though you kept earning through December (§4.1); a leave date taxes
+only what you were paid. At that date L-4 shows the reconciliation, line by line, to L-1's
+after-tax running total: the last year's tax, and any clawback.
 
 **W6. L-4** (sample, base case)
 
@@ -593,6 +633,10 @@ L-4 · LEAVING EARLY             After-tax pay kept, after clawbacks · nominal 
 
 For each offer that isn't winning, show the starting salary, or sign-on, that would tie
 the winner on the selected basis. It's base case and PV over your stay, using `breakeven`.
+- **The window** is the comparison window: the earliest start of every offer, plus your stay
+  (rev 3). `breakeven` defaults to the two offers' own window, and with three offers on different
+  start dates its target then isn't the rank list's figure, so L-3 passes the window, and a test
+  checks the target against the rank list to the cent.
 
 **W7a. L-3** (sample; to tie C, after rent at U.S. prices, 4-year stay)
 
@@ -610,9 +654,21 @@ L-3 · WHAT IT WOULD TAKE                         to tie C · after rent at U.S.
 **Rules:**
 - **Per-hour basis:** breakeven isn't defined per hour. L-3 shows the step-3 numbers and
   says so.
-- **Already ahead:** when an offer already leads, L-3 says "A already leads C by $X a month
-  on after-tax pay". Breakeven returns that as a structured result instead of throwing
-  (§11).
+- **The winner's cushion** (rev 3): a row for the winner against the runner-up, how far its
+  starting salary could fall before the runner-up ties, and whether it still leads with no
+  sign-on. That's where "already ahead" comes up: "C still leads A with no sign-on". Breakeven
+  returns that as a structured result instead of throwing (§11). (Offers behind the winner
+  always need more, so it can't come up in their rows.)
+- **The cash-award lever** changes the offer's first cash award, whatever it is, so the row
+  names it by its own label and date ("Relocation, paid Aug 12"). With no award, it's "a sign-on
+  paid 30 days after you start, with no clawback", the one the engine adds (rev 3).
+- **What scales with salary is said per offer** (rev 3): raises, a percent-of-salary bonus and
+  a 401(k) match scale with it; a bonus entered in dollars, or by year, doesn't (sample A).
+- **The rent lever** (rev 3, engine item 11), on the after-rent basis only: the monthly rent
+  (first lease year) that would tie, for each offer behind the winner, and the rent at which the
+  winner's lead would go, in its cushion row. It's closed form, since the total is linear in
+  rent. Rent is the softest input and often an estimate (`E`), so this says how much the verdict
+  depends on it.
 - **Wording stays factual:** "what it would take", never "ask for".
 
 ### 4.7 L-5 · Warnings
@@ -627,8 +683,17 @@ L-3 · WHAT IT WOULD TAKE                         to tie C · after rent at U.S.
 **Rules:**
 - **Never color alone.** Status colors are reserved and always come with an icon and a
   label (§9).
-- **Grouped by offer.** Each warning names the offer it's about.
+- **Grouped by kind, then offer.** Each warning names the offer it's about.
 - **Not dismissible** if it changes your numbers.
+- **L-5 is the roll-up** (rev 3). Since slice 3 the engine's warnings show at their fields; L-5
+  lists every one for your stay, each with "Show at the field" (it opens the section and focuses
+  the field, like "Edit it").
+- **The lead schedule points to L-5** with one line when a warning changes your numbers.
+- **The comparability warning** (a cost or benefit counted for some offers but not others) stays
+  under the verdict, where it qualifies the answer (rev 3).
+- **The withholding shortfall** covers your stay's calendar years.
+- **Leave-date warnings** (a bonus forfeited, FICA on a later-year clawback) belong to L-4's
+  panel at the cursor.
 
 **W7b. L-5** (examples: the samples raise none)
 
@@ -682,7 +747,7 @@ $62,595. Unexplained, that reads as a bug.
    above the verdict reads: "This is much lower than your salary on purpose. It's what's
    left to spend after tax and rent, priced as in an average U.S. city, plus what you save.
    [See how we get there] [Got it]". It's remembered in this browser.
-6. **Prices in a place you know.** "at U.S. prices" is a control. Switching it to "at
+6. **Prices in a place you know** (slice 8). "at U.S. prices" is a control. Switching it to "at
    Charlotte prices" (your current city, say) restates every figure in dollars you
    recognize. The factor for that city becomes 1.
 7. **Methodology M-6.3** has the formula, the reconciliation with total rewards, and a link
@@ -745,8 +810,9 @@ rewards. Never per hour.
 The samples are the three offers from `scripts/offer-table.ts`. They move to `src/samples.ts`
 so the script and the app share one source (§11).
 
-**First run:** two buttons, "Start with my offers" and "Try the sample offers". The second
-button is captioned "illustrative inputs, not market data" (W1).
+**First run:** the samples load by default, stamped illustrative, with a "Start with my offers"
+link (since slice 1). W1, the choice screen below, was dropped in rev 3 and is kept only as a
+record.
 
 **Where the label appears:**
 - **Offer column:** a `SAMPLE` stamp in the header. Editing a sample changes it to
@@ -762,7 +828,7 @@ button is captioned "illustrative inputs, not market data" (W1).
 - **Tickmarks:** every `T` tickmark on a sample input says "traced to a sample input
   (illustrative)".
 
-**W1. First run**
+**W1. First run** (dropped in rev 3)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -924,8 +990,8 @@ figure's derivation.
   it sits on the page. Tracing a number means watching its inputs light up.
 
 **Legend.** Every schedule ends with the tickmark legend, as on a real workpaper, and M-13
-explains the marks at length. A setting can hide tickmarks for a cleaner read. The figures
-then keep a dotted underline, so they're still links.
+explains the marks at length. A setting can hide tickmarks for a cleaner read (slice 6). The
+figures then keep a dotted underline, so they're still links.
 
 **Accessibility.**
 - **A real control:** each tickmark is a `<button>` labeled "How 62,595 was worked out
@@ -1102,10 +1168,14 @@ font requests.
 - **Hosting:** a static build on GitHub Pages (or Vercel), with hash routing.
   - No analytics and no third-party requests.
   - A strict CSP: `default-src 'self'`.
-- **Charts:** hand-built SVG with `d3-scale` and `d3-shape`, not a chart library. That gives
-  full control of the dataviz specs and the tickmarks at a small size.
+- **Charts:** hand-built SVG, not a chart library. That gives full control of the dataviz specs
+  and the tickmarks at a small size. (Rev 3: L-1 shipped with no d3 at all, its scales written
+  by hand; L-2 and L-4 follow it.)
 - **Size:** the engine with tax params is about 44 KB of source; the RPP JSON is about
   98 KB. Code-split the methodology page.
+- **Bundle budget** (rev 3): the JS a quick-mode visit loads on the main thread stays at or
+  under 110 KB gzipped, checked in CI. Every schedule after the lead loads on first use (when it
+  nears the viewport, or when opened). Only the worker holds the engine and the data tables.
 - **Today:** the app takes the local date when it loads, and again on focus after midnight.
   It passes that date as `valuationDate`.
 - **Accessibility:** WCAG 2.2 AA.
@@ -1116,9 +1186,12 @@ font requests.
   - No color-only encoding; `prefers-reduced-motion` is respected.
 - **Tests:**
   - Vitest: reducers, migrations, the help-coverage test and the metric-registry test.
-  - Playwright smoke tests: load the samples and change a salary, and the verdict updates;
-    export, import, then the same results; offline use.
-  - axe in CI.
+  - Playwright smoke tests (slice 7): load the samples and change a salary, and the verdict
+    updates; export, import, then the same results. (Rev 3: "offline use" is dropped: there's no
+    service worker, so the app works offline only while its tab stays open.)
+  - axe in CI (slice 7), through Playwright against `vite preview`, light and dark, desktop and
+    phone widths. It fails on any WCAG A/AA violation. Exceptions are listed in a file, each with
+    the reason it's accepted; an entry without a reason fails the check.
 
 ## 11. Engine work
 
@@ -1141,8 +1214,10 @@ font requests.
 | 8 | Samples moved to `src/samples.ts`, shared by the table script and the app. Done with item 1. | §7 |
 | 9 | Rent estimate. Done (2026-10-08): HUD FY2027 FMRs, with the BEA-derived fallback anchored at the ACS median | Rent estimate |
 | 10 | City picker data: metro → states, the NYC locality, multi-state prompts (`findRppAreas` exists) | Quick mode |
-| 11 | (Optional) Rent flip: the rent change that ties, closed form, since the total is linear in rent | Close calls |
+| 11 | Rent flip: the rent change that ties, closed form, since the total is linear in rent. No longer optional (rev 3): it's L-3's rent lever (slice 4) | L-3 |
 | 12 | (Optional) Leave sweep on the COL basis | L-4 |
+| 13 | Leave sweep by day (rev 3): `keptIfLeaving` at given last days, so each step lands on its real date (slice 5) | L-4 |
+| 14 | Breakeven over the comparison window (rev 3): the caller passes the window of every offer; a test ties L-3's target to the rank list (slice 4) | L-3 |
 
 **Also done before UI code (2026-10-08):** the engine returns numbers and codes, and
 `src/format` writes the words. That's faster (a projection takes 2.5 ms) and lets the UI own
@@ -1169,7 +1244,7 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 **UI slice 1 versus this design:**
 - **Tickmarks:** they show with their legend but don't open derivations yet (UI slice 2).
 - **Phones:** the ledger scrolls one offer at a time instead of tabs, and there's no
-  sticky verdict bar yet (UI slice 6).
+  sticky verdict bar yet (UI slice 7, since rev 3).
 - **Lead schedule:** the close-call stamp shows; the flip line comes with breakeven (UI
   slice 4). Pay per extra hour isn't shown yet (UI slice 2).
 - **First run:** the samples load by default with a "Start with my offers" link, instead
@@ -1216,8 +1291,8 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   figures stay in one column at every width. Its prices line is the identity's remainder
   (after rent − total rewards + rent), so every subtotal foots by construction.
 - **L-6 isn't built** (slice 6): `<` ties go to L-1's table view and the rank list.
-- **Not yet:** the hide-tickmarks setting; switching "Prices in" to a city you know (§5,
-  item 6, not assigned to a slice).
+- **Not yet:** the hide-tickmarks setting (slice 6, since rev 3); switching "Prices in" to a city
+  you know (§5, item 6; slice 8, since rev 3).
 
 - **UI slice 3** (2026-10-08; plan in `docs/slice-3-plan.md`):
   - **Step 0:** engine item 7 (`validateOffer`, every problem with its input path; words in
@@ -1252,8 +1327,8 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   shrink (the 401(k) match, vesting steps) and otherwise scrolls inside the editor (promotions, bonus by
   year).
 
-**UI slices**, numbered as shipped. The engine prerequisites came first and aren't
-numbered.
+**UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
+build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
    row, the pipeline toggle, local saving and the samples. Engine item 10 came with it.
 2. **Explanations** (done, 2026-10-08): tickmarks and Show the work, L-1, the bridge and the
@@ -1264,10 +1339,20 @@ numbered.
    cost or benefit is counted for some offers but not others, per-hour figures only when every
    offer has hours, a review checkpoint after the verdict-moving inputs, and JSON export/import
    (moved from slice 6).
-4. **L-2 and L-3:** the risk view and breakeven, with the close-call flip line.
-5. **L-4 and L-5:** leaving early and warnings.
-6. **Finish:** CSV export of each table, print, an accessibility pass, phone tabs and a sticky
-   verdict bar. (JSON export/import moved to slice 3.)
+4. **L-3 and close calls:** breakeven (§4.6) with the winner's cushion and the rent lever
+   (engine item 11), and the close-call flip line (§4.1). Engine item 14 (the window) comes with
+   it. (Rev 3: L-2 moved to slice 5.)
+5. **Leaving early and downside risk:** L-2 (§4.4), L-4 with the next-cliff panel (§4.5) and L-5
+   (§4.7). Engine item 13 (the leave sweep by day), the worker's slow lane (§3.4) and the CI
+   bundle check come with it.
+6. **The reconciliation schedule:** L-6 (§4.8), CSV export of each table, print, and the
+   hide-tickmarks setting (§9.1). (JSON export/import moved to slice 3; the accessibility pass,
+   phone tabs and sticky bars moved to slice 7.)
+7. **Mobile and accessibility** (rev 3, out of slice 6): phone tabs, the sticky verdict bars
+   (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough.
+8. **Prices in a city you know** (rev 3): §5, item 6.
+
+**Build order** (rev 3; plan in `docs/ui-slices-4-8-plan.md`): 5, 4, 8, 7, 6.
 
 ## 13. Decided in rev 2 (say if you disagree)
 
