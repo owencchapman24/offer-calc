@@ -230,6 +230,21 @@ export const bonusBasis = (b: BonusDraft): AnnualBonus["basis"] => b.basis ?? "p
 /** A blank required number becomes NaN, so the validator says "Enter an amount" at its field. */
 const req = (v: number | null) => (v === null ? Number.NaN : v);
 
+/**
+ * A list without the rows at its end that are still blank: a row just added to an editor isn't an error
+ * before you type in it. Only trailing rows go, so every other row keeps its index (and its problems
+ * their path).
+ */
+export function dropTrailing<T>(rows: T[], blank: (row: T) => boolean): T[] {
+  let n = rows.length;
+  while (n > 0 && blank(rows[n - 1])) n--;
+  return n === rows.length ? rows : rows.slice(0, n);
+}
+const blankPromotion = (p: PromotionDraft) => p.on === null && p.stepUp === null;
+const blankTranche = (t: { month: number | null; fraction: number | null }) => t.month === null && t.fraction === null;
+const blankGrant = (g: GrantDraft) => g.value === null && !g.label && g.grantDate === null && g.vestStart === null && g.schedule.tranches === null
+  && g.schedule.vestDates === null;
+
 /** The engine's input for an offer, or the quick fields still missing. */
 export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Missing[] } {
   const d = o.draft;
@@ -248,8 +263,9 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
       annual: d.salary.annual!,
       ...(d.salary.raise ? { raise: d.salary.raise } : {}),
       ...(d.salary.raiseOn ? { raiseOn: d.salary.raiseOn } : {}),
-      ...(d.salary.promotions.length ? {
-        promotions: d.salary.promotions.map((p) => ({ on: p.on ?? "", stepUp: req(p.stepUp), ...(p.scenarios ? { scenarios: p.scenarios } : {}) })),
+      ...(dropTrailing(d.salary.promotions, blankPromotion).length ? {
+        promotions: dropTrailing(d.salary.promotions, blankPromotion)
+          .map((p) => ({ on: p.on ?? "", stepUp: req(p.stepUp), ...(p.scenarios ? { scenarios: p.scenarios } : {}) })),
       } : {}),
     },
     costOfLiving: {
@@ -283,8 +299,9 @@ function bonusInput(b: BonusDraft): AnnualBonus | undefined {
   const zero = (s: ByScenario | null) => !s || (s.bear === 0 && s.base === 0 && s.bull === 0);
   const basis = bonusBasis(b);
   if (basis === "byEmploymentYear") {
-    if (!b.amounts.length || b.amounts.every((a) => a !== null && zero(a))) return undefined;
-    return { ...timing, basis: "byEmploymentYear", amounts: b.amounts.map((a) => a ?? all(Number.NaN)) };
+    const amounts = dropTrailing(b.amounts, (a) => a === null);
+    if (!amounts.length || amounts.every((a) => a !== null && zero(a))) return undefined;
+    return { ...timing, basis: "byEmploymentYear", amounts: amounts.map((a) => a ?? all(Number.NaN)) };
   }
   // Blank or zero: no bonus.
   if (zero(b.amount)) return undefined;
@@ -306,17 +323,20 @@ function cashInput(a: CashAwardDraft): CashAward {
 
 function scheduleInput(s: ScheduleDraft): VestingSchedule {
   return {
-    tranches: s.tranches ? s.tranches.map((t) => ({ month: req(t.month), fraction: req(t.fraction) })) : PRESETS[DEFAULT_PRESET].tranches.map((t) => ({ ...t })),
-    ...(s.vestDates ? { vestDates: { months: s.vestDates.months, day: req(s.vestDates.day) } } : {}),
+    tranches: s.tranches ? dropTrailing(s.tranches, blankTranche).map((t) => ({ month: req(t.month), fraction: req(t.fraction) }))
+      : PRESETS[DEFAULT_PRESET].tranches.map((t) => ({ ...t })),
+    // A calendar with no months picked yet vests on the schedule's own dates, as with none.
+    ...(s.vestDates?.months.length ? { vestDates: { months: s.vestDates.months, day: req(s.vestDates.day) } } : {}),
   };
 }
 
 function equityInput(e: OfferDraft["equity"]): OfferInput["equity"] {
-  if (!e.grants.length && !e.refreshers) return undefined;
+  const grants = dropTrailing(e.grants, blankGrant);
+  if (!grants.length && !e.refreshers) return undefined;
   const r = e.refreshers;
   return {
     ...(e.priceGrowth ? { priceGrowth: e.priceGrowth } : {}),
-    grants: e.grants.map((g) => ({
+    grants: grants.map((g) => ({
       kind: "rsu", label: g.label || "RSU grant", value: req(g.value),
       ...(g.grantDate ? { grantDate: g.grantDate } : {}), ...(g.vestStart ? { vestStart: g.vestStart } : {}),
       schedule: scheduleInput(g.schedule),

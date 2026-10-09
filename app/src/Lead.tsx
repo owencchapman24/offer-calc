@@ -2,7 +2,7 @@ import { type Dispatch, useRef } from "react";
 import { formatIssue } from "../../src/format/index";
 import type { Basis } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
-import { HELP, helpKey } from "./help";
+import { fieldName } from "./help";
 import type { EditTarget } from "./metrics";
 import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
@@ -52,7 +52,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
           <ul>
             {problems.map(({ letter, i }) => (
               <li key={`${letter}|${i.path}|${i.code}`}>
-                <strong className={`who offer-${letter}`}>{letter}</strong> {HELP[helpKey(i.path)]?.label ?? "Input"}: {formatIssue(i)}{" "}
+                <strong className={`who offer-${letter}`}>{letter}</strong> {fieldName(i.path)}: {formatIssue(i)}{" "}
                 {onFix && <button type="button" className="link" onClick={() => onFix({ letter, path: i.path.replace(/\.(bear|base|bull)$/, "") })}>Fix it</button>}
               </li>
             ))}

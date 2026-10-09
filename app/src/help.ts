@@ -25,6 +25,14 @@ export interface FieldHelp {
 /** An input path's help key: the path without its array indexes. */
 export const helpKey = (path: string) => path.split(".").filter((k) => !/^\d+$/.test(k)).join(".");
 
+/** An input's name out of context ("Promotions, date"): a field inside an editor is named with its editor. */
+export function fieldName(path: string): string {
+  const key = helpKey(path);
+  const h = HELP[key];
+  if (!h) return "Input";
+  return h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
+}
+
 const tranches = (owner: string, editor: string): Record<string, FieldHelp> => ({
   [`${owner}.schedule.tranches.month`]: {
     label: "Month", hint: "Months after the vesting start.", section: "M-3", group: "equity", editor,
@@ -88,7 +96,7 @@ export const HELP: Record<string, FieldHelp> = {
       + "at firms with one review cycle. A January raise reaches a July start after six months instead of twelve.",
   },
   "salary.promotions": {
-    label: "Promotions", hint: "A date and a step-up, like analyst to associate.", section: "M-2", group: "pay",
+    label: "Promotions", hint: "A date and a step-up, like analyst to associate.", section: "M-2", group: "pay", editor: "salary.promotions",
     help: "Each promotion raises your salary by a percent on its date: for example 35% after three years. Merit raises then "
       + "compound from the new salary. A promotion that isn't certain can count in some scenarios only.",
   },
@@ -116,7 +124,7 @@ export const HELP: Record<string, FieldHelp> = {
       + "are prorated by days worked.",
   },
   "bonus.amounts": {
-    label: "Bonus by year", hint: "Dollars for each employment year; the last repeats.", section: "M-2", group: "bonus",
+    label: "Bonus by year", hint: "Dollars for each employment year; the last repeats.", section: "M-2", group: "bonus", editor: "bonus.amounts",
     help: "For bonuses that grow with seniority, as for banking analysts. Each payout uses the employment year its bonus year ends "
       + "in, prorated by days worked. After the last year you enter, its amount repeats.",
   },
@@ -148,7 +156,7 @@ export const HELP: Record<string, FieldHelp> = {
 
   // ---- equity ----
   "equity.grants": {
-    label: "RSU grants", hint: "Stock units: the value at grant and the vesting.", section: "M-3", group: "equity",
+    label: "RSU grants", hint: "Stock units: the value at grant and the vesting.", section: "M-3", group: "equity", editor: "equity.grants",
     help: "Enter each grant at its dollar value on the grant date, as the offer quotes it. Each tranche counts as pay the day it "
       + "vests, taxed as wages, and we assume you sell then. Options and private-company equity count as $0 for now.",
   },
@@ -183,7 +191,7 @@ export const HELP: Record<string, FieldHelp> = {
       + "because no one knows; add a range for a bear and a bull case. Shares are sold at vest, so later moves don't count.",
   },
   "equity.refreshers": {
-    label: "Refreshers", hint: "Top-up grants while you stay; none unless promised.", section: "M-3", group: "equity",
+    label: "Refreshers", hint: "Top-up grants while you stay; none unless promised.", section: "M-3", group: "equity", editor: "equity.refreshers",
     help: "Some firms add a refresher grant each year once you've been there a while. Enter its value and timing if your offer or "
       + "recruiter gives them; it's none by default because it isn't promised. Each refresher vests on its own schedule from its "
       + "own grant date.",

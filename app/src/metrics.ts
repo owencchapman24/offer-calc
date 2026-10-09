@@ -1277,6 +1277,13 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
       return d.bonus.amounts.length ? d.bonus.amounts.map((a, i) => line(`Year ${i + 1}${i === d.bonus.amounts.length - 1 ? ", and after" : ""}`,
         a ? rangeText(a, dollars) : "—")) : [line(label, "None")];
     case "bonus.amount": return [line("Target bonus", bonusText(d))];
+    case "bonus.basis": return [line(label, { percentOfSalary: "% of salary", fixed: "Dollars a year", byEmploymentYear: "Dollars by employment year" }[bonusBasis(d.bonus)])];
+    case "salary.raiseOn": return [line(label, v === "jan1" ? "Each January 1" : "Each work anniversary")];
+    case "salary.promotions.scenarios": return [line(label, Array.isArray(v) && v.length ? v.join(", ") : "None")];
+    case "equity.grants.schedule.vestDates": case "equity.refreshers.schedule.vestDates": {
+      const c = v as ScheduleDraft["vestDates"];
+      return [line(label, c && c.months.length ? `${c.months.map((m) => MONTH_SHORT[m - 1]).join(", ")} ${c.day ?? "—"}` : "None")];
+    }
     case "cashAwards": return [line("Cash awards", cashAwardsText(d))];
     case "retirement": return [line("401(k)", retirementText(d))];
     case "health": return [line("Health plan", healthText(d))];

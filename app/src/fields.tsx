@@ -48,16 +48,20 @@ export function issuesAt(api: LedgerApi, letter: Letter, path: string): OfferIss
 
 const SCENARIO_WORD: Record<string, string> = { bear: "Bear case", bull: "Bull case" };
 
-/** The problems at a field (and inside it), in plain English. */
-export function Issues({ letter, path, exclude }: { letter: Letter; path: string; /** Paths shown elsewhere (in an editor). */ exclude?: string }) {
+/** The problems at a field (and inside it), in plain English, saying which case or tranche when it's one of several. */
+export function Issues({ letter, path, exclude, exact }: {
+  letter: Letter; path: string; /** Paths shown elsewhere (in an editor). */ exclude?: string; /** Only problems at the path itself. */ exact?: boolean;
+}) {
   const api = useLedger();
-  const list = issuesAt(api, letter, path).filter((i) => !exclude || !within(i.path, exclude));
+  const list = issuesAt(api, letter, path).filter((i) => (!exclude || !within(i.path, exclude)) && (!exact || i.path === path));
   if (!list.length) return null;
   return (
     <ul className="field-errors" role="alert">
       {list.map((i) => {
         const last = i.path.split(".").pop()!;
-        return <li key={`${i.path}|${i.code}`}>{SCENARIO_WORD[last] ? `${SCENARIO_WORD[last]}: ` : ""}{formatIssue(i)}</li>;
+        const tranche = i.path.match(/tranches\.(\d+)/);
+        const where = [tranche ? `Tranche ${Number(tranche[1]) + 1}` : "", SCENARIO_WORD[last] ?? ""].filter(Boolean).join(", ");
+        return <li key={`${i.path}|${i.code}`}>{where ? `${where}: ` : ""}{formatIssue(i)}</li>;
       })}
     </ul>
   );
@@ -135,7 +139,7 @@ export function NumberField({ o, path, kind, label, unit, placeholder }: {
       <NumberInput id={fieldId(o.letter, path)} kind={kind} label={`Offer ${o.letter} ${label}`} unit={unit} placeholder={placeholder}
         value={v === null ? null : unitOf(kind)(v)} help={k} describedBy={hintId(k)} invalid={issuesAt(api, o.letter, path).length > 0}
         onChange={(x) => api.set(o, { [path]: x === null ? null : fromUnit(kind)(x) })} />
-      <DefaultTick o={o} path={path} label={`the default ${label}`} />
+      <DefaultTick o={o} path={path} label={`the ${label}`} />
     </span>
   );
 }
@@ -166,7 +170,7 @@ export function RangeField({ o, path, kind, label, unit, blank }: {
         <NumberInput id={fieldId(o.letter, path)} kind={kind} unit={unit} label={`Offer ${o.letter} ${label}${shown ? ", base case" : ""}`}
           value={v === null ? null : u(v.base)} help={k} describedBy={hintId(k)} invalid={bad("base")}
           onChange={(x) => api.set(o, { [path]: x === null ? null : shown && v ? { ...v, base: f(x) } : all(f(x)) })} />
-        <DefaultTick o={o} path={path} label={`the default ${label}`} />
+        <DefaultTick o={o} path={path} label={`the ${label}`} />
         {shown && <span className="range-tag">base</span>}
       </span>
       {v === null && blank && <span className="sub not-counted">{blank}</span>}
@@ -210,14 +214,15 @@ export function MonthDayField({ o, path, label, none }: { o: AppOffer; path: str
           {Array.from({ length: 31 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
         </select>
       )}
-      <DefaultTick o={o} path={path} label={`the default ${label}`} />
+      <DefaultTick o={o} path={path} label={`the ${label}`} />
     </span>
   );
 }
 
 /** A choice among a few values (a select), showing its default with a D tickmark. */
-export function ChoiceField<T extends string | boolean>({ o, path, label, options }: {
-  o: AppOffer; path: string; label: string; options: Array<[T, string]>;
+export function ChoiceField<T extends string | boolean>({ o, path, label, options, alsoSet }: {
+  o: AppOffer; path: string; label: string; options: Array<[T, string]>; /** Fields a new choice resets (a bonus's amount goes with its basis). */
+  alsoSet?: Record<string, unknown>;
 }) {
   const api = useLedger();
   const v = shownValue<T>(o, path);
@@ -225,10 +230,10 @@ export function ChoiceField<T extends string | boolean>({ o, path, label, option
   return (
     <span className="field">
       <select id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(k)}
-        value={String(v)} onChange={(e) => api.set(o, { [path]: options.find(([x]) => String(x) === e.target.value)![0] })}>
+        value={String(v)} onChange={(e) => api.set(o, { [path]: options.find(([x]) => String(x) === e.target.value)![0], ...alsoSet })}>
         {options.map(([x, text]) => <option key={String(x)} value={String(x)}>{text}</option>)}
       </select>
-      <DefaultTick o={o} path={path} label={`the default ${label}`} />
+      <DefaultTick o={o} path={path} label={`the ${label}`} />
     </span>
   );
 }
@@ -243,7 +248,7 @@ export function DateField({ o, path, label, fallback }: { o: AppOffer; path: str
       <input id={fieldId(o.letter, path)} type="date" aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(k)}
         aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} value={v ?? ""} min="2026-01-01"
         onChange={(e) => api.set(o, { [path]: e.target.value || null })} />
-      <DefaultTick o={o} path={path} label={`the default ${label}`} />
+      <DefaultTick o={o} path={path} label={`the ${label}`} />
     </span>
   );
 }

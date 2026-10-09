@@ -4,7 +4,7 @@ import type { OfferInput } from "../../src/offer/types";
 import { VESTING_PRESETS } from "../../src/offer/vesting";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import {
-  type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
+  type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
   toOfferInput, withBase,
 } from "./model";
 import { PRESETS, presetOf } from "./presets";
@@ -64,11 +64,14 @@ describe("drafts to the engine's input", () => {
   });
   it("blank required numbers in detailed inputs reach the validator as NaN, so it can say which", () => {
     const o = filled();
-    o.draft.equity.grants = [{ label: "", value: null, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }];
+    const blank = { label: "", value: null, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } };
+    o.draft.equity.grants = [{ ...blank, label: "New-hire" }, blank];
     const r = toOfferInput(o);
-    const grant = "offer" in r ? r.offer.equity!.grants[0] : null;
-    expect(grant?.value).toBeNaN();
-    expect(grant?.schedule).toEqual(PRESETS.evenQuarterlyAfterCliff); // the default schedule
+    const grants = "offer" in r ? r.offer.equity!.grants : [];
+    expect(grants).toHaveLength(1); // a grant just added, still blank, isn't an error yet
+    expect(grants[0].value).toBeNaN(); // a named grant without a value is: "Enter an amount."
+    expect(grants[0].schedule).toEqual(PRESETS.evenQuarterlyAfterCliff); // the default schedule
+    expect(dropTrailing([1, null, 2, null, null], (x) => x === null)).toEqual([1, null, 2]); // only trailing rows go: indexes hold
   });
   it("editing a sample's bonus target keeps its bear/bull range in proportion", () => {
     const b = sampleOffers(TODAY)[1]; // 5% / 10% / 12%

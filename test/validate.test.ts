@@ -49,6 +49,8 @@ const cases: Case[] = [
     o.equity!.grants[0].schedule = { tranches: [{ month: 12, fraction: 0 }, { month: 24, fraction: 1 }] };
   }, "equity.grants.0.schedule.tranches.0.fraction", "positive", true],
   ["company vest dates with no months", C, (o) => { o.equity!.grants[0].schedule.vestDates = { months: [], day: 15 }; }, "equity.grants.0.schedule.vestDates", "noMonths", true],
+  ["company vest dates with no day", C, (o) => { o.equity!.grants[0].schedule.vestDates = { months: [2, 8], day: Number.NaN }; },
+    "equity.grants.0.schedule.vestDates", "required", true],
   ["company vest dates on Feb 31", C, (o) => { o.equity!.grants[0].schedule.vestDates = { months: [2, 5, 8, 11], day: 31 }; }, "equity.grants.0.schedule.vestDates", "monthDay", false],
   ["a vesting start that vests before 2026", C, (o) => { o.equity!.grants[0].vestStart = "2024-01-01"; }, "equity.grants.0.vestStart", "before2026", true],
   ["a refresher every 0 months", C, (o) => { o.equity!.refreshers!.everyMonths = 0; }, "equity.refreshers.everyMonths", "wholeMonths", true],

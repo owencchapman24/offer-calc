@@ -13,7 +13,13 @@ const words = (s: string) => s.trim().split(/\s+/).length;
 const sentences = (s: string) => (s.replace(/U\.S\./g, "US").match(/[.!?](?=\s+[A-Z"(]|\s*$)/g) ?? []).length;
 
 describe("help on every input", () => {
-  const html = renderAllInputs(context());
+  // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, so every editor's fields render.
+  const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter !== "C" ? o : { ...o, draft: { ...o.draft, equity: {
+    ...o.draft.equity,
+    grants: o.draft.equity.grants.map((g) => ({ ...g, schedule: { ...g.schedule, tranches: [{ month: 12, fraction: 0.5 }, { month: 24, fraction: 0.5 }] } })),
+    refreshers: { ...o.draft.equity.refreshers!, schedule: { tranches: [{ month: 12, fraction: 1 }], vestDates: { months: [3, 9], day: 1 } } },
+  } } })));
+  const html = renderAllInputs(custom);
   const fields = [...html.matchAll(/<(input|select|textarea)\b[^>]*>/g)].map((m) => m[0]);
 
   it("every rendered input names its help, and the help is there", () => {
@@ -34,6 +40,11 @@ describe("help on every input", () => {
   it("inputs point at their hint (aria-describedby)", () => {
     const loose = fields.filter((f) => !/type="checkbox"/.test(f) && !/aria-describedby="hint-/.test(f));
     expect(loose, "inputs without aria-describedby").toEqual([]);
+  });
+
+  it("every help entry is used: each key names a rendered field", () => {
+    const used = new Set([...html.matchAll(/data-help="([^"]+)"/g)].map((m) => m[1]));
+    expect(Object.keys(HELP).filter((k) => !used.has(k)), "help for no field").toEqual([]);
   });
 
   it("every default is for an input with help", () => {

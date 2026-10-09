@@ -201,6 +201,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     if (s.tranches.length && Math.abs(sum - 1) > 1e-9) add(path, "trancheSum", { sum });
     if (s.vestDates) {
       if (!s.vestDates.months.length) add(`${path}.vestDates`, "noMonths", {});
+      if (!num(s.vestDates.day)) { add(`${path}.vestDates`, "required", { kind: "date" }); return false; }
       const bad = s.vestDates.months.find((m) => !realMonthDay(m, s.vestDates!.day));
       if (bad !== undefined) { add(`${path}.vestDates`, "monthDay", { month: bad, day: s.vestDates.day }); ok = false; }
     }

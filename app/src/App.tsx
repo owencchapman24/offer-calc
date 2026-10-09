@@ -111,17 +111,15 @@ export function App() {
     }
     setFocus(fieldId(t.letter, t.path));
   };
+  // After the render that shows it (the DOM is committed when effects run).
   useEffect(() => {
     if (!focus) return;
-    const frame = requestAnimationFrame(() => {
-      // A field without an input of its own (a read-only row) focuses its section's heading.
-      const section = focus.startsWith("in-") ? sectionOfPath(focus.split("-").slice(2).join(".")) : null;
-      const el = document.getElementById(focus) ?? (section ? document.getElementById(`section-head-${section}`) : null);
-      el?.scrollIntoView({ block: "center" });
-      el?.focus();
-      setFocus(null);
-    });
-    return () => cancelAnimationFrame(frame);
+    // A field without an input of its own (a read-only row) focuses its section's heading.
+    const section = focus.startsWith("in-") ? sectionOfPath(focus.split("-").slice(2).join(".")) : null;
+    const el = document.getElementById(focus) ?? (section ? document.getElementById(`section-head-${section}`) : null);
+    el?.scrollIntoView({ block: "center" });
+    el?.focus({ preventScroll: true });
+    setFocus(null);
   }, [focus, session.ui]);
   const letters = complete.map((x) => x.o.letter);
   const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
