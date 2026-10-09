@@ -5,7 +5,11 @@ import {
 import { createPortal } from "react-dom";
 import { SECTIONS } from "./sections";
 import { TICKS, type TickKind } from "./ui";
-import { type Derivation, derive, type EditTarget, highlightedSentence, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
+import { lazyModule, useLazyModule } from "./lazy";
+import { type Derivation, type EditTarget, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
+
+/** The derivations (derive.ts): loaded the first time a tickmark is hovered, focused or opened. */
+export const derivations = lazyModule(() => import("./derive"));
 
 // Show the work (docs/ui-design.md §8, §9.1): every figure's tickmark is a button that opens its
 // derivation in a popover. While it's open, the figures it uses wear the highlighter wash wherever
@@ -31,16 +35,30 @@ export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   const [stack, setStack] = useState<MetricId[]>([]);
   const anchor = useRef<HTMLElement | null>(null);
   const openId = stack.length ? stack[stack.length - 1] : null;
+  const work = useLazyModule(derivations);
+
+  // A tickmark hovered or focused is about to be opened: load the derivations then, not on page load.
+  useEffect(() => {
+    if (work) return;
+    const intent = (e: Event) => { if ((e.target as Element).closest?.(".tick-btn")) void derivations.load(); };
+    document.addEventListener("pointerover", intent);
+    document.addEventListener("focusin", intent);
+    return () => {
+      document.removeEventListener("pointerover", intent);
+      document.removeEventListener("focusin", intent);
+    };
+  }, [work]);
+  useEffect(() => { if (openId && !work) void derivations.load(); }, [openId, work]);
 
   let derivation: Derivation | null = null;
   let problem: string | null = null;
-  if (openId) {
+  if (openId && work) {
     try {
-      derivation = derive(openId, ctx);
+      derivation = work.derive(openId, ctx);
     } catch (e) {
       problem = e instanceof Error ? e.message : String(e);
     }
-  }
+  } else if (openId) problem = "Working it out…";
   const tracedKey = derivation ? [openId, ...derivation.uses, ...derivation.ties].join("|") : openId ?? "";
   const traced = useMemo(() => new Set(tracedKey ? tracedKey.split("|") : []), [tracedKey]);
 
@@ -274,6 +292,7 @@ const onPage = (id: MetricId) => {
 
 function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }) {
   const { ctx, edit } = useApi();
+  const highlightedSentence = derivations.get()!.highlightedSentence;
   return (
     <>
       {d.scope && <p className="work-scope">{d.scope}</p>}

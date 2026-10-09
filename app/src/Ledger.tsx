@@ -1,15 +1,18 @@
-import { type CSSProperties, type Dispatch, Fragment, useRef } from "react";
+import { type CSSProperties, type Dispatch, Fragment, useEffect, useRef } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import type { OfferIssue } from "../../src/offer/validate";
-import { DetailedSection } from "./Detailed";
 import { type LedgerApi, LedgerProvider, RowLabel } from "./fields";
 import { HELP, helpKey, LEDGER_SECTIONS } from "./help";
 import { alsoCounted, type AppOffer, type Letter, type Missing } from "./model";
 import { BonusRow, CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { Action, LedgerSection, UiState } from "./session";
 import { Stamp } from "./ui";
+import { lazyModule, useLazyModule } from "./lazy";
 import { Trace, useRovingTicks } from "./Tickmarks";
+
+/** Detailed mode's sections, editors and controls: loaded the first time detailed mode is opened (or about to be). */
+export const detailedModule = lazyModule(() => import("./Detailed"));
 
 // The offers ledger: offers are columns, fields are rows, so A's salary sits beside B's (docs/ui-design.md
 // §3.2). Quick mode asks for five fields; detailed mode adds the sections (§3.3), one open at a time.
@@ -29,6 +32,9 @@ export function Ledger({ offers, missing, rents, issues = {}, ui, dispatch }: {
     openEditor: (row, letter) => dispatch({ type: "ui", patch: { editor: letter ? { row, letter } : null } }),
   };
   const setMode = (m: "quick" | "detailed") => dispatch({ type: "ui", patch: { mode: m, editor: null } });
+  const detailed = useLazyModule(detailedModule);
+  useEffect(() => { if (mode === "detailed" && !detailed) void detailedModule.load(); }, [mode, detailed]);
+  const preload = () => { void detailedModule.load(); };
   return (
     <LedgerProvider value={api}>
       <section ref={ref} className="ledger-wrap" aria-labelledby="offers-title">
@@ -37,8 +43,8 @@ export function Ledger({ offers, missing, rents, issues = {}, ui, dispatch }: {
           <div className="mode">
             <div className="segmented" role="group" aria-label="Input mode">
               <button type="button" className={mode === "quick" ? "is-on" : ""} aria-pressed={mode === "quick"} onClick={() => setMode("quick")}>Quick</button>
-              <button type="button" className={mode === "detailed" ? "is-on" : ""} aria-pressed={mode === "detailed"} onClick={() => setMode("detailed")}>
-                Detailed</button>
+              <button type="button" className={mode === "detailed" ? "is-on" : ""} aria-pressed={mode === "detailed"} onClick={() => setMode("detailed")}
+                onPointerEnter={preload} onFocus={preload}>Detailed</button>
             </div>
             <span className="mode-note">{mode === "quick" ? "Five fields per offer." : "Every input, one section at a time."}</span>
           </div>
@@ -53,13 +59,14 @@ export function Ledger({ offers, missing, rents, issues = {}, ui, dispatch }: {
               <CityRow />
               <StartRow />
               <RentRow rents={rents} />
-              <AlsoCounted offers={offers} show={() => setMode("detailed")} />
+              <AlsoCounted offers={offers} show={() => setMode("detailed")} preload={preload} />
             </>
           ) : LEDGER_SECTIONS.map((s) => (
             <Fragment key={s.id}>
               <SectionHead id={s.id} title={s.title} holds={s.holds} open={ui.section === s.id} issues={issues}
                 toggle={() => dispatch({ type: "ui", patch: { section: ui.section === s.id ? null : s.id, editor: null } })} />
-              {ui.section === s.id && <DetailedSection id={s.id} rents={rents} />}
+              {ui.section === s.id && (detailed ? <detailed.DetailedSection id={s.id} rents={rents} />
+                : <div className="row loading-row"><p className="note">Loading this section…</p></div>)}
             </Fragment>
           ))}
         </div>
@@ -98,7 +105,7 @@ function HeadRow({ offers, missing, dispatch }: { offers: AppOffer[]; missing: M
 }
 
 /** Quick mode's row for what it doesn't show but still counts: hidden inputs never change results silently. */
-function AlsoCounted({ offers, show }: { offers: AppOffer[]; show: () => void }) {
+function AlsoCounted({ offers, show, preload }: { offers: AppOffer[]; show: () => void; preload: () => void }) {
   if (!offers.some((o) => alsoCounted(o.draft).length)) return null;
   return (
     <div className="row">
@@ -106,7 +113,7 @@ function AlsoCounted({ offers, show }: { offers: AppOffer[]; show: () => void })
         <span className="row-name">Also counted</span>
         <div className="help">
           <span className="hint">Detailed inputs this view hides. They still count.</span>{" "}
-          <button type="button" className="link" onClick={show}>Show</button>
+          <button type="button" className="link" onClick={show} onPointerEnter={preload} onFocus={preload}>Show</button>
         </div>
       </div>
       {offers.map((o) => {

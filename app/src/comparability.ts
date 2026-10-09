@@ -1,9 +1,13 @@
+import { HELP } from "./help";
 import type { AppOffer, Letter, OfferDraft } from "./model";
 
 // Comparability (docs/slice-3-plan.md, decision 5): a cost or benefit counted for some offers but not
 // others tilts the comparison, so the lead schedule says so, naming who and what. A category is
 // counted when it's entered (an explicit $0 counts: the offer has none). Offer terms that are simply
 // absent, such as no RSUs or no sign-on, aren't asymmetries: that offer is just smaller.
+//
+// It never names a category you can't enter: a category counts only once its input exists (has help,
+// which every rendered input must have), so the warning can always be acted on.
 
 export type Category = "premium" | "outOfPocket" | "employer401k" | "employerHsa" | "perks" | "hours";
 
@@ -29,9 +33,18 @@ const COST: Record<Category, boolean> = { premium: true, outOfPocket: true, empl
 
 const CATEGORIES = Object.keys(COUNTED) as Category[];
 
-/** Each category counted for some of these offers but not all of them. */
+/** The input that enters each category, by its help key. */
+export const CATEGORY_INPUT: Record<Category, string> = {
+  premium: "health.premium", outOfPocket: "health.outOfPocket", employer401k: "retirement", employerHsa: "health.employerHsa",
+  perks: "perks.section127", hours: "hours.weekly",
+};
+
+/** A category you can enter in the app: its input exists. */
+export const enterable = (c: Category) => HELP[CATEGORY_INPUT[c]] !== undefined;
+
+/** Each category counted for some of these offers but not all of them, among those you can enter. */
 export function asymmetries(offers: AppOffer[]): Asymmetry[] {
-  return CATEGORIES.flatMap((category) => {
+  return CATEGORIES.filter(enterable).flatMap((category) => {
     const counted = offers.filter((o) => COUNTED[category](o.draft)).map((o) => o.letter);
     const missing = offers.filter((o) => !COUNTED[category](o.draft)).map((o) => o.letter);
     return counted.length && missing.length ? [{ category, counted, missing }] : [];

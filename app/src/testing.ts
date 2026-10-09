@@ -7,15 +7,22 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { compute } from "./compute";
 import { HELP, LEDGER_SECTIONS } from "./help";
 import { Lead } from "./Lead";
-import { Ledger } from "./Ledger";
+import * as Derive from "./derive";
+import * as Detailed from "./Detailed";
+import { detailedModule, Ledger } from "./Ledger";
 import { type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
 import type { WorkContext } from "./metrics";
 import { initialSession, type UiState } from "./session";
-import { WorkProvider } from "./Tickmarks";
+import { derivations, WorkProvider } from "./Tickmarks";
 import { verdict } from "./verdict";
 
 // Shared by the app's tests: the samples' comparison as Show the work sees it, and static renders of
 // every view of the inputs (quick mode, each detailed section, each row editor). Not part of the app.
+
+// The app loads detailed mode and the derivations on first use (separate chunks); a static render can't
+// wait for one, so they're supplied up front.
+detailedModule.provide(Detailed);
+derivations.provide(Derive);
 
 /** The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's. */
 export const VALUATION = "2026-07-13";

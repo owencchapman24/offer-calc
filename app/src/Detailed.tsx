@@ -1,6 +1,8 @@
 import type { RentEstimate } from "../../src/col/rent";
+import "./helpText"; // detailed mode's help text, which arrives with this chunk
 import { BonusYearsEditor, GrantsEditor, newGrant, newPromotion, newRefreshers, PromotionsEditor, RefreshersEditor } from "./editors";
-import { ChoiceField, DefaultTick, EditButton, EditorRow, FieldRow, MonthDayField, NumberField, RangeField, useLedger } from "./fields";
+import { ChoiceField, EditButton, EditorRow, MonthDayField, NumberField, RangeField } from "./controls";
+import { DefaultTick, FieldRow, useLedger } from "./fields";
 import { type AppOffer, ASSUMPTIONS, bonusBasis, type OfferDraft } from "./model";
 import { BonusRow, CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
