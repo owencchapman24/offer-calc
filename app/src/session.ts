@@ -1,11 +1,17 @@
-import type { Basis } from "../../src/offer/types";
-import { type AppHousehold, type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, type Letter, LETTERS, type QuickFields, sampleOffers } from "./model";
+import type { Basis, OfferInput } from "../../src/offer/types";
+import {
+  all, type AppHousehold, type AppOffer, blankDraft, blankOffer, completeSample, DEFAULT_HOUSEHOLD, fromOfferInput, type Letter, LETTERS,
+  type OfferDraft, sampleOffers, setPath,
+} from "./model";
 
 // Everything the user has entered, plus UI choices. Serializable: saved in this browser only.
 
 export type Theme = "system" | "light" | "dark";
 
 export type Hint = "ticks" | "afterRent";
+
+/** The ledger's sections in detailed mode (docs/ui-design.md §3.3), one open at a time. */
+export type LedgerSection = "pay" | "bonus" | "cash" | "equity" | "retirement" | "health" | "perks" | "hours" | "where";
 
 /** View choices remembered in this browser. The optional ones arrived after slice 1; saved sessions without them still load. */
 export interface UiState {
@@ -17,10 +23,16 @@ export interface UiState {
   byYear?: { mode: "each" | "running"; table: boolean };
   /** The bridge's offer and employment year. */
   bridge?: { letter: Letter; year: number };
+  /** Quick or detailed inputs. Default quick. */
+  mode?: "quick" | "detailed";
+  /** The open section in detailed mode; null: all closed. */
+  section?: LedgerSection | null;
+  /** The row editor open beneath a row: its row and offer. */
+  editor?: { row: string; letter: Letter } | null;
 }
 
 export interface Session {
-  schemaVersion: 1;
+  schemaVersion: 2;
   household: AppHousehold;
   offers: AppOffer[];
   ui: UiState;
@@ -29,12 +41,13 @@ export interface Session {
 export const STORAGE_KEY = "offer-calc:v1";
 
 export function initialSession(today: string): Session {
-  return { schemaVersion: 1, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
+  return { schemaVersion: 2, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
 }
 
 export type Action =
   | { type: "household"; patch: Partial<AppHousehold> }
-  | { type: "offer"; id: string; patch: Partial<QuickFields> }
+  /** Sets draft fields by path, e.g. { "salary.annual": 120000 }. */
+  | { type: "edit"; id: string; set: Record<string, unknown> }
   | { type: "addOffer" }
   | { type: "removeOffer"; id: string }
   | { type: "loadSamples"; today: string }
@@ -42,14 +55,15 @@ export type Action =
   | { type: "basis"; basis: Basis }
   | { type: "theme"; theme: Theme }
   | { type: "dismiss"; hint: Hint }
-  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge">> };
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor">> };
 
 export function reducer(s: Session, a: Action): Session {
   switch (a.type) {
     case "household": return { ...s, household: { ...s.household, ...a.patch } };
-    case "offer":
-      return { ...s, offers: s.offers.map((o) => o.id !== a.id ? o
-        : { ...o, quick: { ...o.quick, ...a.patch }, sample: o.sample === "sample" ? "edited" : o.sample }) };
+    case "edit":
+      return { ...s, offers: s.offers.map((o) => o.id !== a.id ? o : {
+        ...o, draft: Object.entries(a.set).reduce((d, [path, v]) => setPath(d, path, v), o.draft), sample: o.sample === "sample" ? "edited" : o.sample,
+      }) };
     case "addOffer": {
       const free = LETTERS.find((l) => !s.offers.some((o) => o.letter === l));
       return free ? { ...s, offers: [...s.offers, blankOffer(free)].sort(byLetter) } : s;
@@ -73,8 +87,8 @@ export function loadSession(store: KeyValueStore | undefined, today: string): Se
   try {
     const raw = store?.getItem(STORAGE_KEY);
     if (raw) {
-      const s = JSON.parse(raw) as Session;
-      if (s?.schemaVersion === 1 && Array.isArray(s.offers) && s.household && s.ui) return s;
+      const s = migrate(JSON.parse(raw));
+      if (s) return s;
     }
   } catch { /* unreadable or blocked: start fresh */ }
   return initialSession(today);
@@ -89,4 +103,61 @@ export function saveSession(store: KeyValueStore | undefined, s: Session): boole
   } catch {
     return false;
   }
+}
+
+// ---- older saved sessions -------------------------------------------------------------------------
+
+/** Slice 1 and 2's offer: the quick fields, plus a sample's detailed inputs as an engine input. */
+export interface V1Offer {
+  id: string;
+  letter: Letter;
+  sample: "sample" | "edited" | null;
+  quick: {
+    label: string; salary: number | null;
+    /** A percent (10 = 10%) or dollars a year; "schedule" kept a sample's bonus by year. */
+    bonus: { kind: "percent" | "amount"; value: number | null } | { kind: "schedule" };
+    area: string | null; state: string | null; nyc: boolean; startDate: string | null; rent: number | null;
+  };
+  base?: OfferInput;
+}
+
+export interface V1Session { schemaVersion: 1; household: AppHousehold; offers: V1Offer[]; ui: UiState }
+
+/** A saved session in the current shape, migrating older ones; null if it isn't one. */
+export function migrate(s: unknown): Session | null {
+  const x = s as Partial<Session> | Partial<V1Session> | null;
+  if (!x || !Array.isArray(x.offers) || !x.household || !x.ui) return null;
+  if (x.schemaVersion === 2) return x as Session;
+  if (x.schemaVersion === 1) return { ...(x as V1Session), schemaVersion: 2, offers: (x as V1Session).offers.map(migrateOffer) };
+  return null;
+}
+
+/**
+ * A v1 offer as a draft: the sample's inputs (`base`) become the draft, and the quick fields, which
+ * overrode them, are written over it, the same way v1 built the engine's input.
+ */
+export function migrateOffer(o: V1Offer): AppOffer {
+  const q = o.quick;
+  let d: OfferDraft = o.base ? fromOfferInput(o.base, q.label) : { ...blankDraft(), label: q.label };
+  d = {
+    ...d,
+    label: q.label,
+    residence: { state: q.state, nyc: q.nyc },
+    employerState: null,
+    startDate: q.startDate,
+    salary: { ...d.salary, annual: q.salary },
+    costOfLiving: { ...d.costOfLiving, area: q.area, monthlyRent: q.rent },
+  };
+  const b = q.bonus;
+  const base = o.base?.bonus;
+  if (b.kind !== "schedule") {
+    const basis = b.kind === "percent" ? "percentOfSalary" as const : "fixed" as const;
+    const v = b.value === null ? null : b.kind === "percent" ? b.value / 100 : b.value;
+    // v1 kept a sample's bear/bull range in proportion to the quick target.
+    const amount = v === null ? null : base && base.basis === basis && base.amount.base > 0
+      ? { bear: base.amount.bear * (v / base.amount.base), base: v, bull: base.amount.bull * (v / base.amount.base) } : all(v);
+    // v1 kept only the payout timing (payOn, cutoff, period) from a sample, or the default.
+    d = setPath(d, "bonus", { ...d.bonus, basis: basis === "percentOfSalary" && !o.base ? null : basis, amount, amounts: [], firstPayoutGuaranteed: null, mustBeEmployedOnPayDate: null });
+  }
+  return { id: o.id, letter: o.letter, sample: o.sample, draft: o.sample ? completeSample(d) : d };
 }

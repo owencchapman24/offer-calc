@@ -1,5 +1,9 @@
 import { type Dispatch, useRef } from "react";
+import { formatIssue } from "../../src/format/index";
 import type { Basis } from "../../src/offer/types";
+import type { OfferIssue } from "../../src/offer/validate";
+import { fieldName } from "./help";
+import type { EditTarget } from "./metrics";
 import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
@@ -16,10 +20,15 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch }: {
+export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [] }: {
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
+  /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
+  cautions?: string[];
+  /** Problems with the latest inputs: the results are the last valid ones until they're fixed. */
+  issues?: Partial<Record<Letter, OfferIssue[]>>; onFix?: (t: EditTarget) => void;
 }) {
+  const problems = (Object.entries(issues) as Array<[Letter, OfferIssue[]]>).flatMap(([letter, list]) => list.map((i) => ({ letter, i })));
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   return (
@@ -37,7 +46,21 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
       {error && <p className="note error" role="alert">Couldn't compute: {error}</p>}
-      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} /> : !error && notes.length === 0 && (
+      {problems.length > 0 && (
+        <div className="stale" role="alert">
+          <p className="stale-head">{view ? "These results are for your last valid inputs." : "Nothing to compare yet."} Fix {problems.length === 1 ? "this" : "these"} to update them:</p>
+          <ul>
+            {problems.map(({ letter, i }) => (
+              <li key={`${letter}|${i.path}|${i.code}`}>
+                <strong className={`who offer-${letter}`}>{letter}</strong> {fieldName(i.path)}: {formatIssue(i)}{" "}
+                {onFix && <button type="button" className="link" onClick={() => onFix({ letter, path: i.path.replace(/\.(bear|base|bull)$/, "") })}>Fix it</button>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions} />
+        : !error && notes.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
       <TickLegend />
@@ -45,8 +68,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dismissed, dispatch }: {
-  view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>;
+function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions }: {
+  view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf } = view;
   const step = PIPELINE.find((p) => p.basis === basis)!;
@@ -92,6 +115,12 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch }: {
           {pv ? " · today's dollars" : " · nominal"}
         </p>
         {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
+        {cautions.length > 0 && (
+          <div className="caution" role="note" aria-label="Not counted for every offer">
+            <p className="caution-head"><span aria-hidden="true">⚠</span> Not counted for every offer</p>
+            {cautions.map((c) => <p key={c}>{c}</p>)}
+          </div>
+        )}
         {!dismissed?.ticks && (
           <p className="hint-ticks">
             <span>{touch() ? "Tap" : "Click"} any figure or <span className="tick" aria-hidden="true">✓</span><span className="sr-only">tickmark</span> to see how it's calculated.</span>

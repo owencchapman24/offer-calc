@@ -2,6 +2,7 @@ import type { RentEstimate } from "../../src/col/rent";
 import type {
   Assumption, CostOfLivingInfo, EmploymentYearResult, HorizonSweep, Household, ISODate, OfferInput, OfferWarning, WindowTotals,
 } from "../../src/offer/types";
+import type { OfferIssue } from "../../src/offer/validate";
 
 // Messages between the main thread and the engine worker. Types and one key helper only: importing
 // a value from engine.worker.ts would pull the engine and its data tables into the main bundle.
@@ -22,6 +23,8 @@ export interface EngineRequest {
   gen: number;
   /** Null until at least two offers are complete: then only rent estimates are computed. */
   compare: CompareRequest | null;
+  /** Every complete offer, to check (validateOffer) before anything is computed. Default: the compared offers. */
+  check?: OfferInput[];
   /** Places (with the residence state) whose rent estimate the inputs show. */
   rents: Array<{ area: string; state: string }>;
 }
@@ -55,9 +58,14 @@ export interface StayDetail {
   annuity: Record<number, AnnuityTerm[]>;
 }
 
-export type EngineResponse = { gen: number; rents: Record<string, RentEstimate>; ms: number } & (
+export type EngineResponse = {
+  gen: number; rents: Record<string, RentEstimate>; ms: number;
+  /** The validator's problems for each checked offer, in order: all empty when the comparison ran. */
+  issues: OfferIssue[][];
+} & (
   | { ok: true; sweep: HorizonSweep | null; detail: StayDetail | null }
-  | { ok: false; error: string }
+  /** error null: the inputs have problems (`issues`), so nothing was computed. */
+  | { ok: false; error: string | null }
 );
 
 export const rentKey = (area: string, state: string) => `${area}|${state}`;

@@ -5,7 +5,7 @@ import {
 import { createPortal } from "react-dom";
 import { SECTIONS } from "./sections";
 import { TICKS, type TickKind } from "./ui";
-import { type Derivation, derive, highlightedSentence, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
+import { type Derivation, derive, type EditTarget, highlightedSentence, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
 
 // Show the work (docs/ui-design.md §8, §9.1): every figure's tickmark is a button that opens its
 // derivation in a popover. While it's open, the figures it uses wear the highlighter wash wherever
@@ -18,11 +18,16 @@ interface WorkApi {
   traced: ReadonlySet<string>;
   toggle(id: MetricId, anchor: HTMLElement): void;
   push(id: MetricId): void;
+  /** "Edit it": open the field's section (and row editor) and focus it. */
+  edit(target: EditTarget): void;
 }
 
 const Api = createContext<WorkApi | null>(null);
 
-export function WorkProvider({ ctx, children, onOpen }: { ctx: WorkContext; children: ReactNode; /** Called when a derivation opens. */ onOpen?: () => void }) {
+export function WorkProvider({ ctx, children, onOpen, onEdit }: {
+  ctx: WorkContext; children: ReactNode; /** Called when a derivation opens. */ onOpen?: () => void;
+  /** Shows and focuses an input: the app opens its section first. */ onEdit?: (target: EditTarget) => void;
+}) {
   const [stack, setStack] = useState<MetricId[]>([]);
   const anchor = useRef<HTMLElement | null>(null);
   const openId = stack.length ? stack[stack.length - 1] : null;
@@ -51,7 +56,10 @@ export function WorkProvider({ ctx, children, onOpen }: { ctx: WorkContext; chil
     opened.current?.();
   }, []);
   const push = useCallback((id: MetricId) => setStack((s) => (s[s.length - 1] === id ? s : [...s, id])), []);
-  const api = useMemo<WorkApi>(() => ({ ctx, openId, traced, toggle, push }), [ctx, openId, traced, toggle, push]);
+  const editRef = useRef(onEdit);
+  useEffect(() => { editRef.current = onEdit; });
+  const edit = useCallback((target: EditTarget) => editRef.current?.(target), []);
+  const api = useMemo<WorkApi>(() => ({ ctx, openId, traced, toggle, push, edit }), [ctx, openId, traced, toggle, push, edit]);
 
   return (
     <Api.Provider value={api}>
@@ -257,10 +265,15 @@ function ShowTheWork({ id, derivation, problem, anchor, depth, back, close }: {
 }
 
 /** A figure is named in "the highlighted figures" only if it's on the page to light up. */
-const onPage = (id: MetricId) => typeof document !== "undefined" && !!document.querySelector(`[data-metric="${id}"], [data-trace="${id}"]`);
+const onPage = (id: MetricId) => {
+  // A plain string: querySelector's overloads would otherwise type the selector as a template over every
+  // pair of metric ids, which TypeScript can't check in reasonable time.
+  const s: string = id;
+  return typeof document !== "undefined" && !!document.querySelector(`[data-metric="${s}"], [data-trace="${s}"]`);
+};
 
 function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }) {
-  const { ctx } = useApi();
+  const { ctx, edit } = useApi();
   return (
     <>
       {d.scope && <p className="work-scope">{d.scope}</p>}
@@ -281,6 +294,15 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
           ))}
         </tbody>
       </table>
+      {d.inputs && d.inputs.length > 0 && (
+        <p className="work-inputs">
+          <span className="work-inputs-head">From your inputs:</span>{" "}
+          {d.inputs.map((x, i) => (
+            <span key={x.ref} className="work-input">{i ? " · " : ""}{x.label}{" "}
+              <Fig id={x.ref} label={`${x.label}, ${x.value}`} drill>{x.value}</Fig></span>
+          ))}
+        </p>
+      )}
       {d.notes.map((n) => <p key={n} className="work-note">{n}</p>)}
       {(d.uses.length > 0 || d.ties.length > 0) && (
         <p className="work-ties">
@@ -293,9 +315,7 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
         {d.edit && (
           <button type="button" className="link" onClick={() => {
             close(false);
-            const el = document.getElementById(d.edit!);
-            el?.scrollIntoView({ block: "center" });
-            el?.focus();
+            edit(d.edit!);
           }}>Edit it</button>
         )}
       </p>

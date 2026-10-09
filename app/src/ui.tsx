@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
-import { figure, parseMoney, parsePercent } from "./text";
+import { figure, parseMoney, parseNumber, parsePercent } from "./text";
 
 // Small building blocks shared by the schedules.
 
@@ -35,64 +35,83 @@ export function Stamp({ children, tone = "ink" }: { children: ReactNode; tone?: 
   return <span className={`stamp stamp-${tone}`}>{children}</span>;
 }
 
-/** The ⓘ toggle: expands longer help inline (not a hover tooltip). */
-export function Help({ hint, children }: { hint: string; children: ReactNode }) {
+/**
+ * An input's help (docs/ui-design.md §3.5): the hint, always visible; the ⓘ toggle, which expands the
+ * longer help inline (not a hover tooltip); and "How this is used →", a link to the methodology.
+ * `hintId` lets the inputs point at the hint with aria-describedby.
+ */
+export function Help({ hint, hintId, section, extra, children }: {
+  hint: string; hintId?: string; section?: string; /** After the help: "Reset to default". */ extra?: ReactNode; children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
     <div className="help">
-      <span className="hint">{hint}</span>
+      <span className="hint" id={hintId}>{hint}</span>
       <button type="button" className="help-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}
-        title={open ? "Hide help" : "More help"}>ⓘ</button>
-      {open && <div id={id} className="help-body">{children}</div>}
+        aria-label={open ? "Hide help" : "More help"} title={open ? "Hide help" : "More help"}>ⓘ</button>
+      {open && (
+        <div id={id} className="help-body">
+          <p>{children}</p>
+          {extra}
+          {section && <p><a href={`#/method/${section}`}>How this is used →</a></p>}
+        </div>
+      )}
     </div>
   );
 }
 
+/** What a number field accepts and shows: dollars ("110k"), a percent ("12.5", "-3") or a plain number. */
+export type NumberKind = "money" | "percent" | "number";
+
+const PARSE: Record<NumberKind, (t: string) => number | null> = { money: parseMoney, percent: parsePercent, number: parseNumber };
+const INVALID: Record<NumberKind, string> = {
+  money: "Enter an amount like 110000 or 110k.", percent: "Enter a percent like 10.", number: "Enter a number like 12.",
+};
+
 /**
- * A money field: accepts "110k", "110,000" or "$110000" while typing; shows "110,000" otherwise.
- * Blank is null. `placeholder` shows an estimate when the field is blank.
+ * A number field: accepts what people type ("110k", "$110,000", "12.5%") while typing, and shows the
+ * value formatted otherwise. Blank is null. `help` names its help entry (help.ts); `describedBy` ties
+ * the hint to it; `invalid` marks a problem the validator found.
  */
-export function MoneyInput({ id, value, onChange, label, placeholder, invalidNote = "Enter an amount like 110000 or 110k." }: {
-  id?: string; value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string; invalidNote?: string;
+export function NumberInput({ id, kind, value, onChange, label, placeholder, unit, describedBy, help, invalid, invalidNote }: {
+  id?: string; kind: NumberKind; value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string;
+  /** Shown after the field ("%", "hrs"); money shows "$" before it. */ unit?: string; describedBy?: string; help?: string;
+  invalid?: boolean; invalidNote?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? (value === null ? "" : figure(value));
-  const parsed = draft === null ? value : parseMoney(draft);
-  const invalid = parsed !== null && Number.isNaN(parsed);
+  const format = (v: number) => (kind === "money" ? figure(v) : String(v));
+  const shown = draft ?? (value === null ? "" : format(value));
+  const parsed = draft === null ? value : PARSE[kind](draft);
+  const unparsable = parsed !== null && Number.isNaN(parsed);
+  const after = kind === "percent" ? unit ?? "%" : unit;
   return (
-    <span className="money">
-      <span className="unit" aria-hidden="true">$</span>
-      <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder={placeholder} aria-invalid={invalid || undefined}
+    <span className={`money num-${kind}`}>
+      {kind === "money" && <span className="unit" aria-hidden="true">$</span>}
+      <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder={placeholder} data-help={help}
+        aria-invalid={unparsable || invalid || undefined} aria-describedby={describedBy}
         onFocus={() => setDraft(shown)} /* keep the text as shown, so a select-all-and-type replaces it cleanly */
         onChange={(e) => {
           setDraft(e.target.value);
-          const v = parseMoney(e.target.value);
+          const v = PARSE[kind](e.target.value);
           if (v === null || !Number.isNaN(v)) onChange(v);
         }}
         onBlur={() => setDraft(null)} />
-      {invalid && <span className="field-error" role="alert">{invalidNote}</span>}
+      {after && <span className="unit" aria-hidden="true">{after}</span>}
+      {unparsable && <span className="field-error" role="alert">{invalidNote ?? INVALID[kind]}</span>}
     </span>
   );
 }
 
-export function PercentInput({ id, value, onChange, label }: { id?: string; value: number | null; onChange: (v: number | null) => void; label: string }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? (value === null ? "" : String(value));
-  const parsed = draft === null ? value : parsePercent(draft);
-  const invalid = parsed !== null && Number.isNaN(parsed);
-  return (
-    <span className="money">
-      <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder="0" aria-invalid={invalid || undefined}
-        onFocus={() => setDraft(shown)}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          const v = parsePercent(e.target.value);
-          if (v === null || !Number.isNaN(v)) onChange(v);
-        }}
-        onBlur={() => setDraft(null)} />
-      <span className="unit" aria-hidden="true">%</span>
-      {invalid && <span className="field-error" role="alert">Enter a percent like 10.</span>}
-    </span>
-  );
+/** A money field: accepts "110k", "110,000" or "$110000" while typing; shows "110,000" otherwise. Blank is null. */
+export function MoneyInput(props: Omit<Parameters<typeof NumberInput>[0], "kind">) {
+  return <NumberInput {...props} kind="money" />;
+}
+
+/** A fraction as the percent a field shows: 0.07 -> 7 (not 7.000000000000001). */
+export const toPercent = (f: number) => +(f * 100).toFixed(8);
+
+/** A percent field over a value in percent units (10 = 10%). */
+export function PercentInput(props: Omit<Parameters<typeof NumberInput>[0], "kind">) {
+  return <NumberInput {...props} kind="percent" />;
 }

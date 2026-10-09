@@ -29,11 +29,14 @@ function run() {
   if (!req) return;
   const t = performance.now();
   try {
-    const { sweep, detail, rents } = compute(req);
-    scope.postMessage({ gen: req.gen, ok: true, sweep, detail, rents, ms: performance.now() - t });
+    const { sweep, detail, rents, issues } = compute(req);
+    const ms = performance.now() - t;
+    // Problems with the inputs: nothing was compared, and the results keep the last valid state.
+    if (issues.some((x) => x.length)) scope.postMessage({ gen: req.gen, ok: false, error: null, issues, rents, ms });
+    else scope.postMessage({ gen: req.gen, ok: true, sweep, detail, rents, issues, ms });
   } catch (err) {
     // Rent estimates don't depend on the comparison, so they still come back.
-    const { rents } = compute({ ...req, compare: null });
-    scope.postMessage({ gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), rents, ms: performance.now() - t });
+    const { rents } = compute({ ...req, compare: null, check: [] });
+    scope.postMessage({ gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), issues: [], rents, ms: performance.now() - t });
   }
 }

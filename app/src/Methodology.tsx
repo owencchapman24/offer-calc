@@ -84,8 +84,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             <strong>Salary</strong> accrues by calendar month: each month earns 1/12 of the yearly rate, and a partial month earns
             its share by days worked. So a July start earns about half its salary in its first calendar year, and a full employment
-            year is exactly the yearly rate. Raises and promotions, when entered (detailed mode, coming soon), change the rate on
-            their dates.
+            year is exactly the yearly rate. Raises and promotions, entered under Pay in detailed mode, change the rate on their
+            dates.
           </p>
           <p>
             <strong>Bonuses</strong> are paid once a year for the work before it. A target given as a percent applies to the salary
@@ -176,8 +176,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-5">
           <p>
             Total rewards adds what the job gives you beyond cash, and takes out what its health plan costs you beyond premiums.
-            Quick mode doesn't ask for these yet; the sample offers include them, and detailed mode (coming soon) will let you
-            enter your own.
+            Quick mode doesn't ask for these; detailed mode shows each offer's, and the sample offers include them.
           </p>
         </Section>
         <Section id="M-5.1">
@@ -552,7 +551,7 @@ function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
         const offer = ctx.offers.find((o) => o.letter === l);
         return (
           <div key={l} className="method-assumptions">
-            <h4><span className={`who offer-${l}`}>{l}</span>{offer?.quick.label ? ` · ${offer.quick.label}` : ""}{" "}
+            <h4><span className={`who offer-${l}`}>{l}</span>{offer?.draft.label ? ` · ${offer.draft.label}` : ""}{" "}
               {offer?.sample && sample ? <span className="stamp">Sample</span> : null}</h4>
             <ul>{r.detail!.offers[i].assumptions.map((a, k) => <li key={k}>{formatAssumption(a)}</li>)}</ul>
           </div>

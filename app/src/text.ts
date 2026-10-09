@@ -43,11 +43,16 @@ export function parseMoney(text: string): number | null {
   return Number(m[1]) * (m[2] === "k" ? 1_000 : m[2] === "m" ? 1_000_000 : 1);
 }
 
-/** Accepts "10", "10%", "12.5". */
+/** Accepts "10", "10%", "12.5", "-3" (a rate can fall); blank is null; anything else is NaN. */
 export function parsePercent(text: string): number | null {
-  const t = text.trim().replace(/%$/, "").trim();
+  return parseNumber(text.trim().replace(/%$/, ""));
+}
+
+/** Accepts "12", "12.5", "-3" or "−3"; blank is null; anything else is NaN. */
+export function parseNumber(text: string): number | null {
+  const t = text.trim().replace(/^−/, "-").replace(/,/g, "");
   if (t === "") return null;
-  return /^\d+(?:\.\d+)?$/.test(t) ? Number(t) : Number.NaN;
+  return /^-?\d+(?:\.\d+)?$/.test(t) || /^-?\.\d+$/.test(t) ? Number(t) : Number.NaN;
 }
 
 /** Today in the user's time zone, as YYYY-MM-DD: the valuation date. */

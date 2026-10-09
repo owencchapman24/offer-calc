@@ -290,7 +290,7 @@ function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch
         </div>
       </div>
       <p className="bridge-scope">
-        <strong className={`who offer-${letter}`}>{letter}</strong>{offer?.quick.label ? ` · ${offer.quick.label}` : ""} · year {n} ({longDate(b.start)} – {longDate(dayBefore(b.end))})
+        <strong className={`who offer-${letter}`}>{letter}</strong>{offer?.draft.label ? ` · ${offer.draft.label}` : ""} · year {n} ({longDate(b.start)} – {longDate(dayBefore(b.end))})
       </p>
       <table className="bridge-table">
         <tbody>

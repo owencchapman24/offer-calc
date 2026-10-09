@@ -1,40 +1,21 @@
-import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import type { Basis } from "../../src/offer/types";
-import { About } from "./About";
-import { ByYear } from "./ByYear";
-import { compute } from "./compute";
-import { Lead } from "./Lead";
 import Methodology, { sectionAnchor } from "./Methodology";
-import { Ledger } from "./Ledger";
-import { type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
+import { blankDraft, type Letter, type OfferDraft } from "./model";
 import { bridge, byYear, derive, highlightedSentence, type MetricId, metricKind, metricSection, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
-import { initialSession } from "./session";
+import { context, renderAllInputs, renderPage } from "./testing";
 import { figure } from "./text";
-import { WorkProvider } from "./Tickmarks";
-import { extraHoursView, verdict } from "./verdict";
+import { extraHoursView } from "./verdict";
 
-// The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's.
-const VALUATION = "2026-07-13";
 const LETTERS: Letter[] = ["A", "B", "C"];
 
-function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o): WorkContext {
-  const offers = tweak(sampleOffers(VALUATION));
-  const inputs = offers.map((o) => {
-    const r = toOfferInput(o);
-    if (!("offer" in r)) throw new Error("incomplete sample");
-    return r.offer;
-  });
-  const household = DEFAULT_HOUSEHOLD;
-  const out = compute({
-    compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: 4, valuationDate: VALUATION,
-      inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
-    rents: offers.map((o) => ({ area: o.quick.area!, state: o.quick.state! })),
-  });
-  const view = verdict(out.sweep!, LETTERS, basis, 4)!;
-  return { today: VALUATION, household, wagesYear: 2026, offers, rents: out.rents, results: { sweep: out.sweep!, detail: out.detail, view, letters: LETTERS } };
+/** Only what quick mode asks for, as your own offer would have it: a 10% bonus on the default timing, and an estimated rent. */
+function quickOnly(d: OfferDraft): OfferDraft {
+  const b = blankDraft();
+  return { ...b, label: d.label, salary: { ...b.salary, annual: d.salary.annual }, residence: d.residence, startDate: d.startDate,
+    costOfLiving: { ...b.costOfLiving, area: d.costOfLiving.area }, bonus: { ...b.bonus, amount: { bear: 0.1, base: 0.1, bull: 0.1 } } };
 }
 
 const parse = (s: string | undefined) => Number((s ?? "").replace(/[$,]/g, "").replace("−", "-"));
@@ -91,7 +72,7 @@ describe("show the work: an offer's totals", () => {
     expect(Math.abs(total - v("After rent, at U.S. prices"))).toBeLessThanOrEqual(2);
     expect(d.lines[d.lines.length - 1].value).toBe("313,175");
     expect(d.notes[1]).toMatch(/= 313,175\.$/); // total rewards - rent + (factor - 1) x (spending - out-of-pocket)
-    expect(d.uses).toEqual(["in.A.rent", "in.A.city"]);
+    expect(d.uses).toEqual(["in.A.costOfLiving.monthlyRent", "in.A.costOfLiving.area"]);
   });
   it("after-tax pay is gross - tax - premiums, in present value", () => {
     const d = derive("pv.C.cash", ctx);
@@ -165,12 +146,44 @@ describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
   });
 });
 
+describe("show the work reaches every detailed input (step 0.4)", () => {
+  const ctx = context();
+  const refs = (id: MetricId, c = ctx) => (derive(id, c).inputs ?? []).map((x) => `${x.ref} = ${x.value}`);
+  it("the bridge's RSU line points to each grant and its vesting, share-price growth and refreshers", () => {
+    expect(refs("br.C.2.rsu")).toEqual([
+      "in.C.equity.grants.0.value = $120,000", "in.C.equity.grants.0.schedule = 5/15/40/40, semiannual after a 1-year cliff; on company dates",
+      "in.C.equity.priceGrowth = 0%", "in.C.equity.refreshers = $10,000 / $25,000 / $40,000 a year, from month 12",
+    ]);
+    expect(derive("br.C.2.rsu", ctx).uses).toContain("in.C.also"); // quick mode's row lights up where the inputs are hidden
+  });
+  it("the bridge's bonus line points to the amount and the payout date; the salary line to raises and promotions", () => {
+    expect(refs("br.A.1.bonus")).toEqual(["in.A.bonus.amounts = Year 1 $56,000 / $70,000 / $84,000; Year 2 $68,000 / $85,000 / $102,000; "
+      + "Year 3 $80,000 / $100,000 / $120,000; Year 4 $92,000 / $115,000 / $138,000; Year 5, and after $104,000 / $130,000 / $156,000",
+      "in.A.bonus.payOn = Jan 31", "in.A.bonus.periodStart = Jan 1"]);
+    expect(metricKind("in.A.bonus.periodStart", ctx)).toBe("default");
+    expect(metricKind("in.A.bonus.payOn", ctx)).toBe("traced");
+  });
+  it("per hour points to weekly hours, and weeks a year shows its default and why", () => {
+    const c = context("perHour");
+    expect(refs("ph.A", c)).toEqual(["in.A.hours.weekly = 80 hours a week", "in.A.hours.weeksPerYear = 50"]);
+    const weeks = derive("in.A.hours.weeksPerYear", c);
+    expect([weeks.kind, weeks.lines[0].value, weeks.notes[0]]).toEqual(["default", "50", "A default, not something you entered. Two weeks off a year."]);
+    expect(weeks.edit).toEqual({ letter: "A", path: "hours.weeksPerYear" });
+  });
+  it("a range reads bear / base / bull; a promotion that isn't certain says so", () => {
+    expect(derive("in.B.bonus.amount", ctx).lines.map((l) => [l.label, l.value])).toEqual([
+      ["Bonus, bear case", "5%"], ["Bonus, base case", "10%"], ["Bonus, bull case", "12%"]]);
+    expect(derive("in.A.salary.promotions", ctx).lines.map((l) => [l.label, l.value, l.note]))
+      .toEqual([["Promotion 1", "+35%", "on Jul 13, 2029, base and bull only"]]);
+  });
+});
+
 describe("L-1 by year", () => {
   it("the years add up to the stay as paid; a later start's last year runs past it and is reconciled", () => {
     const a = byYear(context(), "A");
     expect(a.years.map((y) => Math.round(y.value))).toEqual([62_595, 80_562, 87_631, 118_764]); // W4a's end label: 118,764
     expect(a.sum!).toBeCloseTo(a.window!, 1);
-    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, quick: { ...o.quick, startDate: "2026-10-01" } } : o)));
+    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)));
     const b = byYear(later, "B");
     expect(b.sum! - b.window!).toBeGreaterThan(1_000); // B's year 4 ends Sep 30, 2030, after the stay's last day, Jul 12, 2030
     const d = derive("eysum.B", later);
@@ -180,31 +193,19 @@ describe("L-1 by year", () => {
 });
 
 describe("every figure has a tickmark kind, a methodology section and a derivation", () => {
-  const noop = () => {};
-  // L-1 with its table view open, each year or running, and the bridge for one offer.
-  const render = (ctx: WorkContext, running = false, bridgeOf: Letter = "A") => {
-    const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
-    const ui = { ...session.ui, byYear: { mode: running ? "running" as const : "each" as const, table: true }, bridge: { letter: bridgeOf, year: running ? 2 : 1 } };
-    const tree = (children: ReactElement[]) => createElement(WorkProvider, { ctx, children });
-    return renderToStaticMarkup(tree([
-      createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
-      createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, dispatch: noop }),
-      createElement(Lead, { key: "s", view: ctx.results!.view, letters: LETTERS, stayYears: 4, updating: false, error: null, notes: [],
-        sample: true, dispatch: noop }),
-      createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
-    ]));
-  };
+  // L-1 with its table view open, each year or running, the bridge for one offer, and every view of the inputs.
+  const render = (ctx: WorkContext, running = false, bridgeOf: Letter = "A") => renderPage(ctx, { running, bridgeOf });
   // The samples on each basis, and with B as your own offer (default bonus timing) on an estimated rent.
   const contexts: Array<[string, WorkContext]> = [
     ["after rent", context()],
     ["per hour", context("perHour")],
     ["after tax, B yours with an estimated rent", context("cash", (os) => os.map((o) => (o.letter !== "B" ? o
-      : { ...o, sample: null, base: undefined, quick: { ...o.quick, bonus: { kind: "percent" as const, value: 10 }, rent: null } })))],
+      : { ...o, sample: null, draft: quickOnly(o.draft) })))],
   ];
 
   for (const [name, ctx] of contexts) {
     it(name, () => {
-      const html = render(ctx) + render(ctx, true, "C");
+      const html = render(ctx) + render(ctx, true, "C") + renderAllInputs(ctx);
       expect(html).toContain('id="bridge"');
       const ids = [...new Set([...html.matchAll(/data-(?:tick|metric|trace)="([^"]+)"/g)].map((m) => m[1] as MetricId))];
       const ticks = [...html.matchAll(/<button[^>]*class="[^"]*\btick-btn\b[^"]*"[^>]*>/g)];
@@ -221,7 +222,7 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
         expect(d.title, id).toBeTruthy();
         expect(d.lines.length, id).toBeGreaterThan(0);
         // Every drill-down a derivation offers works too.
-        if (depth < 3) for (const l of d.lines) if (l.ref) check(l.ref, depth + 1);
+        if (depth < 3) for (const ref of [...d.lines.flatMap((l) => (l.ref ? [l.ref] : [])), ...(d.inputs ?? []).map((x) => x.ref)]) check(ref, depth + 1);
       };
       for (const id of ids) check(id, 0);
       expect(seen.size).toBeGreaterThan(15);
@@ -242,9 +243,9 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
 
   it("estimated rents carry an E tickmark; entered ones don't", () => {
     const ctx = contexts[2][1];
-    expect(metricKind("in.B.rent", ctx)).toBe("estimate");
-    expect(metricKind("in.A.rent", ctx)).toBe("traced");
-    expect(render(ctx)).toContain('data-tick="in.B.rent"');
-    expect(derive("in.B.rent", ctx).lines[0].value).toBe(`$${figure(ctx.rents["16740|NC"].monthlyRent)}`);
+    expect(metricKind("in.B.costOfLiving.monthlyRent", ctx)).toBe("estimate");
+    expect(metricKind("in.A.costOfLiving.monthlyRent", ctx)).toBe("traced");
+    expect(render(ctx)).toContain('data-tick="in.B.costOfLiving.monthlyRent"');
+    expect(derive("in.B.costOfLiving.monthlyRent", ctx).lines[0].value).toBe(`$${figure(ctx.rents["16740|NC"].monthlyRent)}`);
   });
 });
