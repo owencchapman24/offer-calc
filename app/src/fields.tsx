@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext } from "react";
-import { formatIssue } from "../../src/format/index";
+import { formatIssue } from "../../src/format/issues";
 import type { OfferIssue } from "../../src/offer/validate";
+import type { OfferWarning } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { HELP, helpKey } from "./help";
 import type { AppOffer, Letter } from "./model";
@@ -18,6 +19,8 @@ export interface LedgerApi {
   set(o: AppOffer, values: Record<string, unknown>): void;
   /** The validator's problems for each offer. */
   issues: Partial<Record<Letter, OfferIssue[]>>;
+  /** The engine's warnings for each offer (your stay, base case): shown at the field they're about. */
+  warnings?: Partial<Record<Letter, OfferWarning[]>>;
   /** The open row editor. */
   editor: { row: string; letter: Letter } | null;
   openEditor(row: string, letter: Letter | null): void;
@@ -45,7 +48,7 @@ export function issuesAt(api: LedgerApi, letter: Letter, path: string): OfferIss
   return (api.issues[letter] ?? []).filter((i) => within(i.path, path));
 }
 
-const SCENARIO_WORD: Record<string, string> = { bear: "Bear case", bull: "Bull case" };
+const SCENARIO_WORD: Record<string, string> = { bear: "Bear case", bull: "Bull case", low: "Low use", medium: "Medium use", high: "High use" };
 
 /** The problems at a field (and inside it), in plain English, saying which case or tranche when it's one of several. */
 export function Issues({ letter, path, exclude, exact }: {

@@ -1,37 +1,39 @@
+import type { ReactNode } from "react";
+import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
-import { BonusYearsEditor, GrantsEditor, newGrant, newPromotion, newRefreshers, PromotionsEditor, RefreshersEditor } from "./editors";
-import { ChoiceField, EditButton, EditorRow, MonthDayField, NumberField, RangeField } from "./controls";
-import { DefaultTick, FieldRow, useLedger } from "./fields";
-import { type AppOffer, ASSUMPTIONS, bonusBasis, type OfferDraft } from "./model";
+import {
+  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
+  PromotionsEditor, RefreshersEditor, VestingStepsEditor,
+} from "./editors";
+import { ChoiceField, EditButton, EditorRow, MonthDayField, NumberField, PlanField, RangeField, Warnings } from "./controls";
+import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
+import { type AppOffer, bonusBasis, type HealthDraft, type RetirementDraft } from "./model";
 import { BonusRow, CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
-import {
-  bonusYearsText, cashAwardsText, employerStateText, grantsText, healthText, perksText, promotionsText, refreshersText, rentGrowthText, retirementText,
-} from "./summary";
-import { Trace } from "./Tickmarks";
+import { bonusYearsText, cashAwardsText, grantsText, matchText, promotionsText, refreshersText } from "./summary";
+import { percent } from "./text";
 
 // Detailed mode's sections (docs/ui-design.md §3.3), one open at a time, each a run of rows with one
-// cell per offer. Complex inputs open an editor beneath their row (W3). Inputs not yet editable here
-// show what's counted, as entered, so nothing hidden changes the results silently.
+// cell per offer. Complex inputs open an editor beneath their row (W3).
 
 export function DetailedSection({ id, rents }: { id: LedgerSection; rents: Record<string, RentEstimate> }) {
   switch (id) {
     case "pay": return <Pay />;
     case "bonus": return <Bonus />;
-    case "cash": return <ShownRow path="cashAwards" label="Cash awards" text={cashAwardsText} />;
+    case "cash": return <Cash />;
     case "equity": return <Equity />;
-    case "retirement": return <ShownRow path="retirement" label="401(k)" text={retirementText} />;
-    case "health": return <ShownRow path="health" label="Health plan" text={healthText} />;
-    case "perks": return <ShownRow path="perks" label="Perks" text={perksText} />;
+    case "retirement": return <Retirement />;
+    case "health": return <Health />;
+    case "perks": return <Perks />;
     case "hours": return <Hours />;
     case "where":
       return (
         <>
           <CityRow />
           <RentRow rents={rents} />
-          <ShownRow path="employerState" label="Employer state" text={employerStateText} />
-          <ShownRow path="costOfLiving.rentGrowth" label="Rent growth" text={(d) => rentGrowthText(d, ASSUMPTIONS.inflation)} />
+          <FieldRow k="employerState">{(o) => <><EmployerStateField o={o} /><Warnings o={o} path="employerState" /></>}</FieldRow>
+          <FieldRow k="costOfLiving.rentGrowth">{(o) => <NumberField o={o} path="costOfLiving.rentGrowth" kind="percent" label="rent growth a year" />}</FieldRow>
         </>
       );
   }
@@ -142,16 +144,197 @@ function Hours() {
   );
 }
 
-/** A row that isn't editable here yet: what each offer has, counted as shown. */
-function ShownRow({ path, label, text }: { path: string; label: string; text: (d: OfferDraft) => string }) {
+// ---- sign-on and other cash ---------------------------------------------------------------------------
+
+function Cash() {
   const api = useLedger();
   return (
-    <div className="row">
-      <div className="row-label">
-        <span className="row-name">{label}</span>
-        <div className="help"><span className="hint">Counted as shown; editing it here comes next.</span></div>
-      </div>
-      {api.offers.map((o) => <Trace key={o.id} id={`in.${o.letter}.${path}`} className="cell shown">{text(o.draft)}</Trace>)}
-    </div>
+    <>
+      <FieldRow k="cashAwards" issues="editor">
+        {(o) => <EditorCell o={o} row="cashAwards" summary={cashAwardsText(o.draft)} empty={!o.draft.cashAwards.length}
+          start={() => api.set(o, { cashAwards: [newCashAward()] })} />}
+      </FieldRow>
+      <EditorRow row="cashAwards" title="Sign-on and other cash">{(o) => <CashAwardsEditor o={o} />}</EditorRow>
+    </>
+  );
+}
+
+// ---- 401(k) -------------------------------------------------------------------------------------------
+
+/** A row about a plan's details: a cell for each offer that has the plan, a dash for the others. */
+function PlanRow({ k, plan, label, issues, children }: {
+  k: string; plan: "retirement" | "health"; label?: string; issues?: "all" | "editor"; children: (o: AppOffer) => ReactNode;
+}) {
+  return (
+    <FieldRow k={k} label={label} issues={issues}>
+      {(o) => {
+        const v = o.draft[plan];
+        return v && v !== "none" ? children(o) : <span className="sub">—</span>;
+      }}
+    </FieldRow>
+  );
+}
+
+const retirementOf = (o: AppOffer) => o.draft.retirement as RetirementDraft;
+
+/** The deferral rate the full match needs: the top of the last tier that adds anything. Facts, not advice. */
+function fullMatchNote(r: RetirementDraft): string | null {
+  const tiers = r.match.filter((t) => t.upToPct !== null && t.rate !== null && t.rate > 0);
+  if (!tiers.length) return null;
+  const top = Math.max(...tiers.map((t) => t.upToPct!));
+  return top >= 1 ? "The match applies to everything you defer." : `The full match needs ${percent(top)} of pay.`;
+}
+
+function Retirement() {
+  const api = useLedger();
+  return (
+    <>
+      <FieldRow k="retirement">
+        {(o) => <PlanField o={o} path="retirement" label="401(k) plan" has="Has a 401(k)" none="No 401(k)" start={newRetirement} />}
+      </FieldRow>
+      <PlanRow k="retirement.contributionPct" plan="retirement">
+        {(o) => {
+          const note = fullMatchNote(retirementOf(o));
+          return (
+            <>
+              <NumberField o={o} path="retirement.contributionPct" kind="percent" label="401(k) contribution" />
+              {note && <span className="sub">{note}</span>}
+              <Warnings o={o} path="retirement.contributionPct" />
+            </>
+          );
+        }}
+      </PlanRow>
+      <PlanRow k="retirement.type" plan="retirement">
+        {(o) => <ChoiceField o={o} path="retirement.type" label="401(k) type" options={[["pretax", "Pre-tax"], ["roth", "Roth"]]} />}
+      </PlanRow>
+      <PlanRow k="retirement.eligiblePay" plan="retirement">
+        {(o) => <ChoiceField o={o} path="retirement.eligiblePay" label="pay the 401(k) counts"
+          options={[["salary", "Salary"], ["salaryAndBonus", "Salary and bonus"]]} />}
+      </PlanRow>
+      <PlanRow k="retirement.match" plan="retirement" issues="editor">
+        {(o) => <EditorCell o={o} row="retirement.match" summary={matchText(retirementOf(o))} empty={!retirementOf(o).match.length}
+          start={() => api.set(o, { "retirement.match": [{ rate: null, upToPct: null }] })} />}
+      </PlanRow>
+      <EditorRow row="retirement.match" title="401(k) match">{(o) => <MatchEditor o={o} />}</EditorRow>
+      <PlanRow k="retirement.nonElectivePct" plan="retirement">
+        {(o) => <NumberField o={o} path="retirement.nonElectivePct" kind="percent" unit="% of pay" label="employer contribution" />}
+      </PlanRow>
+      <PlanRow k="retirement.vesting" plan="retirement" issues="editor">{(o) => <VestingField o={o} />}</PlanRow>
+      <EditorRow row="retirement.vesting.steps" title="Vesting steps">{(o) => <VestingStepsEditor o={o} />}</EditorRow>
+      <PlanRow k="retirement.vestingService" plan="retirement">
+        {(o) => <ChoiceField o={o} path="retirement.vestingService" label="vesting service"
+          options={[["elapsedTime", "Years worked"], ["planYearHours", "Plan years with 1,000 hours"]]} />}
+      </PlanRow>
+    </>
+  );
+}
+
+
+/** Vesting: immediate (the default), a cliff after some years, or graded steps (in their own editor). */
+function VestingField({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const v = retirementOf(o).vesting;
+  const kind = v?.kind ?? "immediate";
+  return (
+    <span className="field vesting-field">
+      <select id={fieldId(o.letter, "retirement.vesting")} aria-label={`Offer ${o.letter} 401(k) vesting`} data-help="retirement.vesting"
+        aria-describedby={hintId("retirement.vesting")} value={kind}
+        onChange={(e) => {
+          const k = e.target.value;
+          api.set(o, { "retirement.vesting": k === "cliff" ? { kind: "cliff", years: null } : k === "graded" ? { kind: "graded", steps: [{ years: null, pct: null }] }
+            : { kind: "immediate" } });
+          if (k === "graded") api.openEditor("retirement.vesting.steps", o.letter);
+        }}>
+        <option value="immediate">Immediate</option>
+        <option value="cliff">A cliff</option>
+        <option value="graded">Graded steps</option>
+      </select>
+      <DefaultTick o={o} path="retirement.vesting" label="vesting at once" />
+      {v?.kind === "cliff" && (
+        <span className="field"><span className="sub">after</span>
+          <NumberField o={o} path="retirement.vesting.years" kind="number" unit="years" label="401(k) cliff, years of service" />
+        </span>
+      )}
+      {v?.kind === "graded" && (
+        <span className="editor-cell">
+          <span className="summary">{v.steps.map((x) => `${x.pct === null ? "—" : percent(x.pct)} after ${x.years ?? "—"}`).join(", ")}</span>
+          <EditButton o={o} row="retirement.vesting.steps" label="Edit" />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ---- health and perks ------------------------------------------------------------------------------------
+
+function Health() {
+  return (
+    <>
+      <FieldRow k="health">
+        {(o) => <PlanField o={o} path="health" label="health plan" has="Has a health plan" none="None from this job" start={newHealth} />}
+      </FieldRow>
+      <PlanRow k="health.premium" plan="health">
+        {(o) => <NumberField o={o} path="health.premium" kind="money" label="health premium a year" blank="Not counted" />}
+      </PlanRow>
+      <PlanRow k="health.outOfPocket" plan="health">
+        {(o) => (
+          <span className="oop">
+            {(["low", "medium", "high"] as const).map((level) => (
+              <span key={level} className="range-case">
+                <NumberField o={o} path={`health.outOfPocket.${level}`} k="health.outOfPocket" kind="money" label={`out-of-pocket a year, ${level} use`} />
+                <span className="range-tag">{level}</span>
+              </span>
+            ))}
+            {Object.values((o.draft.health as HealthDraft).outOfPocket).every((x) => x === null) && <span className="sub not-counted">Not counted</span>}
+          </span>
+        )}
+      </PlanRow>
+      <PlanRow k="health.oopMax" plan="health">
+        {(o) => <NumberField o={o} path="health.oopMax" kind="money" label="out-of-pocket maximum" blank="No maximum entered" />}
+      </PlanRow>
+      <PlanRow k="health.employeeHsa" plan="health">
+        {(o) => <><NumberField o={o} path="health.employeeHsa" kind="money" label="your HSA a year" /><Warnings o={o} path="health.employeeHsa" /></>}
+      </PlanRow>
+      <PlanRow k="health.employerHsa" plan="health">
+        {(o) => <NumberField o={o} path="health.employerHsa" kind="money" label="employer HSA a year" />}
+      </PlanRow>
+      <PlanRow k="health.coverage" plan="health">
+        {(o) => <ChoiceField o={o} path="health.coverage" label="health coverage" options={[["self", "Self"], ["family", "Family"]]} />}
+      </PlanRow>
+    </>
+  );
+}
+
+function Perks() {
+  return (
+    <>
+      <FieldRow k="perks.section127">
+        {(o) => <><NumberField o={o} path="perks.section127" kind="money" label="education assistance a year" /><Warnings o={o} path="perks.section127" /></>}
+      </FieldRow>
+      <FieldRow k="perks.commuterMonthly">
+        {(o) => <><NumberField o={o} path="perks.commuterMonthly" kind="money" label="commuter benefit a month" /><Warnings o={o} path="perks.commuterMonthly" /></>}
+      </FieldRow>
+    </>
+  );
+}
+
+// ---- where you'd live ----------------------------------------------------------------------------------
+
+/** Every state the tax engine knows (50 and DC), from the city list; a test checks it against the engine's. */
+export const US_STATES: string[] = [...new Set(CITIES.flatMap((c) => c.states))].sort();
+
+function EmployerStateField({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const residence = o.draft.residence.state;
+  const v = o.draft.employerState ?? residence ?? "";
+  return (
+    <span className="field">
+      <select id={fieldId(o.letter, "employerState")} aria-label={`Offer ${o.letter} employer state`} data-help="employerState"
+        aria-describedby={hintId("employerState")} value={v} onChange={(e) => api.set(o, { employerState: e.target.value || null })}>
+        {!residence && <option value="">—</option>}
+        {US_STATES.map((st) => <option key={st} value={st}>{st}</option>)}
+      </select>
+      <DefaultTick o={o} path="employerState" label="employer state, where you'd live" />
+    </span>
   );
 }

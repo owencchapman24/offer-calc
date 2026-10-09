@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { asymmetries, asymmetryText, type Category, CATEGORY_INPUT, enterable } from "./comparability";
-import { type AppOffer, blankDraft, sampleOffers } from "./model";
+import { type AppOffer, blankDraft, type HealthDraft, sampleOffers } from "./model";
 import { context, renderAllInputs, renderPage } from "./testing";
 
 // Step 0.5: a cost or benefit counted for some offers but not others is named under the verdict, and
@@ -18,13 +18,13 @@ describe("the comparability warning", () => {
   it("names each category counted for some offers but not others, and who it favors", () => {
     const [a, b, c] = samples();
     const cases: Array<[string, AppOffer[], string]> = [
-      ["premium", [a, edit(b, (d) => ({ ...d, health: { ...d.health!, premium: null } }))],
+      ["premium", [a, edit(b, (d) => ({ ...d, health: { ...(d.health as HealthDraft), premium: null } }))],
         "Health premiums are counted for A but not for B. If B has a health plan, add it: otherwise the comparison favors B."],
-      ["outOfPocket", [a, edit(b, (d) => ({ ...d, health: { ...d.health!, outOfPocket: { low: null, medium: null, high: null } } }))],
+      ["outOfPocket", [a, edit(b, (d) => ({ ...d, health: { ...(d.health as HealthDraft), outOfPocket: { low: null, medium: null, high: null } } }))],
         "Out-of-pocket health costs are counted for A but not for B. If B has a health plan, add its costs: otherwise the comparison favors B."],
       ["employer401k", [a, edit(b, (d) => ({ ...d, retirement: null })), edit(c, (d) => ({ ...d, retirement: null }))],
         "A 401(k) is counted for A but not for B or C. If B and C offer one, add it with its match: otherwise the comparison favors A."],
-      ["employerHsa", [a, edit(b, (d) => ({ ...d, health: { ...d.health!, employerHsa: null } }))],
+      ["employerHsa", [a, edit(b, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employerHsa: null } }))],
         "Employer HSA money is counted for A but not for B. If B's plan puts money in an HSA, add it: otherwise the comparison favors A."],
       ["perks", [edit(a, (d) => ({ ...d, perks: { section127: null, commuterMonthly: null } })), c],
         "Perks are counted for C but not for A. If A offers education or commuter benefits, add them: otherwise the comparison favors C."],

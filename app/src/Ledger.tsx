@@ -1,6 +1,7 @@
 import { type CSSProperties, type Dispatch, Fragment, useEffect, useRef } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
+import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { type LedgerApi, LedgerProvider, RowLabel } from "./fields";
 import { HELP, helpKey, LEDGER_SECTIONS } from "./help";
@@ -18,16 +19,17 @@ export const detailedModule = lazyModule(() => import("./Detailed"));
 // §3.2). Quick mode asks for five fields; detailed mode adds the sections (§3.3), one open at a time.
 // Switching back to quick keeps every detailed value, and the "Also counted" row says what still counts.
 
-export function Ledger({ offers, missing, rents, issues = {}, ui, dispatch }: {
+export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui, dispatch }: {
   offers: AppOffer[]; missing: Map<string, Missing[]>; rents: Record<string, RentEstimate>;
   /** The validator's problems for each offer. */ issues?: Partial<Record<Letter, OfferIssue[]>>;
+  /** The engine's warnings for each offer, shown at their fields. */ warnings?: Partial<Record<Letter, OfferWarning[]>>;
   ui: Pick<UiState, "mode" | "section" | "editor">; dispatch: Dispatch<Action>;
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   const mode = ui.mode ?? "quick";
   const api: LedgerApi = {
-    offers, issues, editor: ui.editor ?? null,
+    offers, issues, warnings, editor: ui.editor ?? null,
     set: (o, values) => dispatch({ type: "edit", id: o.id, set: values }),
     openEditor: (row, letter) => dispatch({ type: "ui", patch: { editor: letter ? { row, letter } : null } }),
   };

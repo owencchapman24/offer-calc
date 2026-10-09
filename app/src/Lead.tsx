@@ -1,5 +1,5 @@
 import { type Dispatch, useRef } from "react";
-import { formatIssue } from "../../src/format/index";
+import { formatIssue } from "../../src/format/issues";
 import type { Basis } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldName } from "./help";

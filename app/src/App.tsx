@@ -5,6 +5,7 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
+import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
@@ -21,7 +22,7 @@ import { verdict } from "./verdict";
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
 const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.area", "startDate", "costOfLiving.monthlyRent", "label"]);
-const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", prices: "about-filing" } as const;
+const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-filing" } as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
 
@@ -125,6 +126,9 @@ export function App() {
   const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
     ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours) : null;
+  // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
+  const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
+  if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
   // A cost or benefit counted for some offers but not others: the lead schedule says so.
   const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
 
@@ -163,7 +167,8 @@ export function App() {
           <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
 
           <main className="workpaper">
-            <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} ui={session.ui} dispatch={dispatch} />
+            <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} warnings={warnings} ui={session.ui}
+              dispatch={dispatch} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
