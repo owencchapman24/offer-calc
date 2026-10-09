@@ -98,11 +98,11 @@ and show the work. Correctness and a clear methodology page matter more than fea
     `horizonSweep` plus your stay's three full projections, ~29 ms warm in dev.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 309 passing.
+**Tests:** 310 passing.
 - `test/offer.test.ts` 114, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 23, `app/src/metrics.test.ts` 21,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
-  `app/src/exchange.test.ts` 5.
+  `app/src/exchange.test.ts` 6.
 - `defaults.test.ts` checks every default in the registry against the engine: an offer with
   the field at its default projects exactly as one with the default's value entered.
 - `validate.test.ts` checks each problem at its path, and whether the engine also throws for
