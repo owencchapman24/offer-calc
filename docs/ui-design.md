@@ -590,8 +590,9 @@ The sweep answers "what do I keep if I leave after N months"; the next-cliff pan
 - what's forfeited (unvested RSUs at grant value, unvested 401(k));
 - the next cliff, with the after-tax value of staying until it, split into the extra pay
   and the cliff itself (`nextCliff`, §11);
-- **when the next cliff is a clawback step,** also the next cliff that isn't one, so a $833
-  step doesn't hide a bonus three months away (rev 3);
+- **the next cliff skips a prorated clawback's monthly steps** (they're drawn as one segment),
+  so a $833 step doesn't hide a bonus three months away; the value of staying still counts
+  them (rev 3, as built in slice 5);
 - **the warnings that depend on the leave date** (a bonus forfeited, FICA not refunded on a
   repayment in a later year), here at the cursor rather than in L-5 (rev 3).
 

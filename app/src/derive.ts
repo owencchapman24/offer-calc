@@ -12,6 +12,7 @@ import {
 } from "./metrics";
 import type { OfferDetail } from "./protocol";
 import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
+import { cliffsText, cliffText, reconcile } from "./leaveModel";
 import type { SectionId } from "./sections";
 import {
   bonusText, cashAwardsText, employerStateText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText, retirementText,
@@ -97,6 +98,8 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "in": return inputSection(pathOf(id));
     case "about": return ABOUT_SECTION[a as AboutField];
     case "risk": case "drop": case "win": return "M-8";
+    case "kept": case "repay": case "forfeit": case "next": case "nextown": return "M-9";
+    case "stayafter": case "recon": return "M-7.3";
   }
   throw new Error(`Unknown figure: ${id}`);
 }
@@ -129,6 +132,13 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "risk": return caseWork(ctx, a as L, b as Scenario);
       case "drop": return dropWork(ctx, a as L);
       case "win": return caseLeadWork(ctx, a as Scenario);
+      case "kept": return keptWork(ctx, a as L);
+      case "repay": return repayWork(ctx, a as L);
+      case "forfeit": return forfeitWork(ctx, a as L, b as "rsu" | "k401");
+      case "next": return nextWork(ctx, a as L);
+      case "nextown": return nextOwnWork(ctx, a as L);
+      case "stayafter": return stayAfterWork(ctx, a as L);
+      case "recon": return reconWork(ctx, a as L);
     }
     throw new Error(`Unknown figure: ${id}`);
   }
@@ -157,6 +167,13 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "risk": return `${a}'s ${b} case`;
     case "drop": return `${a}'s drop to the bear case`;
     case "win": return `the ${a}-case lead`;
+    case "kept": return `${a}'s pay kept`;
+    case "repay": return `${a}'s clawback`;
+    case "forfeit": return `${a}'s unvested ${b === "rsu" ? "RSUs" : "401(k) money"}`;
+    case "next": return `${a}'s value of staying`;
+    case "nextown": return `${a}'s next cliff`;
+    case "stayafter": return `${a}'s stay after tax`;
+    case "recon": return `${a}'s difference from the stay`;
   }
   return id;
 }
@@ -557,6 +574,192 @@ function caseLeadWork(ctx: WorkContext, scenario: Scenario): Work {
       ? ["The base case is the verdict's, so this is the verdict's lead."]
       : [`Each offer's ${scenario} case sets every uncertain input to its ${scenario} value at once; ${W} leads ${R} there.`],
     ties: scenario === "base" ? sameFigure(ctx, n, basis) : [], uses: [`risk.${W}.${scenario}`, `risk.${R}.${scenario}`],
+  };
+}
+
+// ---- L-4: leaving early -------------------------------------------------------------------------------
+
+/** An offer's L-4 panel at the last day picked. */
+function panelOf(ctx: WorkContext, letter: L) {
+  const leave = res(ctx).leave;
+  const panel = leave?.panels[indexOf(ctx, letter)];
+  if (!leave || panel === undefined) throw new Error("Still working this out…");
+  if (!panel) throw new Error(`Offer ${letter} hasn't started by then.`);
+  return { leave, panel, scope: `If your last day is ${longDate(panel.leaveDate)} · as paid, not discounted` };
+}
+
+/** L-4: what you keep, after tax (or in total rewards). */
+function keptWork(ctx: WorkContext, letter: L): Work {
+  const { leave, panel: p, scope } = panelOf(ctx, letter);
+  const repaid = p.repaid >= 0.5;
+  const afterTax: WorkLine[] = [
+    { label: "Pay received", note: "salary to your last day, bonuses and cash awards paid by then, RSUs vested by then", value: figure(p.paid) },
+    ...(repaid ? [{ op: "−" as const, label: "Clawbacks repaid", value: figure(p.repaid), ref: `repay.${letter}` as MetricId }] : []),
+    { op: "−", label: repaid ? "Tax, less the relief on what's repaid" : "Tax on it", value: figure(p.tax) },
+    ...(p.premiums >= 0.5 ? [{ op: "−" as const, label: "Health premiums", value: figure(p.premiums) }] : []),
+  ];
+  const notes = [
+    "Leaving is your last day of work, a voluntary exit. Pay stops that day; a bonus not yet paid is forfeited if you must be employed on its "
+      + "payout date; unvested RSUs and employer 401(k) money stay behind.",
+    "The tax is the offer's share of each calendar year's household tax, on the pay actually received.",
+  ];
+  if (leave.basis === "cash") {
+    return { title: `${letter} · after-tax pay kept`, scope, lines: [...afterTax, { op: "=", label: "After-tax pay kept", value: figure(p.afterTaxCompKept), rule: "double" }],
+      notes, ties: [], uses: repaid ? [`repay.${letter}`] : [] };
+  }
+  const b = p.benefits;
+  return {
+    title: `${letter} · total rewards kept`, scope,
+    lines: [
+      { label: "After-tax pay kept", value: figure(p.afterTaxCompKept), note: "pay received, less clawbacks, tax and premiums" },
+      ...(p.retirementVested >= 0.5 ? [{ op: "+" as const, label: "Employer 401(k), vested by then", value: figure(p.retirementVested) }] : []),
+      ...(b.perks >= 0.5 ? [{ op: "+" as const, label: "Perks", value: figure(b.perks) }] : []),
+      ...(b.employerHsa >= 0.5 ? [{ op: "+" as const, label: "Employer HSA money", value: figure(b.employerHsa) }] : []),
+      ...(b.outOfPocket >= 0.5 ? [{ op: "−" as const, label: "Expected out-of-pocket health costs", value: figure(b.outOfPocket) }] : []),
+      { op: "=", label: "Total rewards kept", value: figure(p.totalRewardsKept), rule: "double" },
+    ],
+    notes, ties: [], uses: [],
+  };
+}
+
+const RELIEF: Record<"sameYearReversal" | "irc1341Credit" | "noRelief", string> = {
+  sameYearReversal: "repaid in the year it was paid, so the wages are reversed and their tax comes back",
+  irc1341Credit: "repaid in a later year: over $3,000, the federal IRC 1341 credit returns the federal tax on it; Social Security, Medicare and state tax don't come back",
+  noRelief: "repaid in a later year, $3,000 or less: no tax relief",
+};
+
+/** L-4: clawbacks owed on the last day picked. */
+function repayWork(ctx: WorkContext, letter: L): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const owed = p.clawbacks.filter((c) => c.owed > 0);
+  if (!owed.length) throw new Error(`Nothing to repay for ${letter} on that day.`);
+  const relief = owed.reduce((s, c) => s + c.taxRelief, 0);
+  return {
+    title: `${letter} · clawbacks if you leave`, scope,
+    lines: [
+      ...owed.map((c, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `${c.award}: ${percent(c.fraction)} of it`,
+        note: c.basis === "net" ? "repaid net of tax" : "repaid gross, as paid", value: figure(c.owed) })),
+      ...(owed.length > 1 ? [{ op: "=" as const, label: "Repaid", value: figure(p.clawbackOwed), rule: "single" as const }] : []),
+      { op: "−", label: "Tax relief", value: figure(relief) },
+      { op: "=", label: "What repaying costs you", value: figure(p.clawbackOwed - relief), rule: "double" },
+    ],
+    notes: [
+      ...owed.map((c) => `${c.award}: ${RELIEF[c.treatment]}.`),
+      "A prorated clawback falls as each month of its window is completed; a full one stays whole until the window ends.",
+    ],
+    ties: [], ...fromInputs(ctx, letter, ["cashAwards"]),
+  };
+}
+
+/** L-4: what's left behind. */
+function forfeitWork(ctx: WorkContext, letter: L, which: "rsu" | "k401"): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  if (which === "rsu") {
+    return {
+      title: `${letter} · RSUs not vested`, scope,
+      lines: [{ label: "RSUs granted by then but not vested, at grant value", value: figure(p.unvestedRsuForfeited), tick: "recomputed" }],
+      notes: ["At grant value: the dollar value when granted, before any share-price growth. Unvested RSUs stay behind when you go."],
+      ties: [], ...fromInputs(ctx, letter, equityPaths(ctx, letter)),
+    };
+  }
+  return {
+    title: `${letter} · employer 401(k) not vested`, scope,
+    lines: [{ label: "Employer 401(k) money credited but not vested", value: figure(p.retirementForfeited), tick: "recomputed" }],
+    notes: ["The plan's vesting schedule decides what you keep; what isn't vested on your last day goes back to the plan."],
+    ties: [], ...fromInputs(ctx, letter, ["retirement.vesting", "retirement.vestingService"]),
+  };
+}
+
+/** L-4: what staying until the next cliff is worth, and how much of it is the cliff itself. */
+function nextWork(ctx: WorkContext, letter: L): Work {
+  const { leave, panel: p, scope } = panelOf(ctx, letter);
+  const n = p.next;
+  if (!n) throw new Error(`Nothing else pays, vests or steps down for ${letter} within the projection.`);
+  const cash = leave.basis === "cash";
+  const now = cash ? p.afterTaxCompKept : p.totalRewardsKept;
+  const value = cash ? n.valueOfStaying.afterTaxComp : n.valueOfStaying.totalRewards;
+  const what = cash ? "after-tax pay" : "total rewards";
+  return {
+    title: `${letter} · staying until ${longDate(n.date)}`, scope,
+    lines: [
+      { label: `Kept if your last day is ${longDate(n.date)}`, value: figure(now + value) },
+      { op: "−", label: `Kept if it's ${longDate(p.leaveDate)}`, value: figure(now), ref: `kept.${letter}` },
+      { op: "=", label: `Worth staying for, in ${what}`, value: figure(value), rule: "single" },
+      { label: "of which the cliff itself", value: figure(n.cliffValue), ref: `nextown.${letter}` },
+      { label: `and pay for the ${figure(n.daysAway)} more days`, value: signed(value - n.cliffValue) },
+    ],
+    notes: [`The next cliff is ${cliffsText(n.cliffs)}, ${figure(n.daysAway)} days after your last day. A prorated clawback's `
+      + "monthly steps on the way count in what staying is worth; they aren't counted as the next cliff."],
+    ties: [], uses: [`kept.${letter}`, `nextown.${letter}`],
+  };
+}
+
+/** L-4: the next cliff's own part: payments after tax, the clawback no longer owed, 401(k) money that vests. */
+function nextOwnWork(ctx: WorkContext, letter: L): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const n = p.next;
+  if (!n) throw new Error(`Nothing else pays, vests or steps down for ${letter} within the projection.`);
+  return {
+    title: `${letter} · the cliff on ${longDate(n.date)}`, scope,
+    lines: [
+      ...n.cliffs.map((c, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: cliffText(c), note: "before tax", value: figure(c.amount) })),
+      { op: "=", label: "Its own part, after tax", value: figure(n.cliffValue), rule: "double" },
+    ],
+    notes: ["A payment counts after tax at that year's average rate on the offer, in the projection where you stay until the cliff, like every "
+      + "payment. A clawback that ends counts what you'd no longer repay, net of tax relief; 401(k) money counts as it vests."],
+    ties: [], uses: [],
+  };
+}
+
+/** L-4: your stay after tax, as paid: what L-1 counts on the after-tax basis. */
+function stayAfterWork(ctx: WorkContext, letter: L): Work {
+  const r = res(ctx);
+  const w = detailOf(ctx, letter).window;
+  const n = w.nominal;
+  return {
+    title: `${letter} · your stay after tax, as paid`, scope: `Base case · stay ${years(r.view.row.years)} (${windowText(r.view.row)}) · not discounted`,
+    lines: [
+      { label: "Pay in your stay", value: figure(n.gross) },
+      { op: "−", label: "Tax", note: "its last calendar year as though pay continued through December", value: figure(n.tax) },
+      ...(n.premiums >= 0.5 ? [{ op: "−" as const, label: "Health premiums", value: figure(n.premiums) }] : []),
+      { op: "=", label: "After-tax pay, as paid", value: figure(n.afterTaxComp), rule: "double" },
+    ],
+    notes: [
+      "The stay is a stretch of time to compare offers over, not a leave date: its last calendar year is taxed as though you kept earning at "
+        + "the same rate through December, as at a similar next job, so a short last year isn't taxed at an artificially low rate.",
+      "L-1 shows this on the after-tax basis (its table's “Your stay, as paid”).",
+    ],
+    ties: r.view.basis === "cash" ? [`eysum.${letter}`] : [], uses: [],
+  };
+}
+
+/** L-4: leaving on your stay's last day vs the stay as L-1 counts it, after tax. */
+function reconWork(ctx: WorkContext, letter: L): Work {
+  const { leave, panel: p } = panelOf(ctx, letter);
+  if (p.leaveDate !== leave.stayEnd) throw new Error("Move the last day to the end of your stay to see this.");
+  const r = reconcile(p, detailOf(ctx, letter).window);
+  const diff = r.kept - r.stay;
+  const shown = (x: number) => Math.abs(x) >= 0.5;
+  // The tax line is the remainder, so the column foots as displayed (the stay's totals are rounded to cents).
+  const tax = diff - (shown(r.pay) ? r.pay : 0) - (shown(r.premiums) ? r.premiums : 0) + (shown(r.clawback) ? r.clawback : 0);
+  return {
+    title: `${letter} · leaving on ${longDate(p.leaveDate)} vs your stay`, scope: `Your stay's last day · after tax, as paid`,
+    lines: [
+      { label: "Kept if you leave that day", value: figure(r.kept), ref: `kept.${letter}` },
+      { op: "−", label: "Your stay, as L-1 counts it", value: figure(r.stay), ref: `stayafter.${letter}` },
+      { op: "=", label: "Difference", value: signed(diff), rule: "single" },
+      { label: `Tax the stay counts in ${r.year} that leaving doesn't`, value: signed(tax) },
+      ...(shown(r.pay) ? [{ op: "+" as const, label: "Pay after you leave, which the stay doesn't count", value: signed(r.pay) }] : []),
+      ...(shown(r.premiums) ? [{ op: "+" as const, label: "Premiums the stay counts that leaving doesn't", value: signed(r.premiums) }] : []),
+      ...(shown(r.clawback) ? [{ op: "−" as const, label: "Clawbacks repaid (their tax relief is in the tax line)", value: figure(r.clawback),
+        ref: `repay.${letter}` as MetricId }] : []),
+      { op: "=", label: "Difference", value: signed(diff), rule: "double" },
+    ],
+    notes: [
+      `Both stop pay on ${longDate(p.leaveDate)}. The stay taxes ${r.year} as though pay continued through December, at a similar next job; `
+        + `leaving taxes only what was paid in ${r.year}, at the lower rate a part year brings.`,
+    ],
+    ties: [], uses: [`kept.${letter}`, `stayafter.${letter}`],
   };
 }
 

@@ -1,6 +1,6 @@
 # UI slices 4-8 plan (approved 2026-10-09)
 
-**Status (2026-10-09): approved; slice 5 in progress.**
+**Status (2026-10-09): approved; slice 5 in progress** (review stops A and B merged).
 
 The plan for the UI slices after slice 3, with the decisions made in review on 2026-10-09. A fresh
 session should be able to execute it from this file, `CLAUDE.md` and `docs/ui-design.md` (rev 3,
@@ -73,8 +73,8 @@ Slice numbers are stable IDs (`docs/ui-design.md` §12); this is the order to bu
   pointing to "+ range"); a ticked table view.
 - **L-4, Leaving early (§4.5):** the stepped chart of what you keep after clawbacks, by date; cliff
   markers; a last-day cursor (drag, date field, ± month); an after-tax / total-rewards switch; the
-  next-cliff panel per offer (keep, repay, forfeited, the next cliff and the next that isn't a
-  clawback step, with the value of staying until it); the leave-date warnings at the cursor; the
+  next-cliff panel per offer (keep, repay, forfeited, the next real cliff, past a prorated
+  clawback's monthly steps, with the value of staying until it); the leave-date warnings at the cursor; the
   reconciliation with your stay at its end.
 - **L-5, Warnings (§4.7):** every engine warning for your stay, grouped by kind then offer, each
   with "Show at the field"; the withholding shortfall for your stay's calendar years; a one-line

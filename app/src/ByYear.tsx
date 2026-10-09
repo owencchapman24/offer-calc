@@ -3,6 +3,7 @@ import type { Basis, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { BASIS_PHRASE, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, type WorkContext } from "./metrics";
 import type { Action, UiState } from "./session";
+import { niceTicks } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Fig, useRovingTicks } from "./Tickmarks";
 import { Stamp, TickLegend } from "./ui";
@@ -14,16 +15,6 @@ import { Stamp, TickLegend } from "./ui";
 const UNIT: Record<Basis, string> = {
   cash: "$, as paid", totalRewards: "$, as paid", colAdjustedTotal: "U.S.-avg $, as paid", perHour: "$ an hour, as paid",
 };
-
-/** "Nice" axis ticks from 0: 1, 2, 2.5 or 5 times a power of ten, at most 6 of them. */
-export function niceTicks(max: number): number[] {
-  if (!(max > 0)) return [0, 1];
-  const raw = max / 5;
-  const pow = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw)!;
-  const top = Math.ceil(max / step) * step;
-  return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
-}
 
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;

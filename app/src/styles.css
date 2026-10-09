@@ -647,3 +647,38 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .risk-table { max-width: 760px; }
 .risk-wrong ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .later { min-height: 1px; }
+
+/* ---- L-4 leaving early --------------------------------------------------------------------------- */
+
+.leaving { margin-top: 24px; }
+.leaving .leave-chart, .leaving .leave-panel { transition: opacity 120ms; }
+.leaving.is-updating .leave-chart, .leaving.is-updating .leave-panel { opacity: 0.6; }
+.leave-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 6px 0 10px; font-size: 14px; }
+.leave-controls label { font-weight: 700; }
+.leave-controls input[type="date"] { min-height: 32px; padding: 2px 6px; font: inherit; font-variant-numeric: tabular-nums; color: var(--ink);
+  background: var(--sheet); border: 1px solid var(--graphite); }
+.leave-steps { display: inline-flex; gap: 4px; }
+.leave-steps button { min-width: 32px; min-height: 32px; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); cursor: pointer; font: inherit; }
+.leave-steps button:hover { border-color: var(--ink); }
+.leave-controls .hint { flex-basis: 100%; margin: 0; font-size: 12.5px; color: var(--graphite); }
+.leave-chart .leave-mark { font-size: 11px; font-weight: 700; fill: var(--offer); }
+.leave-chart .leave-band { font-size: 12px; fill: var(--graphite); }
+.leave-chart .leave-stay { stroke: var(--graphite); stroke-width: 1; stroke-dasharray: 4 3; }
+.leave-chart .series-dot { stroke-width: 2; }
+.leave-at { position: absolute; transform: translateX(-50%); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--sheet); padding: 0 4px; white-space: nowrap; pointer-events: none; }
+/* Drag sideways to move the last day; vertical swipes still scroll the page on a phone. */
+.leave-hit { cursor: ew-resize; touch-action: pan-y; }
+.leave-key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+.leave-key b { color: var(--graphite); }
+.leave-key-stay { display: inline-block; width: 0; height: 12px; border-left: 1px dashed var(--graphite); vertical-align: middle; margin-right: 2px; }
+.leave-wait { min-height: 140px; }
+.leave-bands { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; color: var(--graphite); }
+.leave-panel { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.leave-offers { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 14px; }
+.leave-offer { font-size: 14.5px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
+.leave-line { margin: 0; }
+.leave-worked { color: var(--graphite); }
+.leave-warnings { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--graphite); }
+.leave-warnings span { color: var(--warning); }
+.leave-recon { margin: 6px 0 0; padding: 6px 10px; background: var(--band); border-left: 3px solid var(--rule); font-size: 14px; }

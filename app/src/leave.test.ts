@@ -1,0 +1,136 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { toDays } from "../../src/offer/dates";
+import { keptIfLeaving, leaveDateSweep } from "../../src/offer/project";
+import { derive } from "./derive";
+import { Leaving } from "./Leaving";
+import { addMonthsIso, leaveAxis, leaveLines, reconcile, valueAt, worked } from "./leaveModel";
+import type { WorkContext } from "./metrics";
+import type { LeaveCurve, LeavePanel } from "./protocol";
+import { cursorJob, leaveJob, sweepDays } from "./slowJobs";
+import { compareOf, context, runJob, VALUATION, withLeave } from "./testing";
+import { dayBefore } from "./text";
+import { WorkProvider } from "./Tickmarks";
+
+// L-4 · Leaving early (docs/ui-design.md §4.5). The samples start Jul 13, 2026 and are valued then, as in W6.
+
+const page = (ctx: WorkContext, at?: string) => {
+  const L = withLeave(ctx, at);
+  return renderToStaticMarkup(createElement(WorkProvider, { ctx: L.ctx, children: createElement(Leaving, L.props) }))
+    .replace(/<(li|p)[^>]*>/g, "\n").replace(/<[^>]+>/g, "").replace(/[✓^<]/g, "").replace(/&#x27;/g, "'");
+};
+const base = (ctx: WorkContext) => {
+  const c = compareOf(ctx);
+  return { offers: c.offers, household: c.household, inflation: c.inflation };
+};
+const curves = (ctx: WorkContext, end = addMonthsIso(VALUATION, 60)) => {
+  const r = runJob((post) => leaveJob({ lane: "leave", gen: 1, ...base(ctx), end }, post));
+  if (!r.ok || !("curves" in r)) throw new Error("leave job failed");
+  return r.curves as LeaveCurve[];
+};
+const panels = (ctx: WorkContext, leaveDate: string) => {
+  const r = runJob((post) => cursorJob({ lane: "cursor", gen: 1, ...base(ctx), leaveDate }, post));
+  if (!r.ok || !("panels" in r)) throw new Error("cursor job failed");
+  return r.panels as Array<LeavePanel | null>;
+};
+
+describe("L-4's curves: steps on their real dates", () => {
+  const ctx = context();
+  const all = curves(ctx);
+
+  it("samples the start, each month's end, and the day before and the day of each cliff off a month's end", () => {
+    // A's first year: the sign-on (Aug 12) and the clawback's end (Jul 12, 2027) fall on month ends; the bonus (Jan 31) doesn't.
+    const days = sweepDays(VALUATION, all[0].cliffs, "2027-07-13");
+    expect(days).toHaveLength(1 + 12 + 2);
+    expect(days.slice(0, 2)).toEqual(["2026-07-13", "2026-08-12"]);
+    expect(days).toContain("2027-01-30");
+    expect(days).toContain("2027-01-31");
+  });
+  it("at each month's end the curve is the engine's leave sweep for that month", () => {
+    const byMonth = leaveDateSweep(compareOf(ctx).offers[0], compareOf(ctx).household, [1, 6, 12, 60], { inflation: 0.025 });
+    for (const row of byMonth) expect(all[0].points.find((p) => p.leaveDate === row.leaveDate)).toEqual((({ months: _, ...rest }) => rest)(row));
+  });
+  it("a prorated clawback is one segment; a full one's end is a ✓ marker", () => {
+    const lines = leaveLines(all, ["A", "B", "C"], "cash");
+    expect(lines.map((l) => l.segments.map((s) => [s.award, Math.round(s.perMonth), s.from, s.until]))).toEqual([
+      [], [["Sign-on", 417, "2026-09-12", "2027-07-12"]], [["Sign-on", 833, "2026-09-12", "2027-07-12"]],
+    ]);
+    expect(lines[0].markers.find((m) => m.date === "2027-07-12")?.kinds).toEqual(["clawbackEnds"]);
+    expect(lines[0].markers.find((m) => m.date === "2027-01-31")?.kinds).toEqual(["payment"]);
+    expect(page(ctx)).toContain("C: Sign-on clawback shrinks $833 a month until Jul 12, 2027");
+  });
+  it("offers line up by calendar date: a later start begins its line on its own start", () => {
+    const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-09-01" } } : o)));
+    const c = curves(later);
+    expect(leaveAxis(later.results!.view.row.window.start, 4).start).toBe("2026-07-13");
+    expect(c[1].points[0].leaveDate).toBe("2026-09-01");
+    expect(panels(later, "2026-08-15")[1]).toBeNull(); // B hasn't started by then
+    expect(worked("2026-09-01", "2027-01-12")).toEqual({ months: 4, days: 12 });
+  });
+});
+
+describe("L-4's panel (W6)", () => {
+  const ctx = context();
+  const text = page(ctx);
+
+  it("keep, repay and leave behind, six months in: W6's figures", () => {
+    expect(text).toContain("A 6 months worked · keep $41,200 after tax, and repay $10,000 of the Sign-on (all of it).");
+    expect(text).toContain("B 6 months worked · keep $34,974 after tax, and repay $2,500 of the Sign-on (prorated: it shrinks $417 a month until "
+      + "Jul 12, 2027).");
+    expect(text).toContain("C 6 months worked · keep $47,506 after tax, and repay $5,000 of the Sign-on");
+    expect(text).toContain("Left behind: $120,000 of RSUs not yet vested (at grant value).");
+  });
+  it("the next real cliff: A's bonus 19 days away (+$29,970, $26,057 of it the bonus); B skips its clawback steps to its bonus", () => {
+    expect(text).toContain("Next cliff: your 2026 bonus ($32,986 before tax) on Jan 31, 2027, 19 days later. Staying until then is worth +$29,970 "
+      + "after tax, $26,057 of it the cliff itself.");
+    expect(text).toContain("Next cliff: your 2026 bonus ($3,742 before tax) on Mar 15, 2027, 62 days later.");
+  });
+  it("the warnings that leaving that day sets off are in the panel", () => {
+    expect(text).toContain("Leaving then forfeits the bonuses for 2026 (paid Jan 31, 2027) and 2027 (paid Jan 31, 2028): you must be employed on "
+      + "the payout date.");
+    expect(text).toContain("Repaying the Sign-on in 2027 for pay received in 2026: the Social Security and Medicare tax withheld on it isn't "
+      + "refunded automatically");
+  });
+  it("kept = pay - clawbacks repaid - tax (net of relief) - premiums; the tax is the events' to within their rounding", () => {
+    const { offers, household } = base(ctx);
+    for (const at of ["2027-01-12", "2027-07-11", "2030-07-12"]) {
+      panels(ctx, at).forEach((p, i) => {
+        expect(p!.paid - p!.repaid - p!.tax - p!.premiums).toBeCloseTo(p!.afterTaxCompKept, 6);
+        // The engine rounds each event's gross, tax and after-tax to the cent separately, so the summed event tax is cents away.
+        const eventTax = keptIfLeaving(offers[i], household, toDays(at), { inflation: 0.025 }).result.events.reduce((s, e) => s + e.tax, 0);
+        expect(Math.abs(p!.tax - eventTax)).toBeLessThan(0.5);
+      });
+    }
+    const kept = derive("kept.A", withLeave(ctx).ctx);
+    expect(kept.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "65,000"], ["−", "10,000"], ["−", "12,900"], ["−", "900"], ["=", "41,200"]]);
+    const tr = derive("kept.C", withLeave(ctx, undefined, "totalRewards").ctx);
+    expect(tr.title).toBe("C · total rewards kept");
+  });
+});
+
+describe("L-4 at your stay's last day: the reconciliation with the stay", () => {
+  const ctx = context();
+  const end = dayBefore(ctx.results!.view.row.window.end);
+
+  it("leaving on Jul 12, 2030 keeps $2,511 more than the 4-year stay counts for A: the last year's tax", () => {
+    expect(page(ctx, end)).toContain("Leaving that day, A keeps $550,908 after tax, $2,511 more than the $548,398 that L-1 counts for your stay "
+      + "(after tax, as paid). It's tax: the stay taxes 2030 as though pay continued through December, at a similar next job, while leaving taxes "
+      + "only what was paid in 2030, at a part year's lower rate.");
+  });
+  it("kept = stay + pay + tax + premiums - clawbacks, and the derivation foots", () => {
+    const L = withLeave(ctx, end);
+    L.ctx.results!.leave!.panels.forEach((p, i) => {
+      const r = reconcile(p!, L.ctx.results!.detail!.offers[i].window);
+      // The stay's totals are rounded to cents: within a few cents.
+      expect(Math.abs(r.stay + r.pay + r.tax + r.premiums - r.clawback - r.kept)).toBeLessThan(0.5);
+    });
+    const d = derive("recon.C", L.ctx);
+    expect(d.lines.map((l) => l.value)).toEqual(["486,402", "481,282", "5,121", "5,121", "5,121"]);
+    expect(d.section).toBe("M-7.3");
+  });
+  it("a curve's value between samples is a straight line", () => {
+    const line = { points: [{ date: "2027-01-01", value: 0 }, { date: "2027-01-11", value: 100 }] };
+    expect([valueAt(line, "2026-12-31"), valueAt(line, "2027-01-06"), valueAt(line, "2027-02-01")]).toEqual([null, 50, 100]);
+  });
+});

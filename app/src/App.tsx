@@ -5,7 +5,8 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
-import { RiskSlot } from "./Later";
+import { LeavingSlot, RiskSlot } from "./Later";
+import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldId } from "./fields";
@@ -14,7 +15,7 @@ import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
 import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
 import type { EditTarget, WorkContext } from "./metrics";
-import { localToday } from "./text";
+import { dayBefore, localToday } from "./text";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
 import { SECTIONS, type SectionId } from "./sections";
@@ -142,9 +143,15 @@ export function App() {
     if (x.offer.startDate < today) notes.push(`Offer ${x.o.letter} starts before today, so its present value counts pay already received.`);
   }
   const sample = session.offers.some((o) => o.sample !== null);
+  // L-4's last day and what it counts: this visit only.
+  const [leaveAt, setLeaveAt] = useState<string | null>(null);
+  const [leaveBasis, setLeaveBasis] = useState<LeaveBasis>("cash");
+  const panels = engine.cursor.result;
+  const leave = view && panels?.length === letters.length
+    ? { leave: { basis: leaveBasis, stayEnd: dayBefore(view.row.window.end), panels } } : {};
   const work: WorkContext = {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
-    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters } } : {}),
+    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave } } : {}),
   };
 
   return (
@@ -186,6 +193,11 @@ export function App() {
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}
           {work.results && <RiskSlot ctx={work} sample={sample} />}
+          {work.results && (
+            <LeavingSlot ctx={work} sample={sample} compare={compare} ready={!engine.updating && !engine.invalid && !!engine.sweep}
+              leave={engine.leave} cursor={engine.cursor} requestSlow={engine.requestSlow} at={leaveAt} basis={leaveBasis} onAt={setLeaveAt}
+              onBasis={setLeaveBasis} />
+          )}
         </>
       )}
 
