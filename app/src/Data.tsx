@@ -1,4 +1,4 @@
-import { type ChangeEvent, type Dispatch, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type Dispatch, type RefObject, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/issues";
 import type { OfferIssue } from "../../src/offer/validate";
 import { exportSession, type ImportResult, readImport } from "./exchange";
@@ -30,6 +30,10 @@ function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
   });
 }
 
+/** Where focus goes after a step, so the keyboard never drops to the page: the element that replaced the one used. */
+type FocusAfter = "cancelDelete" | "deleteButton" | "review" | "fileInput" | "imported";
+type Done = { at: "export" | "import" | "delete"; text: string };
+
 const UI_WORDS: Record<string, string> = { basis: "the basis", theme: "the theme", mode: "quick or detailed mode" };
 const FILING = { single: "single", joint: "married, filing jointly", headOfHousehold: "head of household" } as const;
 
@@ -41,7 +45,19 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
   useEffect(() => { window.scrollTo(0, 0); top.current?.focus({ preventScroll: true }); }, []);
   const [file, setFile] = useState<{ name: string; result: ImportResult; checked?: Checked } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const focusAfter = useRef<FocusAfter | null>(null);
+  const refs: Record<FocusAfter, RefObject<HTMLElement | null>> = {
+    cancelDelete: useRef(null), deleteButton: useRef(null), review: useRef(null), fileInput: useRef(null), imported: useRef(null),
+  };
+  // After each render, move focus where the last step asked (once).
+  useEffect(() => {
+    const k = focusAfter.current;
+    if (!k || !refs[k].current) return;
+    focusAfter.current = null;
+    refs[k].current.focus();
+  });
+  const then = (k: FocusAfter) => { focusAfter.current = k; };
   const sample = session.offers.some((o) => o.sample !== null);
   const download = exportSession(session, today);
 
@@ -54,7 +70,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    setDone(`Saved ${download.fileName}.`);
+    setDone({ at: "export", text: `Saved ${download.fileName}.` });
   };
 
   const pick = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -68,12 +84,14 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
     const issues = await checkOffers(result.offers);
     const missing = result.offers.flatMap((o) => { const r = toOfferInput(o); return "missing" in r ? [{ letter: o.letter, missing: r.missing }] : []; });
     setFile({ name: f.name, result, checked: { ...result, issues, missing } });
+    then("review");
   };
 
   const replace = (c: Checked) => {
     dispatch({ type: "replace", household: c.household, offers: c.offers, ...(c.ui ? { ui: c.ui } : {}) });
     setFile(null);
-    setDone(`Imported ${c.offers.length} ${c.offers.length === 1 ? "offer" : "offers"}. `);
+    setDone({ at: "import", text: `Imported ${c.offers.length} ${c.offers.length === 1 ? "offer" : "offers"}. ` });
+    then("imported");
   };
 
   return (
@@ -100,6 +118,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
           <p>One JSON file with every offer, About you and your view choices. It's versioned, so a later version of this app can read it.</p>
           <p><button type="button" className="got-it data-button" onClick={save}>Download {download.fileName}</button></p>
           {sample && <p className="method-note">The file says it includes sample offers, and its name ends -sample.</p>}
+          {done?.at === "export" && <p className="note" role="status">{done.text}</p>}
         </section>
 
         <section className="method-section" aria-labelledby="data-import">
@@ -111,7 +130,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
           <p>
             <label className="got-it data-button file-button">
               Choose a file…
-              <input type="file" accept="application/json,.json" onChange={pick} className="sr-only" />
+              <input ref={refs.fileInput as RefObject<HTMLInputElement>} type="file" accept="application/json,.json" onChange={pick} className="sr-only" />
             </label>
           </p>
           {file && !file.result.ok && (
@@ -122,15 +141,23 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
             </div>
           )}
           {file?.result.ok && !file.checked && <p className="note">Checking {file.name}…</p>}
-          {file?.checked && <Review name={file.name} c={file.checked} current={session} replace={() => replace(file.checked!)} cancel={() => setFile(null)} />}
-          {done && <p className="note" role="status">{done}{done.startsWith("Imported") && <a href="#/">See the comparison</a>}</p>}
+          {file?.checked && (
+            <Review box={refs.review as RefObject<HTMLDivElement>} name={file.name} c={file.checked} current={session}
+              replace={() => replace(file.checked!)} cancel={() => { setFile(null); then("fileInput"); }} />
+          )}
+          {done?.at === "import" && (
+            <p className="note" role="status" tabIndex={-1} ref={refs.imported as RefObject<HTMLParagraphElement>}>{done.text}<a href="#/">See the comparison</a></p>
+          )}
         </section>
 
         <section className="method-section" aria-labelledby="data-delete">
           <h2 id="data-delete"><span className="ref">D-4</span> Delete all data</h2>
           <p>Deletes everything you've entered in this browser and starts again with the sample offers.</p>
           {!confirmDelete ? (
-            <p><button type="button" className="got-it data-button" onClick={() => setConfirmDelete(true)}>Delete all data…</button></p>
+            <p>
+              <button type="button" className="got-it data-button" ref={refs.deleteButton as RefObject<HTMLButtonElement>}
+                onClick={() => { setConfirmDelete(true); setDone(null); then("cancelDelete"); }}>Delete all data…</button>
+            </p>
           ) : (
             <div className="stale" role="alertdialog" aria-labelledby="delete-confirm">
               <p className="stale-head" id="delete-confirm">Delete {session.offers.length} {session.offers.length === 1 ? "offer" : "offers"} and About you? This can't be undone; export first to keep a copy.</p>
@@ -139,12 +166,17 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
                   clear();
                   dispatch({ type: "reset", today });
                   setConfirmDelete(false);
-                  setDone("Deleted. The sample offers are loaded again.");
+                  setFile(null);
+                  setDone({ at: "delete", text: "Deleted. The sample offers are loaded again." });
+                  then("deleteButton");
                 }}>Delete</button>
-                <button type="button" className="link" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                {/* Focus starts here, on the action that changes nothing. */}
+                <button type="button" className="link" ref={refs.cancelDelete as RefObject<HTMLButtonElement>}
+                  onClick={() => { setConfirmDelete(false); then("deleteButton"); }}>Cancel</button>
               </p>
             </div>
           )}
+          {done?.at === "delete" && <p className="note" role="status">{done.text}</p>}
         </section>
       </article>
     </div>
@@ -152,12 +184,14 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
 }
 
 /** What an import would replace, and its problems field by field, before anything changes. */
-function Review({ name, c, current, replace, cancel }: { name: string; c: Checked; current: Session; replace: () => void; cancel: () => void }) {
+function Review({ box, name, c, current, replace, cancel }: {
+  /** Focus moves here when the review appears. */ box: RefObject<HTMLDivElement>; name: string; c: Checked; current: Session; replace: () => void; cancel: () => void;
+}) {
   const h = c.household;
   const offers = (os: AppOffer[]) => os.map((o) => `${o.letter}${o.draft.label ? ` ${o.draft.label}` : ""}`).join(", ");
   const problems = c.issues.length + c.missing.length;
   return (
-    <div className="import-review" role="region" aria-label={`Importing ${name}`}>
+    <div className="import-review" role="region" aria-label={`Importing ${name}`} tabIndex={-1} ref={box}>
       <p className="stale-head">{name}{c.migratedFrom ? ` (an older export, schema ${c.migratedFrom}, updated as it's read)` : ""}</p>
       <ul>
         <li>Replaces your {current.offers.length} {current.offers.length === 1 ? "offer" : "offers"} ({offers(current.offers)}) with {c.offers.length} from the file: {offers(c.offers)}.</li>
