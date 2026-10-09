@@ -4,10 +4,13 @@ import { rentKey } from "./protocol";
 import { About } from "./About";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
-import { Ledger } from "./Ledger";
-import { ASSUMPTIONS, firstYear, type Missing, toHousehold, toOfferInput } from "./model";
+import type { OfferIssue } from "../../src/offer/validate";
+import { fieldId } from "./fields";
+import { HELP, helpKey } from "./help";
+import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
+import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
 import { type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
-import type { WorkContext } from "./metrics";
+import type { EditTarget, WorkContext } from "./metrics";
 import { localToday } from "./text";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
@@ -15,6 +18,9 @@ import { SECTIONS, type SectionId } from "./sections";
 import { verdict } from "./verdict";
 
 const STAYS = [2, 3, 4, 5];
+/** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
+const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.area", "startDate", "costOfLiving.monthlyRent", "label"]);
+const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", prices: "about-filing" } as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
 
@@ -87,7 +93,35 @@ export function App() {
     const state = o.draft.residence.state;
     return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
   })).values()];
-  const engine = useEngine({ compare, rents });
+  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) });
+  // The validator's problems, by offer: the engine checks the complete offers, in order.
+  const issues: Partial<Record<Letter, OfferIssue[]>> = {};
+  complete.forEach((x, i) => { if (engine.issues[i]?.length) issues[x.o.letter] = engine.issues[i]; });
+
+  // "Edit it" (and "Fix it"): show the field (its mode, section and row editor), then focus it.
+  const [focus, setFocus] = useState<string | null>(null);
+  const edit = (t: EditTarget) => {
+    if ("about" in t) { setFocus(ABOUT_FIELDS[t.about]); return; }
+    const key = helpKey(t.path);
+    const quick = QUICK_FIELDS.has(key) && (session.ui.mode ?? "quick") === "quick";
+    if (!quick) {
+      const editor = HELP[key]?.editor;
+      dispatch({ type: "ui", patch: { mode: "detailed", section: sectionOfPath(t.path), editor: editor ? { row: editor, letter: t.letter } : null } });
+    }
+    setFocus(fieldId(t.letter, t.path));
+  };
+  useEffect(() => {
+    if (!focus) return;
+    const frame = requestAnimationFrame(() => {
+      // A field without an input of its own (a read-only row) focuses its section's heading.
+      const section = focus.startsWith("in-") ? sectionOfPath(focus.split("-").slice(2).join(".")) : null;
+      const el = document.getElementById(focus) ?? (section ? document.getElementById(`section-head-${section}`) : null);
+      el?.scrollIntoView({ block: "center" });
+      el?.focus();
+      setFocus(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus, session.ui]);
   const letters = complete.map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
     ? verdict(engine.sweep, letters, session.ui.basis, stayYears) : null;
@@ -104,7 +138,7 @@ export function App() {
   };
 
   return (
-    <WorkProvider ctx={work} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
+    <WorkProvider ctx={work} onEdit={edit} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
     <div className="page">
       <header className="masthead">
         <a className="brand" href="#/">
@@ -127,10 +161,10 @@ export function App() {
           <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
 
           <main className="workpaper">
-            <Ledger offers={session.offers} missing={missing} rents={engine.rents} dispatch={dispatch} />
+            <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} ui={session.ui} dispatch={dispatch} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
-                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} />
+                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit} />
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}

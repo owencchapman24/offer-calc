@@ -1,9 +1,16 @@
 import type { RentEstimate } from "../../src/col/rent";
 import type {
-  Basis, CashTotals, EmploymentYearResult, HorizonRow, HorizonSweep, RppUsed, ValueBasis, WindowTotals,
+  Basis, ByScenario, CashTotals, EmploymentYearResult, HorizonRow, HorizonSweep, RppUsed, ValueBasis, WindowTotals,
 } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
-import { alsoCounted, type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
+import { defaultFor, isDefault } from "./defaults";
+import { HELP, helpKey } from "./help";
+import {
+  alsoCounted, type AppHousehold, type AppOffer, bonusBasis, DEFAULT_HOUSEHOLD, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft,
+} from "./model";
+import {
+  bonusText, cashAwardsText, employerStateText, healthText, perksText, rangeText, refreshersText, rentGrowthText, retirementText, scheduleText,
+} from "./summary";
 import { type OfferDetail, rentKey, type StayDetail } from "./protocol";
 import type { SectionId } from "./sections";
 import { cents, dayBefore, dollars, figure, longDate, monthName, percent, shortDate, signed } from "./text";
@@ -15,7 +22,6 @@ import type { VerdictView } from "./verdict";
 // no React. A unit test renders the schedules and fails if a figure's id lacks any of the three.
 
 type L = Letter;
-export type InputField = "salary" | "bonus" | "bonusTiming" | "city" | "start" | "rent" | "also";
 export type AboutField = "filing" | "stay" | "wages" | "prices";
 export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | "perks" | "healthExtra" | "savings" | "rent" | "faceValue";
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
@@ -38,7 +44,7 @@ export type MetricId =
   | `run.${L}.${number}` // L-1: the running total through a year
   | `eysum.${L}` // L-1's table: the years, footed
   | `br.${L}.${number}.${BridgeLine}` // the bridge
-  | `in.${L}.${InputField}` // an input in the ledger
+  | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
 export interface WorkLine {
@@ -69,9 +75,12 @@ export interface Derivation {
   ties: MetricId[];
   /** Figures on the page this one is built from: highlighted while it's open. */
   uses: MetricId[];
-  /** For an input: the id of the field "Edit it" focuses. */
-  edit?: string;
+  /** For an input: the field "Edit it" opens and focuses. */
+  edit?: EditTarget;
 }
+
+/** An offer's input, by its path, or a field in About you. */
+export type EditTarget = { letter: Letter; path: string } | { about: AboutField };
 
 /** Everything a derivation can draw on. `results` is present once two or more offers compare. */
 export interface WorkContext {
@@ -104,9 +113,14 @@ const TOTAL_NAME: Record<ValueBasis, string> = {
   cash: "after-tax pay", totalRewards: "total rewards", colAdjustedTotal: "after rent, at U.S. prices",
 };
 const SECTION_OF: Record<ValueBasis, SectionId> = { cash: "M-4", totalRewards: "M-5", colAdjustedTotal: "M-6.3" };
-const INPUT_SECTION: Record<InputField, SectionId> = {
-  salary: "M-2", bonus: "M-2", bonusTiming: "M-2", city: "M-6.1", start: "M-7.3", rent: "M-6.2", also: "M-5",
+/** Inputs without help of their own (the read-only rows, "also"): their methodology section, by the path's head. */
+const INPUT_SECTION: Record<string, SectionId> = {
+  salary: "M-2", startDate: "M-7.3", bonus: "M-2", cashAwards: "M-2", equity: "M-3", retirement: "M-5.1", health: "M-5.2", perks: "M-5.3",
+  hours: "M-5.4", costOfLiving: "M-6.2", residence: "M-4", employerState: "M-4", also: "M-5",
 };
+const inputSection = (path: string): SectionId => HELP[helpKey(path)]?.section ?? INPUT_SECTION[path.split(".")[0]] ?? "M-1";
+/** An input's path within its metric id: "in.A.equity.grants.0.value" -> "equity.grants.0.value". */
+const pathOf = (id: string) => id.split(".").slice(2).join(".");
 const ABOUT_SECTION: Record<AboutField, SectionId> = { filing: "M-4", stay: "M-7.3", wages: "M-4", prices: "M-6.1" };
 const BRIDGE_SECTION: Record<BridgeLine, SectionId> = {
   letter: "M-2", salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", clawback: "M-9", paid: "M-1", tax: "M-4", premiums: "M-5.2",
@@ -119,9 +133,11 @@ const BRIDGE_NAME: Record<BridgeLine, string> = {
   perks: "perks", hsa: "employer HSA", oop: "out-of-pocket costs", totalRewards: "total rewards", rent: "rent", prices: "price line",
   total: "total after rent", spend: "spending a month", saved: "saving a month",
 };
-const INPUT_NAME: Record<InputField, string> = {
-  salary: "salary", bonus: "bonus", bonusTiming: "bonus timing", city: "city", start: "start date", rent: "rent", also: "other inputs",
+const READ_ONLY_NAME: Record<string, string> = {
+  also: "other inputs", cashAwards: "cash awards", retirement: "401(k)", health: "health plan", perks: "perks", employerState: "employer state",
+  "costOfLiving.rentGrowth": "rent growth", "hours.weekly": "weekly hours",
 };
+const inputName = (path: string) => READ_ONLY_NAME[path] ?? HELP[helpKey(path)]?.label.toLowerCase() ?? path;
 const ABOUT_NAME: Record<AboutField, string> = { filing: "your filing status", stay: "your stay", wages: "your other wages", prices: "the prices setting" };
 const PART: Record<PvPart, { label: string; gloss: string }> = {
   gross: { label: "Gross pay", gloss: "salary, bonuses, cash awards and RSU vests paid in your stay" },
@@ -158,9 +174,9 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
   switch (head) {
     case "in": {
       const o = offerByLetter(ctx, a as L);
-      if (b === "bonusTiming") return "default";
-      if (b === "rent") return o?.draft.costOfLiving.monthlyRent === null && rentEstimate(ctx, o) ? "estimate" : "traced";
-      return "traced";
+      const path = pathOf(id);
+      if (path === "costOfLiving.monthlyRent") return o?.draft.costOfLiving.monthlyRent === null && rentEstimate(ctx, o) ? "estimate" : "traced";
+      return o && isDefault(o.draft, path) ? "default" : "traced";
     }
     case "about": return aboutIsDefault(ctx.household, a as AboutField) ? "default" : "traced";
     case "rpp": return "traced";
@@ -192,7 +208,7 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "ey": return !basis || basis === "perHour" ? "M-5.4" : SECTION_OF[basis];
     case "run": case "eysum": return "M-1";
     case "br": return BRIDGE_SECTION[c as BridgeLine];
-    case "in": return INPUT_SECTION[b as InputField];
+    case "in": return inputSection(pathOf(id));
     case "about": return ABOUT_SECTION[a as AboutField];
   }
   throw new Error(`Unknown figure: ${id}`);
@@ -221,7 +237,7 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "run": return runningWork(ctx, a as L, Number(b));
       case "eysum": return yearsSumWork(ctx, a as L);
       case "br": return bridgeWork(ctx, a as L, Number(b), c as BridgeLine);
-      case "in": return inputWork(ctx, a as L, b as InputField);
+      case "in": return inputWork(ctx, a as L, pathOf(id));
       case "about": return aboutWork(ctx, a as AboutField);
     }
     throw new Error(`Unknown figure: ${id}`);
@@ -246,7 +262,7 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "run": return `${a}'s running total through year ${b}`;
     case "eysum": return `${a}'s total in L-1`;
     case "br": return `the bridge's ${BRIDGE_NAME[c as BridgeLine]}`;
-    case "in": return `${a}'s ${INPUT_NAME[b as InputField]}`;
+    case "in": return `${a}'s ${inputName(pathOf(id))}`;
     case "about": return ABOUT_NAME[a as AboutField];
   }
   return id;
@@ -478,7 +494,7 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
         { op: "=", label: "After-tax pay", value: figure(pv.afterTaxComp), rule: "double" },
       ],
       notes: [discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`],
-      ties: [], uses: [`in.${letter}.salary`, `in.${letter}.bonus`, `in.${letter}.city`, `in.${letter}.start`],
+      ties: [], uses: [`in.${letter}.salary.annual`, `in.${letter}.bonus.amount`, `in.${letter}.costOfLiving.area`, `in.${letter}.startDate`],
     };
   }
   const healthExtra = ben.healthNet - pv.premiums;
@@ -531,7 +547,7 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
         + `(spending ${figure(col.nonHousingLocal)} − out-of-pocket ${figure(oopLocal)}) = ${figure(check)}.`,
       discountNote,
     ],
-    ties: [], uses: [`in.${letter}.rent`, `in.${letter}.city`],
+    ties: [], uses: [`in.${letter}.costOfLiving.monthlyRent`, `in.${letter}.costOfLiving.area`],
   };
 }
 
@@ -587,7 +603,7 @@ function partWork(ctx: WorkContext, letter: L, part: PvPart): Work {
       nominal ? `Each amount is discounted from its date to today, ${longDate(r.sweep.valuationDate)}: `
         + `$1 paid a year from now is worth $${(1 / (1 + r.sweep.discountRate)).toFixed(4)} today.` : "None entered for this offer.",
     ],
-    ties: [], uses: part === "rent" ? [`in.${letter}.rent`] : part === "gross" ? [`in.${letter}.salary`, `in.${letter}.bonus`] : [],
+    ties: [], uses: part === "rent" ? [`in.${letter}.costOfLiving.monthlyRent`] : part === "gross" ? [`in.${letter}.salary.annual`, `in.${letter}.bonus.amount`] : [],
   };
 }
 
@@ -624,7 +640,7 @@ function rppWork(ctx: WorkContext, letter: L, which: "us" | "area"): Work {
         + `${info.rppVintage.dataYear}. ${info.rppVintage.release}`,
       "Rent is counted separately, at what you'd pay, so only prices other than rent restate your spending. 16% is housing rents' share of BEA's price weights.",
     ],
-    ties: [], uses: which === "area" ? [`in.${letter}.city`] : [],
+    ties: [], uses: which === "area" ? [`in.${letter}.costOfLiving.area`] : [],
   };
 }
 
@@ -942,14 +958,14 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
       return {
         title: title("the offer letter"), scope,
         lines: [
-          { label: "Salary at the year's start", value: figure(q.salary), ref: `in.${letter}.salary` },
-          ...(q.bonus ? [{ op: "+" as const, label: "Target bonus on it", value: figure(q.bonus), ref: `in.${letter}.bonus` as MetricId }] : []),
+          { label: "Salary at the year's start", value: figure(q.salary), ref: `in.${letter}.salary.annual` },
+          ...(q.bonus ? [{ op: "+" as const, label: "Target bonus on it", value: figure(q.bonus), ref: `in.${letter}.bonus.amount` as MetricId }] : []),
           ...(q.cash ? [{ op: "+" as const, label: "Cash awards paid in the year", value: figure(q.cash), ref: `in.${letter}.also` as MetricId }] : []),
           ...(q.rsu ? [{ op: "+" as const, label: "New-hire RSUs due in the year, at grant value", value: figure(q.rsu), ref: `in.${letter}.also` as MetricId }] : []),
           { op: "=", label: "The offer letter's year", value: figure(y.quotedTC), rule: "double" },
         ],
         notes: ["What an offer letter quotes: no proration, payout timing, company vest dates, share-price growth or refreshers. The lines under it in the bridge are those differences."],
-        ties: [], uses: [`in.${letter}.salary`, `in.${letter}.bonus`],
+        ties: [], uses: [`in.${letter}.salary.annual`, `in.${letter}.bonus.amount`],
       };
     }
     case "salary": case "cash":
@@ -972,13 +988,13 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
           ...paid.map((p, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `Paid ${longDate(p.date)}`,
             note: `for ${longDate(workedFrom(d, p.periodFrom))} – ${longDate(p.periodTo)}`, value: figure(p.gross) })),
           ...(paid.length ? [] : [{ label: `Bonus paid in year ${n}`, value: "0" }]),
-          { op: "−", label: "Target bonus in the offer letter", value: figure(y.quoted.bonus), ref: `in.${letter}.bonus`, rule: "single" },
+          { op: "−", label: "Target bonus in the offer letter", value: figure(y.quoted.bonus), ref: `in.${letter}.bonus.amount`, rule: "single" },
           { op: "=", label: "Difference", value: signed(y.gross.bonus - y.quoted.bonus), rule: "double" },
         ],
         notes: [
           "Bonuses are paid once a year for the work before it, so the first one covers only the months you've worked, and each year's payout is for the year before.",
         ],
-        ties: [], uses: [`in.${letter}.bonus`],
+        ties: [], uses: [`in.${letter}.bonus.amount`],
       };
     }
     case "rsu": {
@@ -1022,7 +1038,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
             + `Social Security and Medicare ${rate2(t.parts.fica / t.gross)}, ${st} ${rate2(t.parts.state / t.gross)}`
             + `${t.parts.local ? `, ${local} ${rate2(t.parts.local / t.gross)}` : ""}${t.projectedLaw ? " (tax law projected from 2026)" : ""}.`),
         ],
-        ties: [], uses: [`in.${letter}.city`],
+        ties: [], uses: [`in.${letter}.costOfLiving.area`],
       };
     }
     case "premiums": case "perks": case "hsa": case "oop": {
@@ -1058,13 +1074,13 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
       return {
         title: title("rent"), scope,
         lines: full
-          ? [{ label: `Rent a month in year ${n}`, value: dollars(monthly), ref: `in.${letter}.rent` },
+          ? [{ label: `Rent a month in year ${n}`, value: dollars(monthly), ref: `in.${letter}.costOfLiving.monthlyRent` },
             { op: "×", label: "Months", value: "12" },
             { op: "=", label: `Rent in year ${n}`, value: figure(rent), rule: "double" }]
-          : [{ label: `Rent paid in year ${n}`, value: figure(rent), ref: `in.${letter}.rent` }],
+          : [{ label: `Rent paid in year ${n}`, value: figure(rent), ref: `in.${letter}.costOfLiving.monthlyRent` }],
         notes: [`The first lease year's rent is ${dollars(info.monthlyRent)} a month, rising ${percent(info.rentGrowth)} at each anniversary of your start date `
           + `(${info.rentGrowthSource === "inflation" ? "the inflation rate" : "as entered"}). It's paid only while you work there.`],
-        ties: [], uses: [`in.${letter}.rent`],
+        ties: [], uses: [`in.${letter}.costOfLiving.monthlyRent`],
       };
     }
     case "prices": {
@@ -1084,7 +1100,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         ],
         notes: ["Only spending money is restated: what's left after tax, your 401(k) and HSA, planned savings, rent and health costs. "
           + "Money you save counts at face value, and rent is already what you'd pay."],
-        ties: [], uses: [`in.${letter}.city`],
+        ties: [], uses: [`in.${letter}.costOfLiving.area`],
       };
     }
     case "spend": case "saved": {
@@ -1114,29 +1130,16 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
 
 const SAMPLE_NOTE = "Traced to a sample input (illustrative, not market data).";
 
-function inputWork(ctx: WorkContext, letter: L, field: InputField): Work {
+function inputWork(ctx: WorkContext, letter: L, path: string): Work {
   const o = offerByLetter(ctx, letter);
   if (!o) throw new Error(`There's no offer ${letter}.`);
   const d = o.draft;
   const traced = o.sample ? SAMPLE_NOTE : "As you entered it.";
-  const edit = `in-${letter}-${field}`;
+  const edit: EditTarget = { letter, path };
   const title = (what: string) => `${letter} · ${what}`;
-  switch (field) {
-    case "salary":
-      return { title: title("salary"), lines: [{ label: "Starting salary, per year, before tax", value: d.salary.annual === null ? "—" : dollars(d.salary.annual), tick: "traced" }],
-        notes: [traced, "Pay accrues by calendar month. Raises and promotions are separate inputs (detailed mode, coming soon)."], ties: [], uses: [], edit };
-    case "bonus": {
-      const b = d.bonus;
-      const value = b.basis === "byEmploymentYear" ? "by employment year" : !b.amount?.base ? "none"
-        : b.basis === "percentOfSalary" ? `${percent(b.amount.base)} of salary` : `${dollars(b.amount.base)} a year`;
-      return { title: title("bonus"), lines: [{ label: "Target bonus", value, tick: "traced" }],
-        notes: [traced, "The first bonus is prorated for the part of the year you work."], ties: [], uses: [], edit };
-    }
-    case "bonusTiming":
-      return { title: title("bonus timing"), lines: [{ label: "Paid each year on", value: "Mar 15", tick: "default" }, { label: "For", value: "the prior calendar year", tick: "default" }],
-        notes: ["A default, not something you entered: it's the most common pattern. Detailed mode (coming soon) will let you change it.",
-          "A July start gets a partial first bonus about eight months later."], ties: [], uses: [], edit: `in-${letter}-bonus` };
-    case "city": {
+  const help = HELP[helpKey(path)];
+  switch (path) {
+    case "costOfLiving.area": {
       const nyc = inNyc(d);
       const state = d.residence.state;
       const where = `${cityName(d.costOfLiving.area)}${state ? ` · live in ${state}` : ""}${nyc ? ", inside New York City" : ""}`;
@@ -1144,15 +1147,13 @@ function inputWork(ctx: WorkContext, letter: L, field: InputField): Work {
         notes: [traced, `Taxed as a full-year resident of ${state ?? "that state"}${nyc ? " and New York City" : ""}; `
           + "spending is priced with this metro's BEA price level."], ties: [], uses: [], edit };
     }
-    case "start":
-      return { title: title("start date"), lines: [{ label: "First day of work", value: d.startDate ? longDate(d.startDate) : "—", tick: "traced" }],
-        notes: [traced, "Comparisons start on the earliest start date, so a later start counts as pay you don't get yet."], ties: [], uses: [], edit };
-    case "rent": {
+    case "costOfLiving.monthlyRent": {
       const est = rentEstimate(ctx, o);
       const rent = d.costOfLiving.monthlyRent;
       if (rent !== null || !est) {
         return { title: title("rent"), lines: [{ label: "Rent a month", value: rent === null ? "—" : dollars(rent), tick: "traced" }],
-          notes: [traced, "It rises with inflation (2.5% a year) at each lease anniversary while you work there."], ties: [], uses: [], edit };
+          notes: [traced, "It rises at each lease anniversary while you work there, by the rent growth under Where you'd live (inflation, 2.5% a year, unless you change it)."],
+          ties: [], uses: [], edit };
       }
       return {
         title: title("rent, estimated"),
@@ -1171,14 +1172,88 @@ function inputWork(ctx: WorkContext, letter: L, field: InputField): Work {
       };
     }
     case "also": {
-      const also = alsoCounted(o.draft);
+      const also = alsoCounted(d);
       return also.length
-        ? { title: title("inputs quick mode doesn't show"), lines: also.map((s): WorkLine => ({ label: s })),
-          notes: [SAMPLE_NOTE, "They still count. Detailed mode (coming soon) will let you see and edit them."], ties: [], uses: [] }
+        ? { title: title("inputs quick mode doesn't show"), lines: also.map((x): WorkLine => ({ label: x })),
+          notes: [o.sample ? SAMPLE_NOTE : "As you entered them.", "They still count. Detailed mode shows each one, where you can see and edit it."],
+          ties: [], uses: [] }
         : { title: title("inputs quick mode doesn't show"), lines: [{ label: "None: only the fields above count for this offer" }],
-          notes: ["Detailed mode (coming soon) adds RSUs, 401(k), health, perks and hours."], ties: [], uses: [] };
+          notes: ["Detailed mode adds raises, bonus timing, RSUs and hours, and shows the 401(k), health and perks."], ties: [], uses: [] };
     }
   }
+  // At its default: the default, and why.
+  const def = defaultFor(path);
+  if (def && isDefault(d, path)) {
+    return {
+      title: title(inputName(path)), lines: [{ label: help?.label ?? inputName(path), value: def.shown(d), tick: "default" }],
+      notes: [`A default, not something you entered. ${def.reason}`, "Edit it to change it; its help (ⓘ) can reset it to the default."],
+      ties: [], uses: [], edit,
+    };
+  }
+  return {
+    title: title(inputName(path)), lines: inputLines(d, path),
+    notes: [traced, ...(help ? [help.help.split(/(?<=[.])\s/)[0]] : [])], ties: [], uses: [], edit,
+  };
+}
+
+/** An input's value as derivation lines: one line, or bear / base / bull when it has a range. */
+function inputLines(d: OfferDraft, path: string): WorkLine[] {
+  const key = helpKey(path);
+  const v = getPath(d, path);
+  const fmt = formatterFor(d, key);
+  const label = HELP[key]?.label ?? inputName(path);
+  const line = (l: string, value: string, note?: string): WorkLine => ({ label: l, value, tick: "traced", ...(note ? { note } : {}) });
+  if (isRange(v)) {
+    return hasRange(v) ? [line(`${label}, bear case`, fmt(v.bear)), line(`${label}, base case`, fmt(v.base)), line(`${label}, bull case`, fmt(v.bull))]
+      : [line(label, fmt(v.base))];
+  }
+  switch (key) {
+    case "salary.promotions":
+      return d.salary.promotions.length ? d.salary.promotions.map((p, i) => line(`Promotion ${i + 1}`, p.stepUp === null ? "+—" : `+${percent(p.stepUp)}`,
+        `on ${p.on ? longDate(p.on) : "—"}${p.scenarios && p.scenarios.length < 3 ? `, ${p.scenarios.join(" and ")} only` : ""}`)) : [line(label, "None")];
+    case "equity.grants":
+      return d.equity.grants.length ? d.equity.grants.map((g) => line(g.label || "RSU grant", g.value === null ? "—" : dollars(g.value), scheduleText(g.schedule)))
+        : [line(label, "None")];
+    case "equity.grants.schedule": case "equity.refreshers.schedule":
+      return [line(label, scheduleText(v as ScheduleDraft))];
+    case "equity.refreshers": return [line(label, refreshersText(d))];
+    case "bonus.amounts":
+      return d.bonus.amounts.length ? d.bonus.amounts.map((a, i) => line(`Year ${i + 1}${i === d.bonus.amounts.length - 1 ? ", and after" : ""}`,
+        a ? rangeText(a, dollars) : "—")) : [line(label, "None")];
+    case "bonus.amount": return [line("Target bonus", bonusText(d))];
+    case "cashAwards": return [line("Cash awards", cashAwardsText(d))];
+    case "retirement": return [line("401(k)", retirementText(d))];
+    case "health": return [line("Health plan", healthText(d))];
+    case "perks": return [line("Perks", perksText(d))];
+    case "employerState": return [line("Employer state", employerStateText(d))];
+    case "costOfLiving.rentGrowth": return [line("Rent growth", rentGrowthText(d, 0.025))];
+    case "hours.weekly": return [line(label, "Not counted")];
+  }
+  if (v === null || v === undefined) return [line(label, "—")];
+  if (typeof v === "boolean") return [line(label, v ? "Yes" : "No")];
+  if (typeof v === "string") return [line(label, /^\d{4}-\d{2}-\d{2}$/.test(v) ? longDate(v) : v)];
+  if (typeof v === "number") return [line(label, fmt(v))];
+  if (typeof v === "object" && "month" in v && "day" in v) {
+    const md = v as { month: number; day: number };
+    return [line(label, `${MONTH_SHORT[md.month - 1] ?? "—"} ${md.day}`)];
+  }
+  return [line(label, "Entered")];
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const isRange = (v: unknown): v is ByScenario => !!v && typeof v === "object" && "base" in v && "bear" in v;
+const PERCENT_KEYS = new Set(["salary.raise", "equity.priceGrowth", "salary.promotions.stepUp", "costOfLiving.rentGrowth",
+  "equity.grants.schedule.tranches.fraction", "equity.refreshers.schedule.tranches.fraction"]);
+const MONTH_KEYS = new Set(["equity.refreshers.firstAfterMonths", "equity.refreshers.everyMonths", "equity.grants.schedule.tranches.month",
+  "equity.refreshers.schedule.tranches.month"]);
+
+/** How an input's numbers read: a percent, dollars, hours, weeks or months. */
+function formatterFor(d: OfferDraft, key: string): (x: number) => string {
+  if (PERCENT_KEYS.has(key) || (key === "bonus.amount" && bonusBasis(d.bonus) === "percentOfSalary")) return percent;
+  if (key === "hours.weekly") return (x) => `${x} hours a week`;
+  if (key === "hours.weeksPerYear") return (x) => `${x} weeks`;
+  if (MONTH_KEYS.has(key)) return (x) => `${x} ${x === 1 ? "month" : "months"}`;
+  return dollars;
 }
 
 function aboutWork(ctx: WorkContext, field: AboutField): Work {
@@ -1189,17 +1264,17 @@ function aboutWork(ctx: WorkContext, field: AboutField): Work {
     case "filing":
       return { title: "Filing status", lines: [{ label: "Files as", value: { single: "Single", joint: "Married, filing jointly", headOfHousehold: "Head of household" }[h.filingStatus], tick }],
         notes: [isDefault ? "The default: most new grads file single." : "As you chose it.", "It sets the tax brackets and the standard deduction for every offer."],
-        ties: [], uses: [], edit: "about-filing" };
+        ties: [], uses: [], edit: { about: "filing" } };
     case "stay":
       return { title: "How long you expect to stay", lines: [{ label: "Stay", value: years(h.stayYears), tick }],
         notes: [isDefault ? "The default: a typical first-job tenure. The row under the verdict shows 2 to 5 years." : "As you chose it.",
           "Every offer is compared over the same stretch, starting on the earliest start date; pay after it isn't counted."],
-        ties: [], uses: [], edit: "stay" };
+        ties: [], uses: [], edit: { about: "stay" } };
     case "wages":
       return { title: `Other wages in ${ctx.wagesYear}`, lines: [{ label: "From another job", value: dollars(h.otherWagesThisYear), tick }],
         notes: [isDefault ? "The default: none." : "As you entered it.",
           `Pay from another job in ${ctx.wagesYear} is taxed in the same year, so it raises the new job's first-year tax.`],
-        ties: [], uses: [], edit: "about-wages" };
+        ties: [], uses: [], edit: { about: "wages" } };
     case "prices":
       return { title: "Prices in", lines: [{ label: "Dollars", value: "U.S. average", tick: "default" }],
         notes: ["The default: every offer's spending money is priced as in an average U.S. city, so offers in different cities compare in the same dollars."],

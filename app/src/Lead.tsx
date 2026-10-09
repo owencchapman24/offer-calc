@@ -1,5 +1,9 @@
 import { type Dispatch, useRef } from "react";
+import { formatIssue } from "../../src/format/index";
 import type { Basis } from "../../src/offer/types";
+import type { OfferIssue } from "../../src/offer/validate";
+import { HELP, helpKey } from "./help";
+import type { EditTarget } from "./metrics";
 import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
@@ -16,10 +20,13 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch }: {
+export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix }: {
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
+  /** Problems with the latest inputs: the results are the last valid ones until they're fixed. */
+  issues?: Partial<Record<Letter, OfferIssue[]>>; onFix?: (t: EditTarget) => void;
 }) {
+  const problems = (Object.entries(issues) as Array<[Letter, OfferIssue[]]>).flatMap(([letter, list]) => list.map((i) => ({ letter, i })));
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   return (
@@ -37,6 +44,19 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
       {error && <p className="note error" role="alert">Couldn't compute: {error}</p>}
+      {problems.length > 0 && (
+        <div className="stale" role="alert">
+          <p className="stale-head">{view ? "These results are for your last valid inputs." : "Nothing to compare yet."} Fix {problems.length === 1 ? "this" : "these"} to update them:</p>
+          <ul>
+            {problems.map(({ letter, i }) => (
+              <li key={`${letter}|${i.path}|${i.code}`}>
+                <strong className={`who offer-${letter}`}>{letter}</strong> {HELP[helpKey(i.path)]?.label ?? "Input"}: {formatIssue(i)}{" "}
+                {onFix && <button type="button" className="link" onClick={() => onFix({ letter, path: i.path.replace(/\.(bear|base|bull)$/, "") })}>Fix it</button>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} /> : !error && notes.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}

@@ -211,7 +211,7 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
       area: null, state: null, nyc: true, startDate: "2027-06-01", rent: null } };
     const s = loadSession({ getItem: () => JSON.stringify({ ...v1, offers: [blank] }), setItem: () => {} }, TODAY);
     expect(toOfferInput(s.offers[0])).toEqual({ missing: ["salary", "city"] });
-    expect(s.offers[0].draft).toMatchObject({ label: "Mine", startDate: "2027-06-01", bonus: { basis: "percentOfSalary", amount: null } });
+    expect(s.offers[0].draft).toMatchObject({ label: "Mine", startDate: "2027-06-01", bonus: { basis: null, amount: null } });
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)

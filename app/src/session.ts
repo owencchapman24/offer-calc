@@ -157,7 +157,7 @@ export function migrateOffer(o: V1Offer): AppOffer {
     const amount = v === null ? null : base && base.basis === basis && base.amount.base > 0
       ? { bear: base.amount.bear * (v / base.amount.base), base: v, bull: base.amount.bull * (v / base.amount.base) } : all(v);
     // v1 kept only the payout timing (payOn, cutoff, period) from a sample, or the default.
-    d = setPath(d, "bonus", { ...d.bonus, basis, amount, amounts: [], firstPayoutGuaranteed: null, mustBeEmployedOnPayDate: null });
+    d = setPath(d, "bonus", { ...d.bonus, basis: basis === "percentOfSalary" && !o.base ? null : basis, amount, amounts: [], firstPayoutGuaranteed: null, mustBeEmployedOnPayDate: null });
   }
   return { id: o.id, letter: o.letter, sample: o.sample, draft: o.sample ? completeSample(d) : d };
 }

@@ -76,7 +76,8 @@ export interface PromotionDraft {
 }
 
 export interface BonusDraft {
-  basis: AnnualBonus["basis"];
+  /** Null: % of salary (the usual quote). */
+  basis: AnnualBonus["basis"] | null;
   /** percentOfSalary (a fraction) or fixed (dollars a year). Null: blank, so no bonus. */
   amount: ByScenario | null;
   /** byEmploymentYear: dollars for employment years 1, 2, ...; the last repeats. A null year is blank. */
@@ -223,6 +224,9 @@ export type Missing = "salary" | "city" | "start date";
 /** Taxed by New York City: the New York metro, living in NY, inside the city. */
 export const inNyc = (d: OfferDraft) => d.residence.nyc && d.costOfLiving.area === NYC_METRO && d.residence.state === "NY";
 
+/** The bonus basis, with its default. */
+export const bonusBasis = (b: BonusDraft): AnnualBonus["basis"] => b.basis ?? "percentOfSalary";
+
 /** A blank required number becomes NaN, so the validator says "Enter an amount" at its field. */
 const req = (v: number | null) => (v === null ? Number.NaN : v);
 
@@ -277,13 +281,14 @@ function bonusInput(b: BonusDraft): AnnualBonus | undefined {
     ...(b.mustBeEmployedOnPayDate !== null ? { mustBeEmployedOnPayDate: b.mustBeEmployedOnPayDate } : {}),
   };
   const zero = (s: ByScenario | null) => !s || (s.bear === 0 && s.base === 0 && s.bull === 0);
-  if (b.basis === "byEmploymentYear") {
+  const basis = bonusBasis(b);
+  if (basis === "byEmploymentYear") {
     if (!b.amounts.length || b.amounts.every((a) => a !== null && zero(a))) return undefined;
     return { ...timing, basis: "byEmploymentYear", amounts: b.amounts.map((a) => a ?? all(Number.NaN)) };
   }
   // Blank or zero: no bonus.
   if (zero(b.amount)) return undefined;
-  return { ...timing, basis: b.basis, amount: b.amount! };
+  return { ...timing, basis, amount: b.amount! };
 }
 
 function cashInput(a: CashAwardDraft): CashAward {
@@ -377,7 +382,7 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
       promotions: (o.salary.promotions ?? []).map((p) => ({ on: p.on, stepUp: p.stepUp, scenarios: or(p.scenarios) })),
     },
     bonus: {
-      basis: b?.basis ?? "percentOfSalary",
+      basis: b?.basis ?? null,
       amount: b && b.basis !== "byEmploymentYear" ? b.amount : null,
       amounts: b?.basis === "byEmploymentYear" ? b.amounts.map((a) => ({ ...a })) : [],
       payOn: or(b?.payOn), periodStart: or(b?.periodStart), cutoff: or(b?.cutoff),
@@ -414,7 +419,7 @@ export function blankDraft(): OfferDraft {
   return {
     label: "", residence: { state: null, nyc: true }, employerState: null, startDate: null,
     salary: { annual: null, raise: null, raiseOn: null, promotions: [] },
-    bonus: { basis: "percentOfSalary", amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
+    bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
     cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: null, health: null,
     perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },

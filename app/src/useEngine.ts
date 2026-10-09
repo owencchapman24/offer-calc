@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
+import type { OfferIssue } from "../../src/offer/validate";
 import type { EngineRequest, EngineResponse, StayDetail } from "./protocol";
 
 export interface EngineState {
@@ -12,6 +13,10 @@ export interface EngineState {
   rents: Record<string, RentEstimate>;
   updating: boolean;
   error: string | null;
+  /** The validator's problems for each checked offer (the request's `check`, in order). */
+  issues: OfferIssue[][];
+  /** The latest inputs have problems: `sweep` and `detail` are from the last valid ones. */
+  invalid: boolean;
   ms: number | null;
 }
 
@@ -25,7 +30,7 @@ const DEBOUNCE_MS = 200;
 export function useEngine(request: Omit<EngineRequest, "gen">): EngineState {
   const worker = useRef<Worker | null>(null);
   const gen = useRef(0);
-  const [state, setState] = useState<EngineState>({ sweep: null, detail: null, rents: {}, updating: true, error: null, ms: null });
+  const [state, setState] = useState<EngineState>({ sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null });
 
   useEffect(() => {
     const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });
@@ -33,8 +38,8 @@ export function useEngine(request: Omit<EngineRequest, "gen">): EngineState {
       const r = e.data;
       if (r.gen !== gen.current) return; // stale
       setState((s) => r.ok
-        ? { sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, ms: r.sweep ? r.ms : s.ms }
-        : { ...s, rents: r.rents, updating: false, error: r.error });
+        ? { sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, issues: r.issues, invalid: false, ms: r.sweep ? r.ms : s.ms }
+        : { ...s, rents: r.rents, updating: false, error: r.error, issues: r.issues, invalid: r.error === null });
     };
     worker.current = w;
     return () => w.terminate();

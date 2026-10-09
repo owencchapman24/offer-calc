@@ -1,0 +1,98 @@
+import { describeSchedule } from "../../src/format/index";
+import type { ByScenario } from "../../src/offer/types";
+import { bonusBasis, type CashAwardDraft, hasRange, type OfferDraft, type ScheduleDraft } from "./model";
+import { DEFAULT_PRESET, PRESETS } from "./presets";
+import { dollars, longDate, percent } from "./text";
+
+// One-line summaries of detailed inputs, in words: for the cells of rows whose inputs open in an
+// editor, for the sections not yet editable, and for their derivations. Pure: no React.
+
+const k = (x: number) => (Math.abs(x) >= 1000 ? `$${+(x / 1000).toFixed(1)}k` : dollars(x));
+/** "3%", or "1% / 3% / 5%" with a range (bear / base / bull). */
+export const rangeText = (s: ByScenario, fmt: (x: number) => string) => (hasRange(s) ? `${fmt(s.bear)} / ${fmt(s.base)} / ${fmt(s.bull)}` : fmt(s.base));
+
+export function scheduleText(s: ScheduleDraft): string {
+  const tranches = s.tranches;
+  const ok = tranches?.every((t) => t.month !== null && t.fraction !== null);
+  const label = !tranches ? describeSchedule(PRESETS[DEFAULT_PRESET])
+    : ok && tranches.length ? describeSchedule({ tranches: tranches.map((t) => ({ month: t.month!, fraction: t.fraction! })) }) : "custom (incomplete)";
+  return s.vestDates?.months.length ? `${label}; on company dates` : label;
+}
+
+export function grantsText(d: OfferDraft): string {
+  const g = d.equity.grants;
+  if (!g.length) return "None";
+  return g.map((x) => `${x.value === null ? "$—" : dollars(x.value)} ${x.label || "RSUs"}`).join(" + ");
+}
+
+export function promotionsText(d: OfferDraft): string {
+  const p = d.salary.promotions;
+  if (!p.length) return "None";
+  return p.map((x) => `${x.stepUp === null ? "+—" : `+${percent(x.stepUp)}`} on ${x.on ? longDate(x.on) : "—"}${
+    x.scenarios && x.scenarios.length < 3 ? ` (${x.scenarios.join(" and ")} only)` : ""}`).join("; ");
+}
+
+export function bonusYearsText(d: OfferDraft): string {
+  const a = d.bonus.amounts;
+  if (!a.length) return "No years entered";
+  const ks = a.map((x) => (x ? k(x.base) : "—"));
+  return `${ks.join(", ")}${a.length > 1 ? "; the last repeats" : " a year"}`;
+}
+
+export function refreshersText(d: OfferDraft): string {
+  const r = d.equity.refreshers;
+  if (!r) return "None";
+  const every = r.everyMonths ?? 12;
+  return `${r.value ? rangeText(r.value, dollars) : "$—"} ${every === 12 ? "a year" : `every ${every} months`}, from month ${r.firstAfterMonths ?? 12}`;
+}
+
+export function bonusText(d: OfferDraft): string {
+  const b = d.bonus;
+  const basis = bonusBasis(b);
+  if (basis === "byEmploymentYear") return `By year: ${bonusYearsText(d)}`;
+  if (!b.amount || !b.amount.base) return "None";
+  return basis === "percentOfSalary" ? `${rangeText(b.amount, percent)} of salary` : `${rangeText(b.amount, dollars)} a year`;
+}
+
+// ---- sections not yet editable (group 2) -------------------------------------------------------------
+
+function cashText(a: CashAwardDraft): string {
+  const paid = a.paidOn === null ? "30 days after you start" : typeof a.paidOn === "string" ? longDate(a.paidOn)
+    : `${a.paidOn.daysAfterStart ?? "—"} days after you start`;
+  const c = a.clawback;
+  const back = !c ? "no clawback" : `${(c.kind ?? "prorated") === "full" ? "owed back in full" : "owed back prorated"} if you leave within ${c.months ?? 12} months`;
+  return `${a.label || "Cash award"} ${a.amount === null ? "$—" : dollars(a.amount)}, paid ${paid}; ${back}`;
+}
+
+export const cashAwardsText = (d: OfferDraft) => (d.cashAwards.length ? d.cashAwards.map(cashText).join("; ") : "None");
+
+export function retirementText(d: OfferDraft): string {
+  const r = d.retirement;
+  if (!r) return "Not entered";
+  const tiers = r.match.map((t) => `${percent(t.rate ?? 0)} of ${t.upToPct === 1 ? "all deferrals" : `the first ${percent(t.upToPct ?? 0)}`}`);
+  const v = r.vesting;
+  const vesting = !v || v.kind === "immediate" ? "vests immediately" : v.kind === "cliff" ? `vests after a ${v.years}-year cliff` : "graded vesting";
+  return `You defer ${percent(r.contributionPct ?? 0)}${(r.type ?? "pretax") === "pretax" ? "pre-tax" : "Roth"}; match ${tiers.length ? tiers.join(" + ") : "none"}`
+    + `${r.nonElectivePct ? ` + ${percent(r.nonElectivePct)} of pay` : ""}; ${vesting}`;
+}
+
+export function healthText(d: OfferDraft): string {
+  const h = d.health;
+  if (!h) return "Not entered";
+  const o = h.outOfPocket;
+  const parts = [h.premium !== null ? `premium ${dollars(h.premium)} a year` : "premium not counted",
+    o.medium !== null ? `out-of-pocket ${dollars(o.medium)} (medium use)` : "out-of-pocket not counted"];
+  if (h.employerHsa) parts.push(`employer HSA ${dollars(h.employerHsa)}`);
+  return parts.join("; ");
+}
+
+export function perksText(d: OfferDraft): string {
+  const p = d.perks;
+  const parts = [p.section127 ? `education ${dollars(p.section127)} a year` : "", p.commuterMonthly ? `commuter ${dollars(p.commuterMonthly)} a month` : ""]
+    .filter(Boolean);
+  return parts.length ? parts.join("; ") : "None";
+}
+
+export const employerStateText = (d: OfferDraft) => (d.employerState ? d.employerState : `Where you'd live${d.residence.state ? ` (${d.residence.state})` : ""}`);
+export const rentGrowthText = (d: OfferDraft, inflation: number) =>
+  (d.costOfLiving.rentGrowth !== null ? `${percent(d.costOfLiving.rentGrowth)} a year` : `${percent(inflation)} a year (inflation)`);

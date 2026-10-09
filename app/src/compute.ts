@@ -1,13 +1,16 @@
 import { estimateRent, type RentEstimate } from "../../src/col/rent";
 import { annuityTerms, horizonSweep } from "../../src/offer/compare";
 import { projectScenario } from "../../src/offer/project";
+import { type OfferIssue, validateOffer } from "../../src/offer/validate";
 import type { HorizonSweep } from "../../src/offer/types";
 import { type CompareRequest, type EngineRequest, type OfferDetail, rentKey, type StayDetail } from "./protocol";
 
 // What the worker computes for each request. Engine values: import this only from the worker (and
 // tests), never from the main thread, or the engine and its tables land in the main bundle.
 
-export function compute(req: Omit<EngineRequest, "gen">): { sweep: HorizonSweep | null; detail: StayDetail | null; rents: Record<string, RentEstimate> } {
+export function compute(req: Omit<EngineRequest, "gen">): {
+  sweep: HorizonSweep | null; detail: StayDetail | null; rents: Record<string, RentEstimate>; issues: OfferIssue[][];
+} {
   const rents: Record<string, RentEstimate> = {};
   for (const { area, state } of req.rents) {
     try {
@@ -15,10 +18,12 @@ export function compute(req: Omit<EngineRequest, "gen">): { sweep: HorizonSweep 
     } catch { /* an unknown area just shows no estimate */ }
   }
   const c = req.compare;
-  if (!c) return { sweep: null, detail: null, rents };
+  // Every problem, at its field, before anything is computed (the engine's own throws are the backstop).
+  const issues = (req.check ?? c?.offers ?? []).map((o) => validateOffer(o, c?.household));
+  if (!c || issues.some((x) => x.length)) return { sweep: null, detail: null, rents, issues };
   const sweep = horizonSweep(c.offers, c.household, c.stays,
     { valuationDate: c.valuationDate, inflation: c.inflation, discountRate: c.discountRate });
-  return { sweep, detail: stayDetail(c, sweep.rows[0].window.start), rents };
+  return { sweep, detail: stayDetail(c, sweep.rows[0].window.start), rents, issues };
 }
 
 /** Your stay, projected in full for each offer (base case), plus every stay's annuity terms. */
