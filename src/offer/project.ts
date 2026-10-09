@@ -10,7 +10,8 @@ import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
 import type {
   Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
-  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, LeaveSweepRow, OfferInput, ProjectionOptions, ScenarioResult,
+  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, ISODate, LeaveDayRow, LeaveSweepRow, OfferInput,
+  ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -583,18 +584,37 @@ export function leaveDateSweep(
   const start = toDays(offer.startDate);
   return months.map((m) => {
     if (!Number.isInteger(m) || m < 1) throw new Error("Sweep months must be whole numbers >= 1.");
-    const k = keptIfLeaving(offer, household, addMonths(start, m) - 1, options);
-    return {
-      months: m,
-      leaveDate: k.result.leave!.leaveDate,
-      paid: round2(k.paid),
-      clawbackOwed: round2(k.clawbackOwed),
-      afterTaxCompKept: round2(k.afterTaxCompKept),
-      unvestedRsuForfeited: k.result.leave!.unvestedRsuForfeited,
-      retirementVested: round2(k.retirementVested),
-      totalRewardsKept: round2(k.totalRewardsKept),
-    };
+    return { months: m, ...leaveRow(offer, household, addMonths(start, m) - 1, options) };
   });
+}
+
+/**
+ * What you keep if each of `lastDays` is your last day (inclusive), in the order given: the leave
+ * sweep by day, so a payment, vest or clawback step shows on its own date rather than at the next
+ * month's end. Nominal, after tax and clawbacks, as in leaveDateSweep.
+ */
+export function leaveDaySweep(
+  offer: OfferInput, household: Household, lastDays: ISODate[], options: ProjectionOptions = {},
+): LeaveDayRow[] {
+  const start = toDays(offer.startDate);
+  return lastDays.map((date) => {
+    const day = toDays(date);
+    if (day < start) throw new Error("A last day can't be before the start date.");
+    return leaveRow(offer, household, day, options);
+  });
+}
+
+function leaveRow(offer: OfferInput, household: Household, leaveDay: number, options: ProjectionOptions): LeaveDayRow {
+  const k = keptIfLeaving(offer, household, leaveDay, options);
+  return {
+    leaveDate: k.result.leave!.leaveDate,
+    paid: round2(k.paid),
+    clawbackOwed: round2(k.clawbackOwed),
+    afterTaxCompKept: round2(k.afterTaxCompKept),
+    unvestedRsuForfeited: k.result.leave!.unvestedRsuForfeited,
+    retirementVested: round2(k.retirementVested),
+    totalRewardsKept: round2(k.totalRewardsKept),
+  };
 }
 
 /**

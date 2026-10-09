@@ -5,6 +5,7 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
+import { RiskSlot } from "./Later";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldId } from "./fields";
@@ -184,6 +185,7 @@ export function App() {
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}
+          {work.results && <RiskSlot ctx={work} sample={sample} />}
         </>
       )}
 

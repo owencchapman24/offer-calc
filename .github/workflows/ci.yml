@@ -1,5 +1,6 @@
-# Tests, the engine's formatting guard, the type check and the build, on every pull request and every
-# push to main. Pushes to other branches run only through their pull request, so CI runs once per push.
+# Tests, the engine's formatting guard, the type check, the build and its size budget, on every pull
+# request and every push to main. Pushes to other branches run only through their pull request, so CI
+# runs once per push.
 # The PolicyEngine comparison (npm run oracle) stays manual: it needs Python and PolicyEngine and takes
 # minutes.
 name: CI
@@ -26,3 +27,4 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run check-bundle

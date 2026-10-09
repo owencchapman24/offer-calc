@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { type RefObject, useEffect, useSyncExternalStore } from "react";
 
 // A module that loads the first time it's needed (a separate chunk), which components then read
 // synchronously. Quick-mode visitors who never open detailed mode or a tickmark never download them.
@@ -36,4 +36,27 @@ export function lazyModule<T>(loader: () => Promise<T>): LazyModule<T> {
 /** The module if it's loaded, re-rendering when it arrives; null until then (call load() to start it). */
 export function useLazyModule<T>(m: LazyModule<T>): T | null {
   return useSyncExternalStore(m.subscribe, m.get, m.get);
+}
+
+/**
+ * Starts loading a module when `ref`'s element comes within a screen of the viewport: a schedule below
+ * the fold loads as you scroll toward it, so a visit that never gets there doesn't download it.
+ */
+export function useLoadNear<T>(m: LazyModule<T>, ref: RefObject<Element | null>, loaded: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    if (loaded || !el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      void m.load();
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        io.disconnect();
+        void m.load();
+      }
+    }, { rootMargin: "100% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [m, ref, loaded]);
 }

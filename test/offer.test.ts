@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import {
-  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, leaveDateSweep, nextCliff, projectOffer,
+  breakeven, byYear, cliffs, compareOffers, convenienceRuleWarning, leaveDateSweep, leaveDaySweep, nextCliff, projectOffer,
   projectScenario, VESTING_PRESETS, withholdingShortfall, horizonSweep, monthlyEquivalent, annuityTerms, type AnnualBonus, type Household,
   type OfferInput,
 } from "../src/offer/index";
@@ -410,6 +410,33 @@ describe("leave date and clawbacks", () => {
     expect(rows[2].paid).toBe(186_169.35); // exactly the first 12 months
     const kept = rows.map((r) => r.afterTaxCompKept);
     expect(kept).toEqual([...kept].sort((a, b) => a - b));
+  });
+  // The leave sweep by day (docs/ui-design.md §4.5): each step on its own date. Samples, illustrative.
+  const [sampleA, , sampleC] = SAMPLE_OFFERS;
+  const days = (o: OfferInput, dates: string[]) => leaveDaySweep(o, SAMPLE_HOUSEHOLD, dates, { inflation: 0.025 });
+  it("leaveDaySweep: A's first bonus is kept from Jan 31, 2027, not Jan 30", () => {
+    // Jan 31 adds the $32,986.30 bonus and one more January day of salary: 110,000 / 12 / 31 = 295.70.
+    const [before, on] = days(sampleA, ["2027-01-30", "2027-01-31"]);
+    expect(on.paid - before.paid).toBeCloseTo(32_986.3 + 295.7, 2);
+    expect([before.clawbackOwed, on.clawbackOwed]).toEqual([10_000, 10_000]);
+  });
+  it("leaveDaySweep: A's sign-on window clears on Jul 12, 2027, the day before 12 months from the start", () => {
+    // Full clawback over 12 months from Jul 13, 2026: still owed on Jul 11; nothing owed on Jul 12.
+    const [before, on] = days(sampleA, ["2027-07-11", "2027-07-12"]);
+    expect([before.clawbackOwed, on.clawbackOwed]).toEqual([10_000, 0]);
+    expect(on.paid - before.paid).toBeCloseTo(295.7, 2); // one July day of salary
+  });
+  it("leaveDaySweep: C's first RSU tranche vests Aug 15, 2027 (company date), not Aug 14", () => {
+    // 5% of the $120,000 grant; unvested falls from 120,000 + the first $25,000 refresher to 139,000. One August
+    // day of 2027 salary (105,000 x 1.03 from Jan 1) = 108,150 / 12 / 31 = 290.73.
+    const [before, on] = days(sampleC, ["2027-08-14", "2027-08-15"]);
+    expect([before.unvestedRsuForfeited, on.unvestedRsuForfeited]).toEqual([145_000, 139_000]);
+    expect(on.paid - before.paid).toBeCloseTo(6_000 + 290.73, 2);
+  });
+  it("leaveDaySweep at a month's end equals leaveDateSweep's row for that month", () => {
+    const byMonth = leaveDateSweep(sampleA, SAMPLE_HOUSEHOLD, [6, 12], { inflation: 0.025 });
+    expect(days(sampleA, ["2027-01-12", "2027-07-12"])).toEqual(byMonth.map(({ months: _, ...row }) => row));
+    expect(() => days(sampleA, ["2026-07-12"])).toThrow(/before the start date/);
   });
 });
 

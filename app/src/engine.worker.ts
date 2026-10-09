@@ -1,32 +1,22 @@
 import { compute } from "./compute";
+import { createRunner } from "./jobs";
 import type { EngineRequest, EngineResponse } from "./protocol";
 
 // The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). It
 // also holds the full BEA and HUD tables: the main thread ships only the slim city list and asks
 // here for rent estimates. Requests carry a generation number; while one runs, only the newest
-// waiting request is kept.
+// waiting request is kept. Edits take the fast lane (jobs.ts): they run ahead of any slow job's
+// next chunk.
 
 const scope = self as unknown as {
   postMessage(message: EngineResponse): void;
   onmessage: ((e: MessageEvent<EngineRequest>) => void) | null;
 };
 
-let waiting: EngineRequest | null = null;
-let scheduled = false;
+const runner = createRunner(run);
+scope.onmessage = (e) => runner.fast(e.data);
 
-scope.onmessage = (e) => {
-  waiting = e.data;
-  if (!scheduled) {
-    scheduled = true;
-    setTimeout(run, 0); // lets queued messages arrive first, so stale requests are skipped
-  }
-};
-
-function run() {
-  scheduled = false;
-  const req = waiting;
-  waiting = null;
-  if (!req) return;
+function run(req: EngineRequest) {
   const t = performance.now();
   try {
     const { sweep, detail, rents, issues } = compute(req);

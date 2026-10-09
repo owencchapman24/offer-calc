@@ -26,13 +26,18 @@ export function compute(req: Omit<EngineRequest, "gen">): {
   return { sweep, detail: stayDetail(c, sweep.rows[0].window.start), rents, issues };
 }
 
-/** Your stay, projected in full for each offer (base case), plus every stay's annuity terms. */
+/** Your stay, projected in full for each offer (base case), its bear and bull totals, and every stay's annuity terms. */
 function stayDetail(c: CompareRequest, start: string): StayDetail {
   const options = { valuationDate: c.valuationDate, inflation: c.inflation, discountRate: c.discountRate };
+  const window = { start, years: c.stayYears };
   return {
     years: c.stayYears,
     offers: c.offers.map((o): OfferDetail => {
-      const r = projectScenario(o, c.household, { ...options, scenario: "base", window: { start, years: c.stayYears } });
+      const r = projectScenario(o, c.household, { ...options, scenario: "base", window });
+      const cases = {
+        bear: projectScenario(o, c.household, { ...options, scenario: "bear", window }).window,
+        bull: projectScenario(o, c.household, { ...options, scenario: "bull", window }).window,
+      };
       const split = new Map<string, OfferDetail["split"][number]>();
       for (const e of r.events) {
         const key = `${e.employmentYear}|${e.calendarYear}`;
@@ -42,7 +47,7 @@ function stayDetail(c: CompareRequest, start: string): StayDetail {
         split.set(key, s);
       }
       return {
-        window: r.window, employmentYears: r.employmentYears, costOfLiving: r.costOfLiving, assumptions: r.assumptions, warnings: r.warnings,
+        window: r.window, cases, employmentYears: r.employmentYears, costOfLiving: r.costOfLiving, assumptions: r.assumptions, warnings: r.warnings,
         taxYears: r.calendarYears.map((y) => {
           const w = y.withOffer.result;
           const wo = y.withoutOffer.result;
