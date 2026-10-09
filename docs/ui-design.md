@@ -1447,6 +1447,34 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   ("97.2933"), and there are no padded zeros ("105.696", not "105.696000"). The steps of an index's own
   derivation are exact too ("0.16 × 148.616 = 23.77856"), so it foots.
 
+- **UI slice 7** (in progress; plan in `docs/ui-slices-4-8-plan.md`), three review stops:
+  - **A** (2026-10-09): the automated scan (Playwright and axe-core in CI, §10), the smoke tests, and the fixes
+    for what the scan found and for the four problems known before it.
+  - **B:** phone tabs and the sticky verdict bars (§3.2). **C:** the screen-reader walkthrough.
+
+**UI slice 7 versus this design** (stop A):
+- **The scan runs on the production build served as Vercel serves it** (`scripts/serve-dist.ts`: compressed,
+  with `vercel.json`'s headers, the CSP included), not `vite preview`. It covers 29 states in four projects
+  (desktop 1440 and phone 390 px, light and dark): 116 scans, none excepted. axe's "needs review" items (what it
+  can't decide alone, like text over an SVG chart or beside a pseudo-element) are listed in the report by
+  reason; reviewed at stop A, none was a failure.
+- **Stale figures** (§3.4 said the previous results stay at 60% opacity): dimmed only while they're being worked
+  out, a moment, and only the figures; captions, legends and "Working it out…" keep full contrast. While the
+  inputs have a problem, L-1 to L-5 keep full contrast and their heads say "⚠ Last valid results", as the lead
+  already did. At 60% opacity, graphite and muted text fall under 4.5:1 (WCAG 1.4.3), which is no state to
+  leave text in until a problem is fixed.
+- **The verdict's live region** (§10) says one sentence, the verdict's ("C leaves you about $487 a month more than
+  A, after rent, at U.S. prices."), a second after the last result and only when it changes. The first verdict
+  isn't announced: it's on the page as it loads.
+- **L-1's crosshair** (§4.3) is a slider over the years for the keyboard and screen readers: its value text reads
+  every offer at that year; the drawn tooltip is hidden from them. Home and End go to the first and last year.
+- **Lone tickmarks** (an input's `D` or `E`, §9.1) are 24 × 24 px buttons with the small mark inside, where they
+  had a 24 px hit area from a pseudo-element: WCAG 2.5.8 counts the target's box, and beside a select they were
+  too close to it. Figures in sentences keep the pseudo-element (inline targets are exempt).
+- **The theme switch** (§9.5) is native radios: arrow keys move and choose. The other two-way switches stay toggle
+  buttons (`aria-pressed`), each its own Tab stop, as WAI-ARIA's button pattern has it.
+- **Muted text under the highlighter wash** takes graphite: muted on the dark wash is 3.4:1.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

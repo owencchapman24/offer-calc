@@ -50,6 +50,13 @@ describe("help on every input", () => {
     expect(loose, "inputs without aria-describedby").toEqual([]);
   });
 
+  it("every aria-describedby names an element that's rendered (a hint the field points at is on the page)", () => {
+    const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    const dangling = [...html.matchAll(/<[^>]*aria-describedby="([^"]+)"[^>]*>/g)]
+      .flatMap((m) => m[1].split(/\s+/).filter((id) => !ids.has(id)).map((id) => `${id} (${m[0].match(/aria-label="([^"]+)"/)?.[1] ?? m[0].slice(0, 60)})`));
+    expect([...new Set(dangling)], "aria-describedby without its element").toEqual([]);
+  });
+
   it("every help entry is used: each key names a rendered field", () => {
     const used = new Set([...html.matchAll(/data-help="([^"]+)"/g)].map((m) => m[1]));
     expect(Object.keys(HELP).filter((k) => !used.has(k)), "help for no field").toEqual([]);

@@ -33,8 +33,37 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
 **UI: slices 1-5 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
-`docs/ui-slices-4-8-plan.md`; slices 4, 5 and 8 versus the design: `docs/ui-design.md` §12). Slice 7 is
-next.
+`docs/ui-slices-4-8-plan.md`; slices 4, 5 and 8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
+under way: its stop A (the automated accessibility scan and its fixes) is done; stop B (phone tabs, sticky
+verdict bars) is next.
+- **The accessibility scan** (slice 7, stop A): Playwright with axe-core (`e2e/`, `npm run e2e`) on the
+  production build, served as Vercel serves it (`scripts/serve-dist.ts`: compressed, `vercel.json`'s CSP).
+  29 states (quick mode, every detailed section and row editor, Show the work opened, drilled into and on a
+  default, L-1's table view, L-1 to L-5 loaded, L-4 on your stay's last day, the methodology, the Data
+  page's import review, its problems, a file it can't import and the delete confirmation), each in four
+  projects (desktop 1440 and phone 390, light and dark): 116 scans. Any WCAG 2.0/2.1/2.2 A or AA violation
+  fails, unless `test/a11y-exceptions.json` accepts it with a rule, a selector and a reason (an entry
+  without a reason fails, in `npm test` too). None is excepted. The report (`.a11y/report.md`) lists the
+  violations, the exceptions, and what axe left for a person to check ("needs review"), by axe's reason.
+  - **Smoke tests:** a salary edit updates the verdict; export, change the inputs, import: the same
+    results, and the same file again.
+  - **Keyboard tests** (`e2e/keyboard.e2e.ts`) for what axe can't see: the verdict announced as one
+    sentence; L-1's chart as a slider; the theme radios' arrow keys; focus after picking a city.
+  - **Its fixes:** lone tickmarks (`TickButton`) are 24 × 24 px boxes (WCAG 2.5.8 counts the box, not
+    `::before`); lists keep their list role (a warning's `role="note"` or an error's `role="alert"` is on a
+    wrapper); the vesting table's sideways scroll takes focus; every `aria-describedby` names a rendered hint
+    (a nested field points at its parent's, tested in `help.test.ts`); muted text under the highlighter wash
+    takes graphite (3.4:1 in dark mode before).
+  - **The verdict for screen readers:** `aria-live` no longer wraps the verdict. A polite live region
+    (`#verdict-live`, `LiveVerdict` in `Lead.tsx`) says one sentence ("C leaves you about $487 a month more
+    than A, after rent, at U.S. prices.") a second after the last result, only when it changes; the first
+    verdict isn't announced.
+  - **L-1's chart** is a slider over the years: its value text reads every offer at a year ("Year 2: A …, B …, C …"),
+    so it speaks only as you move it (arrows, Home, End); the drawn tooltip is `aria-hidden`.
+  - **The theme switch** is native radios in a fieldset: arrow keys move and choose, one Tab stop. The
+    other two-way switches (Quick / Detailed, Each year / Running total, the bridge's offer, L-4's basis,
+    the pipeline's steps) stay `aria-pressed` toggle buttons, each a Tab stop.
+  - **The ledger's city** returns focus to Change after a pick or Escape, as "Prices in" does.
 - **Prices in a city you know** (slice 8): About you's "Prices in" is the U.S. average (`D`) or any city
   in the list (Change, then a search; "Use the U.S. average" goes back). It's the engine's
   `household.costOfLiving.reference`: that city's own price factor is 1, every offer's spending money
@@ -90,8 +119,9 @@ next.
   (the federal withholding shortfall, estimated in the fast lane). A recurring warning is one line with
   its years, and each has "Show at the field". The lead points to L-5 when a warning changes the numbers
   (the worker counts them).
-- **Stale schedules:** L-1 to L-5 dim their figures while they're from earlier inputs and say
-  "Updating…" or "Last valid results" (`StaleNote` in `ui.tsx`).
+- **Stale schedules:** L-1 to L-5 dim their figures while they're being worked out (a moment) and say
+  "Updating…"; while the inputs have a problem they keep full contrast (WCAG 1.4.3) and say "⚠ Last valid
+  results" (`staleClass` and `StaleNote` in `ui.tsx`). Captions, legends and "Working it out…" never dim.
 - **Methodology live numbers:** M-7.4 L-3's ties once it has run; M-8 lists your bear, base and bull
   cases; M-9 each offer's leaving-early terms, and L-4's panel once it has run.
 - **App:** `app/`, React 19 and Vite 8.
@@ -144,16 +174,19 @@ next.
 - **Samples:** loaded by default and stamped illustrative.
 - **Deploys:** Vercel deploys every push to `main` from the private GitHub repo (going public
   is deferred; see Decisions). CI (`.github/workflows/ci.yml`) runs on every pull request and every
-  push to `main` (not on other branches' pushes, so a pull request runs it once), in two jobs:
+  push to `main` (not on other branches' pushes, so a pull request runs it once), in three jobs:
   - `check`: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, `npm run check-bundle`;
   - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); the median run's report is
-    uploaded as the `lighthouse-report` artifact.
+    uploaded as the `lighthouse-report` artifact;
+  - `e2e`: builds, installs Playwright's Chromium, then `npm run e2e` (the scan, smoke and keyboard tests;
+    one retry for a slow runner); the scan's report and Playwright's are uploaded as `a11y-report`.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 362.7 / 111.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 4 ended at 357.9 / 109.7;
+  - **Main thread:** 364.3 / 111.9 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 8 ended at 362.7 / 111.4; slice
+    4 at 357.9 / 109.7;
     slice 5 at 355.7 / 109.1;
     slice 3 at 351.8 /
     107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 120 kB gzipped by the check, which CI runs
@@ -181,13 +214,14 @@ next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 397 passing.
+**Tests:** 402 passing (`npm test`), and 95 Playwright tests (`npm run e2e`: the scan's 22 tests in each of four
+projects, 2 smoke tests and 5 keyboard tests).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
-  `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 6,
+  `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
   `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13,
-  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2.
+  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2, `e2e/lib/exceptions.test.ts` 4.
 - `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
   prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
   against L-3's rent lever to the cent.
@@ -242,10 +276,10 @@ next.
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 7: mobile and accessibility:** phone tabs, sticky verdict bars, Playwright smoke tests
-   and axe in CI (any WCAG A/AA violation fails; exceptions need a reason), a screen-reader
-   walkthrough the user runs from a script. The ledger's city field drops focus to the page after a
-   pick (its search input unmounts); "Prices in" in About you returns it to Change, so do the same.
+1. **Slice 7: mobile and accessibility:** stop A (the scan, the smoke tests and their fixes) is done. Next,
+   stop B: phone tabs (A | B | C | +) and the sticky verdict bars (bottom on phones, top on tablets), never
+   hiding the focused field (scroll padding; the phone's bar hides while the keyboard is up), within the
+   bundle budget and Lighthouse's LCP. Then stop C: the NVDA script the user runs; fix what it finds.
 2. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
@@ -253,7 +287,7 @@ build them in.
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
 - `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node
-  types) and `tsc -p app` (DOM, React).
+  types), `tsc -p app` (DOM, React) and `tsc -p e2e` (the Playwright tests).
 - `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
   `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
 - `npm run offers`: sample comparison tables.
@@ -269,6 +303,12 @@ build them in.
   Chrome or `CHROME_PATH`; on Windows without Chrome it uses Edge and closes it over the DevTools
   protocol (Edge relaunches itself, so killing the launched process leaves the browser running).
   The median run's report goes to `.lighthouse/report.html`.
+- `npm run e2e`: after `npm run build`, Playwright (`e2e/playwright.config.ts`) on the production build,
+  served by `scripts/serve-dist.ts` on port 4180 (a running one is reused locally): the accessibility scan
+  in four projects, then the smoke and keyboard tests. Locally it drives the installed Edge
+  (`channel: "msedge"`), so nothing is downloaded; CI installs Chromium. The scan's report goes to
+  `.a11y/report.md`, Playwright's to `.playwright/report/`. One project: `npm run e2e -- --project=phone-dark`.
+  Don't pass `--reporter`: it replaces the config's reporters, the scan's included.
 - `npm run fetch-rpp`: re-download BEA RPPs into `src/col/rpp.json`. Run it when BEA
   publishes a new vintage (usually December).
 - `npm run fetch-fmr [-- <FY>] [--file <FY27_FMRs.xlsx>]`: re-download HUD Fair Market Rents
@@ -389,8 +429,13 @@ build them in.
     `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
   `offer-table.ts`, `bench.ts`, `check-engine.ts`, `check-bundle.ts` (with `lib/bundle.ts`),
-  `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`),
+  `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`), `serve-dist.ts` (the build for Playwright),
   `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
+- `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
+  - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded,
+    when the page has settled); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
+    (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
+  - `smoke.e2e.ts`, `keyboard.e2e.ts`.
 
 ## Working agreements
 - **Pull requests** (adopted 2026-10-08, by agreement; not enforced): one branch per slice or

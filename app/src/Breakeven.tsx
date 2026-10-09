@@ -7,7 +7,7 @@ import { basisPhrase, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, tieJob, type Ties } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
-import { type Stale, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 
 // L-3 · What it would take (docs/ui-design.md §4.6): for each offer behind the winner, the starting
@@ -51,11 +51,12 @@ export function Breakeven(p: BreakevenProps) {
   const ties = p.ties.result;
   const v = ties ? tieView(ties, r.letters, c.offers) : null;
   const fresh = p.ties.key === key && !p.ties.updating;
-  const status: Stale = p.status ?? (fresh ? null : "updating");
+  // Nothing worked out yet: the note says so, and there's nothing from earlier inputs to dim.
+  const status: Stale = !v ? null : p.status ?? (fresh ? null : "updating");
   const row = r.view.row;
   const years = row.years;
   return (
-    <section ref={ref} className={`schedule ties${status ? " is-updating" : ""}`} aria-labelledby="l3-title" aria-busy={status === "updating"}
+    <section ref={ref} className={`schedule ties${staleClass(status)}`} aria-labelledby="l3-title" aria-busy={!fresh}
       data-ready={fresh ? "1" : "0"} data-fill-ms={p.ties.ms !== null ? Math.round(p.ties.ms) : undefined}>
       <header className="schedule-head">
         <h2 id="l3-title"><span className="ref">L-3</span> What it would take</h2>

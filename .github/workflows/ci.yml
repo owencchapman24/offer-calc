@@ -1,6 +1,7 @@
 # Tests, the engine's formatting guard, the type check, the build and its size budget, on every pull
-# request and every push to main; beside them, Lighthouse on the production build. Pushes to other
-# branches run only through their pull request, so CI runs once per push.
+# request and every push to main; beside them, Lighthouse and Playwright (the accessibility scan, the smoke
+# and keyboard tests) on the production build. Pushes to other branches run only through their pull
+# request, so CI runs once per push.
 # The PolicyEngine comparison (npm run oracle) stays manual: it needs Python and PolicyEngine and takes
 # minutes.
 name: CI
@@ -49,5 +50,33 @@ jobs:
         with:
           name: lighthouse-report
           path: .lighthouse/
+          include-hidden-files: true
+          retention-days: 14
+
+  # Playwright on the production build, served with vercel.json's headers (e2e/playwright.config.ts): the accessibility
+  # scan, axe for WCAG 2.2 A and AA in every state of the app, at desktop and phone widths, light and dark, failing on any
+  # violation that test/a11y-exceptions.json doesn't accept with a reason; then the smoke and keyboard tests. The scan's
+  # report (.a11y/report.md) and Playwright's are uploaded.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a11y-report
+          path: |
+            .a11y/
+            .playwright/report/
+            .playwright/results/
           include-hidden-files: true
           retention-days: 14

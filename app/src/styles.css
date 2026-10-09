@@ -107,11 +107,11 @@ a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 2p
 .prices-in input { width: 100%; min-width: 220px; }
 .assumptions { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 
-select, input:not([type="checkbox"]) {
+select, input:not([type="checkbox"]):not([type="radio"]) {
   background: var(--sheet); border: 1px solid var(--rule); border-bottom: 1.5px solid var(--graphite);
   padding: 5px 8px; min-height: 34px; border-radius: 0;
 }
-input:not([type="checkbox"]):focus, select:focus { border-bottom-color: var(--ink); }
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus { border-bottom-color: var(--ink); }
 input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 /* ---- workpaper: inputs left, schedules right ----------------------------------------- */
@@ -178,6 +178,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .schedule-head h2 { margin: 0; display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .ref { display: inline-grid; place-items: center; min-width: 40px; height: 40px; background: var(--ink); color: var(--sheet); font-size: 15px; letter-spacing: 0.04em; }
 .updating { margin-left: auto; font-size: 13px; color: var(--muted); }
+.stale-note { color: var(--graphite); font-weight: 700; }
+.stale-note .warn-icon { color: var(--warning); }
 
 .banner { margin: 0 0 12px; padding: 8px 10px; background: var(--band); border-left: 3px solid var(--graphite); font-size: 14px; }
 .note { font-size: 14px; color: var(--graphite); }
@@ -249,14 +251,18 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .tick { display: inline-block; margin-left: 0.18em; font-size: 0.72em; font-weight: 700; color: var(--graphite); transform: translateY(-0.35em) rotate(-6deg); font-family: var(--mono); }
 .hero .tick { font-size: 18px; transform: translateY(-1.1em) rotate(-6deg); }
 
-/* A lone tickmark (an input's default or estimate) is a button: the mark stays small, and its
-   ::before is a hit area of at least 24 x 24 px, centered on it (WCAG 2.5.8). */
+/* A tickmark is a button. A figure's (below) is inline in its sentence, and its ::before is a hit area of at least
+   24 x 24 px, centered on it. A lone one (an input's default or estimate) sits beside other controls, so its own box
+   is 24 x 24 px (WCAG 2.5.8 counts the box, not a pseudo-element), and the mark inside stays small. */
 .tick-btn { position: relative; border: none; background: none; padding: 0 1px; line-height: 1; cursor: pointer; color: var(--graphite); }
 .tick-btn::before {
   content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%);
 }
-.tick-btn:hover, .tick-btn.is-open { color: var(--ink); }
+.tick-btn:hover, .tick-btn.is-open, .tick-lone:hover .tick, .tick-lone.is-open .tick { color: var(--ink); }
 .tick-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.tick-lone { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; padding: 0; flex: none; }
+.tick-lone .tick { margin: 0; }
+.tick-lone:focus-visible { outline-offset: 0; }
 
 /* A figure is one button with its tickmark: the number itself opens Show the work. A dotted
    underline and the pointer on hover say so; its hit area is at least 24px tall. */
@@ -275,6 +281,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .fig, .trace { transition: background-color 120ms, box-shadow 120ms; }
 .fig:hover, .fig:focus-visible, .fig.is-open, .fig.is-traced { background: var(--highlighter); box-shadow: 0 0 0 3px var(--highlighter); }
 .trace.is-traced { background: var(--highlighter); }
+/* Muted text on the wash would fall under 4.5:1 in dark mode (3.4:1), so under the wash it takes graphite. */
+.fig.is-traced, .fig.is-open, .fig:hover, .fig:focus-visible, .trace.is-traced { --muted: var(--graphite); }
 .about-label { display: inline-flex; align-items: baseline; gap: 2px; }
 .about-field.trace { display: flex; flex-direction: column; gap: 4px; min-width: 180px; padding: 2px 4px; margin: -2px -4px; }
 
@@ -488,10 +496,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .colophon { margin-top: 28px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
 .colophon p { margin: 0; }
-.theme { display: inline-flex; border: 1px solid var(--rule); width: fit-content; }
-.theme button { border: none; background: var(--sheet); padding: 4px 12px; cursor: pointer; border-left: 1px solid var(--rule); }
-.theme button:first-child { border-left: none; }
+.theme { display: inline-flex; border: 1px solid var(--rule); width: fit-content; margin: 0; padding: 0; min-width: 0; }
+.theme label { position: relative; background: var(--sheet); color: var(--ink); padding: 4px 12px; cursor: pointer; border-left: 1px solid var(--rule); }
+.theme label:first-of-type { border-left: none; }
 .theme .is-on { background: var(--ink); color: var(--sheet); }
+.theme label:has(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; z-index: 1; }
 
 /* ---- smaller screens ----------------------------------------------------------------------- */
 
@@ -612,7 +621,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .oop { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .vesting-field { gap: 4px 8px; }
 .clawback { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.clawback-field { display: grid; grid-template-columns: 7.5em auto; align-items: center; gap: 8px; }
+.clawback-field { display: grid; grid-template-columns: 6.5em auto; align-items: center; gap: 8px; }
 .paid-on { gap: 6px; }
 .oop .range-case { flex-wrap: nowrap; }
 .oop .money { flex-wrap: nowrap; }
@@ -661,7 +670,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .ties { margin-top: 24px; }
 .ties > :not(.schedule-head) { transition: opacity 120ms; }
-.ties.is-updating > :not(.schedule-head) { opacity: 0.6; }
+.ties.is-updating > :not(.schedule-head, .caption, .legend) { opacity: 0.6; }
 .tie-scope { margin: 2px 0 10px; font-size: 14.5px; line-height: 1.55; max-width: 96ch; font-variant-numeric: tabular-nums; }
 .tie-offers { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 14px; }
 .tie-offer { font-size: 14.5px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
@@ -679,9 +688,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .leaving { margin-top: 24px; }
 /* The schedules after the lead dim their figures while they're from earlier inputs; the head says why (StaleNote). */
-.by-year .by-year-grid, .risk > :not(.schedule-head), .leaving .leave-chart, .leaving .leave-panel { transition: opacity 120ms; }
-.by-year.is-updating .by-year-grid, .risk.is-updating > :not(.schedule-head), .leaving.is-updating .leave-chart,
-.leaving.is-updating .leave-panel { opacity: 0.6; }
+/* Only figures dim (a moment, while they're worked out): not captions, legends or "Working it out…" (ui.tsx, staleClass). */
+.by-year .by-year-grid, .risk > :not(.schedule-head), .leaving .leave-chart, .leaving .leave-offers { transition: opacity 120ms; }
+.by-year.is-updating .by-year-grid, .risk.is-updating > :not(.schedule-head, .caption, .legend), .leaving.is-updating .leave-chart,
+.leaving.is-updating .leave-offers { opacity: 0.6; }
 .leave-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 6px 0 10px; font-size: 14px; }
 .leave-controls label { font-weight: 700; }
 .leave-controls input[type="date"] { min-height: 32px; padding: 2px 6px; font: inherit; font-variant-numeric: tabular-nums; color: var(--ink);
@@ -716,7 +726,7 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .warnings { margin-top: 24px; }
 .warnings > :not(.schedule-head) { transition: opacity 120ms; }
-.warnings.is-updating > :not(.schedule-head) { opacity: 0.6; }
+.warnings.is-updating > :not(.schedule-head, .caption, .legend) { opacity: 0.6; }
 .warn-none { margin: 2px 0 6px; font-size: 14.5px; max-width: 76ch; }
 .warn-group { margin: 6px 0 14px; }
 .warn-head { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }

@@ -44,6 +44,7 @@ npm test            # unit tests (engine and app), then the no-formatting-in-the
 npm run typecheck
 npm run dev         # the app at http://localhost:5173
 npm run build       # static build in dist/ (deployed on Vercel; see vercel.json)
+npm run e2e         # after the build: the accessibility scan (axe), smoke and keyboard tests, in Playwright
 npm run offers      # the sample offers' tables, in the terminal
 ```
 
