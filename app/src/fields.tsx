@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/index";
 import type { OfferIssue } from "../../src/offer/validate";
 import type { ByScenario, MonthDay } from "../../src/offer/types";
@@ -271,11 +271,19 @@ export function EditButton({ o, row, label }: { o: AppOffer; row: string; label:
  */
 export function EditorRow({ row, title, children }: { row: string; title: string; children: (o: AppOffer) => ReactNode }) {
   const api = useLedger();
-  if (api.editor?.row !== row) return null;
-  const o = api.offers.find((x) => x.letter === api.editor!.letter);
+  const open = api.editor?.row === row ? api.editor.letter : null;
+  const box = useRef<HTMLDivElement>(null);
+  // Opening an editor moves focus to its first field, so the keyboard doesn't pass the other offers' cells first.
+  // ("Edit it" then focuses the field it named: the app's effect runs after this one.)
+  useEffect(() => {
+    const first = box.current?.querySelector<HTMLElement>("input, select, textarea") ?? box.current?.querySelector<HTMLElement>(".add-row");
+    if (open) first?.focus({ preventScroll: true });
+  }, [open]);
+  if (!open) return null;
+  const o = api.offers.find((x) => x.letter === open);
   if (!o) return null;
   return (
-    <div className={`row-editor offer-${o.letter}`} id={`editor-${row.replace(/\./g, "-")}`} role="group" aria-label={`Offer ${o.letter}: ${title}`}>
+    <div ref={box} className={`row-editor offer-${o.letter}`} id={`editor-${row.replace(/\./g, "-")}`} role="group" aria-label={`Offer ${o.letter}: ${title}`}>
       <div className="editor-head">
         <span className="who">{o.letter}</span>
         <span className="editor-title">{title}</span>
