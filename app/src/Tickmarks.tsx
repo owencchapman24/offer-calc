@@ -1,12 +1,13 @@
-import {
-  createContext, type MouseEvent, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef,
-  useState,
-} from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Api, Fig, useApi, useRovingTicks, type WorkApi } from "./figures";
 import { SECTIONS } from "./sections";
 import { TICKS, type TickKind } from "./ui";
 import { lazyModule, useLazyModule } from "./lazy";
-import { type Derivation, type EditTarget, type MetricId, metricKind, tickWord, type WorkContext } from "./metrics";
+import { type Derivation, type EditTarget, type MetricId, metricKind, type WorkContext } from "./metrics";
+
+// The figures themselves (Fig, TickButton, Trace, the roving tabindex) are in figures.tsx.
+export { Fig, TickButton, Trace, useRovingTicks } from "./figures";
 
 /** The derivations (derive.ts): loaded the first time a tickmark is hovered, focused or opened. */
 export const derivations = lazyModule(() => import("./derive"));
@@ -14,19 +15,6 @@ export const derivations = lazyModule(() => import("./derive"));
 // Show the work (docs/ui-design.md §8, §9.1): every figure's tickmark is a button that opens its
 // derivation in a popover. While it's open, the figures it uses wear the highlighter wash wherever
 // they are on the page, and its own tickmarks drill down. Escape closes it and returns focus.
-
-interface WorkApi {
-  ctx: WorkContext;
-  /** The derivation on top of the drill-down stack. */
-  openId: MetricId | null;
-  traced: ReadonlySet<string>;
-  toggle(id: MetricId, anchor: HTMLElement): void;
-  push(id: MetricId): void;
-  /** "Edit it": open the field's section (and row editor) and focus it. */
-  edit(target: EditTarget): void;
-}
-
-const Api = createContext<WorkApi | null>(null);
 
 export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   ctx: WorkContext; children: ReactNode; /** Called when a derivation opens. */ onOpen?: () => void;
@@ -77,7 +65,8 @@ export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   const editRef = useRef(onEdit);
   useEffect(() => { editRef.current = onEdit; });
   const edit = useCallback((target: EditTarget) => editRef.current?.(target), []);
-  const api = useMemo<WorkApi>(() => ({ ctx, openId, traced, toggle, push, edit }), [ctx, openId, traced, toggle, push, edit]);
+  const api = useMemo<WorkApi>(() => ({ ctx, kind: (id) => metricKind(id, ctx), openId, traced, toggle, push, edit }),
+    [ctx, openId, traced, toggle, push, edit]);
 
   return (
     <Api.Provider value={api}>
@@ -90,118 +79,6 @@ export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   );
 }
 
-const useApi = () => {
-  const api = useContext(Api);
-  if (!api) throw new Error("Figures need a WorkProvider.");
-  return api;
-};
-
-const PHRASE: Record<TickKind, (label: string) => string> = {
-  recomputed: (l) => `How ${l} was worked out`,
-  footed: (l) => `How ${l} was totaled`,
-  crossFooted: (l) => `Where else ${l} appears`,
-  traced: (l) => `Where ${l} comes from`,
-  default: (l) => `Why ${l} is the default`,
-  estimate: (l) => `How ${l} was estimated`,
-};
-
-/** What a tickmark button does when pressed: open its derivation, or (in a popover) drill down to it. */
-function useOpen(id: MetricId, drill: boolean) {
-  const api = useApi();
-  return (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    if (drill) api.push(id);
-    else api.toggle(id, e.currentTarget);
-  };
-}
-
-/**
- * A lone audit tickmark, for an input's default or estimate: a small mark with a 24px hit area
- * (WCAG 2.5.8). `drill` (inside a popover) opens it on top of the current one, with a way back.
- */
-export function TickButton({ id, label, drill = false }: { id: MetricId; label: string; drill?: boolean }) {
-  const api = useApi();
-  const kind = metricKind(id, api.ctx);
-  const open = api.openId === id;
-  return (
-    <button type="button" className={`tick tick-btn tick-${kind}${open ? " is-open" : ""}`} data-tick={id}
-      aria-label={`${PHRASE[kind](label)} (${tickWord(kind)})`} aria-haspopup="dialog" aria-expanded={drill ? undefined : open}
-      onClick={useOpen(id, drill)}>
-      {TICKS[kind].mark}
-    </button>
-  );
-}
-
-/**
- * A figure and its tickmark, as one button: the whole figure opens its derivation, so the ✓ doesn't
- * have to be found. It wears the wash while a derivation that uses it is open.
- */
-export function Fig({ id, label, children, className = "", drill = false }: {
-  id: MetricId; label: string; children: ReactNode; className?: string; drill?: boolean;
-}) {
-  const api = useApi();
-  const kind = metricKind(id, api.ctx);
-  const open = api.openId === id;
-  const cls = `fig tick-btn${api.traced.has(id) ? " is-traced" : ""}${open ? " is-open" : ""} ${className}`.trim();
-  return (
-    <button type="button" className={cls} data-metric={id} data-tick={id}
-      aria-label={`${PHRASE[kind](label)} (${tickWord(kind)})`} aria-haspopup="dialog" aria-expanded={drill ? undefined : open}
-      onClick={useOpen(id, drill)}>
-      <span className="fig-value">{children}</span><span className={`tick tick-${kind}`} aria-hidden="true">{TICKS[kind].mark}</span>
-    </button>
-  );
-}
-
-/** Marks an input (or anything else) as a figure derivations can light up, without a tickmark of its own. */
-export function Trace({ id, children, className = "" }: { id: MetricId; children: ReactNode; className?: string }) {
-  const api = useApi();
-  return <div className={`trace${api.traced.has(id) ? " is-traced" : ""} ${className}`.trim()} data-trace={id}>{children}</div>;
-}
-
-/**
- * Within a schedule, arrow keys move between tickmarks and only one of them is a tab stop (a roving
- * tabindex), so a page full of figures isn't hundreds of tab stops (§9.1).
- */
-export function useRovingTicks(ref: RefObject<HTMLElement | null>) {
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ticks = [...el.querySelectorAll<HTMLButtonElement>("button.tick-btn")];
-    const active = ticks.find((t) => t.dataset.active === "1") ?? ticks[0];
-    for (const t of ticks) t.tabIndex = t === active ? 0 : -1;
-  });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ticks = () => [...el.querySelectorAll<HTMLButtonElement>("button.tick-btn")];
-    const onFocus = (e: FocusEvent) => {
-      const t = e.target as HTMLElement;
-      if (!t.matches?.("button.tick-btn")) return;
-      for (const b of ticks()) {
-        b.dataset.active = b === t ? "1" : "";
-        b.tabIndex = b === t ? 0 : -1;
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (!t.matches?.("button.tick-btn")) return;
-      const all = ticks();
-      const i = all.indexOf(t as HTMLButtonElement);
-      const next = e.key === "ArrowRight" || e.key === "ArrowDown" ? i + 1
-        : e.key === "ArrowLeft" || e.key === "ArrowUp" ? i - 1
-        : e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : null;
-      if (next === null) return;
-      e.preventDefault();
-      all[(next + all.length) % all.length]?.focus();
-    };
-    el.addEventListener("focusin", onFocus);
-    el.addEventListener("keydown", onKey);
-    return () => {
-      el.removeEventListener("focusin", onFocus);
-      el.removeEventListener("keydown", onKey);
-    };
-  }, [ref]);
-}
 
 const GAP = 8;
 

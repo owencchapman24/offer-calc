@@ -13,8 +13,10 @@ export const TICKS: Record<TickKind, { mark: string; name: string }> = {
   default: { mark: "D", name: "Default" },
   estimate: { mark: "E", name: "Estimate" },
 };
+/** A tickmark's name inside a sentence: "cross-footed". */
+export const tickWord = (k: TickKind) => (k === "crossFooted" ? "cross-footed" : TICKS[k].name.toLowerCase());
 
-/** A tickmark that opens nothing: for the legend. Figures use TickButton (Work.tsx), which opens their derivation. */
+/** A tickmark that opens nothing: for the legend. Figures use Fig and TickButton (figures.tsx), which open their derivation. */
 export function Tick({ kind, note }: { kind: TickKind; note?: string }) {
   const t = TICKS[kind];
   return <span className={`tick tick-${kind}`} title={note ? `${t.name}: ${note}` : t.name} aria-hidden="true">{t.mark}</span>;

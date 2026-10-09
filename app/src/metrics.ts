@@ -107,10 +107,6 @@ export const BASIS_PHRASE: Record<Basis, string> = {
 };
 /** An input's path within its metric id: "in.A.equity.grants.0.value" -> "equity.grants.0.value". */
 export const pathOf = (id: string) => id.split(".").slice(2).join(".");
-const LONG_TICK: Record<TickKind, string> = {
-  recomputed: "recomputed", footed: "footed", crossFooted: "cross-footed", traced: "traced", default: "default", estimate: "estimate",
-};
-export const tickWord = (k: TickKind) => LONG_TICK[k];
 export const cityName = (code: string | null) => (code ? CITIES.find((c) => c.code === code)?.name ?? code : "");
 /** A metro's first city: "New York-Newark-Jersey City, NY-NJ" -> "New York". */
 export const shortCity = (name: string) => name.split(/[-,]/)[0].trim();
