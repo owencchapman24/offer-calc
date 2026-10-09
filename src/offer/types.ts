@@ -765,3 +765,29 @@ interface BreakevenCommon {
   targetPV: number;
   window: { start: ISODate; end: ISODate };
 }
+
+/**
+ * The rent lever (rentFlip): the first lease year's monthly rent at which B ties A on the COL-adjusted
+ * total. "tie": `to` = from + change (change < 0: B's rent must fall; > 0: B's lead holds until its rent
+ * rises that much). "rentFree": B trails A even at $0 rent; `change` is still the change that would tie.
+ * "noRent": B pays no rent inside the window (it starts after the window ends).
+ */
+export type RentFlipResult = RentFlipCommon & (
+  | { outcome: "tie"; change: number; to: number }
+  | { outcome: "rentFree"; change: number; to: null }
+  | { outcome: "noRent"; change: null; to: null }
+);
+
+interface RentFlipCommon {
+  /** B's first-lease-year monthly rent as used: entered, or estimated. */
+  from: number;
+  /** B's base-scenario COL-adjusted present value minus A's, as entered. */
+  aheadBy: number;
+  /** A's base-scenario COL-adjusted present value over the window: the target. */
+  targetPV: number;
+  /** B's reference ÷ area non-housing price index: what $1 of B's local spending is worth at reference prices. */
+  nonHousingFactor: number;
+  /** The present value of $1 a month of B's first-year rent over its months there in the window, rising at each lease anniversary. */
+  rentFactor: number;
+  window: { start: ISODate; end: ISODate };
+}
