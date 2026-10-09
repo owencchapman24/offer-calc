@@ -1248,7 +1248,9 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **"Edit it"** opens the field's mode, section and row editor and focuses the field; opening an
   editor focuses its first field.
 - **Phones:** as in slices 1 and 2, the ledger scrolls one offer at a time; a section's heading and an
-  open editor stay in view while it scrolls.
+  open editor stay in view while it scrolls. An editor's table fits the screen where its columns can
+  shrink (the 401(k) match, vesting steps) and otherwise scrolls inside the editor (promotions, bonus by
+  year).
 
 **UI slices**, numbered as shipped. The engine prerequisites came first and aren't
 numbered.
