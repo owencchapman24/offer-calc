@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ISODate } from "../../src/offer/types";
 import { niceTicks } from "./axes";
 import { Fig, useRovingTicks } from "./figures";
@@ -6,6 +6,7 @@ import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
   forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, valueAt, worked,
 } from "./leaveModel";
+import { useOnScreen } from "./lazy";
 import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import type { CompareRequest, LeaveCurve, LeavePanel } from "./protocol";
@@ -41,19 +42,6 @@ export interface LeavingProps {
 
 const Who = ({ l }: { l: Letter }) => <strong className={`who offer-${l}`}>{l}</strong>;
 const COUNTED: Record<LeaveBasis, string> = { cash: "after tax", totalRewards: "in total rewards" };
-
-/** Whether the element is on screen or near it: the slow jobs run only then. */
-function useOnScreen(ref: RefObject<Element | null>): boolean {
-  const [on, setOn] = useState(typeof IntersectionObserver === "undefined");
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => setOn(entries.some((e) => e.isIntersecting)), { rootMargin: "50% 0px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref]);
-  return on;
-}
 
 /** One month more or less of work: from a last day of start + 6 months - 1 day to start + 7 months - 1 day. */
 const stepMonth = (axis: LeaveAxis, at: ISODate, by: number) => onAxis(axis, dayBefore(addMonthsIso(addDays(at, 1), by)));

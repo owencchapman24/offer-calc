@@ -4,7 +4,7 @@ import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
 import type { LeaveBasis } from "./leaveModel";
-import { type LeavePanel, type OfferDetail, rentKey, type StayDetail } from "./protocol";
+import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties } from "./protocol";
 import type { SectionId } from "./sections";
 import { dollars, monthName, percent, shortDate } from "./text";
 import type { TickKind } from "./ui";
@@ -52,6 +52,9 @@ export type MetricId =
   | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
   | `recon.${L}` // L-4: leaving on your stay's last day vs the stay
   | `wh.${L}.${number}` // L-5: federal tax a calendar year's withholding falls short of, owed the next April
+  | "flip" // the close-call line: the runner-up's starting salary increase that ties the verdict
+  | "tie.target" // L-3: the winner's total, which each offer behind it ties to
+  | `tie.${L}.${"salary" | "cash" | "rent"}` // L-3: the starting salary, cash award or rent that ties (the winner's: where the runner-up ties)
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
@@ -113,6 +116,8 @@ export interface WorkContext {
     letters: Letter[];
     /** L-4's panel at the last day picked, once the worker has sent it. */
     leave?: LeaveContext;
+    /** Breakevens, once the worker has sent them: the close-call line's and L-3's, as displayed. */
+    ties?: { flip?: Ties; l3?: Ties };
   };
 }
 
@@ -146,6 +151,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "rpp": return "traced";
     case "run": case "eysum": return "footed";
     case "risk": return b === "base" ? "crossFooted" : "recomputed";
+    case "tie": return a === "target" ? "crossFooted" : "recomputed";
     case "br":
       switch (c as BridgeLine) {
         case "letter": case "premiums": case "perks": case "hsa": case "oop": return "traced";

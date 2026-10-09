@@ -1,6 +1,6 @@
 import { type Dispatch, useRef } from "react";
 import { formatIssue } from "../../src/format/issues";
-import type { Basis } from "../../src/offer/types";
+import type { Basis, BreakevenResult } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldName } from "./help";
 import type { EditTarget } from "./metrics";
@@ -14,6 +14,9 @@ import { extraHoursView, type ExtraHoursLine, PIPELINE, type StepView, totalsCap
 
 // L · Lead schedule: the verdict, the "winner if you stay" row and the basis pipeline (docs/ui-design.md §4.1-4.2).
 
+/** The close-call line's breakeven (§4.1): the last one worked out for this pair of offers, and whether a newer one is on its way. */
+export interface FlipLine { row: BreakevenResult | null; updating: boolean; error: string | null }
+
 const margin = (basis: Basis, lead: NonNullable<StepView["lead"]>) =>
   basis === "perHour" ? `${cents(lead.margin)}` : dollars(lead.perMonth ?? 0);
 const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
@@ -21,7 +24,9 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
 export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [], changes = 0,
-  onWarnings }: {
+  onWarnings, flip = null }: {
+  /** A close call's flip line: present while the lead is a close call on a dollar basis. */
+  flip?: FlipLine | null;
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
   /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
@@ -64,7 +69,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
       {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions}
-        changes={changes} onWarnings={onWarnings} />
+        changes={changes} onWarnings={onWarnings} flip={flip} />
         : !error && notes.length === 0 && problems.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
@@ -73,8 +78,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings }: {
-  changes: number; onWarnings?: () => void;
+function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings, flip }: {
+  changes: number; onWarnings?: () => void; flip: FlipLine | null;
   view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf } = view;
@@ -120,7 +125,17 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
           Base case · stay {stayYears} {stayYears === 1 ? "year" : "years"} ({longDate(row.window.start)} – {longDate(dayBefore(row.window.end))})
           {pv ? " · today's dollars" : " · nominal"}
         </p>
-        {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
+        {lead?.closeCall && (
+          <p className={`close${flip?.updating ? " is-updating" : ""}`}>
+            <Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.
+            {flip?.row?.outcome === "tie" && (
+              <>{" "}<Fig id="flip" label={`${dollars(flip.row.increase)} more starting salary for ${lead.runnerUpLetter}`}>{dollars(flip.row.increase)}</Fig> more
+                starting salary for <strong className={`who offer-${lead.runnerUpLetter}`}>{lead.runnerUpLetter}</strong> would tie.</>
+            )}
+            {flip && !flip.row && flip.updating && " Working out what would tie…"}
+            {flip?.row && flip.updating && <span className="updating"> Updating…</span>}
+          </p>
+        )}
         {changes > 0 && (
           <p className="lead-pointer">
             <span className="warn-icon" aria-hidden="true">⚠</span> {changes === 1 ? "A warning changes" : `${changes} warnings change`} these

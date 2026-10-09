@@ -2,6 +2,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Basis } from "../../src/offer/types";
 import { About } from "./About";
+import { Breakeven, type BreakevenProps } from "./Breakeven";
 import { ByYear } from "./ByYear";
 import { asymmetries, asymmetryText } from "./comparability";
 import { compute } from "./compute";
@@ -11,8 +12,8 @@ import { Leaving, type LeavingProps } from "./Leaving";
 import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
 import { Warnings } from "./Warnings";
-import { cursorJob, leaveJob } from "./slowJobs";
-import type { CompareRequest, LeaveCurve, LeavePanel, SlowResponse } from "./protocol";
+import { breakevenJob, cursorJob, leaveJob } from "./slowJobs";
+import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties } from "./protocol";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
@@ -124,19 +125,45 @@ export function withLeave(ctx: WorkContext, at?: string, basis: LeaveBasis = "ca
   };
 }
 
-/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), L-4 when given, and L-5. */
+/**
+ * L-3 and the close-call line with their slow jobs run, as the worker would: the context with both results, and L-3's
+ * props (without its context). The close-call line's job runs only when the verdict is a close call on a dollar basis.
+ */
+export function withTies(ctx: WorkContext): { ctx: WorkContext; props: Omit<BreakevenProps, "ctx"> } {
+  const r = ctx.results!;
+  const compare = compareOf(ctx);
+  const basis = r.view.basis === "perHour" ? r.view.perHourOf : r.view.basis;
+  const run = (job: ReturnType<typeof tieJob>): Ties => {
+    const out = runJob((post) => breakevenJob({ ...job, gen: 1 }, post));
+    if (!out.ok || !("ties" in out)) throw new Error(`L-3's job failed: ${out.ok ? "" : out.error}`);
+    return out.ties;
+  };
+  const job = tieJob("breakeven", compare, basis, r.view.row.leads[basis]!);
+  const l3 = run(job);
+  const lead = r.view.lead;
+  const flip = lead?.closeCall && lead.margin > 0 && r.view.basis !== "perHour" ? run(tieJob("flip", compare, r.view.basis, lead)) : undefined;
+  return {
+    ctx: { ...ctx, results: { ...r, ties: { l3, ...(flip ? { flip } : {}) } } },
+    props: { sample: true, compare, ready: true, ties: { result: l3, key: JSON.stringify(job), updating: false, error: null, ms: 0 }, requestSlow: noop },
+  };
+}
+
+/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), L-3 and L-4 when given, and L-5. */
 export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor">;
-  leave?: LeavingProps } = {}): string {
+  leave?: LeavingProps; ties?: Omit<BreakevenProps, "ctx"> } = {}): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
   const ui = { ...session.ui, byYear: { mode: opts.running ? "running" as const : "each" as const, table: true },
     bridge: { letter: opts.bridgeOf ?? "A", year: opts.running ? 2 : 1 } };
+  const flip = ctx.results!.ties?.flip;
   return renderToStaticMarkup(tree(ctx, [
     createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: opts.ui ?? { mode: "quick" }, dispatch: noop }),
     createElement(Lead, { key: "s", view: ctx.results!.view, letters: ctx.results!.letters, stayYears: ctx.household.stayYears, updating: false, error: null, notes: [],
-      sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText) }),
+      sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText),
+      flip: flip ? { row: flip.rows[0].salary, updating: false, error: null } : null }),
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
     createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
+    ...(opts.ties ? [createElement(Breakeven, { key: "b", ctx, ...opts.ties })] : []),
     ...(opts.leave ? [createElement(Leaving, { key: "v", ...opts.leave })] : []),
     createElement(Warnings, { key: "w", ctx, sample: true }),
   ]));

@@ -21,6 +21,7 @@ export const SECTIONS = {
   "M-7.1": "Present value",
   "M-7.2": "Per month",
   "M-7.3": "The stay and the window",
+  "M-7.4": "What it would take",
   "M-8": "Scenarios",
   "M-9": "Leaving early",
   "M-10": "Known gaps",

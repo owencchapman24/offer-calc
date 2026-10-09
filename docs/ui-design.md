@@ -878,7 +878,7 @@ unit test fails if any figure in the UI renders without all three.
    - 6.3 After rent, at U.S. prices: the formula and its reconciliation
    - 6.4 What it leaves out
 7. **M-7 Time:** present value, the per-month annuity, the stay and the window, today as the
-   valuation date.
+   valuation date; what it would take (M-7.4, slice 4: breakeven and the rent lever).
 8. **M-8 Scenarios:** joint bear, base and bull.
 9. **M-9 Leaving early:** leave date, clawbacks, the IRC 1341 credit, forfeitures, cliffs.
 10. **M-10 Known gaps:** CLAUDE.md's known gaps in plain language.
@@ -1382,6 +1382,38 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **The methodology:** M-8 lists your offers' bear, base and bull cases and what differs in the bear case.
   M-9 states what leaving early would cost under each offer's terms (the first bonus's date and rule, each
   clawback's window, the first RSU vest, the 401(k) vesting), and L-4's panel once it has worked one out.
+
+- **UI slice 4** (2026-10-09; plan in `docs/ui-slices-4-8-plan.md`), one review stop:
+  - **Step 0:** breakeven over the comparison window (engine item 14: `comparisonWindow`, passed by the
+    worker; tested with three offers on different start dates against the rank list), breakeven as
+    resumable steps (`breakevenSteps`) for the slow lane, and the rent flip (engine item 11: `rentFlip`,
+    closed form, hand-checked and checked against a bisection).
+  - **L-3** (§4.6) with the winner's cushion and the rent lever; the close-call line (§4.1); M-7.4.
+
+**UI slice 4 versus this design:**
+- **L-3's layout** follows W7a, an offer at a time, with two additions: its target (the winner's total) in
+  the opening line, cross-footed to the rank list, and the rent lever as a sentence ("C still wins unless
+  your New York rent for A is under $3,290 a month (now $3,800, first lease year)"). An offer that trails
+  even rent-free says so ("Even rent-free in Charlotte, B trails C").
+- **The cushion** is the last row: "C leads. Its cushion over A, the runner-up:", then how far its salary
+  could fall, its sign-on ("C still leads A with no sign-on (now $10,000, paid Aug 12, 2027)", the
+  "already ahead" case), and the rent at which its lead goes.
+- **What scales with salary** is one line per offer ("Promotions and the 401(k) match scale with A's salary;
+  its bonus, entered by year, doesn't."). On after-tax pay the match isn't named: it isn't counted there.
+  W7a's "salary is the lever here" is dropped: the figures say it.
+- **The cash lever** is named "Sign-on, paid Aug 12, 2027" (the award's label and date); with no award,
+  "a sign-on paid 30 days after you start (date), with no clawback".
+- **Ties are to within a few cents, not under one.** Each figure is found to the cent, but a cent of annual
+  salary moves a 4-year total about 2.5 cents, and the engine rounds each payment to the cent, so totals
+  are noisy by a cent or two at that scale. Re-entered, a salary meets the target within 5 cents (tested);
+  a rent within 25 cents (a cent of rent moves the total about 43 cents).
+- **The close-call line** shows on the dollar bases only: breakeven isn't defined per hour, so per hour
+  keeps the stamp alone. While it's worked out the line says "Working out what would tie…", and a newer
+  one dims the figure with "Updating…".
+- **The slow lane:** the close-call line's breakeven runs ahead of L-3's and L-4's jobs (a job priority),
+  and L-3 reuses it from a small memo in the worker. L-3 fills in about 0.3-0.7 s after it comes on
+  screen, on a desktop (four to six bisections of ~55 ms each, plus a rent flip of ~5 ms per offer).
+- **The methodology:** a new subsection, M-7.4 What it would take, with L-3's numbers once it has run.
 
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.

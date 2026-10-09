@@ -1,14 +1,14 @@
 import { compute } from "./compute";
 import { createRunner } from "./jobs";
 import type { EngineRequest, EngineResponse, SlowRequest, SlowResponse } from "./protocol";
-import { cursorJob, leaveJob } from "./slowJobs";
+import { breakevenJob, cursorJob, leaveJob } from "./slowJobs";
 
 // The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). It
 // also holds the full BEA and HUD tables: the main thread ships only the slim city list and asks
 // here for rent estimates. Requests carry a generation number; while one runs, only the newest
 // waiting request is kept. Edits take the fast lane (jobs.ts): they run ahead of any slow job's
-// next chunk. L-4's leave sweep and its panel at the cursor are slow jobs (slowJobs.ts), each replaced
-// by a newer request of its kind.
+// next chunk. L-4's leave sweep and its panel at the cursor, L-3's breakevens and the close-call line's
+// are slow jobs (slowJobs.ts), each replaced by a newer request of its kind.
 
 const scope = self as unknown as {
   postMessage(message: EngineResponse | SlowResponse): void;
@@ -21,8 +21,13 @@ scope.onmessage = (e) => {
   const m = e.data;
   if (m.lane === "leave") runner.slow("leave", leaveJob(m, post));
   else if (m.lane === "cursor") runner.slow("cursor", cursorJob(m, post));
-  else runner.fast(m);
+  else if (isEdit(m)) runner.fast(m);
+  // The close-call line's breakeven runs ahead of L-3's and L-4's jobs: the lead schedule is always on screen.
+  else runner.slow(m.lane, breakevenJob(m, post), m.lane === "flip" ? 1 : 0);
 };
+
+/** An edit's request: the fast lane. (A lane that's optional doesn't narrow the union by itself.) */
+const isEdit = (m: EngineRequest | SlowRequest): m is EngineRequest => m.lane === undefined || m.lane === "compare";
 
 function run(req: EngineRequest) {
   const t = performance.now();

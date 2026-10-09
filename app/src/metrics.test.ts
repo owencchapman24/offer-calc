@@ -6,7 +6,7 @@ import { blankDraft, type Letter, type OfferDraft } from "./model";
 import { derive, highlightedSentence, metricSection } from "./derive";
 import { bridge, byYear, type MetricId, metricKind, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
-import { context, renderAllInputs, renderPage, withLeave } from "./testing";
+import { context, renderAllInputs, renderPage, withLeave, withTies } from "./testing";
 import { dayBefore, figure } from "./text";
 import { extraHoursView } from "./verdict";
 import type { OfferInput } from "../../src/offer/types";
@@ -283,15 +283,19 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
     ["per hour", context("perHour")],
     ["after tax, B yours with an estimated rent", context("cash", (os) => os.map((o) => (o.letter !== "B" ? o
       : { ...o, sample: null, draft: quickOnly(o.draft) })))],
+    // A close call: the flip line in the lead.
+    ["after rent, a 5-year stay", context("colAdjustedTotal", undefined, 5)],
   ];
 
   for (const [name, plain] of contexts) {
     it(name, () => {
-      // L-4 with its panel six months in, and again on your stay's last day (the reconciliation).
-      const six = withLeave(plain);
-      const end = withLeave(plain, dayBefore(plain.results!.view.row.window.end));
-      checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx) + renderPage(six.ctx, { leave: six.props }));
-      checkAll(end.ctx, renderPage(end.ctx, { leave: end.props }));
+      // L-3 and the close-call line worked out; L-4 with its panel six months in, and again on your stay's last day (the reconciliation).
+      const tied = withTies(plain);
+      const six = withLeave(tied.ctx);
+      const end = withLeave(tied.ctx, dayBefore(plain.results!.view.row.window.end));
+      checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx)
+        + renderPage(six.ctx, { leave: six.props, ties: tied.props }));
+      checkAll(end.ctx, renderPage(end.ctx, { leave: end.props, ties: tied.props }));
     });
   }
   function checkAll(ctx: WorkContext, html: string) {
