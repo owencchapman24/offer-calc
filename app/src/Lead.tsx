@@ -20,9 +20,11 @@ const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix }: {
+export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [] }: {
   view: VerdictView | null; letters: Letter[]; stayYears: number; updating: boolean; error: string | null; notes: string[];
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
+  /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
+  cautions?: string[];
   /** Problems with the latest inputs: the results are the last valid ones until they're fixed. */
   issues?: Partial<Record<Letter, OfferIssue[]>>; onFix?: (t: EditTarget) => void;
 }) {
@@ -57,7 +59,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
           </ul>
         </div>
       )}
-      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} /> : !error && notes.length === 0 && (
+      {view ? <Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions} />
+        : !error && notes.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}
       <TickLegend />
@@ -65,8 +68,8 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   );
 }
 
-function Verdict({ view, letters, stayYears, dismissed, dispatch }: {
-  view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>;
+function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions }: {
+  view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf } = view;
   const step = PIPELINE.find((p) => p.basis === basis)!;
@@ -112,6 +115,12 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch }: {
           {pv ? " · today's dollars" : " · nominal"}
         </p>
         {lead?.closeCall && <p className="close"><Stamp>Close call</Stamp> The lead is under 3% of {lead.winnerLetter}'s value.</p>}
+        {cautions.length > 0 && (
+          <div className="caution" role="note" aria-label="Not counted for every offer">
+            <p className="caution-head"><span aria-hidden="true">⚠</span> Not counted for every offer</p>
+            {cautions.map((c) => <p key={c}>{c}</p>)}
+          </div>
+        )}
         {!dismissed?.ticks && (
           <p className="hint-ticks">
             <span>{touch() ? "Tap" : "Click"} any figure or <span className="tick" aria-hidden="true">✓</span><span className="sr-only">tickmark</span> to see how it's calculated.</span>

@@ -48,18 +48,23 @@ export interface VerdictView {
   stays: Array<{ years: number; lead: StepView["lead"]; current: boolean }>;
 }
 
+const join = (ls: string[]) => (ls.length <= 1 ? ls.join("") : `${ls.slice(0, -1).join(", ")} and ${ls[ls.length - 1]}`);
+
 const withLetters = (lead: Lead | undefined, letters: Letter[]) =>
   lead ? { ...lead, winnerLetter: letters[lead.winner], runnerUpLetter: letters[lead.runnerUp] } : null;
 
-/** Picks the stay row and basis; falls back to the first available basis when the chosen one can't be shown. */
-export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, stayYears: number): VerdictView | null {
+/**
+ * Picks the stay row and basis; falls back to the first available basis when the chosen one can't be shown.
+ * `noHours` names the offers without weekly hours: per hour needs hours for every offer, and says whose are missing.
+ */
+export function verdict(sweep: HorizonSweep, letters: Letter[], basis: Basis, stayYears: number, noHours: Letter[] = []): VerdictView | null {
   const row = sweep.rows.find((r) => r.years === stayYears);
   if (!row) return null;
   const steps: StepView[] = PIPELINE.map((p) => ({
     basis: p.basis, step: p.step, title: p.title,
     lead: withLetters(row.leads[p.basis], letters),
     unavailable: row.leads[p.basis] ? null
-      : p.basis === "perHour" ? "Needs weekly hours for every offer (detailed mode)."
+      : p.basis === "perHour" ? `Add weekly hours for ${noHours.length && noHours.length < letters.length ? join(noHours) : "every offer"}.`
       : p.basis === "colAdjustedTotal" ? "Needs a city for every offer." : "Not available.",
   }));
   const chosen = steps.find((s) => s.basis === basis && s.lead) ?? steps.find((s) => s.lead)!;

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useReducer, useState } from "react"
 import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey } from "./protocol";
 import { About } from "./About";
+import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead } from "./Lead";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -123,8 +124,11 @@ export function App() {
     return () => cancelAnimationFrame(frame);
   }, [focus, session.ui]);
   const letters = complete.map((x) => x.o.letter);
+  const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
-    ? verdict(engine.sweep, letters, session.ui.basis, stayYears) : null;
+    ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours) : null;
+  // A cost or benefit counted for some offers but not others: the lead schedule says so.
+  const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
 
   const notes: string[] = [];
   if (complete.length < 2) notes.push("Fill in at least two offers to compare them.");
@@ -164,7 +168,8 @@ export function App() {
             <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} ui={session.ui} dispatch={dispatch} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
-                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit} />
+                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
+                cautions={cautions} />
             </div>
           </main>
           {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} />}

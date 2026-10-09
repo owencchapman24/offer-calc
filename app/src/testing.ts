@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Basis } from "../../src/offer/types";
 import { About } from "./About";
 import { ByYear } from "./ByYear";
+import { asymmetries, asymmetryText } from "./comparability";
 import { compute } from "./compute";
 import { HELP, LEDGER_SECTIONS } from "./help";
 import { Lead } from "./Lead";
@@ -35,7 +36,7 @@ export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
   if (!out.sweep) throw new Error(`The samples don't compare: ${JSON.stringify(out.issues)}`);
-  const view = verdict(out.sweep, letters, basis, 4)!;
+  const view = verdict(out.sweep, letters, basis, 4, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter))!;
   return { today: VALUATION, household, wagesYear: 2026, offers, rents: out.rents, results: { sweep: out.sweep, detail: out.detail, view, letters } };
 }
 
@@ -75,7 +76,7 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
     createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: opts.ui ?? { mode: "quick" }, dispatch: noop }),
     createElement(Lead, { key: "s", view: ctx.results!.view, letters: ctx.results!.letters, stayYears: 4, updating: false, error: null, notes: [],
-      sample: true, dispatch: noop }),
+      sample: true, dispatch: noop, cautions: asymmetries(ctx.offers).map(asymmetryText) }),
     createElement(ByYear, { key: "y", ctx, ui, sample: true, dispatch: noop }),
   ]));
 }
