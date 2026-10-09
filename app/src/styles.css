@@ -593,6 +593,13 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .field-warnings { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--graphite); line-height: 1.4; }
 .field-warnings span { color: var(--warning); }
 .editor-grid.tiers { grid-template-columns: minmax(150px, max-content) minmax(170px, max-content) auto; }
+@media (max-width: 759px) {
+  /* An editor's table stays as wide as the editor (in view while the ledger scrolls) and scrolls inside it
+     if it must; its columns shrink to their content first, so most fit. */
+  .row-editor > .editor-table { max-width: calc(100vw - 66px); padding-right: 4px; }
+  .editor-grid.promotions { grid-template-columns: repeat(3, minmax(min-content, max-content)) auto; }
+  .editor-grid.years, .editor-grid.tranches, .editor-grid.tiers { grid-template-columns: repeat(2, minmax(min-content, max-content)) auto; }
+}
 .oop { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .vesting-field { gap: 4px 8px; }
 .clawback { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
