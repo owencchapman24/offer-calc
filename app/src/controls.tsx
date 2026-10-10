@@ -189,12 +189,25 @@ export function DateField({ o, path, label, fallback }: { o: AppOffer; path: str
   );
 }
 
+/** A row editor's name in a sentence, as its editor is titled: "promotions", "401(k) match". */
+export const EDITOR_NAMES: Record<string, string> = {
+  "salary.promotions": "promotions", "bonus.amounts": "bonus by year", "equity.grants": "RSU grants", "equity.refreshers": "refreshers",
+  cashAwards: "sign-on and other cash", "retirement.match": "401(k) match", "retirement.vesting.steps": "401(k) vesting steps",
+};
+
+/**
+ * What a row editor's button says to a screen reader: what it does, and whose editor ("Edit A's promotions"). On screen it's
+ * "Edit" in the offer's column; without its column a screen reader would hear three "Edit" buttons alike.
+ */
+export const editorButtonName = (action: "Edit" | "Close" | "Add", o: AppOffer, row: string) => `${action} ${o.letter}'s ${EDITOR_NAMES[row] ?? row}`;
+
 /** The button in a cell that opens its row's editor beneath the row. */
-export function EditButton({ o, row, label }: { o: AppOffer; row: string; label: string }) {
+export function EditButton({ o, row, label }: { o: AppOffer; row: string; label: "Edit" }) {
   const api = useLedger();
   const open = api.editor?.row === row && api.editor.letter === o.letter;
   return (
     <button type="button" id={fieldId(o.letter, row)} className="link edit-button" aria-expanded={open} data-help={helpKey(row)}
+      aria-label={editorButtonName(open ? "Close" : label, o, row)}
       aria-controls={`editor-${row.replace(/\./g, "-")}`} onClick={() => api.openEditor(row, open ? null : o.letter)}>
       {open ? "Close" : label} <span aria-hidden="true">✎</span>
     </button>

@@ -6,7 +6,7 @@ import {
   BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
   PromotionsEditor, RefreshersEditor, VestingStepsEditor,
 } from "./editors";
-import { ChoiceField, EditButton, EditorRow, MonthDayField, NumberField, PlanField, RangeField, Warnings } from "./controls";
+import { ChoiceField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, Warnings } from "./controls";
 import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
 import { type AppOffer, bonusBasis, type HealthDraft, type RetirementDraft } from "./model";
 import { BonusRow, CityRow, RentRow, SalaryRow, StartRow } from "./rows";
@@ -47,7 +47,8 @@ function EditorCell({ o, row, summary, empty, start }: { o: AppOffer; row: strin
     <div className="editor-cell">
       <span className="summary">{summary}</span>
       {empty && !open
-        ? <button type="button" className="link edit-button" id={`in-${o.letter}-${row.replace(/\./g, "-")}`} data-help={row} onClick={() => { start(); api.openEditor(row, o.letter); }}>
+        ? <button type="button" className="link edit-button" id={`in-${o.letter}-${row.replace(/\./g, "-")}`} data-help={row}
+            aria-label={editorButtonName("Add", o, row)} onClick={() => { start(); api.openEditor(row, o.letter); }}>
             + Add</button>
         : <EditButton o={o} row={row} label="Edit" />}
     </div>

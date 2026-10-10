@@ -4,7 +4,7 @@ import { niceTicks } from "./axes";
 import { Fig, useRovingTicks } from "./figures";
 import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
-  forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, valueAt, worked,
+  forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, sliderText, valueAt, worked,
 } from "./leaveModel";
 import { useOnScreen } from "./lazy";
 import type { WorkContext } from "./metrics";
@@ -79,6 +79,10 @@ export function Leaving(p: LeavingProps) {
   const lines = curves ? leaveLines(curves, letters, p.basis) : null;
   const fresh = p.leave.key === leaveKey && !p.leave.updating && p.cursor.key === cursorKey && !p.cursor.updating;
   const notHere = r.view.basis === "colAdjustedTotal" || r.view.basis === "perHour";
+  // What the slider says: the date and what each offer keeps, once the panel is worked out for that date (null until then).
+  const panels = r.leave?.panels;
+  const said = p.cursor.key === cursorKey && !p.cursor.updating && panels?.find((x) => x)?.leaveDate === at
+    ? sliderText(at, letters, panels, p.basis) : null;
   // Stale while the comparison is, and while the slow lane works on the curves or the panel after it.
   // Nothing worked out yet (no curves, no panel): the notes say so, and there's nothing from earlier inputs to dim.
   const status: Stale = !lines && !r.leave?.panels ? null : p.status ?? (fresh ? null : "updating");
@@ -112,7 +116,8 @@ export function Leaving(p: LeavingProps) {
         <button type="button" className="link" onClick={() => p.onAt(axis.stayEnd)}>Your stay's last day ({longDate(axis.stayEnd)})</button>
         <span className="hint" id="leave-day-hint">Your last day of work. Drag along the chart, or step a month at a time.</span>
       </div>
-      {lines ? <LeaveChart lines={lines} axis={axis} at={at} onAt={p.onAt} /> : <p className="note leave-wait">{p.leave.error ?? "Working out every last day…"}</p>}
+      {lines ? <LeaveChart lines={lines} axis={axis} at={at} onAt={p.onAt} said={said} />
+        : <p className="note leave-wait">{p.leave.error ?? "Working out every last day…"}</p>}
       <p className="leave-key" aria-hidden="true">
         {(Object.keys(MARKS) as Array<keyof typeof MARKS>).map((k) => <span key={k}><b>{MARKS[k].glyph}</b> {MARKS[k].name}</span>)}
         <span><b className="leave-key-stay" /> your stay ends</span>
@@ -135,9 +140,24 @@ const BAND = 18;
 
 const short = (x: number) => (x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`);
 
-function LeaveChart({ lines, axis, at, onAt }: { lines: LeaveLine[]; axis: LeaveAxis; at: ISODate; onAt(date: ISODate): void }) {
+function LeaveChart({ lines, axis, at, onAt, said }: {
+  lines: LeaveLine[]; axis: LeaveAxis; at: ISODate; onAt(date: ISODate): void;
+  /** What each offer keeps at `at`, in words, once the panel has it; null while it's worked out. */ said: string | null;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
+  // The slider's value, as a screen reader hears it: the date with what each offer keeps, from the panel, so its figures are
+  // the panel's to the dollar, and a step is announced once, complete. Until the panel has the new date the slider keeps
+  // what it last said (a moment: the panel follows the last day in ~150 ms); if the panel doesn't come, the date alone.
+  const [value, setValue] = useState(() => ({ at, text: said ?? longDate(at) }));
+  useEffect(() => {
+    if (said) {
+      setValue({ at, text: said });
+      return;
+    }
+    const t = setTimeout(() => setValue({ at, text: longDate(at) }), 1500);
+    return () => clearTimeout(t);
+  }, [at, said]);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -223,7 +243,7 @@ function LeaveChart({ lines, axis, at, onAt }: { lines: LeaveLine[]; axis: Leave
         </svg>
         <span className="leave-at" style={{ left: Math.min(Math.max(x(at), M.left + 40), width - 60), top: 0 }}>{longDate(at)}</span>
         <div className="chart-hit leave-hit" tabIndex={0} role="slider" aria-label="Last day" aria-valuemin={0} aria-valuemax={span - 1}
-          aria-valuenow={daysBetween(axis.start, at)} aria-valuetext={longDate(at)}
+          aria-valuenow={daysBetween(axis.start, value.at)} aria-valuetext={value.text}
           aria-describedby="leave-day-hint" style={{ left: M.left, width: plotW, top: M.top, height: H }}
           onPointerDown={(e: PointerEvent<HTMLDivElement>) => { e.currentTarget.setPointerCapture(e.pointerId); onAt(dateAt(e.clientX)); }}
           onPointerMove={(e: PointerEvent<HTMLDivElement>) => { if (e.buttons & 1) onAt(dateAt(e.clientX)); }} onKeyDown={onKey} />

@@ -115,6 +115,23 @@ export function valueAt(line: Pick<LeaveLine, "points">, date: ISODate): number 
   return p[i].value + ((p[i + 1].value - p[i].value) * daysBetween(p[i].date, date)) / span;
 }
 
+/**
+ * What L-4's slider says at a last day: the date, then what each offer keeps, short, as the panel has it to the dollar.
+ * "Jan 12, 2028. A keeps $41,254, B $34,963, C $47,538." An offer that hasn't started by then says so.
+ */
+export function sliderText(at: ISODate, letters: Letter[], panels: Array<LeavePanel | null>, basis: LeaveBasis): string {
+  let first = true;
+  const parts = letters.map((l, i) => {
+    const p = panels[i];
+    if (!p) return `${l} hasn't started`;
+    const kept = dollars(basis === "cash" ? p.afterTaxCompKept : p.totalRewardsKept);
+    const part = first ? `${l} keeps ${kept}` : `${l} ${kept}`;
+    first = false;
+    return part;
+  });
+  return `${longDate(at)}. ${basis === "totalRewards" ? "In total rewards, " : ""}${parts.join(", ")}.`;
+}
+
 // ---- the panel's words -------------------------------------------------------------------------------
 
 /** "clawback shrinks $833 a month until Jul 12, 2027" */
