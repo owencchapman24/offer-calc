@@ -23,11 +23,35 @@ export const EDITORS: Array<{ section: Section; row: string; letter: "A" | "B" |
 
 const dashed = (path: string) => path.replace(/\./g, "-");
 
-/** The comparison is worked out for the current inputs: the verdict shows, and the lead and the fast-lane schedules aren't updating. */
+/**
+ * The page has settled for the current inputs, so a scan never catches it mid-change (a schedule dims for a moment while
+ * it's worked out):
+ * - the verdict shows, and the lead and the fast-lane schedules aren't updating;
+ * - no schedule near the screen is still waiting for its code (they load within a screen of it);
+ * - L-3 and L-4, worked out only while on screen, have caught up: one that's dimmed is brought on screen until it's ready,
+ *   then the page goes back to where it was;
+ * - and it all holds for a moment.
+ */
 export async function settled(page: Page) {
   await expect(page.locator(".lead .verdict")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true']"))
-    .toHaveCount(0, { timeout: 30_000 });
+  const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true']");
+  const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
+    .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
+  for (let quiet = 0, tries = 0; quiet < 2; tries++) {
+    if (tries > 60) throw new Error("The page didn't settle.");
+    await expect(busy).toHaveCount(0, { timeout: 30_000 });
+    await expect.poll(loading, { timeout: 30_000 }).toBe(false);
+    const y = await page.evaluate(() => window.scrollY);
+    for (const schedule of [".ties", ".leaving"]) {
+      const dimmed = page.locator(`${schedule}.is-updating`);
+      if (!(await dimmed.count())) continue;
+      await dimmed.scrollIntoViewIfNeeded();
+      await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+      await page.evaluate((top) => window.scrollTo(0, top), y);
+    }
+    quiet = (await page.locator(".is-updating").count()) === 0 && !(await loading()) ? quiet + 1 : 0;
+    await page.waitForTimeout(250);
+  }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 

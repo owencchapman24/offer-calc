@@ -80,9 +80,10 @@ export function Leaving(p: LeavingProps) {
   const fresh = p.leave.key === leaveKey && !p.leave.updating && p.cursor.key === cursorKey && !p.cursor.updating;
   const notHere = r.view.basis === "colAdjustedTotal" || r.view.basis === "perHour";
   // Stale while the comparison is, and while the slow lane works on the curves or the panel after it.
-  const status: Stale = p.status ?? (fresh ? null : "updating");
+  // Nothing worked out yet (no curves, no panel): the notes say so, and there's nothing from earlier inputs to dim.
+  const status: Stale = !lines && !r.leave?.panels ? null : p.status ?? (fresh ? null : "updating");
   return (
-    <section ref={ref} className={`schedule leaving${staleClass(status)}`} aria-labelledby="l4-title" aria-busy={status === "updating"}
+    <section ref={ref} className={`schedule leaving${staleClass(status)}`} aria-labelledby="l4-title" aria-busy={!fresh}
       data-ready={fresh ? "1" : "0"} data-fill-ms={p.leave.ms !== null ? Math.round(p.leave.ms) : undefined}>
       <header className="schedule-head">
         <h2 id="l4-title"><span className="ref">L-4</span> Leaving early</h2>
