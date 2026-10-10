@@ -57,6 +57,41 @@ function LiveVerdict({ text }: { text: string | null }) {
   return <p id="verdict-live" className="sr-only" role="status">{said}</p>;
 }
 
+/** Goes to the lead schedule: its heading takes focus, below a sticky bar's scroll padding. */
+export function toLead() {
+  document.getElementById("lead")?.scrollIntoView({ block: "start" });
+  document.getElementById("lead-title")?.focus({ preventScroll: true });
+}
+
+/**
+ * The sticky verdict bar (docs/ui-design.md §3.2, W9): at the top on a tablet, where it has room for the sentence; at the
+ * bottom on a phone, short ("C +$487 a month · stay 4 yrs"). It's one button, to the lead schedule (L), where the figures
+ * and their tickmarks are. `hidden`: out of the way (a phone's keyboard is up), and out of the tab order.
+ */
+export function VerdictBar({ view, stayYears, place, updating, hidden = false }: {
+  view: VerdictView; stayYears: number; place: "top" | "bottom"; updating: boolean; hidden?: boolean;
+}) {
+  const { lead, basis } = view;
+  const stay = place === "top" ? `stay ${stayYears} ${stayYears === 1 ? "year" : "years"}` : `stay ${stayYears} ${stayYears === 1 ? "yr" : "yrs"}`;
+  return (
+    <div className={`verdict-bar is-${place}${updating ? " is-updating" : ""}${hidden ? " is-hidden" : ""}`} data-bar={place}>
+      <button type="button" className="bar-go" onClick={toLead}>
+        <span className="bar-text">
+          {place === "top" ? verdictSentence(view).replace(/\.$/, "") : lead && lead.margin > 0 ? (
+            <>
+              <strong className={`who offer-${lead.winnerLetter}`}>{lead.winnerLetter}</strong><span className="sr-only"> leads by</span>{" "}
+              <span className="bar-figure">+{margin(basis, lead)}</span> {per(basis)}
+            </>
+          ) : "The offers tie"}
+          {lead?.closeCall && <>{" "}<Stamp>Close call</Stamp></>}
+          <span className="bar-scope"> · {stay}</span>
+        </span>
+        <span className="bar-to"><span className="sr-only">. Go to the lead schedule</span><span className="ref" aria-hidden="true">L</span></span>
+      </button>
+    </div>
+  );
+}
+
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
@@ -79,9 +114,9 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   return (
-    <section ref={ref} className={`schedule lead${updating ? " is-updating" : ""}`} aria-labelledby="lead-title" aria-busy={updating}>
+    <section ref={ref} id="lead" className={`schedule lead${updating ? " is-updating" : ""}`} aria-labelledby="lead-title" aria-busy={updating}>
       <header className="schedule-head">
-        <h2 id="lead-title"><span className="ref">L</span> Lead schedule</h2>
+        <h2 id="lead-title" tabIndex={-1}><span className="ref">L</span> Lead schedule</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}
         <span className="updating" aria-hidden={!updating}>{updating ? "Updating…" : ""}</span>
       </header>

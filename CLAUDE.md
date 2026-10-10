@@ -34,14 +34,32 @@ and show the work. Correctness and a clear methodology page matter more than fea
 
 **UI: slices 1-5 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
 `docs/ui-slices-4-8-plan.md`; slices 4, 5 and 8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
-under way: its stop A (the automated accessibility scan and its fixes) is done; stop B (phone tabs, sticky
-verdict bars) is next.
+under way: stop A (the automated accessibility scan and its fixes) and stop B (phone tabs, sticky verdict bars) are
+done; stop C (the NVDA walkthrough) is next.
+- **Phones and tablets** (slice 7, stop B; `docs/ui-design.md` §3.2, W9):
+  - **Offer tabs on a phone** (under 760 px; `useMedia(PHONE)` in `media.ts`): `OfferTabs` in `Ledger.tsx`, a tab list
+    (arrow keys, Home and End choose; one Tab stop) with each offer's letter and name, ⚠ on an offer that needs a fix,
+    and + while there are fewer than three. Every ledger cell carries `data-offer`; the stylesheet shows the chosen
+    offer's (`ui.offerTab`, saved; a missing or removed offer falls back to the first). "Edit it", "Fix it" and "Show at
+    the field" show their offer's tab first. Removing an offer moves focus to the tab shown (the Offers heading on a
+    desktop).
+  - **The sticky verdict bar** (`VerdictBar` in `Lead.tsx`): sticky, not fixed, so it shifts nothing. On a tablet
+    (760-1179 px) it sits under About you and sticks at the top, with the verdict's sentence; on a phone it's last on the
+    page and sticks at the bottom, short ("C +$500 a month · stay 4 yrs"). One button, to the lead schedule (its heading
+    takes focus).
+  - **It never hides the focused element** (WCAG 2.4.11): 72 px of scroll padding while a bar shows (`:root:has(...)`),
+    `useFocusClearOfBars` (a focused element a bar covers is scrolled clear), and the phone's bar hides while the
+    keyboard is up (`useKeyboardUp`: a field you type in has focus on a touch screen, or the visual viewport has shrunk).
+    `e2e/mobile.e2e.ts` tabs down the page and back up on a phone and a tablet: nothing covered (without the guards, 8 and
+    6 were).
 - **The accessibility scan** (slice 7, stop A): Playwright with axe-core (`e2e/`, `npm run e2e`) on the
   production build, served as Vercel serves it (`scripts/serve-dist.ts`: compressed, `vercel.json`'s CSP).
-  29 states (quick mode, every detailed section and row editor, Show the work opened, drilled into and on a
+  33 states (quick mode, every detailed section and row editor, Show the work opened, drilled into and on a
   default, L-1's table view, L-1 to L-5 loaded, L-4 on your stay's last day, the methodology, the Data
-  page's import review, its problems, a file it can't import and the delete confirmation), each in four
-  projects (desktop 1440 and phone 390, light and dark): 116 scans. Any WCAG 2.0/2.1/2.2 A or AA violation
+  page's import review, its problems, a file it can't import and the delete confirmation; since stop B the
+  verdict bar and the phone's tabs), in desktop 1440 and phone 390 projects, light and dark, and the comparison
+  page's states in tablet 820 projects: 140 scans. The verdict bar is scanned in its place (`position: static`):
+  axe counts targets scrolled under a stuck bar as obscured, which is a scroll position, not the layout. Any WCAG 2.0/2.1/2.2 A or AA violation
   fails, unless `test/a11y-exceptions.json` accepts it with a rule, a selector and a reason (an entry
   without a reason fails, in `npm test` too). None is excepted. The report (`.a11y/report.md`) lists the
   violations, the exceptions, and what axe left for a person to check ("needs review"), by axe's reason.
@@ -184,9 +202,9 @@ verdict bars) is next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 364.3 / 111.9 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 8 ended at 362.7 / 111.4; slice
-    4 at 357.9 / 109.7;
+  - **Main thread:** 369.4 / 113.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 7's stop A ended at 364.3 / 111.9; slice 8
+    at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
     slice 5 at 355.7 / 109.1;
     slice 3 at 351.8 /
     107.7; slice 2 346 / 106; slice 1 276 / 85. Budget: 120 kB gzipped by the check, which CI runs
@@ -215,13 +233,13 @@ verdict bars) is next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 403 passing (`npm test`), and 95 Playwright tests (`npm run e2e`: the scan's 22 tests in each of four
-projects, 2 smoke tests and 5 keyboard tests).
+**Tests:** 408 passing (`npm test`), and 115 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
+tests, 5 keyboard tests, and the phone and tablet tests; 12 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13,
+  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
   `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
   prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
@@ -277,10 +295,11 @@ projects, 2 smoke tests and 5 keyboard tests).
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 7: mobile and accessibility:** stop A (the scan, the smoke tests and their fixes) is done. Next,
-   stop B: phone tabs (A | B | C | +) and the sticky verdict bars (bottom on phones, top on tablets), never
-   hiding the focused field (scroll padding; the phone's bar hides while the keyboard is up), within the
-   bundle budget and Lighthouse's LCP. Then stop C: the NVDA script the user runs; fix what it finds.
+1. **Slice 7: mobile and accessibility:** stops A (the scan, the smoke tests and their fixes) and B (phone tabs,
+   the sticky verdict bars) are done. Next, stop C: a step-by-step NVDA script for the main flows (quick-mode
+   entry, the verdict, Show the work and drilling in, the detailed editors, L-4's last-day slider, export and
+   import) with what NVDA should announce at each step; the user runs it with Speech Viewer and pastes the
+   output; fix what it finds.
 2. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
@@ -387,6 +406,8 @@ build them in.
     message types and `rentKey`: never import values from `engine.worker.ts` or
     `compute.ts`.
   - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
+  - `src/media.ts`: the layout's widths (`PHONE`, `TABLET`, as `styles.css` has them) as `useMedia`, the phone keyboard
+    (`useKeyboardUp`) and `useFocusClearOfBars` (WCAG 2.4.11).
   - Show the work: each figure's metric id maps to a tickmark kind, a methodology section
     (`src/sections.ts`) and a derivation built from the engine's numbers.
     - `src/metrics.ts`: what the page renders: the ids, their tickmark kinds, the lookups,
@@ -436,7 +457,8 @@ build them in.
   - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded,
     when the page has settled); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
-  - `smoke.e2e.ts`, `keyboard.e2e.ts`.
+  - `smoke.e2e.ts`, `keyboard.e2e.ts`; `mobile.e2e.ts` (the phone's tabs and the verdict bars, in the `phone` and
+    `tablet` projects).
 
 ## Working agreements
 - **Pull requests** (adopted 2026-10-08, by agreement; not enforced): one branch per slice or

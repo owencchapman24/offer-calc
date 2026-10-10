@@ -17,7 +17,7 @@ import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowRespons
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
-import { type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, sampleOffers, toHousehold, toOfferInput } from "./model";
+import { type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, type Missing, sampleOffers, toHousehold, toOfferInput } from "./model";
 import { rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
 import { initialSession, type UiState } from "./session";
@@ -60,9 +60,12 @@ export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]
 const noop = () => {};
 const tree = (ctx: WorkContext, children: ReactElement[]) => createElement(WorkProvider, { ctx, children });
 
-/** The ledger with these view choices. */
-export function renderLedger(ctx: WorkContext, ui: Pick<UiState, "mode" | "section" | "editor">): string {
-  return renderToStaticMarkup(tree(ctx, [createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui, dispatch: noop })]));
+/** The ledger with these view choices; `tabbed`, as on a phone (one offer at a time). */
+export function renderLedger(ctx: WorkContext, ui: Pick<UiState, "mode" | "section" | "editor" | "offerTab">,
+  opts: { tabbed?: boolean; missing?: Map<string, Missing[]> } = {}): string {
+  return renderToStaticMarkup(tree(ctx, [createElement(Ledger, {
+    key: "l", offers: ctx.offers, missing: opts.missing ?? new Map(), rents: ctx.rents, ui, dispatch: noop, tabbed: opts.tabbed,
+  })]));
 }
 
 /** Every view of the inputs: About you, quick mode, and detailed mode with each section open, and each row editor open for each offer. */

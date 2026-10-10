@@ -4,7 +4,8 @@ import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
-import { Lead } from "./Lead";
+import { Lead, VerdictBar } from "./Lead";
+import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
 import { BreakevenSlot, LeavingSlot, RiskSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
@@ -72,6 +73,11 @@ export function App() {
   useEffect(() => { if (page === "compare") window.scrollTo(0, 0); }, [page]);
   const [session, dispatch] = useReducer(reducer, undefined, () => loadSession(storage(), today));
   const [saved, setSaved] = useState(true);
+  // Phones show one offer at a time and the verdict bar at the bottom; tablets, the bar at the top (docs/ui-design.md §3.2).
+  const phone = useMedia(PHONE);
+  const tablet = useMedia(TABLET);
+  const keyboardUp = useKeyboardUp();
+  useFocusClearOfBars();
 
   useEffect(() => {
     const t = setTimeout(() => setSaved(saveSession(storage(), session)), 500);
@@ -107,16 +113,15 @@ export function App() {
   const issues: Partial<Record<Letter, OfferIssue[]>> = {};
   complete.forEach((x, i) => { if (engine.issues[i]?.length) issues[x.o.letter] = engine.issues[i]; });
 
-  // "Edit it" (and "Fix it"): show the field (its mode, section and row editor), then focus it.
+  // "Edit it" (and "Fix it"): show the field (its offer's tab on a phone, its mode, section and row editor), then focus it.
   const [focus, setFocus] = useState<string | null>(null);
   const edit = (t: EditTarget) => {
     if ("about" in t) { setFocus(ABOUT_FIELDS[t.about]); return; }
     const key = helpKey(t.path);
     const quick = QUICK_FIELDS.has(key) && (session.ui.mode ?? "quick") === "quick";
-    if (!quick) {
-      const editor = HELP[key]?.editor;
-      dispatch({ type: "ui", patch: { mode: "detailed", section: sectionOfPath(t.path), editor: editor ? { row: editor, letter: t.letter } : null } });
-    }
+    const editor = HELP[key]?.editor;
+    dispatch({ type: "ui", patch: quick ? { offerTab: t.letter, ...(session.ui.editor?.letter !== t.letter ? { editor: null } : {}) }
+      : { offerTab: t.letter, mode: "detailed", section: sectionOfPath(t.path), editor: editor ? { row: editor, letter: t.letter } : null } });
     setFocus(fieldId(t.letter, t.path));
   };
   // After the render that shows it (the DOM is committed when effects run).
@@ -219,10 +224,11 @@ export function App() {
       ) : (
         <>
           <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
+          {tablet && view && <VerdictBar view={view} stayYears={stayYears} place="top" updating={engine.updating} />}
 
           <main className="workpaper">
             <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} warnings={warnings} ui={session.ui}
-              dispatch={dispatch} />
+              dispatch={dispatch} tabbed={phone} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
@@ -264,6 +270,10 @@ export function App() {
           Not financial advice.
         </p>
       </footer>
+      {/* Last on the page, so it sticks to the bottom of the screen all the way down (W9). */}
+      {route.page === "compare" && phone && view && (
+        <VerdictBar view={view} stayYears={stayYears} place="bottom" updating={engine.updating} hidden={keyboardUp} />
+      )}
     </div>
     </WorkProvider>
   );

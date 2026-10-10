@@ -1450,7 +1450,8 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **UI slice 7** (in progress; plan in `docs/ui-slices-4-8-plan.md`), three review stops:
   - **A** (2026-10-09): the automated scan (Playwright and axe-core in CI, §10), the smoke tests, and the fixes
     for what the scan found and for the four problems known before it.
-  - **B:** phone tabs and the sticky verdict bars (§3.2). **C:** the screen-reader walkthrough.
+  - **B** (2026-10-10): phone tabs and the sticky verdict bars (§3.2), in the scan and in tests of their own.
+  - **C:** the screen-reader walkthrough.
 
 **UI slice 7 versus this design** (stop A):
 - **The scan runs on the production build served as Vercel serves it** (`scripts/serve-dist.ts`: compressed,
@@ -1474,6 +1475,27 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **The theme switch** (§9.5) is native radios: arrow keys move and choose. The other two-way switches stay toggle
   buttons (`aria-pressed`), each its own Tab stop, as WAI-ARIA's button pattern has it.
 - **Muted text under the highlighter wash** takes graphite: muted on the dark wash is 3.4:1.
+
+**UI slice 7 versus this design** (stop B):
+- **The phone's tabs** (W9) sit at the top of the ledger, under its heading: each tab the offer's letter and its name, cut
+  short, the one shown with its offer's color rule; ⚠ on an offer that needs a fix, since its fields are out of sight; + while
+  there are fewer than three (the desktop's "+ Add an offer" gives way to it). Arrow keys, Home and End choose (the tab
+  pattern, choosing as focus moves), and only the chosen tab is a Tab stop. The ledger keeps its rows: the field names beside
+  the chosen offer's column. "Edit it", "Fix it" and "Show at the field" show their offer's tab first; switching tabs closes
+  another offer's row editor. Removing an offer moves focus to the tab shown.
+- **The bars are sticky, not fixed,** so neither shifts the page: the tablet's sits under About you and sticks at the top; the
+  phone's is last on the page and sticks at the bottom all the way down.
+- **What they say:** the phone's is short, "C +$500 a month · stay 4 yrs" (W9's "+$487/mo ✓"); the tablet's has room for the
+  verdict's own sentence and the stay. Each is one button, to the lead schedule (its heading takes focus), marked with the
+  lead's reference, `L`. There's no tickmark in a bar: the figure and its work are in the lead it goes to. A close call shows
+  its stamp; while the verdict is worked out, the bar dims with the lead.
+- **WCAG 2.4.11:** 72 px of scroll padding while a bar shows, and a focused element a bar would cover is scrolled clear (focus
+  moved by script, or a browser that scrolls it only just into view). The phone's bar hides while the keyboard is up, taken as
+  a field you type in having focus on a touch screen, or the visual viewport shrinking. Tested by tabbing down the page and
+  back up on a phone and a tablet: nothing covered (without the guards, 8 and 6 focused elements were).
+- **The scan** adds tablet projects (820 px, light and dark) for the comparison page, and the phone's tabs. A bar is scanned
+  in its place in the page: axe counts targets scrolled under a stuck bar as obscured (2.5.8), which is a scroll position, not
+  the layout; whether the stuck bar covers the focused element is 2.4.11's test.
 
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
