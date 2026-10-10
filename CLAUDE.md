@@ -176,7 +176,7 @@ verdict bars) is next.
   is deferred; see Decisions). CI (`.github/workflows/ci.yml`) runs on every pull request and every
   push to `main` (not on other branches' pushes, so a pull request runs it once), in three jobs:
   - `check`: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, `npm run check-bundle`;
-  - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); the median run's report is
+  - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); a warm-up, then three runs; the median LCP's run's report is
     uploaded as the `lighthouse-report` artifact;
   - `e2e`: builds, installs Playwright's Chromium, then `npm run e2e` (the scan, smoke and keyboard tests;
     one retry for a slow runner); the scan's report and Playwright's are uploaded as `a11y-report`.
@@ -193,7 +193,8 @@ verdict bars) is next.
     after the build (110 kB until 2026-10-09; see Decisions). Slices 4, 8 and 7 add to the main thread
     (the close-call line, the prices control, tabs and sticky bars).
   - **Load time** (`npm run lighthouse`, Lighthouse 13 mobile: simulated slow 4G, 4x CPU slowdown,
-    median of 3 runs): LCP at most 2.5 s, checked in CI. 2026-10-09: the production build 1.86 s,
+    a discarded warm-up, then the median of 3 runs, LCP's and the score's each taken on its own): LCP at most 2.5 s,
+    checked in CI. Before the warm-up (2026-10-10), CI's cold first run (TBT ~1 s) could be reported as the median. 2026-10-09: the production build 1.86 s,
     performance 98; the live site 1.47 s, performance 100. The LCP element is About you's assumptions
     line, which renders before the worker answers, so the main chunk's download and parse set LCP.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
@@ -214,14 +215,14 @@ verdict bars) is next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 402 passing (`npm test`), and 95 Playwright tests (`npm run e2e`: the scan's 22 tests in each of four
+**Tests:** 403 passing (`npm test`), and 95 Playwright tests (`npm run e2e`: the scan's 22 tests in each of four
 projects, 2 smoke tests and 5 keyboard tests).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
   `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13,
-  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 2, `e2e/lib/exceptions.test.ts` 4.
+  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
   prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
   against L-3's rent lever to the cent.
@@ -298,11 +299,11 @@ build them in.
 - `npm run check-bundle`: after `npm run build`, the JS a quick-mode visit loads, gzipped, against
   the 120 kB budget (`scripts/lib/bundle.ts`). CI runs it.
 - `npm run lighthouse [-- <url>]`: after `npm run build`, Lighthouse's mobile profile on the
-  production build, three runs; fails if the median run's LCP is over 2.5 s
+  production build, a warm-up (discarded) and three runs; fails if the median LCP is over 2.5 s
   (`scripts/lib/lighthouse.ts`). With a URL it audits that page instead (the live site). It needs
   Chrome or `CHROME_PATH`; on Windows without Chrome it uses Edge and closes it over the DevTools
   protocol (Edge relaunches itself, so killing the launched process leaves the browser running).
-  The median run's report goes to `.lighthouse/report.html`.
+  The median LCP's run's report goes to `.lighthouse/report.html`.
 - `npm run e2e`: after `npm run build`, Playwright (`e2e/playwright.config.ts`) on the production build,
   served by `scripts/serve-dist.ts` on port 4180 (a running one is reused locally): the accessibility scan
   in four projects, then the smoke and keyboard tests. Locally it drives the installed Edge

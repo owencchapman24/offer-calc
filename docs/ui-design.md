@@ -1179,7 +1179,7 @@ font requests.
   on first use (when it nears the viewport, or when opened). Only the worker holds the engine and
   the data tables.
 - **Load time** (2026-10-09): Lighthouse's mobile profile on the production build, in CI; the
-  median of three runs' Largest Contentful Paint is at most 2.5 s. The bundle check catches
+  median Largest Contentful Paint of three runs, after a discarded warm-up, is at most 2.5 s. The bundle check catches
   regressions in what we ship; Lighthouse measures what users feel.
 - **Today:** the app takes the local date when it loads, and again on focus after midnight.
   It passes that date as `valuationDate`.
