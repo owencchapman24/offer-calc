@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openCompare, settled } from "./lib/app";
+import { loadSchedules, openCompare, openSection, settled } from "./lib/app";
 
 // What the scan can't see (docs/ui-slices-4-8-plan.md, slice 7, "known before the scan"): what a screen reader hears, and
 // where focus goes. Each was a problem before slice 7; these keep them fixed.
@@ -76,4 +76,38 @@ test("Prices in returns focus to Change after a pick too", async ({ page }) => {
   await change.click();
   await page.locator("#about-prices").fill("Charlotte-Concord-Gastonia, NC-SC");
   await expect(page.getByRole("button", { name: /^Change the prices figures are in, now Charlotte/ })).toBeFocused();
+});
+
+test("a row editor's button says whose editor it opens, and focus comes back to it", async ({ page }) => {
+  await openCompare(page);
+  await openSection(page, "pay");
+  // On screen it's "Edit" in A's column; a screen reader hears whose.
+  const edit = page.getByRole("button", { name: "Edit A's promotions" });
+  await expect(edit).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Add B's promotions" })).toBeVisible();
+  await edit.click();
+  await expect(page.getByRole("button", { name: "Close A's promotions" })).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("group", { name: "Offer A: Promotions" }).getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("button", { name: "Edit A's promotions" })).toBeFocused();
+});
+
+test("L-4's slider says the date and what each offer keeps, as its panel shows", async ({ page }) => {
+  await openCompare(page);
+  await loadSchedules(page);
+  const slider = page.getByRole("slider", { name: "Last day" });
+  /** The panel's date and each offer's "keep" figure, as the slider should say them. */
+  const panel = async () => {
+    const date = (await page.locator(".leave-panel .extra-title").textContent())!.replace(/^If your last day is /, "").replace(/,? the last day of your stay$/, "");
+    const kept = await page.locator('.leave-panel [data-metric^="kept."] .fig-value').allTextContents();
+    return `${date}. A keeps ${kept[0]}, B ${kept[1]}, C ${kept[2]}.`;
+  };
+  await slider.focus();
+  await expect(slider).toHaveAttribute("aria-valuetext", await panel());
+  // A month later: once the panel has the new date, the slider says its figures (one announcement, complete).
+  const before = await slider.getAttribute("aria-valuetext");
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).not.toHaveAttribute("aria-valuetext", before!);
+  await expect(page.locator(".leaving")).toHaveAttribute("data-ready", "1");
+  await expect(slider).toHaveAttribute("aria-valuetext", /^[A-Z][a-z]{2} \d{1,2}, \d{4}\. A keeps \$[\d,]+, B \$[\d,]+, C \$[\d,]+\.$/);
+  await expect(slider).toHaveAttribute("aria-valuetext", await panel());
 });

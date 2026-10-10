@@ -1447,11 +1447,12 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   ("97.2933"), and there are no padded zeros ("105.696", not "105.696000"). The steps of an index's own
   derivation are exact too ("0.16 × 148.616 = 23.77856"), so it foots.
 
-- **UI slice 7** (in progress; plan in `docs/ui-slices-4-8-plan.md`), three review stops:
+- **UI slice 7** (done 2026-10-10; plan in `docs/ui-slices-4-8-plan.md`), three review stops:
   - **A** (2026-10-09): the automated scan (Playwright and axe-core in CI, §10), the smoke tests, and the fixes
     for what the scan found and for the four problems known before it.
   - **B** (2026-10-10): phone tabs and the sticky verdict bars (§3.2), in the scan and in tests of their own.
-  - **C:** the screen-reader walkthrough.
+  - **C** (2026-10-10): the screen-reader walkthrough, `docs/nvda-walkthrough.md`; its run with NVDA is deferred to before
+    the public launch (CLAUDE.md, "Pre-launch checklist"). The two gaps found while writing it are fixed (below).
 
 **UI slice 7 versus this design** (stop A):
 - **The scan runs on the production build served as Vercel serves it** (`scripts/serve-dist.ts`: compressed,
@@ -1497,6 +1498,15 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   in its place in the page: axe counts targets scrolled under a stuck bar as obscured (2.5.8), which is a scroll position, not
   the layout; whether the stuck bar covers the focused element is 2.4.11's test.
 
+**UI slice 7 versus this design** (stop C):
+- **The walkthrough is written, not yet run:** the plan had the user run it with NVDA (and VoiceOver on a phone) at this stop;
+  that's on the pre-launch checklist instead.
+- **A row editor's button names its offer and row** for a screen reader ("Edit A's promotions"; "Close A's promotions" while
+  it's open; "Add B's promotions" with none yet). On screen it's still "Edit" in the offer's column.
+- **L-4's slider says what each offer keeps** (§4.5): "Jan 12, 2028. A keeps $41,254, B $35,029, C $47,560." (in total rewards,
+  "In total rewards, A keeps …"). The figures are the panel's, said once the panel has the new date (a moment after the key), so
+  a step is announced once, complete, and holding an arrow key says where you stop.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
@@ -1518,8 +1528,8 @@ build order differs (below). The engine prerequisites came first and aren't numb
 6. **The reconciliation schedule:** L-6 (§4.8), CSV export of each table, print, and the
    hide-tickmarks setting (§9.1). (JSON export/import moved to slice 3; the accessibility pass,
    phone tabs and sticky bars moved to slice 7.)
-7. **Mobile and accessibility** (rev 3, out of slice 6): phone tabs, the sticky verdict bars
-   (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough.
+7. **Mobile and accessibility** (rev 3, out of slice 6; done 2026-10-10): phone tabs, the sticky verdict bars
+   (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough (its run deferred to before launch).
 8. **Prices in a city you know** (rev 3; done 2026-10-09): §5, item 6, with the rent note.
 
 **Build order** (rev 3; plan in `docs/ui-slices-4-8-plan.md`): 5, 4, 8, 7, 6.

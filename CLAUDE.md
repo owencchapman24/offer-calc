@@ -4,7 +4,7 @@ A job-offer comparison calculator. Differentiator: do the math correctly, in one
 gross comp -> after-tax -> location-adjusted -> per hour of your life, year by year (years 1-5),
 and show the work. Correctness and a clear methodology page matter more than features.
 
-## Status (2026-10-09)
+## Status (2026-10-10)
 **Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
 - **Tax engine:** 2026 law, validated against PolicyEngine-US. Projected later years come
   from `paramsForYear`, cached and frozen.
@@ -32,10 +32,18 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1-5 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
-`docs/ui-slices-4-8-plan.md`; slices 4, 5 and 8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
-under way: stop A (the automated accessibility scan and its fixes) and stop B (phone tabs, sticky verdict bars) are
-done; stop C (the NVDA walkthrough) is next.
+**UI: slices 1-5, 7 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
+`docs/ui-slices-4-8-plan.md`; slices 4, 5, 7 and 8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
+done (2026-10-10): stop A (the automated accessibility scan and its fixes), stop B (phone tabs, sticky verdict bars) and
+stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). Slice 6
+is next.
+- **Screen readers** (slice 7, stop C): `docs/nvda-walkthrough.md`, ten parts, about 30 minutes, with the keys and what NVDA
+  should say at each step. Two gaps found while writing it are fixed: a row editor's button names its offer and row
+  ("Edit A's promotions", "Close …" while open, "Add B's promotions" with none yet: `editorButtonName` in `controls.tsx`),
+  and L-4's slider says what each offer keeps ("Jan 12, 2028. A keeps $41,254, B $35,029, C $47,560.", `sliderText` in
+  `leaveModel.ts`), from the panel once it has the new date, so its figures are the panel's and a step is said once. Both
+  were checked through Windows UI Automation, what NVDA reads (Chrome's DevTools accessibility view shows `aria-valuetext`
+  as empty, for any slider).
 - **Phones and tablets** (slice 7, stop B; `docs/ui-design.md` §3.2, W9):
   - **Offer tabs on a phone** (under 760 px; `useMedia(PHONE)` in `media.ts`): `OfferTabs` in `Ledger.tsx`, a tab list
     (arrow keys, Home and End choose; one Tab stop) with each offer's letter and name, ⚠ on an offer that needs a fix,
@@ -234,13 +242,13 @@ done; stop C (the NVDA walkthrough) is next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 408 passing (`npm test`), and 116 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
-tests, 5 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
+**Tests:** 412 passing (`npm test`), and 118 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
+tests, 7 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
+  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5, `app/src/names.test.ts` 4,
   `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
   prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
@@ -272,6 +280,14 @@ tests, 5 keyboard tests, and the phone and tablet tests; 13 more skip, each a ph
   - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
     export/import) and the public-repo prep after it.
 
+## Pre-launch checklist
+Before the repo and the app go public (deferred, see Decisions):
+1. **The public-repo settings and the visibility switch:** `docs/slice-3-plan.md`, "Public-repo prep", item 7.
+2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files) right before switching.
+3. **Run the NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 30 minutes, NVDA with Chrome): the user runs it and
+   sends the Speech Viewer log; fix what it finds. With it, the plan's VoiceOver pass on a phone for the offer tabs and the
+   verdict bar (`docs/ui-slices-4-8-plan.md`, slice 7).
+
 ## Decisions (2026-10-08)
 - **The repo stays private for now.** The goal is "user-ready" first; going public comes after.
   The public-repo settings and the visibility switch are deferred. Their checklist, with each
@@ -296,12 +312,7 @@ tests, 5 keyboard tests, and the phone and tablet tests; 13 more skip, each a ph
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 7: mobile and accessibility:** stops A (the scan, the smoke tests and their fixes) and B (phone tabs,
-   the sticky verdict bars) are done. Next, stop C: a step-by-step NVDA script for the main flows (quick-mode
-   entry, the verdict, Show the work and drilling in, the detailed editors, L-4's last-day slider, export and
-   import) with what NVDA should announce at each step; the user runs it with Speech Viewer and pastes the
-   output; fix what it finds.
-2. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
+1. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
    cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
    setting.
 

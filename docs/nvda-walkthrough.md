@@ -1,7 +1,9 @@
 # NVDA walkthrough (slice 7, stop C)
 
 A screen-reader check of Offer Calc's main flows, about 30 minutes, with NVDA and Chrome on Windows. You run it and send
-back NVDA's Speech Viewer log; Claude fixes what it shows (`docs/ui-slices-4-8-plan.md`, slice 7).
+back NVDA's Speech Viewer log; Claude fixes what it shows (`docs/ui-slices-4-8-plan.md`, slice 7). **When:** before the public
+launch (CLAUDE.md, "Pre-launch checklist"). Written 2026-10-10; the two gaps found while writing it (the editors' "Edit"
+buttons, L-4's slider) are fixed and the steps expect the fixes.
 
 **How to read the steps.** Each step gives the keys to press, then what NVDA should say. NVDA's wording and word order vary a
 little between versions ("heading level 2, About you" or "About you, heading level 2"), so match the content, not the
@@ -134,8 +136,8 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
     **Enter**. NVDA should say "pressed".
 33. Press **B** until "Sign-on and other cash amounts, pay dates, clawbacks, button, collapsed", then **Enter**. NVDA should
     say "expanded".
-34. Press **B** until the first "Edit, button, collapsed". That's offer A's. **Note whether NVDA tells you which offer it's
-    for.** Press **Enter**.
+34. Press **B** until "Edit A's sign-on and other cash, button, collapsed". The next two are B's and C's, each named the same
+    way. Press **Enter**.
     - The editor opens and focus jumps into it: "Offer A payment 1 name, edit, Sign-on", in focus mode.
 35. **Tab** through the editor. NVDA should say, in order:
     - "More help, button"
@@ -149,8 +151,9 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
     - "Offer A payment 1 clawback clock, combo box, Your start date"
     - "Why the payment 1 clawback clock is the default (default), button"
     - and on to "Remove the clawback", "Remove this payment" and "+ Add another payment"
-36. **Shift+Tab** until "Done, button", then **Enter**. The editor closes and NVDA should say "Edit, button, collapsed":
-    focus is back on the button that opened it.
+36. **Shift+Tab** until "Done, button", then **Enter**. The editor closes and NVDA should say "Edit A's sign-on and other
+    cash, button, collapsed": focus is back on the button that opened it. (While the editor is open, the same button is "Close
+    A's sign-on and other cash".)
 37. Press **Escape** if you're in focus mode. Press **Shift+B** until "Quick, toggle button, not pressed", then **Enter**, to go
     back to quick mode.
 
@@ -166,12 +169,16 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
     - "A month later, button"
     - "Your stay's last day (Jul 12, 2031), button"
 
-    The next Tab stop is the chart. NVDA should say "Last day, slider, Jan 12, 2028" and the hint "Your last day of work. Drag
-    along the chart, or step a month at a time." NVDA should switch to focus mode by itself.
-40. **Right Arrow** moves a month: "Feb 12, 2028". Right Arrow again: "Mar 12, 2028". **Shift+Right Arrow** moves a day: "Mar
-    13, 2028". **Home** goes to the first day on the chart: "Jul 13, 2027". **End** goes to the last.
-    - **Note:** moving the slider says only the date. The panel below it changes too. Tell me whether you'd want to hear what
-      each offer keeps as you move it.
+    The next Tab stop is the chart. NVDA should say "Last day, slider, Jan 12, 2028. A keeps $41,254, B $35,029, C $47,560."
+    and the hint "Your last day of work. Drag along the chart, or step a month at a time." NVDA should switch to focus mode by
+    itself.
+40. **Right Arrow** moves a month. A moment later NVDA should say, once: "Feb 12, 2028. A keeps $73,975, B $41,695, C
+    $56,617." A's figure jumps because its bonus is paid on Jan 31. Each step is the date, then what each offer keeps after
+    tax, matching the panel under the chart.
+    - Right Arrow again: "Mar 12, 2028. …".
+    - **Shift+Right Arrow** moves a day: "Mar 13, 2028. …".
+    - **Home** goes to the first day on the chart, "Jul 13, 2027. …"; **End** goes to the last.
+    - Hold Right Arrow down: you should hear the day you stop on, not every month you pass.
 41. **Escape** (browse mode), then **Down Arrow** to read the panel under the chart. It starts "If your last day is …", then a
     line per offer: "A, … worked · keep $…, button …".
 
@@ -209,7 +216,6 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
 51. Tell me, in a line each:
     - your NVDA version (Insert+N, then Help, then About) and Chrome's (type `chrome://version` in the address bar);
     - any step where a key did something other than the step said: the step number and what happened;
-    - at step 34, whether NVDA said which offer "Edit" was for;
-    - at step 40, whether you'd want to hear the offers' figures as the date moves.
+    - at step 40, whether the figures came quickly enough, and whether you'd rather hear less (or more) on each step.
 
 Then close the Incognito window (Ctrl+Shift+W). Nothing you did in it is kept.

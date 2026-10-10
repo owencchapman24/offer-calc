@@ -1,10 +1,10 @@
 # UI slices 4-8 plan (approved 2026-10-09)
 
-**Status (2026-10-09): approved; slices 5, 4 and 8 done** (slice 5's review stops A, B and C, and slice 4's and
+**Status (2026-10-10): approved; slices 5, 4, 8 and 7 done** (slice 5's review stops A, B and C, and slice 4's and
 slice 8's stop A, merged; how each differs from the design is in `docs/ui-design.md` §12, "UI slice 5 versus
-this design", "UI slice 4 versus this design" and "UI slice 8 versus this design"). Slice 7 is under way: its stops A
-(the scan, the smoke tests and their fixes) and B (phone tabs, the sticky verdict bars) are done, versus the design in §12
-"UI slice 7 versus this design"; stop C is next.
+this design", "UI slice 4 versus this design" and "UI slice 8 versus this design"). Slice 7 is done: stops A (the scan,
+the smoke tests and their fixes), B (phone tabs, the sticky verdict bars) and C (the NVDA walkthrough, written; its run is
+deferred to before the public launch), versus the design in §12 "UI slice 7 versus this design". Slice 6 is next, the last.
 
 The plan for the UI slices after slice 3, with the decisions made in review on 2026-10-09. A fresh
 session should be able to execute it from this file, `CLAUDE.md` and `docs/ui-design.md` (rev 3,
