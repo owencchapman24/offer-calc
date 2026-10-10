@@ -176,6 +176,8 @@ const onPage = (id: MetricId) => {
 function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }) {
   const { ctx, edit } = useApi();
   const highlightedSentence = derivations.get()!.highlightedSentence;
+  // Only figures on the page are named: with none there, no line (and no stray tie mark).
+  const sentence = highlightedSentence(d, ctx, onPage);
   return (
     <>
       {d.scope && <p className="work-scope">{d.scope}</p>}
@@ -207,10 +209,10 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
         </div>
       )}
       {d.notes.map((n) => <p key={n} className="work-note">{n}</p>)}
-      {(d.uses.length > 0 || d.ties.length > 0) && (
+      {sentence && (
         <p className="work-ties">
-          {d.ties.length > 0 && <><span className="tick" aria-hidden="true">&lt;</span>{" "}</>}
-          {highlightedSentence(d, ctx, onPage)}
+          {d.ties.some(onPage) && <><span className="tick" aria-hidden="true">&lt;</span>{" "}</>}
+          {sentence}
         </p>
       )}
       <p className="work-foot">

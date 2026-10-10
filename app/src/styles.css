@@ -799,7 +799,17 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .l6-table { margin-top: 6px; }
 .l6-table th[scope="row"] { text-align: left; font-weight: 400; color: var(--ink); min-width: 12em; }
 .l6-years { min-width: 640px; }
-.l6-payments, .l6-tax, .l6-stay { min-width: 520px; }
+.l6-table td { white-space: nowrap; }
+/* On a phone, the labels take a narrow column, so the first figures show beside them; the rest scroll sideways. */
+@media (max-width: 759px) {
+  /* A cell's width is its column's minimum here (CSS 2.1 auto layout), so the labels keep 9.5em and the figures, which don't
+     wrap, take the rest; a table they don't fit in grows past the screen and scrolls. */
+  .l6-table, .l6-years { width: 100%; min-width: 0; font-size: 13px; }
+  .l6-table th[scope="row"] { min-width: 0; width: 9.5em; }
+  .l6-table th, .l6-table td { padding: 4px 6px; }
+  .l6-table .l6-led { padding-left: calc(6px + 3em); }
+  .l6-table .bridge-gloss { font-size: 11.5px; }
+}
 .l6-table .l6-section th { padding-top: 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--graphite);
   background: none; border-left: none; }
 .l6-table .l6-subtotal th, .l6-table .l6-total th { font-weight: 700; }
@@ -808,7 +818,6 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .l6-table .l6-led { padding-left: calc(10px + 3em); }
 .l6-table thead .l6-label { text-align: left; }
 .l6-no { width: 2.4em; color: var(--muted); font-size: 12px; border-left: none !important; }
-.l6-date { white-space: nowrap; color: var(--graphite); }
 .l6-gap > * { padding-top: 10px !important; }
 /* The years table has the line numbers first: band the year columns, not the labels. */
 .l6-years td:nth-child(even), .l6-years th:nth-child(even) { background: none; }

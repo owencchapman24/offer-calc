@@ -217,18 +217,17 @@ function Payments({ letter, years }: { letter: Letter; years: PaymentYear[] }) {
     <table className="year-table l6-table l6-payments">
       <caption className="sr-only">L-6.{letter}: every payment, by employment year and kind, with its tax, to the cent</caption>
       <thead>
-        <tr><th scope="col">Payment</th><th scope="col">Paid on</th><th scope="col">Pay</th><th scope="col">Tax</th></tr>
+        <tr><th scope="col">Payment</th><th scope="col">Pay</th><th scope="col">Tax</th></tr>
       </thead>
       {years.map((y) => (
         <tbody key={y.ey}>
           <tr className="l6-section">
-            <th scope="rowgroup" colSpan={4}>{y.ey === "after" ? `${yearName(y)}: taxed with its last calendar year, not counted` : yearName(y)}</th>
+            <th scope="rowgroup" colSpan={3}>{y.ey === "after" ? `${yearName(y)}: taxed with its last calendar year, not counted` : yearName(y)}</th>
           </tr>
           {y.groups.map((g) => [
             ...g.rows.map(({ i, p }) => (
               <tr key={i}>
-                <th scope="row">{paymentLabel(p)}<span className="bridge-gloss">{paymentFormula(p)}</span></th>
-                <td className="l6-date">{longDate(p.date)}</td>
+                <th scope="row">{paymentLabel(p)}<span className="bridge-gloss">paid {longDate(p.date)} · {paymentFormula(p)}</span></th>
                 <td><Fig id={`l6p.${letter}.${i}.gross`} label={`${paymentLabel(p)}, ${toCent(p.gross)}`}>{toCent(p.gross)}</Fig></td>
                 <td><Fig id={`l6p.${letter}.${i}.tax`} label={`Tax on ${paymentLabel(p)}, ${toCent(p.tax)}`}>{toCent(p.tax)}</Fig></td>
               </tr>
@@ -236,7 +235,6 @@ function Payments({ letter, years }: { letter: Letter; years: PaymentYear[] }) {
             ...(g.rows.length > 1 ? [(
               <tr key={`${g.component}-sum`} className="rule-single l6-subtotal">
                 <th scope="row">{KIND_NAME[g.component]}, {y.ey === "after" ? "after your stay" : `year ${y.ey}`}</th>
-                <td />
                 <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.gross` as MetricId} label={`${KIND_NAME[g.component]} payments added, ${toCent(g.gross)}`}>{toCent(g.gross)}</Fig></td>
                 <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.tax` as MetricId} label={`Their tax added, ${toCent(g.tax)}`}>{toCent(g.tax)}</Fig></td>
               </tr>
@@ -244,7 +242,6 @@ function Payments({ letter, years }: { letter: Letter; years: PaymentYear[] }) {
           ])}
           <tr className="rule-double l6-total">
             <th scope="row">Tax on {y.ey === "after" ? "these payments" : `year ${y.ey}'s payments`}</th>
-            <td />
             <td />
             <td><Fig id={`l6g.${letter}.${y.ey}.all.tax` as MetricId} label={`Tax on ${y.ey === "after" ? "the payments after your stay" : `year ${y.ey}'s payments`}, ${toCent(y.tax)}`}>{toCent(y.tax)}</Fig></td>
           </tr>
