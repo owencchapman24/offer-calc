@@ -65,8 +65,14 @@ export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   const editRef = useRef(onEdit);
   useEffect(() => { editRef.current = onEdit; });
   const edit = useCallback((target: EditTarget) => editRef.current?.(target), []);
-  const api = useMemo<WorkApi>(() => ({ ctx, kind: (id) => metricKind(id, ctx), openId, traced, toggle, push, edit }),
-    [ctx, openId, traced, toggle, push, edit]);
+  // The context is new with every edit, but the figures' API isn't: it reads the latest context through a ref, so a schedule
+  // that skips rendering until its own data changes (L-6's tables, memoized) doesn't re-render all its figures on each key.
+  // Every other figure re-renders with its schedule, which takes the context as a prop.
+  const latest = useRef(ctx);
+  latest.current = ctx;
+  const kind = useCallback((id: MetricId) => metricKind(id, latest.current), []);
+  const api = useMemo<WorkApi>(() => ({ get ctx() { return latest.current; }, kind, openId, traced, toggle, push, edit }),
+    [kind, openId, traced, toggle, push, edit]);
 
   return (
     <Api.Provider value={api}>
@@ -170,6 +176,8 @@ const onPage = (id: MetricId) => {
 function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }) {
   const { ctx, edit } = useApi();
   const highlightedSentence = derivations.get()!.highlightedSentence;
+  // Only figures on the page are named: with none there, no line (and no stray tie mark).
+  const sentence = highlightedSentence(d, ctx, onPage);
   return (
     <>
       {d.scope && <p className="work-scope">{d.scope}</p>}
@@ -201,10 +209,10 @@ function Body({ d, close }: { d: Derivation; close: (refocus: boolean) => void }
         </div>
       )}
       {d.notes.map((n) => <p key={n} className="work-note">{n}</p>)}
-      {(d.uses.length > 0 || d.ties.length > 0) && (
+      {sentence && (
         <p className="work-ties">
-          {d.ties.length > 0 && <><span className="tick" aria-hidden="true">&lt;</span>{" "}</>}
-          {highlightedSentence(d, ctx, onPage)}
+          {d.ties.some(onPage) && <><span className="tick" aria-hidden="true">&lt;</span>{" "}</>}
+          {sentence}
         </p>
       )}
       <p className="work-foot">

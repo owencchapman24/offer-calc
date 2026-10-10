@@ -1,11 +1,12 @@
 import type { RentEstimate } from "../../src/col/rent";
-import type { Basis, EmploymentYearResult, HorizonRow, HorizonSweep, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
+import type { Basis, Component, EmploymentYearResult, HorizonRow, HorizonSweep, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
+import { type ShownYear, shownStay, shownYears } from "./footing";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, inNyc, type Letter } from "./model";
 import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
-import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties } from "./protocol";
+import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
 import type { SectionId } from "./sections";
 import { dollars, monthName, percent, shortDate } from "./text";
 import type { TickKind } from "./ui";
@@ -25,6 +26,22 @@ export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | 
 export type BridgeLine =
   | "letter" | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
   | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "prices" | "total" | "spend" | "saved";
+/** L-6's employment-year lines (docs/ui-design.md §4.8): cash; total rewards and hours; after rent. workpaper.ts numbers them. */
+export type L6Line =
+  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "takeHome"
+  | "employer" | "oop" | "hsa" | "perks" | "totalRewards" | "hours" | "afterTaxHour" | "totalRewardsHour"
+  | "savings" | "rent" | "local" | "atRef" | "oopRef" | "face" | "total" | "totalHour";
+/** L-6's calendar-year tax lines: what goes in, then each tax. `rate` is the offer's share ÷ its pay (the offer's column only). */
+export type TaxLine =
+  | "wages" | "spouse" | "pretax401k" | "section125" | "taxable" | "federal" | "ss" | "medicare" | "state" | "statePayroll" | "local" | "total" | "rate";
+/** Each L-6 year line's tickmark: inputs traced, sums footed, the rest worked out. */
+const L6_KIND: Record<L6Line, TickKind> = {
+  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", gross: "footed", tax: "recomputed",
+  premiums: "traced", afterTax: "footed", yours: "recomputed", takeHome: "footed", employer: "recomputed", oop: "traced", hsa: "traced",
+  perks: "traced", totalRewards: "footed", hours: "recomputed", afterTaxHour: "recomputed", totalRewardsHour: "recomputed",
+  savings: "recomputed", rent: "traced", local: "footed", atRef: "recomputed", oopRef: "recomputed", face: "recomputed", total: "footed",
+  totalHour: "recomputed",
+};
 
 export type MetricId =
   | "hero" // the verdict: the lead a month (or an hour) on the selected basis, for your stay
@@ -57,6 +74,11 @@ export type MetricId =
   | "tie.target" // L-3: the winner's total, which each offer behind it ties to
   | `tie.${L}.${"salary" | "cash" | "rent"}` // L-3: the starting salary, cash award or rent that ties (the winner's: where the runner-up ties)
   | `rentnote.${L}` // the lead's rent note: an offer's rent estimate, on the other side of the rent that flips the verdict
+  | `l6y.${L}.${L6Line}.${number | "sum"}` // L-6: a line of an employment year, or of the years added
+  | `l6s.${L}.${ValueBasis}.${"after" | "stay" | "pv"}` // L-6: your stay on a basis: what the years run past it, as paid, present value
+  | `l6p.${L}.${number}.${"gross" | "tax"}` // L-6: a payment, by its place in the list, and its tax
+  | `l6g.${L}.${number | "after"}.${Component | "all"}.${"gross" | "tax"}` // L-6: a year's payments of a kind, added (all: the year's tax)
+  | `l6t.${L}.${number}.${TaxLine}.${"with" | "without" | "offer"}` // L-6: a calendar year's tax, with and without the offer
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}`; // an input in About you
 
@@ -120,6 +142,8 @@ export interface WorkContext {
     leave?: LeaveContext;
     /** Breakevens, once the worker has sent them: the close-call line's and L-3's, as displayed. */
     ties?: { flip?: Ties; l3?: Ties };
+    /** L-6's payments and tax years, once the worker has sent them (only while L-6 is open): the offers compared, in order. */
+    work?: WorkOffer[];
   };
 }
 
@@ -157,6 +181,19 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "risk": return b === "base" ? "crossFooted" : "recomputed";
     case "tie": return a === "target" ? "crossFooted" : "recomputed";
     case "rentnote": return "estimate";
+    case "l6y":
+      if (c === "sum") return "footed";
+      if (b === "rent") return offerByLetter(ctx, a as L)?.draft.costOfLiving.monthlyRent === null ? "estimate" : "traced";
+      return L6_KIND[b as L6Line];
+    case "l6s": return c === "after" ? "recomputed" : "crossFooted";
+    case "l6p": return "recomputed";
+    case "l6g": return "footed";
+    case "l6t": {
+      const [, , , line, col] = id.split(".");
+      if (line === "total") return "footed";
+      if (line === "spouse" || (line === "wages" && col === "without")) return "traced";
+      return line === "wages" && col === "offer" ? "footed" : "recomputed";
+    }
     case "br":
       switch (c as BridgeLine) {
         case "letter": case "premiums": case "perks": case "hsa": case "oop": return "traced";
@@ -212,26 +249,32 @@ export function aboutIsDefault(h: AppHousehold, f: AboutField): boolean {
 }
 // ---- L-1: by year ------------------------------------------------------------------------------
 
-/** An employment year's value on a basis: dollars as paid that year, or per hour worked. */
-export function yearValue(y: EmploymentYearResult, basis: Basis, perHourOf: ValueBasis): number | null {
+/** An employment year's value on a basis, as shown (footing.ts): dollars as paid that year, or per hour worked. */
+export function yearValue(y: ShownYear, basis: Basis, perHourOf: ValueBasis): number | null {
   switch (basis) {
-    case "cash": return y.afterTaxComp;
+    case "cash": return y.afterTax;
     case "totalRewards": return y.totalRewards;
-    case "colAdjustedTotal": return y.costOfLiving?.total ?? null;
+    case "colAdjustedTotal": return y.col?.total ?? null;
     case "perHour": {
-      const v = perHourOf === "colAdjustedTotal" ? y.costOfLiving?.total : y.totalRewards;
+      const v = perHourOf === "colAdjustedTotal" ? y.col?.total : y.totalRewards;
       return v !== undefined && y.hours ? v / y.hours : null;
     }
   }
+}
+
+/** One employment year of an offer's stay, as shown. */
+export function shownYearOf(ctx: WorkContext, letter: L, n: number): ShownYear {
+  yearOf(ctx, letter, n);
+  return shownYears(detailOf(ctx, letter))[n - 1];
 }
 
 export interface ByYear {
   letter: L;
   /** Employment years 1 through your stay. */
   years: Array<{ n: number; start: string; end: string; value: number }>;
-  /** The years summed (dollar bases only). */
+  /** The years added (dollar bases only). */
   sum: number | null;
-  /** Your stay's window, as paid; differs from `sum` when a later start runs a year past the window's end. */
+  /** Your stay, as paid: less what the years run past its last day (a later start), as shown (footing.ts). */
   window: number | null;
 }
 
@@ -241,14 +284,13 @@ export function byYear(ctx: WorkContext, letter: L): ByYear {
   const d = detailOf(ctx, letter);
   const basis = r.view.basis;
   const n = r.view.row.years;
-  const out = d.employmentYears.slice(0, n).flatMap((y) => {
+  const out = shownYears(d).slice(0, n).flatMap((y) => {
     const value = yearValue(y, basis, r.sweep.perHourOf);
-    return value === null ? [] : [{ n: y.year, start: y.start, end: y.end, value }];
+    return value === null ? [] : [{ n: y.n, start: y.start, end: y.end, value }];
   });
   if (basis === "perHour") return { letter, years: out, sum: null, window: null };
-  const w = d.window;
-  const window = basis === "cash" ? w.nominal.afterTaxComp : basis === "totalRewards" ? w.totalRewards.nominal : w.costOfLiving?.nominal.total ?? null;
-  return { letter, years: out, sum: out.reduce((s, y) => s + y.value, 0), window };
+  const s = shownStay(d, n);
+  return { letter, years: out, sum: s.years[basis], window: s.stay[basis] };
 }
 
 // ---- the bridge: offer letter to after rent ------------------------------------------------------
@@ -285,32 +327,36 @@ export function eyOfDate(ys: EmploymentYearResult[], date: string): number {
 /** A bonus period counts from your start date: a period that began before it is prorated to the days you worked. */
 export const workedFrom = (d: OfferDetail, periodFrom: string) => (d.employmentYears[0] && periodFrom < d.employmentYears[0].start ? d.employmentYears[0].start : periodFrom);
 
-/** The bridge for one offer and employment year (docs/ui-design.md §5, W4): every line foots. */
+/** "sign-on" when every cash award is one, else "cash awards". */
+export function cashName(o: AppOffer | undefined): string {
+  return o?.draft.cashAwards.length && o.draft.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards";
+}
+
+/** The bridge for one offer and employment year (docs/ui-design.md §5, W4): every line foots, as shown (footing.ts). */
 export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
   const d = detailOf(ctx, letter);
-  const y = yearOf(ctx, letter, n);
+  const y = shownYearOf(ctx, letter, n);
   const o = offerByLetter(ctx, letter);
   const id = (line: BridgeLine) => `br.${letter}.${n}.${line}` as MetricId;
   const rows: BridgeRow[] = [];
   const q = y.quoted;
-  const cashName = o?.draft.cashAwards.length && o.draft.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards";
-  const parts = [q.salary && "salary", q.bonus && "target bonus", q.cash && cashName, q.rsu && "RSUs due"].filter(Boolean) as string[];
-  rows.push({ id: id("letter"), line: "letter", kind: "letter", label: `Offer letter: ${parts.join(" + ")}`, value: y.quotedTC });
+  const parts = [q.salary && "salary", q.bonus && "target bonus", q.cash && cashName(o), q.rsu && "RSUs due"].filter(Boolean) as string[];
+  rows.push({ id: id("letter"), line: "letter", kind: "letter", label: `Offer letter: ${parts.join(" + ")}`, value: q.letter });
 
   // Where what's paid in the year differs from the letter, line by line.
   const change = (line: "salary" | "bonus" | "cash" | "rsu", label: string, gloss?: string) => {
-    const diff = y.gross[line] - q[line];
-    if (Math.abs(diff) >= 0.5) rows.push({ id: id(line), line, kind: "change", label, value: diff, ...(gloss ? { gloss } : {}) });
+    const diff = y[line] - q[line];
+    if (diff) rows.push({ id: id(line), line, kind: "change", label, value: diff, ...(gloss ? { gloss } : {}) });
   };
-  change("salary", y.gross.salary > q.salary ? "raises during the year" : "salary not earned this year");
+  change("salary", y.salary > q.salary ? "raises during the year" : "salary not earned this year");
   const bonuses = d.bonuses.filter((b) => b.ey === n);
   const from = (b: (typeof bonuses)[number]) => workedFrom(d, b.periodFrom);
   const stub = (b: (typeof bonuses)[number]) => (Date.parse(b.periodTo) - Date.parse(from(b))) / 86_400_000 < 360;
   const bonusGloss = bonuses.map((b) => `paid ${shortDate(b.date)} for ${monthName(from(b))}–${monthName(b.periodTo)}${stub(b) ? " only" : ""}`).join("; ");
   const nextBonus = d.bonuses.find((b) => b.ey > n);
   change("bonus",
-    !bonuses.length ? `no bonus paid in year ${n}` : n === 1 && bonuses.every(stub) && y.gross.bonus < q.bonus ? "first bonus is a stub"
-      : y.gross.bonus < q.bonus ? "bonus paid is below the target" : "bonus paid is above the target",
+    !bonuses.length ? `no bonus paid in year ${n}` : n === 1 && bonuses.every(stub) && y.bonus < q.bonus ? "first bonus is a stub"
+      : y.bonus < q.bonus ? "bonus paid is below the target" : "bonus paid is above the target",
     bonuses.length ? bonusGloss : nextBonus ? `the first is paid ${shortDate(nextBonus.date)}, ${nextBonus.date.slice(0, 4)}` : undefined);
   change("cash", "cash awards paid in another year");
   const vests = d.rsus.filter((v) => v.ey === n);
@@ -323,8 +369,8 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
   ];
   change("rsu", reasons.length ? join(reasons) : "RSUs vest on a different schedule",
     vests.length ? `vests ${join([...new Set(vests.map((v) => shortDate(v.date)))])}` : undefined);
-  if (y.gross.clawback) rows.push({ id: id("clawback"), line: "clawback", kind: "less", label: "clawback repaid", value: y.gross.clawback });
-  rows.push({ id: id("paid"), line: "paid", kind: "subtotal", label: `Paid in year ${n}`, value: y.gross.total });
+  if (y.clawback) rows.push({ id: id("clawback"), line: "clawback", kind: "less", label: "clawback repaid", value: y.clawback });
+  rows.push({ id: id("paid"), line: "paid", kind: "subtotal", label: `Paid in year ${n}`, value: y.gross });
 
   const taxYears = d.split.filter((s) => s.ey === n).map((s) => s.year);
   const kinds = d.taxYears.filter((t) => taxYears.includes(t.year));
@@ -334,21 +380,21 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
     kinds.some((t) => t.parts.state) && (o?.draft.residence.state ?? "state"), kinds.some((t) => t.parts.local) && locality,
   ].filter(Boolean) as string[];
   rows.push({ id: id("tax"), line: "tax", kind: "less", label: "tax", value: -y.tax, gloss: who.join(", ") });
-  if (y.health.premiums) rows.push({ id: id("premiums"), line: "premiums", kind: "less", label: "health premiums", value: -y.health.premiums });
-  rows.push({ id: id("afterTax"), line: "afterTax", kind: "subtotal", label: "After-tax pay", value: y.afterTaxComp });
+  if (y.premiums) rows.push({ id: id("premiums"), line: "premiums", kind: "less", label: "health premiums", value: -y.premiums });
+  rows.push({ id: id("afterTax"), line: "afterTax", kind: "subtotal", label: "After-tax pay", value: y.afterTax });
 
   const ret = d.assumptions.find((a) => a.code === "retirement");
-  if (y.retirement.employerCredited) {
-    const share = ret?.code === "retirement" ? ret.params.vestedShare : y.retirement.employerVested / y.retirement.employerCredited;
-    rows.push({ id: id("retirement"), line: "retirement", kind: "plus", label: "employer 401(k)", value: y.retirement.employerVested,
+  if (y.credited) {
+    const share = ret?.code === "retirement" ? ret.params.vestedShare : y.employer / y.credited;
+    rows.push({ id: id("retirement"), line: "retirement", kind: "plus", label: "employer 401(k)", value: y.employer,
       gloss: share >= 1 ? "vested by the end of your stay" : share > 0 ? `${percent(share)} vested by the end of your stay` : "not vested by the end of your stay" });
   }
-  if (y.perks.face) rows.push({ id: id("perks"), line: "perks", kind: "plus", label: "perks", value: y.perks.face, gloss: "tax-free, at face value" });
-  if (y.health.employerHsa) rows.push({ id: id("hsa"), line: "hsa", kind: "plus", label: "employer HSA money", value: y.health.employerHsa });
-  if (y.health.outOfPocket) rows.push({ id: id("oop"), line: "oop", kind: "less", label: "expected out-of-pocket health costs", value: -y.health.outOfPocket });
+  if (y.perks) rows.push({ id: id("perks"), line: "perks", kind: "plus", label: "perks", value: y.perks, gloss: "tax-free, at face value" });
+  if (y.hsa) rows.push({ id: id("hsa"), line: "hsa", kind: "plus", label: "employer HSA money", value: y.hsa });
+  if (y.oop) rows.push({ id: id("oop"), line: "oop", kind: "less", label: "expected out-of-pocket health costs", value: -y.oop });
   rows.push({ id: id("totalRewards"), line: "totalRewards", kind: "subtotal", label: "Total rewards", value: y.totalRewards });
 
-  const col = y.costOfLiving;
+  const col = y.col;
   const info = d.costOfLiving;
   if (!col || !info) return { letter, year: n, start: y.start, end: y.end, rows };
   const monthly = info.monthlyRent * (1 + info.rentGrowth) ** (n - 1);
@@ -362,8 +408,7 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
     gloss: info.area.code === info.reference.code ? `the prices you picked under Prices in: a factor of 1`
       : `non-housing prices ${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} ${p.average}` });
   rows.push({ id: id("total"), line: "total", kind: "total", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: col.total });
-  return { letter, year: n, start: y.start, end: y.end, rows,
-    spend: (col.discretionaryReference - col.outOfPocketReference) / 12, saved: col.faceValue / 12 };
+  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: col.face / 12 };
 }
 
 // ---- the rent note under the verdict ---------------------------------------------------------------

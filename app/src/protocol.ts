@@ -1,7 +1,7 @@
 import type { RentEstimate } from "../../src/col/rent";
 import type {
-  Assumption, BreakevenResult, ClawbackResult, Cliff, CostOfLivingInfo, EmploymentYearResult, HorizonSweep, Household, ISODate, LeaveDayRow,
-  NextCliffResult, OfferInput, OfferWarning, RentFlipResult, ValueBasis, WindowTotals, WithholdingYear,
+  Assumption, BreakevenResult, ClawbackResult, Cliff, Component, CostOfLivingInfo, EmploymentYearResult, EventDetail, HorizonSweep, Household,
+  ISODate, LeaveDayRow, NextCliffResult, OfferInput, OfferWarning, RentFlipResult, ValueBasis, WindowTotals, WithholdingYear,
 } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 
@@ -46,8 +46,13 @@ export interface OfferDetail {
   /** Each calendar year with pay: the offer's gross and tax, its rate, and the tax by kind (with the offer minus without). */
   taxYears: Array<{ year: number; gross: number; tax: number; rate: number; projectedLaw: boolean;
     parts: { federal: number; fica: number; state: number; local: number } }>;
-  /** Gross and tax by employment year and calendar year: how a year's tax splits across tax years. */
+  /** Gross and tax by employment year and calendar year: how a year's tax splits across tax years. Payments as posted, to the cent, added. */
   split: Array<{ ey: number; year: number; gross: number; tax: number }>;
+  /**
+   * Each employment year's payments as posted: each to the cent, as the engine rounds it, added exactly, by component, and their tax.
+   * L-6 lists the payments; the year figures (footing.ts) round these sums, so a year's lines tie to its payments.
+   */
+  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; tax: number }>;
   /** Bonus payments: when, how much, for which stretch of work. */
   bonuses: Array<{ ey: number; date: ISODate; gross: number; periodFrom: ISODate; periodTo: ISODate }>;
   /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
@@ -84,8 +89,8 @@ export type EngineResponse = {
 
 export const rentKey = (area: string, state: string) => `${area}|${state}`;
 
-// ---- the slow lane (jobs.ts): L-4's leave sweep and its panel at the cursor, and breakeven (L-3 and the
-// close-call line) ------------------------------------------------------------------------------------
+// ---- the slow lane (jobs.ts): L-4's leave sweep and its panel at the cursor, breakeven (L-3 and the
+// close-call line), and L-6's payments and tax years ----------------------------------------------------
 
 /** What every slow job projects: the compared offers, in the comparison's order. */
 interface SlowBase { gen: number; offers: OfferInput[]; household: Household; inflation: number }
@@ -167,11 +172,42 @@ export const tieJob = (lane: BreakevenRequest["lane"], c: CompareRequest, basis:
   stayYears: c.stayYears, basis, winner: lead.winner, runnerUp: lead.runnerUp,
 });
 
-export type SlowRequest = LeaveRequest | CursorRequest | BreakevenRequest;
+// ---- L-6, the work: every payment and each calendar year's tax (docs/ui-design.md §4.8), sent only once L-6 is open ------
+
+/** Your stay's projection, base case, over the comparison window: as the fast lane projects it, so the figures tie. */
+export interface WorkRequest extends SlowBase { lane: "work"; valuationDate: ISODate; discountRate: number; stayYears: number }
+/** A payment: dated and rounded to the cent as the engine has it, with its share of its calendar year's tax. */
+export interface WorkPayment { date: ISODate; component: Component; detail: EventDetail; gross: number; tax: number; calendarYear: number; ey: number }
+/** One run of the tax engine for a calendar year (with the offer, or without it): what went in and what came out, unrounded. */
+export interface TaxRun {
+  wages: number; spouseWages: number; pretax401k: number; section125: number;
+  taxableIncome: number; federal: number; ss: number;
+  /** Medicare, the additional 0.9% included. */
+  medicare: number;
+  stateIncome: number; statePayroll: number; local: number; total: number;
+}
+/** A calendar year's tax: with the offer and without it; the offer's share is the difference, spread over its payments at `offerTaxRate`. */
+export interface WorkTaxYear {
+  year: number; projectedLaw: boolean; offerGross: number; offerTax: number; offerTaxRate: number; with: TaxRun; without: TaxRun;
+}
+/**
+ * One offer's payments in the calendar years its stay touches, those past its stay's employment years included (they're
+ * taxed with its last year), and those years' tax.
+ */
+export interface WorkOffer { payments: WorkPayment[]; taxYears: WorkTaxYear[] }
+
+/** L-6's request for a comparison: the lead schedule's and L-6's are built alike, so a result can be matched to its inputs. */
+export const workJob = (c: CompareRequest): Omit<WorkRequest, "gen"> => ({
+  lane: "work", offers: c.offers, household: c.household, inflation: c.inflation, valuationDate: c.valuationDate, discountRate: c.discountRate,
+  stayYears: c.stayYears,
+});
+
+export type SlowRequest = LeaveRequest | CursorRequest | BreakevenRequest | WorkRequest;
 export type SlowLane = SlowRequest["lane"];
 export type SlowResponse = { gen: number; /** From the request's arrival to the result: the wait included. */ ms: number } & (
   | { lane: "leave"; ok: true; curves: LeaveCurve[] }
   | { lane: "cursor"; ok: true; panels: Array<LeavePanel | null> }
   | { lane: "flip" | "breakeven"; ok: true; ties: Ties }
+  | { lane: "work"; ok: true; work: WorkOffer[] }
   | { lane: SlowLane; ok: false; error: string }
 );

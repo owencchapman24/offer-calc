@@ -1,5 +1,5 @@
 import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useLayoutEffect, useRef, useState } from "react";
-import type { Basis, ValueBasis } from "../../src/offer/types";
+import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext } from "./metrics";
 import type { Action, UiState } from "./session";
@@ -57,8 +57,11 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
               {table ? "Hide the table view" : "Table view"}
             </button>
           </p>
-          {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years}
-            pv={(l) => r.view.row.values[basis]?.[r.letters.indexOf(l)]} />}
+          {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years} />}
+          {table && (
+            <p className="caption">Each year ties to L-6, The work, below: every line of it, every payment behind it, and your stay's present value as
+              in the rank list.</p>
+          )}
         </div>
         <Bridge ctx={ctx} ui={ui} dispatch={dispatch} />
       </div>
@@ -216,9 +219,7 @@ function Notes({ ctx }: { ctx: WorkContext }) {
 
 // ---- the table view -----------------------------------------------------------------------------
 
-function YearTable({ offers, basis, units, running, years, pv }: {
-  offers: ByYearData[]; basis: Basis; units: string; running: boolean; years: number; /** The rank list's present value for an offer. */ pv: (l: Letter) => number | undefined;
-}) {
+function YearTable({ offers, basis, units, running, years }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean; years: number }) {
   const perHour = basis === "perHour";
   const fmt = (v: number) => (perHour ? cents(v) : figure(v));
   return (
@@ -247,20 +248,10 @@ function YearTable({ offers, basis, units, running, years, pv }: {
             {offers.map((o) => <td key={o.letter}><Fig id={`ph.${o.letter}`} label={`${o.letter}'s per hour over your stay`}>per hour</Fig></td>)}
           </tr>
         ) : (
-          <>
-            <tr className="rule-single">
-              <th scope="row">Your stay, as paid</th>
-              {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${figure(o.window ?? 0)}`}>{figure(o.window ?? 0)}</Fig></td>)}
-            </tr>
-            <tr className="rule-double">
-              <th scope="row">Present value today <span className="tie" aria-hidden="true">&lt;</span></th>
-              {offers.map((o) => (
-                <td key={o.letter}>
-                  <Fig id={`pv.${o.letter}.${basis as ValueBasis}`} label={`${o.letter}'s present value today, as in the rank list`}>{figure(pv(o.letter) ?? 0)}</Fig>
-                </td>
-              ))}
-            </tr>
-          </>
+          <tr className="rule-double">
+            <th scope="row">Your stay, as paid</th>
+            {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${figure(o.window ?? 0)}`}>{figure(o.window ?? 0)}</Fig></td>)}
+          </tr>
         )}
       </tfoot>
     </table>

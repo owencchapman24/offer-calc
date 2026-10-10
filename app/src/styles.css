@@ -784,3 +784,43 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* WCAG 2.4.11: what the browser scrolls into view (focus, "Edit it", the bar's own jump) stops clear of the bar. */
 :root:has(.verdict-bar.is-top) { scroll-padding-top: 72px; }
 :root:has(.verdict-bar.is-bottom:not(.is-hidden)) { scroll-padding-bottom: 72px; }
+
+/* ---- L-6 the work (slice 6): the full tables, one offer at a time ------------------------------------------- */
+
+.the-work { margin-top: 24px; }
+.l6-lede { margin: 2px 0 10px; font-size: 14.5px; line-height: 1.55; max-width: 84ch; }
+.l6-body { margin-top: 16px; }
+.l6-ref { font-weight: 700; }
+.l6-part { margin: 20px 0 0; }
+.l6-wait { min-height: 40px; }
+/* A table wider than the screen scrolls inside its box; the box takes focus so a keyboard can scroll it. */
+.l6-scroll { overflow-x: auto; max-width: 100%; }
+.l6-scroll:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.l6-table { margin-top: 6px; }
+.l6-table th[scope="row"] { text-align: left; font-weight: 400; color: var(--ink); min-width: 12em; }
+.l6-years { min-width: 640px; }
+.l6-table td { white-space: nowrap; }
+/* On a phone, the labels take a narrow column, so the first figures show beside them; the rest scroll sideways. */
+@media (max-width: 759px) {
+  /* A cell's width is its column's minimum here (CSS 2.1 auto layout), so the labels keep 9.5em and the figures, which don't
+     wrap, take the rest; a table they don't fit in grows past the screen and scrolls. */
+  .l6-table, .l6-years { width: 100%; min-width: 0; font-size: 13px; }
+  .l6-table th[scope="row"] { min-width: 0; width: 9.5em; }
+  .l6-table th, .l6-table td { padding: 4px 6px; }
+  .l6-table .l6-led { padding-left: calc(6px + 3em); }
+  .l6-table .bridge-gloss { font-size: 11.5px; }
+}
+.l6-table .l6-section th { padding-top: 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--graphite);
+  background: none; border-left: none; }
+.l6-table .l6-subtotal th, .l6-table .l6-total th { font-weight: 700; }
+.l6-table .l6-carried th, .l6-table .l6-memo th { color: var(--graphite); }
+/* "less" and "plus" hang in the margin, as in the bridge. */
+.l6-table .l6-led { padding-left: calc(10px + 3em); }
+.l6-table thead .l6-label { text-align: left; }
+.l6-no { width: 2.4em; color: var(--muted); font-size: 12px; border-left: none !important; }
+.l6-gap > * { padding-top: 10px !important; }
+/* The years table has the line numbers first: band the year columns, not the labels. */
+.l6-years td:nth-child(even), .l6-years th:nth-child(even) { background: none; }
+.l6-years td:nth-child(odd):not(:first-child), .l6-years thead th:nth-child(odd):not(:first-child) { background: var(--band); }
+.the-work .l6-scroll { transition: opacity 120ms; }
+.the-work.is-updating .l6-scroll { opacity: 0.6; }

@@ -7,6 +7,7 @@ import { derive } from "./derive";
 import { Leaving } from "./Leaving";
 import { Risk } from "./Risk";
 import { addMonthsIso, leaveAxis, leaveLines, reconcile, valueAt, worked } from "./leaveModel";
+import { shownStay } from "./footing";
 import type { WorkContext } from "./metrics";
 import type { LeaveCurve, LeavePanel } from "./protocol";
 import { cursorJob, leaveJob, sweepDays } from "./slowJobs";
@@ -133,18 +134,20 @@ describe("L-4 at your stay's last day: the reconciliation with the stay", () => 
   const ctx = context();
   const end = dayBefore(ctx.results!.view.row.window.end);
 
-  it("leaving on Jul 12, 2030 keeps $2,510 more than the 4-year stay counts for A, as displayed: the last year's tax", () => {
-    // 550,908.41 - 548,397.54 = 2,510.87; the figures are shown rounded, and the difference is theirs: 550,908 - 548,398 = 2,510.
-    expect(page(ctx, end)).toContain("Leaving that day, A keeps $550,908 after tax, $2,510 more than the $548,398 that L-1 counts for your stay "
+  it("leaving on Jul 12, 2030 keeps $2,511 more than the 4-year stay counts for A, as displayed: the last year's tax", () => {
+    // L-1's stay is A's four years after tax as shown, added: 109,462 + 129,617 + 138,266 + 171,052 = 548,397 (the engine's unrounded
+    // total is 548,397.54). Leaving keeps 550,908.41, shown 550,908, and the difference is between the two as shown: 550,908 - 548,397 = 2,511.
+    expect(page(ctx, end)).toContain("Leaving that day, A keeps $550,908 after tax, $2,511 more than the $548,397 that L-1 counts for your stay "
       + "(after tax, as paid). It's tax: the stay taxes 2030 as though pay continued through December, at a similar next job, while leaving taxes "
       + "only what was paid in 2030, at a part year's lower rate.");
   });
   it("kept = stay + pay + tax + premiums - clawbacks, and the derivation foots", () => {
     const L = withLeave(ctx, end);
     L.ctx.results!.leave!.panels.forEach((p, i) => {
-      const r = reconcile(p!, L.ctx.results!.detail!.offers[i].window);
-      // The stay's totals are rounded to cents: within a few cents.
-      expect(Math.abs(r.stay + r.pay + r.tax + r.premiums - r.clawback - r.kept)).toBeLessThan(0.5);
+      const d = L.ctx.results!.detail!.offers[i];
+      const r = reconcile(p!, d.window, shownStay(d, 4).stay);
+      // The stay is as shown (its years' figures, each rounded, added); the parts are unrounded: within the rounding of four years.
+      expect(Math.abs(r.stay + r.pay + r.tax + r.premiums - r.clawback - r.kept)).toBeLessThan(4);
     });
     const d = derive("recon.C", L.ctx);
     expect(d.lines.map((l) => l.value)).toEqual(["486,402", "481,282", "5,120", "5,120", "5,120"]); // foots as displayed

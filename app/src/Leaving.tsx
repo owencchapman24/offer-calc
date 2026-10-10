@@ -6,6 +6,7 @@ import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
   forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, sliderText, valueAt, worked,
 } from "./leaveModel";
+import { shownStay } from "./footing";
 import { useOnScreen } from "./lazy";
 import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
@@ -361,7 +362,7 @@ function Reconciled({ letter, panel, basis, ctx }: { letter: Letter; panel: Leav
   if (basis !== "cash") {
     return <p className="leave-recon">Switch to after tax to see how leaving on your stay's last day squares with the stay.</p>;
   }
-  const x = reconcile(panel, detail.window);
+  const x = reconcile(panel, detail.window, shownStay(detail, r.view.row.years).stay);
   // As displayed: the difference between the two rounded figures, like its derivation.
   const diff = Math.round(x.kept) - Math.round(x.stay);
   const same = Math.abs(diff) < 0.5;

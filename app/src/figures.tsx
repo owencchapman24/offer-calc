@@ -14,7 +14,8 @@ import type { EditTarget, MetricId, WorkContext } from "./metrics";
 
 /** What figures read from the page's WorkProvider (Tickmarks.tsx). */
 export interface WorkApi {
-  ctx: WorkContext;
+  /** The page's latest context (the API itself stays the same object while it changes). */
+  readonly ctx: WorkContext;
   /** A figure's tickmark kind (metricKind with the page's context). */
   kind(id: MetricId): TickKind;
   /** The derivation on top of the drill-down stack. */

@@ -12,8 +12,9 @@ import { Leaving, type LeavingProps } from "./Leaving";
 import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
 import { Warnings } from "./Warnings";
-import { breakevenJob, cursorJob, leaveJob } from "./slowJobs";
-import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties } from "./protocol";
+import { breakevenJob, cursorJob, leaveJob, paymentsJob } from "./slowJobs";
+import { TheWork, type TheWorkProps } from "./TheWork";
+import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties, workJob } from "./protocol";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
@@ -151,6 +152,29 @@ export function withTies(ctx: WorkContext): { ctx: WorkContext; props: Omit<Brea
     ctx: { ...ctx, results: { ...r, ties: { l3, ...(flip ? { flip } : {}) } } },
     props: { sample: true, compare, ready: true, ties: { result: l3, key: JSON.stringify(job), updating: false, error: null, ms: 0 }, requestSlow: noop },
   };
+}
+
+/**
+ * L-6 with its slow job run, as the worker would: the context with every offer's payments and tax years, and the schedule's
+ * props, open on `letter`'s tables.
+ */
+export function withWork(ctx: WorkContext, letter: Letter = ctx.results!.letters[0]): { ctx: WorkContext; props: TheWorkProps } {
+  const compare = compareOf(ctx);
+  const job = workJob(compare);
+  const out = runJob((post) => paymentsJob({ ...job, gen: 1 }, post));
+  if (!out.ok || !("work" in out)) throw new Error(`L-6's job failed: ${out.ok ? "" : out.error}`);
+  const next = { ...ctx, results: { ...ctx.results!, work: out.work } };
+  return {
+    ctx: next,
+    props: { ctx: next, sample: true, compare, ready: true, work: { result: out.work, key: JSON.stringify(job), updating: false, error: null, ms: 0 },
+      requestSlow: noop, open: true, letter, onOpen: noop, onLetter: noop },
+  };
+}
+
+/** L-6 open on each offer's tables, in turn. */
+export function renderWork(ctx: WorkContext): string {
+  const w = withWork(ctx);
+  return ctx.results!.letters.map((l) => renderToStaticMarkup(tree(w.ctx, [createElement(TheWork, { key: "w", ...w.props, letter: l })]))).join("\n");
 }
 
 /** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), L-3 and L-4 when given, and L-5. */

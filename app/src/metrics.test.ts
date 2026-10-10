@@ -6,7 +6,7 @@ import { blankDraft, type Letter, type OfferDraft } from "./model";
 import { derive, highlightedSentence, metricSection } from "./derive";
 import { bridge, byYear, type MetricId, metricKind, type WorkContext } from "./metrics";
 import { SECTIONS } from "./sections";
-import { context, renderAllInputs, renderPage, withLeave, withTies } from "./testing";
+import { context, renderAllInputs, renderPage, renderWork, withLeave, withTies, withWork } from "./testing";
 import { dayBefore, figure } from "./text";
 import { extraHoursView } from "./verdict";
 import type { OfferInput } from "../../src/offer/types";
@@ -110,34 +110,38 @@ describe("pay per extra hour (docs/ui-design.md §4.2)", () => {
 
 describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
   const ctx = context();
-  it("A, year 1: the letter's 190,000 to 62,595 after rent, as in W4, footing at every subtotal", () => {
+  it("A, year 1: the letter's 190,000 to 62,594 after rent, W4's lines footed as shown at every subtotal", () => {
     const b = bridge(ctx, "A", 1);
-    expect(b.rows.map((r) => [r.kind, r.label, Math.round(r.value)])).toEqual([
+    // W4 has 109,463, 111,263 and 62,595: the engine's figures, each rounded once. Shown, every subtotal is the lines above it as shown,
+    // added (footing.ts): 152,986 - 41,724 - 1,800 = 109,462; + 3,300 - 1,500 = 111,262; take-home 109,462 - 6,600 = 102,862, less rent
+    // 45,600 = 57,262 to spend, x 99.880 / 105.696 = 54,111 at U.S. prices, less out-of-pocket 1,500 x 99.880 / 105.696 = 1,417, plus 9,900
+    // saved = 62,594; the price line is 62,594 - 111,262 + 45,600 = -3,068.
+    expect(b.rows.map((r) => [r.kind, r.label, r.value])).toEqual([
       ["letter", "Offer letter: salary + target bonus + sign-on", 190_000],
       ["change", "first bonus is a stub", -37_014],
       ["subtotal", "Paid in year 1", 152_986],
       ["less", "tax", -41_724], ["less", "health premiums", -1_800],
-      ["subtotal", "After-tax pay", 109_463],
+      ["subtotal", "After-tax pay", 109_462],
       ["plus", "employer 401(k)", 3_300], ["less", "expected out-of-pocket health costs", -1_500],
-      ["subtotal", "Total rewards", 111_263],
+      ["subtotal", "Total rewards", 111_262],
       ["less", "rent", -45_600], ["less", "New York prices", -3_068],
-      ["total", "After rent, at U.S. prices", 62_595],
+      ["total", "After rent, at U.S. prices", 62_594],
     ]);
     expect(b.rows[1].gloss).toBe("paid Jan 31 for Jul–Dec only"); // the bonus year runs Jan-Dec; A worked from Jul 13
     expect(b.rows[3].gloss).toBe("federal, FICA, NY, NYC");
-    // Each subtotal foots: the rows since the last one, added.
+    // Each subtotal foots as shown: the rows since the last one, added, to the dollar.
     let running = 0;
     for (const r of b.rows) {
       if (r.kind === "subtotal" || r.kind === "total") {
-        expect(r.value).toBeCloseTo(running, 1);
+        expect(r.value).toBe(running);
         running = r.value;
       } else running += r.value;
     }
-    // 62,594.52 = spending at U.S. prices 52,694.52 + saved 9,900: $4,391 a month to spend and $825 saved (W4).
+    // 62,594 = spending at U.S. prices 54,111 - 1,417 = 52,694 + saved 9,900: $4,391 a month to spend and $825 saved (W4).
     expect([Math.round(b.spend!), Math.round(b.saved!)]).toEqual([4_391, 825]);
     // It ties to A's year 1 in L-1 on the after-rent basis.
     expect(byYear(ctx, "A").years[0].value).toBe(b.rows[b.rows.length - 1].value);
-    expect(derive("br.A.1.total", ctx).ties).toEqual(["ey.A.1"]);
+    expect(derive("br.A.1.total", ctx).ties).toEqual(["ey.A.1", "l6y.A.total.1"]);
   });
   it("C, year 2: RSUs vest on company dates, so less than the letter's schedule lands in year 2", () => {
     const rsu = bridge(ctx, "C", 2).rows.find((r) => r.line === "rsu")!;
@@ -145,9 +149,9 @@ describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
   });
   it("year 1's tax splits across 2026 and 2027 at each year's rate and adds up", () => {
     const d = derive("br.A.1.tax", ctx);
-    const parts = d.lines.slice(0, -1).map((l) => parse(l.value));
-    expect(Math.abs(parts.reduce((s, x) => s + x, 0) - 41_724)).toBeLessThanOrEqual(1);
-    expect(d.lines.map((l) => l.label.replace(/[\d,]+ paid/, "# paid"))).toEqual(["On # paid in 2026", "On # paid in 2027", "Tax in year 1"]);
+    // Each part is its payments' tax, to the cent: 13,786.99 + 27,936.63 = 41,723.62, which is 41,724 to the dollar.
+    expect(d.lines.map((l) => l.value)).toEqual(["13,786.99", "27,936.63", "41,724"]);
+    expect(d.lines.map((l) => l.label.replace(/[\d,.]+ paid/, "# paid"))).toEqual(["On # paid in 2026", "On # paid in 2027", "Tax in year 1, to the dollar"]);
   });
 });
 
@@ -263,7 +267,8 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
 describe("L-1 by year", () => {
   it("the years add up to the stay as paid; a later start's last year runs past it and is reconciled", () => {
     const a = byYear(context(), "A");
-    expect(a.years.map((y) => Math.round(y.value))).toEqual([62_595, 80_562, 87_631, 118_764]); // W4a's end label: 118,764
+    // As shown (footing.ts): W4a has 62,595 and 80,562, the engine's figures rounded once; each year's lines, as shown, add up to these.
+    expect(a.years.map((y) => y.value)).toEqual([62_594, 80_563, 87_631, 118_764]); // W4a's end label: 118,764
     expect(a.sum!).toBeCloseTo(a.window!, 1);
     const later = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)));
     const b = byYear(later, "B");
@@ -298,7 +303,10 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx)
         + renderPage(six.ctx, { leave: six.props, ties: tied.props }));
       checkAll(end.ctx, renderPage(end.ctx, { leave: end.props, ties: tied.props }));
-    });
+      // L-6 open on each offer, with its payments and tax years: every line, payment and tax figure.
+      const worked = withWork(six.ctx).ctx;
+      checkAll(worked, renderWork(worked) + render(worked));
+    }, 30_000); // every figure on the page and its drill-downs: a few seconds, longer on a busy runner
   }
   function checkAll(ctx: WorkContext, html: string) {
     {

@@ -1295,7 +1295,7 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **The bridge's glosses** sit under each label rather than in a third column, so the
   figures stay in one column at every width. Its prices line is the identity's remainder
   (after rent − total rewards + rent), so every subtotal foots by construction.
-- **L-6 isn't built** (slice 6): `<` ties go to L-1's table view and the rank list.
+- **L-6 isn't built** (slice 6): `<` ties go to L-1's table view and the rank list. (Since slice 6, stop A, they're L-6's.)
 - **Not yet:** the hide-tickmarks setting (slice 6, since rev 3); switching "Prices in" to a city
   you know (§5, item 6; slice 8, since rev 3).
 
@@ -1507,6 +1507,41 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   "In total rewards, A keeps …"). The figures are the panel's, said once the panel has the new date (a moment after the key), so
   a step is announced once, complete, and holding an arrow key says where you stop.
 
+- **UI slice 6** (in progress; plan in `docs/ui-slices-4-8-plan.md`), two review stops:
+  - **A** (2026-10-10): L-6, The work (§4.8), with the `<` ties moved to its rows, and the year figures as shown (below).
+  - **B** (next): CSV export of each table, print, and the hide-tickmarks setting (§9.1).
+
+**UI slice 6 versus this design** (stop A):
+- **One offer at a time:** L-6 is collapsed until "Show the tables"; then an A | B | C switch shows L-6.A, L-6.B or L-6.C, rather than
+  the three stacked. Each has four parts: the employment years, your stay's totals, every payment, and tax by calendar year.
+- **The employment years are lines down and years across** (§4.8 described `npm run offers`' tables, years down): numbered lines in
+  three sections (cash; total rewards and hours; after rent), years 1 to your stay, and the years added. A section starts by carrying
+  a line from above ("After-tax pay, line 7"). W8a's "Ties to L-6.A, year 1, row 12" reads "line 23" for A's after-rent line.
+- **Your stay's totals** on each basis: the years added, less what they run past your stay's last day (a later start, or a payment on
+  the anniversary after it), is your stay as paid, `<` L-1's "Your stay, as paid"; then its present value, `<` the rank list (on
+  the verdict's basis; on the others, the same figure pvWork works out).
+- **Every payment** is listed to the cent, by employment year and then by kind, with its formula and its tax; a kind with several
+  payments has a subtotal that ties to its line, and each year's tax ties to its tax line. Payments after the stay's last employment
+  year, in its last calendar year, are listed too (taxed with that year, not counted).
+- **Tax by calendar year:** with the offer, without it, and the offer's share, line by line: wages, pre-tax 401(k), section 125,
+  federal taxable income, then each tax and the total, and the offer's rate (its tax ÷ its pay), shown with the decimals at which
+  every payment's tax comes out to the cent. The offer's tax is its payments' tax added; with the offer, the total is the total
+  without plus that, and the federal income tax, the largest line, takes the rounding (its work shows the engine's figure).
+- **The year figures as shown** (`app/src/footing.ts`), for L-1, the bridge and L-6 alike, so every column adds up as displayed and a
+  figure in two places is one figure: a leaf is rounded once (a year's salary is its payments, to the cent, added, then rounded), and
+  a subtotal is its lines as shown, added. So a few figures differ by a dollar from the engine's own rounding and from W4/W4a: A's
+  year 1 is 109,462 after tax (W4 109,463) and 62,594 after rent (62,595); its year 2 after rent is 80,563 (80,562). L-4's
+  reconciliation on your stay's last day uses the stay as shown (A keeps $2,511 more, not $2,510); its parts compare unrounded
+  figures, and the tax line takes what's left.
+- **Present values and per hour stay the engine's** (the verdict, the rank list, L-2, L-3, per hour, pay per extra hour): a present
+  value isn't a sum of the years. A per-hour derivation's "total, as paid" divides the unrounded total, so it can differ by a dollar
+  from L-6's stay as shown.
+- **The `<` ties moved:** L-1's table view keeps its years and "Your stay, as paid" (footed); its present-value row is now L-6's.
+  Each year in L-1 and each bridge subtotal names its L-6 line in Show the work.
+- **The worker sends L-6's payments and tax years only while it's open** (a slow-lane job, about 10-20 ms); its years come with the
+  comparison. A payment's figure, its tax and every tax-table figure open their work like any other.
+- **Not yet** (stop B): CSV, print, and the hide-tickmarks setting.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
@@ -1526,7 +1561,7 @@ build order differs (below). The engine prerequisites came first and aren't numb
    (§4.7). Engine item 13 (the leave sweep by day), the worker's slow lane (§3.4) and the CI
    bundle check come with it.
 6. **The reconciliation schedule:** L-6 (§4.8), CSV export of each table, print, and the
-   hide-tickmarks setting (§9.1). (JSON export/import moved to slice 3; the accessibility pass,
+   hide-tickmarks setting (§9.1). (Stop A, L-6 and its ties, done 2026-10-10.) (JSON export/import moved to slice 3; the accessibility pass,
    phone tabs and sticky bars moved to slice 7.)
 7. **Mobile and accessibility** (rev 3, out of slice 6; done 2026-10-10): phone tabs, the sticky verdict bars
    (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough (its run deferred to before launch).

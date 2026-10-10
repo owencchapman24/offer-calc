@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
-import type { EngineRequest, EngineResponse, LeaveCurve, LeavePanel, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties } from "./protocol";
+import type { EngineRequest, EngineResponse, LeaveCurve, LeavePanel, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties, WorkOffer } from "./protocol";
 
-/** A slow-lane result (L-3, L-4, the close-call line): the latest one back, the request it answers, and whether a newer one is on its way. */
+/** A slow-lane result (L-3, L-4, L-6, the close-call line): the latest one back, the request it answers, and whether a newer one is on its way. */
 export interface SlowState<T> {
   result: T | null;
   /** The request `result` answers (requestSlow's key). */
@@ -35,10 +35,12 @@ export interface EngineState {
   /** The close-call line's breakeven (§4.1) and L-3's (§4.6). */
   flip: SlowState<Ties>;
   breakeven: SlowState<Ties>;
+  /** L-6's payments and tax years (§4.8): asked for only while it's open. */
+  work: SlowState<WorkOffer[]>;
 }
 
 type Body<T> = T extends unknown ? Omit<T, "gen"> : never;
-/** A slow job to run: L-4's curves or its panel, or breakevens. A request with the same key as the last of its lane is skipped. */
+/** A slow job to run: L-4's curves or its panel, breakevens, or L-6's payments. A request with the same key as the last of its lane is skipped. */
 export type SlowJob = Body<SlowRequest>;
 
 export interface Engine extends EngineState {
@@ -47,13 +49,13 @@ export interface Engine extends EngineState {
 
 const DEBOUNCE_MS = 200;
 const noSlow = { result: null, key: null, updating: false, error: null, ms: null };
-const LANES: SlowLane[] = ["leave", "cursor", "flip", "breakeven"];
-const slowResult = (r: Extract<SlowResponse, { ok: true }>) => ("curves" in r ? r.curves : "panels" in r ? r.panels : r.ties);
+const LANES: SlowLane[] = ["leave", "cursor", "flip", "breakeven", "work"];
+const slowResult = (r: Extract<SlowResponse, { ok: true }>) => ("curves" in r ? r.curves : "panels" in r ? r.panels : "work" in r ? r.work : r.ties);
 
 /**
  * Runs the engine in a Web Worker. Inputs are debounced; each request gets a generation number and
  * any response for an older generation is dropped, so a slow result never overwrites a newer one.
- * While recomputing, the previous result stays on screen (dimmed by the caller). Slow jobs (L-3, L-4) go
+ * While recomputing, the previous result stays on screen (dimmed by the caller). Slow jobs (L-3, L-4, L-6) go
  * to the same worker's slow lane, each lane with its own generations.
  */
 export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when the offers are replaced wholesale: older results then don't apply. */ revision = 0): Engine {
@@ -67,7 +69,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
   const queued = useRef<SlowRequest[]>([]);
   const [state, setState] = useState<EngineState>({
     sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null,
-    leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow,
+    leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow,
   });
   // An import or "Delete all data" replaces every offer: the last valid results were for offers that are gone.
   const seen = useRef(revision);
@@ -75,7 +77,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
     if (seen.current === revision) return;
     seen.current = revision;
     for (const l of LANES) slow.current[l].key = null;
-    setState((s) => ({ ...s, sweep: null, detail: null, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow }));
+    setState((s) => ({ ...s, sweep: null, detail: null, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow }));
   }, [revision]);
 
   useEffect(() => {

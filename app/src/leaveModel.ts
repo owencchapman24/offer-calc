@@ -1,4 +1,5 @@
 import type { Cliff, ISODate, OfferWarning, WindowTotals } from "../../src/offer/types";
+import type { StayFigures } from "./footing";
 import type { Letter } from "./model";
 import type { LeaveCurve, LeavePanel } from "./protocol";
 import { dayBefore, dollars, longDate, percent } from "./text";
@@ -214,9 +215,10 @@ export function leaveWarningTexts(warnings: OfferWarning[]): string[] {
 // ---- your stay's end -------------------------------------------------------------------------------
 
 /**
- * Leaving on your stay's last day vs the stay as L-1 counts it, after tax and as paid. They differ by
- * the last year's tax (the stay taxes it as though pay continued through December), any pay after you
- * leave, premiums, and clawbacks repaid: kept = stay + pay + tax + premiums - clawback.
+ * Leaving on your stay's last day vs the stay as L-1 counts it, after tax and as paid. They differ by the last year's tax
+ * (the stay taxes it as though pay continued through December), any pay after you leave, premiums, and clawbacks repaid:
+ * kept = stay + pay + tax + premiums - clawback. The stay is L-1's figure as shown (footing.ts); the parts compare the
+ * engine's unrounded figures, so rounding never shows up as a part, and the derivation's tax line takes what's left.
  */
 export interface Reconciliation {
   kept: number;
@@ -233,10 +235,10 @@ export interface Reconciliation {
   year: number;
 }
 
-export function reconcile(panel: LeavePanel, stay: WindowTotals): Reconciliation {
-  const n = stay.nominal;
+export function reconcile(panel: LeavePanel, window: WindowTotals, shown: StayFigures): Reconciliation {
+  const n = window.nominal;
   return {
-    kept: panel.afterTaxCompKept, stay: n.afterTaxComp, pay: panel.paid - n.gross, tax: n.tax - panel.tax,
+    kept: panel.afterTaxCompKept, stay: shown.cash, pay: panel.paid - n.gross, tax: n.tax - panel.tax,
     premiums: n.premiums - panel.premiums, clawback: panel.repaid, year: Number(panel.leaveDate.slice(0, 4)),
   };
 }

@@ -1,11 +1,14 @@
 import { cliffs, nextCliff } from "../../src/offer/cliffs";
 import { breakevenSteps, comparisonWindow, rentFlip } from "../../src/offer/compare";
 import { addMonths, fromDays, toDays } from "../../src/offer/dates";
-import { keptIfLeaving, leaveDaySweep } from "../../src/offer/project";
+import { keptIfLeaving, leaveDaySweep, projectScenario } from "../../src/offer/project";
 import type { BreakevenResult, Cliff, Household, ISODate, LeaveDayRow, OfferInput, ValuedOptions, ValueBasis } from "../../src/offer/types";
-import type { BreakevenRequest, CursorRequest, LeaveCurve, LeavePanel, LeaveRequest, SlowResponse, TieRow } from "./protocol";
+import type { TaxInput, TaxResult } from "../../src/tax/types";
+import type {
+  BreakevenRequest, CursorRequest, LeaveCurve, LeavePanel, LeaveRequest, SlowResponse, TaxRun, TieRow, WorkOffer, WorkRequest,
+} from "./protocol";
 
-// The slow lane's jobs (docs/ui-design.md §3.4, §4.5, §4.6): generators that the worker's runner
+// The slow lane's jobs (docs/ui-design.md §3.4, §4.5, §4.6, §4.8): generators that the worker's runner
 // (jobs.ts) steps a chunk at a time, about 8 ms each, so an edit never waits behind them and a newer
 // request replaces an older one between chunks. Each posts its own result. Worker only: they import the
 // engine.
@@ -116,6 +119,50 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     next: nextCliff(o, req.household, req.leaveDate, options, { skip: proratedStep }).next,
     warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica"),
   };
+}
+
+// ---- L-6: every payment, and each calendar year's tax ---------------------------------------------------------
+
+/** A tax engine run's figures, unrounded: what went in and what came out. */
+function taxRun(input: TaxInput, r: TaxResult): TaxRun {
+  return {
+    wages: input.wages, spouseWages: input.spouseWages ?? 0, pretax401k: input.pretax401k ?? 0, section125: input.section125 ?? 0,
+    taxableIncome: r.federalTaxableIncome, federal: r.federalIncomeTax, ss: r.socialSecurity, medicare: r.medicare + r.additionalMedicare,
+    stateIncome: r.stateIncomeTax, statePayroll: r.statePayrollTax, local: r.localIncomeTax, total: r.totalTax,
+  };
+}
+
+/**
+ * L-6's payments and tax years: each offer's stay projected as the fast lane projects it (base case, the comparison window),
+ * a chunk per offer. The payments are those in the calendar years its stay's employment years touch, so each year's tax
+ * table has all of its payments, those after the stay's last employment year included.
+ */
+export function* paymentsJob(req: WorkRequest, post: (r: SlowResponse) => void, now = () => performance.now()): Generator<void> {
+  const t0 = now();
+  try {
+    const window = comparisonWindow(req.offers, req.stayYears);
+    const options = { valuationDate: req.valuationDate, inflation: req.inflation, discountRate: req.discountRate, scenario: "base" as const, window };
+    const work: WorkOffer[] = [];
+    for (const o of req.offers) {
+      const r = projectScenario(o, req.household, options);
+      const ys = r.employmentYears.slice(0, req.stayYears);
+      const lastDay = ys.length ? fromDays(toDays(ys[ys.length - 1].end) - 1) : o.startDate;
+      const lastYear = Math.max(Number(lastDay.slice(0, 4)), ...r.events.filter((e) => e.employmentYear <= req.stayYears).map((e) => e.calendarYear));
+      work.push({
+        payments: r.events.filter((e) => e.calendarYear <= lastYear).map((e) => ({
+          date: e.date, component: e.component, detail: e.detail, gross: e.gross, tax: e.tax, calendarYear: e.calendarYear, ey: e.employmentYear,
+        })),
+        taxYears: r.calendarYears.filter((c) => c.year <= lastYear).map((c) => ({
+          year: c.year, projectedLaw: c.projectedLaw, offerGross: c.offerGross.total, offerTax: c.offerTax, offerTaxRate: c.offerTaxRate,
+          with: taxRun(c.withOffer.input, c.withOffer.result), without: taxRun(c.withoutOffer.input, c.withoutOffer.result),
+        })),
+      });
+      yield;
+    }
+    post({ lane: "work", gen: req.gen, ok: true, work, ms: now() - t0 });
+  } catch (e) {
+    post({ lane: "work", gen: req.gen, ok: false, error: message(e), ms: now() - t0 });
+  }
 }
 
 // ---- breakeven: L-3 and the close-call line -----------------------------------------------------------

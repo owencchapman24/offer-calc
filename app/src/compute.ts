@@ -55,14 +55,22 @@ function stayDetail(c: CompareRequest, sweep: HorizonSweep): StayDetail {
         years: wh.years.filter((y) => inStay(y.year)),
         warnings: wh.warnings.filter((w) => w.code === "withholdingShortfall" && inStay(w.params.year)),
       };
+      // Payments as posted: each one to the cent, as the engine rounds it, added in whole cents so the sums are exact.
+      const cents = (x: number) => Math.round(x * 100);
       const split = new Map<string, OfferDetail["split"][number]>();
+      const posted = new Map<number, OfferDetail["posted"][number]>();
       for (const e of r.events) {
         const key = `${e.employmentYear}|${e.calendarYear}`;
         const s = split.get(key) ?? { ey: e.employmentYear, year: e.calendarYear, gross: 0, tax: 0 };
-        s.gross += e.gross;
-        s.tax += e.tax;
+        s.gross += cents(e.gross);
+        s.tax += cents(e.tax);
         split.set(key, s);
+        const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, tax: 0 };
+        p[e.component] += cents(e.gross);
+        p.tax += cents(e.tax);
+        posted.set(e.employmentYear, p);
       }
+      const dollarsOf = <T extends object>(o: T, keys: Array<keyof T>): T => ({ ...o, ...Object.fromEntries(keys.map((k) => [k, (o[k] as number) / 100])) });
       return {
         window: r.window, cases, withholding, employmentYears: r.employmentYears, costOfLiving: r.costOfLiving, assumptions: r.assumptions, warnings: r.warnings,
         taxYears: r.calendarYears.map((y) => {
@@ -78,7 +86,8 @@ function stayDetail(c: CompareRequest, sweep: HorizonSweep): StayDetail {
             },
           };
         }),
-        split: [...split.values()],
+        split: [...split.values()].map((s) => dollarsOf(s, ["gross", "tax"])),
+        posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "tax"])),
         bonuses: r.events.flatMap((e) => (e.detail.kind === "bonus"
           ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo }] : [])),
         rsus: r.events.flatMap((e) => (e.detail.kind === "rsu"

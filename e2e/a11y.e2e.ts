@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
-import { EDITORS, loadSchedules, openCompare, openEditor, openSection, SECTIONS, selectOffer, settled, showTheWork } from "./lib/app";
+import { EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, SECTIONS, selectOffer, settled, showTheWork } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
 // four projects (desktop and phone widths, light and dark). Any WCAG A/AA violation fails, unless
@@ -22,6 +22,27 @@ test.describe("compare", () => {
     await expect(page.locator(".leave-recon").first()).toBeVisible();
     await expect(page.locator(".leaving")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
     await scan(page, "L-4 on your stay's last day");
+  });
+
+  // L-6 open is the longest page there is (every schedule loaded, and some 500 figures in its tables): each state its own test,
+  // with room for a slow runner.
+  test("L-6, A's tables", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openCompare(page);
+    await openWork(page, "A");
+    await scan(page, "L-6: A's tables");
+  });
+
+  test("L-6, C's tables, and a payment's tax worked out", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openCompare(page);
+    // C has RSUs and refreshers: the most lines and payments.
+    await openWork(page, "C");
+    await scan(page, "L-6: C's tables");
+    // Show the work from a payment's tax: its rate, from the year's tax table.
+    await page.locator('.l6-payments [data-metric$=".tax"]').first().click();
+    await expect(page.locator(".work .work-lines")).toBeVisible();
+    await scan(page, "L-6: a payment's tax, its work");
   });
 
   test("L-1's table view", async ({ page }) => {
