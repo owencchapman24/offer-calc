@@ -106,7 +106,7 @@ export function FieldRow({ k, label, children, issues = "all", className = "" }:
       {api.offers.map((o) => {
         const inside = issuesAt(api, o.letter, k);
         return (
-          <Trace key={o.id} id={inputMetric(o.letter, k)} className="cell">
+          <Trace key={o.id} id={inputMetric(o.letter, k)} className="cell" offer={o.letter}>
             {children(o)}
             {issues === "all" ? <Issues letter={o.letter} path={k} /> : inside.length > 0 && (
               <p className="field-error" role="alert">{inside.length === 1 ? "1 problem" : `${inside.length} problems`}: open it to fix.</p>

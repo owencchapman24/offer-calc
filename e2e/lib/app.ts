@@ -67,9 +67,16 @@ export async function openSection(page: Page, section: Section) {
   await settled(page);
 }
 
+/** On a phone, the offer's tab (the ledger shows one offer at a time); elsewhere every offer shows already. */
+export async function selectOffer(page: Page, letter: string) {
+  const tab = page.locator(`#offer-tab-${letter}`);
+  if (await tab.isVisible()) await tab.click();
+}
+
 /** A row editor, open beneath its row. */
 export async function openEditor(page: Page, e: (typeof EDITORS)[number]) {
   await openSection(page, e.section);
+  await selectOffer(page, e.letter);
   if (e.row === "retirement.vesting.steps") await page.locator(`#in-${e.letter}-retirement-vesting`).selectOption("graded");
   else await page.locator(`#in-${e.letter}-${dashed(e.row)}`).click();
   await expect(page.locator(`#editor-${dashed(e.row)}`)).toBeVisible();
@@ -80,6 +87,28 @@ export async function openEditor(page: Page, e: (typeof EDITORS)[number]) {
 export async function showTheWork(page: Page, metric: string) {
   await page.locator(`[data-metric="${metric}"], [data-tick="${metric}"]`).first().click();
   await expect(page.locator(".work .work-lines")).toBeVisible();
+}
+
+/** Two frames: the page's own reaction to focus (a scroll that keeps it clear of a sticky bar) has run. */
+export const twoFrames = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+/**
+ * What covers the focused element, if anything does (WCAG 2.4.11): a sticky verdict bar that's showing, overlapping the
+ * element's box. Null when nothing does.
+ */
+export function focusCovered(page: Page) {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || el === document.body) return null;
+    for (const bar of document.querySelectorAll<HTMLElement>(".verdict-bar")) {
+      if (bar.contains(el) || getComputedStyle(bar).visibility === "hidden") continue;
+      const r = el.getBoundingClientRect();
+      const b = bar.getBoundingClientRect();
+      const overlap = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+      if (overlap > 0 && r.width > 0) return `${el.id || el.getAttribute("aria-label") || el.outerHTML.slice(0, 80)}: ${Math.round(overlap)}px under the bar`;
+    }
+    return null;
+  });
 }
 
 /** The lead's results, as text: the hero, the rank list, the if-you-stay row and the pipeline's steps. */

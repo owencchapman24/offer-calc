@@ -91,10 +91,13 @@ export function Fig({ id, label, children, className = "", drill = false }: {
   );
 }
 
-/** Marks an input (or anything else) as a figure derivations can light up, without a tickmark of its own. */
-export function Trace({ id, children, className = "" }: { id: MetricId; children: ReactNode; className?: string }) {
+/**
+ * Marks an input (or anything else) as a figure derivations can light up, without a tickmark of its own. `offer` marks a
+ * ledger cell as that offer's: on a phone, the ledger shows one offer's cells at a time.
+ */
+export function Trace({ id, children, className = "", offer }: { id: MetricId; children: ReactNode; className?: string; offer?: string }) {
   const api = useApi();
-  return <div className={`trace${api.traced.has(id) ? " is-traced" : ""} ${className}`.trim()} data-trace={id}>{children}</div>;
+  return <div className={`trace${api.traced.has(id) ? " is-traced" : ""} ${className}`.trim()} data-trace={id} data-offer={offer}>{children}</div>;
 }
 
 /**

@@ -738,3 +738,49 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .method-list { margin: 6px 0; padding-left: 18px; }
 .method-list li { margin: 4px 0; }
 .method-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- phones: the offer tabs; tablets and phones: the sticky verdict bar (slice 7, docs/ui-design.md §3.2, W9) -------- */
+
+/* One offer at a time: a tab per offer (its letter, the offer's color rule under the one shown), and + to add one. */
+.offer-tabs { display: flex; align-items: stretch; margin: 0 12px; border-bottom: 1px solid var(--rule); }
+.tablist { display: flex; flex: 1; min-width: 0; }
+.tab {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: baseline; gap: 6px; min-height: 44px; padding: 8px 8px 6px; border: none;
+  background: none; text-align: left; cursor: pointer; box-shadow: inset 0 -3px 0 transparent;
+}
+.tab.is-on { background: var(--band); box-shadow: inset 0 -3px 0 var(--offer); }
+.tab-letter { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--graphite); }
+.tab.is-on .tab-label { color: var(--ink); }
+.tab-needs { color: var(--warning); font-weight: 700; }
+.tab-add { flex: none; min-width: 44px; min-height: 44px; border: none; background: none; font-size: 22px; line-height: 1; cursor: pointer; }
+.tab:focus-visible, .tab-add:focus-visible { outline-offset: -3px; }
+/* The ledger shows the chosen offer's cells (data-offer), beside the field names; one column needs no bands. */
+.ledger.is-tabbed { grid-template-columns: 104px minmax(0, 1fr); overflow-x: visible; scroll-snap-type: none; }
+.ledger.tab-A [data-offer]:not([data-offer="A"]), .ledger.tab-B [data-offer]:not([data-offer="B"]),
+.ledger.tab-C [data-offer]:not([data-offer="C"]) { display: none; }
+.ledger.is-tabbed .cell { background: none; }
+
+/* The bar is sticky, not fixed: it keeps a place in the page, so showing it shifts nothing. On a tablet it sits under About
+   you and sticks at the top; on a phone it's last on the page and sticks at the bottom all the way down. */
+.verdict-bar { position: sticky; z-index: 40; background: var(--sheet); transition: transform 150ms, visibility 150ms; }
+.verdict-bar.is-top { top: 0; margin: 0 -24px 20px; border-bottom: 2px solid var(--ink); }
+.verdict-bar.is-bottom { bottom: 0; margin: 20px -16px -32px; border-top: 2px solid var(--ink); }
+.verdict-bar.is-hidden { visibility: hidden; }
+.verdict-bar.is-bottom.is-hidden { transform: translateY(100%); }
+.bar-go {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 52px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px)); border: none; background: none; text-align: left; cursor: pointer;
+  font-size: 15px; line-height: 1.4; font-variant-numeric: tabular-nums;
+}
+.verdict-bar.is-top .bar-go { padding: 8px 24px; }
+.bar-text { min-width: 0; transition: opacity 120ms; }
+.verdict-bar.is-updating .bar-text { opacity: 0.6; }
+.bar-figure { font-weight: 700; font-size: 17px; }
+.bar-scope { color: var(--graphite); font-size: 13.5px; white-space: nowrap; }
+.bar-text .stamp { font-size: 10px; }
+.bar-to .ref { min-width: 32px; height: 32px; font-size: 13px; }
+.bar-go:focus-visible { outline-offset: -4px; }
+/* WCAG 2.4.11: what the browser scrolls into view (focus, "Edit it", the bar's own jump) stops clear of the bar. */
+:root:has(.verdict-bar.is-top) { scroll-padding-top: 72px; }
+:root:has(.verdict-bar.is-bottom:not(.is-hidden)) { scroll-padding-bottom: 72px; }

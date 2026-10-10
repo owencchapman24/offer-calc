@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
-import { EDITORS, loadSchedules, openCompare, openEditor, openSection, SECTIONS, settled, showTheWork } from "./lib/app";
+import { EDITORS, loadSchedules, openCompare, openEditor, openSection, SECTIONS, selectOffer, settled, showTheWork } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
 // four projects (desktop and phone widths, light and dark). Any WCAG A/AA violation fails, unless
@@ -44,6 +44,32 @@ test.describe("compare", () => {
     // An input's default, with "Edit it".
     await showTheWork(page, "about.filing");
     await scan(page, "Show the work: a default");
+  });
+});
+
+test.describe("phones and tablets", () => {
+  test.beforeEach(({ page }) => test.skip((page.viewportSize()?.width ?? 0) >= 1180, "phones and tablets only"));
+
+  test("the verdict bar", async ({ page }) => {
+    await openCompare(page);
+    // Half way down, where it sticks (at the top on a tablet, the bottom on a phone); the scan sees it in its place.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+    await expect(page.locator(".verdict-bar")).toBeVisible();
+    await scan(page, "the verdict bar");
+  });
+
+  test("the phone's offer tabs", async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) >= 760, "phones only");
+    await openCompare(page);
+    await selectOffer(page, "C");
+    await expect(page.locator("#in-C-salary-annual")).toBeVisible();
+    await scan(page, "phone: offer C's tab");
+    // Two offers and +, then a third added: blank, so its tab says it needs a fix.
+    await page.getByRole("button", { name: "Remove offer C" }).click();
+    await scan(page, "phone: two offers, and +");
+    await page.getByRole("button", { name: "Add an offer" }).click();
+    await expect(page.locator("#in-C-salary-annual")).toBeVisible();
+    await scan(page, "phone: an offer added");
   });
 });
 
