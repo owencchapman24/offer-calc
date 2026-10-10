@@ -23,21 +23,27 @@ export const EDITORS: Array<{ section: Section; row: string; letter: "A" | "B" |
 
 const dashed = (path: string) => path.replace(/\./g, "-");
 
+/** The comparison page has settled for the current inputs: the verdict shows, and the page is quiet. */
+export async function settled(page: Page) {
+  await expect(page.locator(".lead .verdict")).toBeVisible({ timeout: 30_000 });
+  await quiet(page);
+}
+
 /**
- * The page has settled for the current inputs, so a scan never catches it mid-change (a schedule dims for a moment while
- * it's worked out):
- * - the verdict shows, and the lead and the fast-lane schedules aren't updating;
+ * The page is quiet, so a scan never catches it mid-change (a schedule dims for a moment while it's worked out). Any page;
+ * the scan waits for it before each run, since anything that scrolls (a click scrolls its target into view) can bring a
+ * schedule on screen and set it working:
+ * - the lead and the fast-lane schedules aren't updating;
  * - no schedule near the screen is still waiting for its code (they load within a screen of it);
  * - L-3 and L-4, worked out only while on screen, have caught up: one that's dimmed is brought on screen until it's ready,
  *   then the page goes back to where it was;
  * - and it all holds for a moment.
  */
-export async function settled(page: Page) {
-  await expect(page.locator(".lead .verdict")).toBeVisible({ timeout: 30_000 });
+export async function quiet(page: Page) {
   const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true']");
   const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
     .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
-  for (let quiet = 0, tries = 0; quiet < 2; tries++) {
+  for (let still = 0, tries = 0; still < 2; tries++) {
     if (tries > 60) throw new Error("The page didn't settle.");
     await expect(busy).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(loading, { timeout: 30_000 }).toBe(false);
@@ -49,7 +55,7 @@ export async function settled(page: Page) {
       await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
       await page.evaluate((top) => window.scrollTo(0, top), y);
     }
-    quiet = (await page.locator(".is-updating").count()) === 0 && !(await loading()) ? quiet + 1 : 0;
+    still = (await page.locator(".is-updating").count()) === 0 && !(await loading()) ? still + 1 : 0;
     await page.waitForTimeout(250);
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));

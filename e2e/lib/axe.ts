@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { quiet } from "./app";
 import { type A11yException, parseExceptions } from "./exceptions";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): axe-core on the page as it stands, for the
@@ -43,8 +44,11 @@ async function exceptionFor(page: Page, rule: string, target: string): Promise<A
  * as obscured by it (2.5.8): a scroll position, not the layout. So for the scan the bar sits in its own place in the page
  * (position: static: the same box, unstuck), where it's scanned like everything else. Whether it ever covers the focused
  * element when stuck is WCAG 2.4.11's, checked by the phone and tablet tests (mobile.e2e.ts).
+ *
+ * It scans a quiet page (app.ts, quiet): never a schedule caught dimmed for the moment it's being worked out.
  */
 export async function scan(page: Page, state: string): Promise<ScanRecord> {
+  await quiet(page);
   const unstick = await page.addStyleTag({ content: ".verdict-bar { position: static !important; }" });
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze().finally(() => unstick.evaluate((el) => (el as Element).remove()));
   const record: ScanRecord = {

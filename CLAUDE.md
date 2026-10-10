@@ -235,7 +235,7 @@ done; stop C (the NVDA walkthrough) is next.
   - Only the worker holds the engine and the BEA/HUD tables.
 
 **Tests:** 408 passing (`npm test`), and 116 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
-tests, 5 keyboard tests, and the phone and tablet tests; 12 more skip, each a phone's test on a tablet or the reverse).
+tests, 5 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
