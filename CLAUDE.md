@@ -259,13 +259,13 @@ stop A** (2026-10-10): L-6 and its ties, and the year figures as shown. Slice 6'
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 424 passing (`npm test`), and 131 Playwright tests (`npm run e2e`: the scan's tests in six projects, 3 smoke
+**Tests:** 425 passing (`npm test`), and 131 Playwright tests (`npm run e2e`: the scan's tests in six projects, 3 smoke
 tests, 7 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 12, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
+  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
   `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),
   the ties to L-1, the bridge and the rank list, the anniversary edge (a payment on your stay's last day is counted; on the

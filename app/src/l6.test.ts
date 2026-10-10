@@ -161,6 +161,13 @@ describe("L-6 ties to L-1, the bridge and the lead schedule", () => {
     const html = renderWork(ctx);
     expect(html).toContain('data-metric="l6y.A.total.1"');
   });
+  it("titles lower a label's first letter only, so abbreviations and places keep their capitals", () => {
+    expect(derive("l6y.A.total.4", ctx).title).toBe("A · year 4 · after rent, at U.S. prices");
+    expect(derive("br.A.1.total", ctx).title).toBe("A · year 1 · after rent, at U.S. prices");
+    expect(derive("l6t.A.2027.state.with", ctx).title).toBe("A · 2027 · NY income tax, with the offer");
+    const rsu = ctx.results!.work![2].payments.findIndex((p) => p.component === "rsu");
+    expect(derive(`l6p.C.${rsu}.gross`, ctx).title).toBe("C · new-hire RSUs, tranche 1 of 7");
+  });
   it("L-1's table view keeps its years and your stay; its present-value row moved to L-6", () => {
     const html = renderPage(ctx);
     expect(html).toContain('id="l1-table"');

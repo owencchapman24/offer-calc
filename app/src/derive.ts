@@ -39,6 +39,13 @@ type L = Letter;
 
 type Work = Omit<Derivation, "kind" | "section">;
 
+/**
+ * A label inside a sentence: its first letter lowered, unless it starts an abbreviation ("NY income tax", "HSA"), and the
+ * rest as it is ("after rent, at U.S. prices", "new-hire RSUs, tranche 1 of 7", "salary, August 2027").
+ */
+const lowerFirst = <T extends string | undefined>(s: T): T =>
+  (s && !(s.length > 1 && /[A-Z]/.test(s[1])) ? `${s[0].toLowerCase()}${s.slice(1)}` : s) as T;
+
 // ---- names ---------------------------------------------------------------------------------------
 
 const TOTAL_NAME: Record<Exclude<ValueBasis, "colAdjustedTotal">, string> = { cash: "after-tax pay", totalRewards: "total rewards" };
@@ -69,7 +76,7 @@ const READ_ONLY_NAME: Record<string, string> = {
   also: "other inputs", cashAwards: "cash awards", retirement: "401(k)", health: "health plan", perks: "perks", employerState: "employer state",
   "costOfLiving.rentGrowth": "rent growth", "hours.weekly": "weekly hours",
 };
-const inputName = (path: string) => READ_ONLY_NAME[path] ?? HELP[helpKey(path)]?.label.toLowerCase() ?? path;
+const inputName = (path: string) => READ_ONLY_NAME[path] ?? lowerFirst(HELP[helpKey(path)]?.label) ?? path;
 const ABOUT_NAME: Record<AboutField, string> = {
   filing: "your filing status", stay: "your stay", wages: "your other wages", healthUsage: "your health use", prices: "the prices setting",
 };
@@ -188,7 +195,7 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "ph": return `${a}'s per hour`;
     case "avg": return `${a}'s average per hour`;
     case "af": return "the annuity factor";
-    case "part": return `${a}'s ${PART[b as PvPart].label.toLowerCase()}`;
+    case "part": return `${a}'s ${lowerFirst(PART[b as PvPart].label)}`;
     case "rpp": return b === "ref" ? `the ${pricesOf(ctx).place} price index` : `${a}'s price index`;
     case "extra": return "the extra-hours line";
     case "ey": return `${a}'s year ${b} in L-1`;
@@ -1139,7 +1146,7 @@ function partWork(ctx: WorkContext, letter: L, part: PvPart): Work {
   const [nominal, pv] = partValues(w, part);
   const p = PART[part];
   return {
-    title: `${letter} · ${p.label.toLowerCase()} over your stay`, scope: `Base case · stay ${years(r.view.row.years)} (${windowText(r.view.row)})`,
+    title: `${letter} · ${lowerFirst(p.label)} over your stay`, scope: `Base case · stay ${years(r.view.row.years)} (${windowText(r.view.row)})`,
     lines: [
       { label: "As paid (nominal)", value: figure(nominal) },
       { label: `Present value today, at ${percent(r.sweep.discountRate)} a year`, value: figure(pv), rule: "single" },
@@ -1362,7 +1369,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
     }));
     lines.push({ op: "=", label: row.label, value: figure(row.value), rule: "double" });
     return {
-      title: title(row.label.toLowerCase()), scope, lines,
+      title: title(lowerFirst(row.label)), scope, lines,
       notes: [line === "paid" ? "Footed: the offer letter, line by line to what's paid in the year." : "Footed: the lines above it, added."],
       ties: line === "paid" ? [l6("gross")] : line === "afterTax" ? tieIf(["cash"], "afterTax") : line === "totalRewards" ? tieIf(["totalRewards"], "totalRewards")
         : line === "total" ? tieIf(["colAdjustedTotal"], "total") : [],
@@ -1611,7 +1618,7 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
   const name = row.label.replace(/, line \d+$/, "");
   const id = (l: L6Line, c: number | "sum"): MetricId => `l6y.${letter}.${l}.${c}`;
   const show = (x: number) => (row.unit === "perHour" ? cents(x) : figure(Math.abs(x)));
-  const title = `${letter} · ${col === "sum" ? `years 1–${t.n}` : `year ${col}`} · ${name.toLowerCase()}`;
+  const title = `${letter} · ${col === "sum" ? `years 1–${t.n}` : `year ${col}`} · ${lowerFirst(name)}`;
 
   if (col === "sum") {
     const of = PER_HOUR_OF[line];
@@ -1636,7 +1643,7 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
           value: i ? show(v) : (row.unit === "dollars" ? signed(v) : figure(v)), ref: id(line, i + 1) })),
         { op: "=", label: "The years, added", value: row.unit === "dollars" ? signed(value) : figure(value), rule: "double" },
       ],
-      notes: [`Footed across: ${name.toLowerCase()} in each year of your stay, as shown, added.`],
+      notes: [`Footed across: ${lowerFirst(name)} in each year of your stay, as shown, added.`],
       ties: [], uses: row.values.map((_, i) => id(line, i + 1)),
     };
   }
@@ -1904,7 +1911,7 @@ function l6PaymentWork(ctx: WorkContext, letter: L, i: number, what: "gross" | "
       ? { value: exact, text: toCent(exact) }
       : enough(exact, 2, (x) => cent(x * rate) === cent(p.tax));
     return {
-      title: `${letter} · tax on ${label.toLowerCase()}`, scope,
+      title: `${letter} · tax on ${lowerFirst(label)}`, scope,
       lines: [
         { label: pay.value === p.gross ? "Pay" : "Pay, before rounding to the cent", value: pay.text, ref: `l6p.${letter}.${i}.gross` },
         { op: "×", label: `The offer's ${p.calendarYear} rate`, value: rateText(t.rate, t.digits), ref: `l6t.${letter}.${p.calendarYear}.rate.offer` },
@@ -1961,7 +1968,7 @@ function l6PaymentWork(ctx: WorkContext, letter: L, i: number, what: "gross" | "
   }
   if (d.kind !== "cash" && d.kind !== "clawback") lines.push({ op: "=", label: "Pay", value: toCent(p.gross), rule: "double" });
   return {
-    title: `${letter} · ${label.toLowerCase()}`, scope, lines,
+    title: `${letter} · ${lowerFirst(label)}`, scope, lines,
     notes: [
       ...(d.kind === "salary" ? ["A month's salary is the annual rate ÷ 12; a part month earns its share by days. It's dated on the last day it covers."] : []),
       ...(d.kind === "bonus" ? [`Paid ${longDate(p.date)} for the period ${longDate(d.periodFrom)} – ${longDate(d.periodTo)}, counting the days you worked in it.`] : []),
@@ -2014,7 +2021,7 @@ function l6TaxWork(ctx: WorkContext, letter: L, year: number, line: TaxLine, col
   if (!row) throw new Error(`No ${line} line in ${letter}'s ${year} tax.`);
   const id = (l: TaxLine, c: TaxCol): MetricId => `l6t.${letter}.${year}.${l}.${c}`;
   const colName = { with: "with the offer", without: "without it", offer: "the offer's share" }[col];
-  const title = `${letter} · ${year} · ${row.label.toLowerCase()}, ${colName}`;
+  const title = `${letter} · ${year} · ${lowerFirst(row.label)}, ${colName}`;
   const scope = `Base case · calendar year ${year}${t.projectedLaw ? " · tax law projected from 2026" : " · 2026 tax law"}`;
   const engineNote = (v: number) => `The tax engine's figure: ${toCent(v)}.`;
   const runOf = (c: "with" | "without") => (c === "with" ? t.t.with : t.t.without);
