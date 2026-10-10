@@ -49,7 +49,8 @@ const TYPING = 'input:not([type="checkbox"], [type="radio"], [type="button"], [t
 
 /**
  * Whether a phone's on-screen keyboard is (likely) up: a field you type in has focus on a touch screen, or the visual
- * viewport has shrunk well below the layout viewport. The sticky verdict bar hides meanwhile (WCAG 2.4.11).
+ * viewport has shrunk well below the layout viewport at its own scale (pinch-zoom shrinks it too, by scaling: that isn't
+ * the keyboard). The sticky verdict bar hides meanwhile (WCAG 2.4.11).
  */
 export function useKeyboardUp(): boolean {
   const [up, setUp] = useState(false);
@@ -58,18 +59,27 @@ export function useKeyboardUp(): boolean {
     const vv = window.visualViewport;
     const check = () => {
       const typing = coarse.matches && !!document.activeElement?.matches?.(TYPING);
-      const shrunk = !!vv && window.innerHeight - vv.height > 150;
+      const shrunk = !!vv && window.innerHeight - vv.height * vv.scale > 150;
       setUp(typing || shrunk);
     };
     // On focusout the next element hasn't taken focus yet: check once it has.
     const later = () => setTimeout(check, 0);
+    // A viewport change (the keyboard, a rotation) can report the window's and the visual viewport's sizes a moment apart:
+    // check again once they agree, so a passing difference never leaves the bar hidden.
+    const resized = () => {
+      check();
+      setTimeout(check, 150);
+    };
+    check();
     document.addEventListener("focusin", check);
     document.addEventListener("focusout", later);
-    vv?.addEventListener("resize", check);
+    vv?.addEventListener("resize", resized);
+    window.addEventListener("resize", resized);
     return () => {
       document.removeEventListener("focusin", check);
       document.removeEventListener("focusout", later);
-      vv?.removeEventListener("resize", check);
+      vv?.removeEventListener("resize", resized);
+      window.removeEventListener("resize", resized);
     };
   }, []);
   return up;

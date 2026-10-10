@@ -102,6 +102,22 @@ test.describe("phone", () => {
     await expect(page.locator(".lead .verdict")).toBeInViewport();
   });
 
+  test("the bar comes back after the screen changes size (a rotation), and pinch-zoom isn't taken for the keyboard", async ({ page }) => {
+    await openCompare(page);
+    const bar = page.locator(".verdict-bar.is-bottom");
+    await page.setViewportSize({ width: 390, height: 300 });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
+    await expect(bar).toBeVisible();
+    // Pinch-zoom to 2x: the visual viewport is half the height, at twice the scale. The bar stays.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 2 });
+    await expect.poll(() => page.evaluate(() => window.visualViewport!.scale)).toBe(2);
+    await page.waitForTimeout(300);
+    await expect(bar).not.toHaveClass(/is-hidden/);
+    await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
+  });
+
   test("tabbing down the page and back up, the bar never covers what has focus (WCAG 2.4.11)", async ({ page }) => {
     await openCompare(page);
     // Down past About you into the ledger (fields you type in hide the bar; the rest don't), then back up.

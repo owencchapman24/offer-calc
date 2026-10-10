@@ -49,7 +49,8 @@ done; stop C (the NVDA walkthrough) is next.
     takes focus).
   - **It never hides the focused element** (WCAG 2.4.11): 72 px of scroll padding while a bar shows (`:root:has(...)`),
     `useFocusClearOfBars` (a focused element a bar covers is scrolled clear), and the phone's bar hides while the
-    keyboard is up (`useKeyboardUp`: a field you type in has focus on a touch screen, or the visual viewport has shrunk).
+    keyboard is up (`useKeyboardUp`: a field you type in has focus on a touch screen, or the visual viewport has shrunk at its
+    own scale, so pinch-zoom doesn't count; re-checked once a resize settles, so a rotation never leaves it hidden).
     `e2e/mobile.e2e.ts` tabs down the page and back up on a phone and a tablet: nothing covered (without the guards, 8 and
     6 were).
 - **The accessibility scan** (slice 7, stop A): Playwright with axe-core (`e2e/`, `npm run e2e`) on the
@@ -233,8 +234,8 @@ done; stop C (the NVDA walkthrough) is next.
     jobs, and the close-call line's breakeven, run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 408 passing (`npm test`), and 115 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
-tests, 5 keyboard tests, and the phone and tablet tests; 12 more skip, each a phone's test on a tablet or the reverse).
+**Tests:** 408 passing (`npm test`), and 116 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
+tests, 5 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,

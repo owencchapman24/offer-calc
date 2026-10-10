@@ -55,6 +55,8 @@ test.describe("phones and tablets", () => {
     // Half way down, where it sticks (at the top on a tablet, the bottom on a phone); the scan sees it in its place.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
     await expect(page.locator(".verdict-bar")).toBeVisible();
+    // Half way down, L-3 and L-4 come on screen and start working: wait for them.
+    await settled(page);
     await scan(page, "the verdict bar");
   });
 
