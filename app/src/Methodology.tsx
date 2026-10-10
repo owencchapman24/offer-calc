@@ -4,6 +4,7 @@ import { formatAssumption } from "../../src/format/index";
 import type { ValueBasis } from "../../src/offer/types";
 import { CASES, changeText, riskView } from "./cases";
 import { cashLever, changeText as tieChangeText } from "./breakevenModel";
+import { shownYears } from "./footing";
 import { addMonthsIso, forfeits } from "./leaveModel";
 import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
 import { basisPhrase, bridge, pricesOf, shortCity, type WorkContext } from "./metrics";
@@ -80,7 +81,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             Every payment and vest is a dated event. Tax is worked out per calendar year, the way the law works; the events are
             then grouped into employment years (year 1 is your first 12 months) for L-1 and the bridge, and summed over your stay
             for the verdict. All three views come from the same events, so they reconcile: the bridge's year-1 total is the
-            chart's year 1, and the years add up to your stay.
+            chart's year 1, and the years add up to your stay. L-6, The work, lists them all: each year line by line, every
+            payment with its formula and tax, and each calendar year's tax with and without the offer.
           </p>
           <PipelineExample ctx={ctx} sample={sample} />
         </Section>
@@ -492,7 +494,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               {([
                 ["recomputed", "Recomputed from other figures; opens the arithmetic."],
                 ["footed", "The total of the lines above it."],
-                ["crossFooted", "Ties to the same figure elsewhere: a bridge total to its year in L-1, a present value to the rank list."],
+                ["crossFooted", "Ties to the same figure on another schedule: L-6's stay to L-1's, its present value to the rank list."],
                 ["traced", "Something you entered, a sample input, or published data (IRS, BEA, HUD, Census)."],
                 ["default", "A default you haven't changed, with the reason for it."],
                 ["estimate", "Estimated, not entered: a rent you can replace with yours."],
@@ -501,6 +503,17 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               ))}
             </tbody>
           </table>
+          <h3 className="method-sub">Rounding: every column adds up as shown</h3>
+          <p>
+            Figures are shown to the dollar, and payments to the cent. A figure is rounded once, where it's worked out: a
+            year's salary is its payments, each to the cent, added and then rounded; its tax likewise. A total is the figures
+            above it as shown, added, so every column on a schedule adds up as you see it, and a figure shown in two places is the
+            same figure. A year's total can differ by a dollar or two from the unrounded figure rounded once (109,462 where the
+            arithmetic before rounding has 109,462.63). In a calendar year's tax with the offer, the total is the tax without it
+            plus the offer's tax, and the federal income tax, the largest line, takes the rounding, as on a rounded schedule; its
+            work shows the unrounded figure. Present values aren't sums of the years (each payment is discounted from its date),
+            so they're worked out before rounding, and L-6 ties each to the rank list.
+          </p>
         </Section>
       </article>
     </div>
@@ -578,9 +591,10 @@ function PipelineExample({ ctx, sample }: { ctx: WorkContext; sample: boolean })
 function YearOne({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const r = ctx.results;
   if (!r?.detail) return null;
+  // As shown in L-1, the bridge and L-6 (footing.ts).
   const rows = r.letters.flatMap((l, i) => {
-    const y = r.detail!.offers[i].employmentYears[0];
-    return y?.costOfLiving ? [[l, y.costOfLiving.total] as [Letter, number]] : [];
+    const y = shownYears(r.detail!.offers[i])[0];
+    return y?.col ? [[l, y.col.total] as [Letter, number]] : [];
   });
   if (!rows.length) return null;
   return (

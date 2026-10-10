@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { BreakevenProps } from "./Breakeven";
 import type { LeavingProps } from "./Leaving";
+import type { TheWorkProps } from "./TheWork";
 import { lazyModule, useLazyModule, useLoadNear } from "./lazy";
 import type { WorkContext } from "./metrics";
 import type { Stale } from "./ui";
@@ -13,6 +14,7 @@ const riskSchedule = lazyModule(() => import("./Risk"));
 const breakevenSchedule = lazyModule(() => import("./Breakeven"));
 const leavingSchedule = lazyModule(() => import("./Leaving"));
 const warningsSchedule = lazyModule(() => import("./Warnings"));
+const workSchedule = lazyModule(() => import("./TheWork"));
 
 /** L-2, once its code has loaded. */
 export function RiskSlot({ ctx, sample, status }: { ctx: WorkContext; sample: boolean; status: Stale }) {
@@ -44,4 +46,12 @@ export function WarningsSlot({ ctx, sample, status }: { ctx: WorkContext; sample
   const ref = useRef<HTMLDivElement>(null);
   useLoadNear(warningsSchedule, ref, m !== null);
   return m ? <m.Warnings ctx={ctx} sample={sample} status={status} /> : <div ref={ref} id="l5" className="later" />;
+}
+
+/** L-6, once its code has loaded. Collapsed by default: its payments are worked out only once it's opened. */
+export function TheWorkSlot(props: TheWorkProps) {
+  const m = useLazyModule(workSchedule);
+  const ref = useRef<HTMLDivElement>(null);
+  useLoadNear(workSchedule, ref, m !== null);
+  return m ? <m.TheWork {...props} /> : <div ref={ref} id="l6" className="later" />;
 }

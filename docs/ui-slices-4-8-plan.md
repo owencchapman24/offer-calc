@@ -4,7 +4,9 @@
 slice 8's stop A, merged; how each differs from the design is in `docs/ui-design.md` §12, "UI slice 5 versus
 this design", "UI slice 4 versus this design" and "UI slice 8 versus this design"). Slice 7 is done: stops A (the scan,
 the smoke tests and their fixes), B (phone tabs, the sticky verdict bars) and C (the NVDA walkthrough, written; its run is
-deferred to before the public launch), versus the design in §12 "UI slice 7 versus this design". Slice 6 is next, the last.
+deferred to before the public launch), versus the design in §12 "UI slice 7 versus this design". Slice 6, the last, is under
+way: stop A (L-6 and its ties) is done, versus the design in §12 "UI slice 6 versus this design"; stop B (CSV, print, the
+hide-tickmarks setting) is next.
 
 The plan for the UI slices after slice 3, with the decisions made in review on 2026-10-09. A fresh
 session should be able to execute it from this file, `CLAUDE.md` and `docs/ui-design.md` (rev 3,

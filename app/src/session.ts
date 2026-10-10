@@ -33,6 +33,8 @@ export interface UiState {
   editor?: { row: string; letter: Letter } | null;
   /** On a phone, the offer the ledger shows (its tab). Missing, or an offer that's gone: the first. */
   offerTab?: Letter;
+  /** L-6, the work: whether its tables are open (closed by default), and the offer shown (missing, or gone: the first). */
+  work?: { open: boolean; letter?: Letter };
 }
 
 export interface Session {
@@ -61,7 +63,7 @@ export type Action =
   | { type: "basis"; basis: Basis }
   | { type: "theme"; theme: Theme }
   | { type: "dismiss"; hint: Hint }
-  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab">> }
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab" | "work">> }
   /** An import: replaces every offer and About you, and takes the file's view choices, if any. */
   | { type: "replace"; household: AppHousehold; offers: AppOffer[]; ui?: Partial<UiState> }
   /** "Delete all data": back to the first visit, with the samples. */

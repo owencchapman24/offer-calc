@@ -40,25 +40,43 @@ export async function settled(page: Page) {
  * - and it all holds for a moment.
  */
 export async function quiet(page: Page) {
-  const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true']");
+  const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true'], "
+    + ".the-work[aria-busy='true']");
   const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
     .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
   for (let still = 0, tries = 0; still < 2; tries++) {
     if (tries > 60) throw new Error("The page didn't settle.");
     await expect(busy).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(loading, { timeout: 30_000 }).toBe(false);
+    await nearbyWorkedOut(page);
     const y = await page.evaluate(() => window.scrollY);
     for (const schedule of [".ties", ".leaving"]) {
       const dimmed = page.locator(`${schedule}.is-updating`);
       if (!(await dimmed.count())) continue;
       await dimmed.scrollIntoViewIfNeeded();
       await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+      // Scrolled here, the other may have come near the screen and started too: it would dim later, off screen, mid-scan.
+      await nearbyWorkedOut(page);
       await page.evaluate((top) => window.scrollTo(0, top), y);
     }
     still = (await page.locator(".is-updating").count()) === 0 && !(await loading()) ? still + 1 : 0;
     await page.waitForTimeout(250);
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
+}
+
+/**
+ * L-3 and L-4 work out their numbers once they come near the screen (useOnScreen's margin: half a screen), and dim only once
+ * they have figures from earlier inputs: one near the screen that hasn't any yet is working on them. Waits for those.
+ */
+async function nearbyWorkedOut(page: Page) {
+  const working = await page.evaluate(() => [".ties", ".leaving"].filter((sel) => {
+    const el = document.querySelector<HTMLElement>(sel);
+    if (!el || el.dataset.ready !== "0") return false;
+    const r = el.getBoundingClientRect();
+    return r.bottom > -0.5 * window.innerHeight && r.top < 1.5 * window.innerHeight;
+  }));
+  for (const schedule of working) await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
 }
 
 /** The comparison page on a first visit, worked out. */
@@ -84,6 +102,31 @@ export async function loadSchedules(page: Page) {
     await page.locator(schedule).scrollIntoViewIfNeeded();
     await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   }
+  await settled(page);
+}
+
+/**
+ * L-6, The work: scrolled to (it loads as you near it), its tables opened, on an offer's tables, with its payments and tax
+ * years worked out.
+ */
+export async function openWork(page: Page, letter = "A") {
+  // The schedules above first, worked out: L-4's panel filling in moves L-6 down, and a click mid-move lands elsewhere.
+  await loadSchedules(page);
+  const title = page.locator("#l6-title");
+  for (let i = 0; i < 80 && !(await title.count()); i++) {
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
+    await page.waitForTimeout(100);
+  }
+  await title.scrollIntoViewIfNeeded();
+  const toggle = page.locator(".l6-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  const pick = page.locator("#l6-body .segmented button", { hasText: letter });
+  await expect(async () => {
+    if ((await pick.getAttribute("aria-pressed")) !== "true") await pick.click();
+    await expect(pick).toHaveAttribute("aria-pressed", "true", { timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(page.locator(".the-work")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(page.locator(".l6-payments")).toBeVisible();
   await settled(page);
 }
 

@@ -32,11 +32,25 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1-5, 7 and 8 are complete and live at https://offer-calc.vercel.app** (plan for slices 4-8:
-`docs/ui-slices-4-8-plan.md`; slices 4, 5, 7 and 8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
+**UI: slices 1-5, 7 and 8 are complete, and slice 6's stop A (L-6), live at https://offer-calc.vercel.app** (plan for slices
+4-8: `docs/ui-slices-4-8-plan.md`; slices 4-8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
 done (2026-10-10): stop A (the automated accessibility scan and its fixes), stop B (phone tabs, sticky verdict bars) and
-stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). Slice 6
-is next.
+stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). **Slice 6,
+stop A** (2026-10-10): L-6 and its ties, and the year figures as shown. Slice 6's stop B (CSV, print, hide-tickmarks) is next.
+- **L-6, The work** (slice 6, stop A; `TheWork.tsx`, view model `workpaper.ts`): collapsed until "Show the tables", then one offer
+  at a time (A | B | C): its employment years as numbered lines (cash; total rewards and hours; after rent) by year and the years
+  added; your stay's totals on each basis (the years, less what runs past the stay, = your stay as paid `<` L-1's; present value
+  `<` the rank list); every payment to the cent with its formula and tax, by year and kind, subtotalled; and each calendar year's
+  tax with the offer, without it and the offer's share, with the offer's rate. Its payments and tax years come from the worker's
+  slow lane (`paymentsJob`, lane `work`) only while it's open; its years come with the comparison. Every figure is a tickmark
+  with a derivation, and `l6.test.ts` works every L-6, L-1 and bridge derivation line by line, as displayed.
+- **The year figures as shown** (`footing.ts`, main thread): what L-1, the bridge and L-6 show for each employment year. A leaf is
+  rounded once (a year's salary, bonus, cash awards and RSUs are its payments as posted, each to the cent, added: `posted` in the
+  fast lane's detail; its tax likewise); a subtotal is its lines as shown, added; spending at the prices picked multiplies the
+  shown spending by the shown BEA indexes. So every column adds up as displayed, and a few year figures differ by a dollar from
+  the engine's own rounding (A's year 1 after rent is 62,594, not W4's 62,595). Present values and per hour stay the engine's.
+  In a tax year with the offer, the total is the total without plus the offer's tax, and the federal line takes the rounding.
+  `footing.ts` names no places: importing the city list there split it out of the main chunk (Rolldown).
 - **Screen readers** (slice 7, stop C): `docs/nvda-walkthrough.md`, ten parts, about 30 minutes, with the keys and what NVDA
   should say at each step. Two gaps found while writing it are fixed: a row editor's button names its offer and row
   ("Edit A's promotions", "Close …" while open, "Add B's promotions" with none yet: `editorButtonName` in `controls.tsx`),
@@ -66,8 +80,9 @@ is next.
   33 states (quick mode, every detailed section and row editor, Show the work opened, drilled into and on a
   default, L-1's table view, L-1 to L-5 loaded, L-4 on your stay's last day, the methodology, the Data
   page's import review, its problems, a file it can't import and the delete confirmation; since stop B the
-  verdict bar and the phone's tabs), in desktop 1440 and phone 390 projects, light and dark, and the comparison
-  page's states in tablet 820 projects: 140 scans. The verdict bar is scanned in its place (`position: static`):
+  verdict bar and the phone's tabs; since slice 6 L-6 open on A and on C, and a payment's tax worked out: 36), in
+  desktop 1440 and phone 390 projects, light and dark, and the comparison page's states in tablet 820 projects: 158
+  scans. L-6's states are the longest pages (every schedule loaded, ~500 figures in its tables): their tests have 180 s. The verdict bar is scanned in its place (`position: static`):
   axe counts targets scrolled under a stuck bar as obscured, which is a scroll position, not the layout. Any WCAG 2.0/2.1/2.2 A or AA violation
   fails, unless `test/a11y-exceptions.json` accepts it with a rule, a selector and a reason (an entry
   without a reason fails, in `npm test` too). None is excepted. The report (`.a11y/report.md`) lists the
@@ -169,7 +184,7 @@ is next.
     it's a bottom sheet. A one-time hint under the verdict points to them.
   - **L-1 by year:** a hand-built SVG line chart (each year or running total) with a
     keyboard-readable crosshair, end labels, notes (promotion, new-hire RSUs finishing) and
-    a ticked table view whose present-value row ties to the rank list.
+    a ticked table view (its years and your stay; since slice 6 its present-value tie is L-6's).
   - **The bridge** beside it: the offer letter to after rent, at U.S. prices, for any
     offer and year (W4), each line explained ("first bonus is a stub", "RSUs vest on
     company dates") and footed; its total ties to L-1.
@@ -211,8 +226,9 @@ is next.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 369.4 / 113.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 7's stop A ended at 364.3 / 111.9; slice 8
+  - **Main thread:** 373.9 / 115.1 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 6's stop A added 4.5 / 1.7 (the year figures as shown,
+    L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8
     at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
     slice 5 at 355.7 / 109.1;
     slice 3 at 351.8 /
@@ -232,24 +248,30 @@ is next.
     controls, its help text), the derivations 69 / 22 KB (when a tickmark is hovered, focused or
     opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
     L-2 9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 14 / 5 KB plus its view model 4 / 2 KB
-    (each view model shared with the derivations), L-5 6 / 3 KB.
+    (each view model shared with the derivations), L-5 6 / 3 KB, L-6 11 / 3 KB plus its view model 12 / 5 KB (2026-10-10; the
+    derivations are now 92 / 27 KB, with L-6's).
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
   - **Worker:** ~250 KB. Per edit it runs `validateOffer` on each offer, then `horizonSweep`, your
     stay's full projection per offer, its bear and bull totals (L-2) and its withholding (L-5): about
     50 ms warm on the samples in Node, 35-65 ms in headless Edge (32 before slice 5). L-3's and L-4's
-    jobs, and the close-call line's breakeven, run in the slow lane.
+    jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 412 passing (`npm test`), and 118 Playwright tests (`npm run e2e`: the scan's tests in six projects, 2 smoke
+**Tests:** 424 passing (`npm test`), and 131 Playwright tests (`npm run e2e`: the scan's tests in six projects, 3 smoke
 tests, 7 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5, `app/src/names.test.ts` 4,
-  `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
+  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 12, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
+  `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
+- `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),
+  the ties to L-1, the bridge and the rank list, the anniversary edge (a payment on your stay's last day is counted; on the
+  day after, it's year 4's but past the stay), and works every L-6, L-1 and bridge derivation line by line as displayed
+  (`footsAsDisplayed`: each "=" is the arithmetic of the lines above it, to the precision shown). `smoke.e2e.ts` checks that the
+  worker is asked for L-6's payments only once it's opened.
 - `prices.test.ts` (slice 8) renders every schedule, every derivation they reach and the methodology with
   prices in Charlotte, and fails on any label that still names U.S. prices; it also checks the rent note
   against L-3's rent lever to the cent.
@@ -312,9 +334,9 @@ Before the repo and the app go public (deferred, see Decisions):
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 6:** the reconciliation schedule (L-6, "The work", §4.8: the full tables, footed and
-   cross-footed to the lead schedule), CSV export of each table, print, and the hide-tickmarks
-   setting.
+1. **Slice 6, stop B:** CSV export of each table (tickmarks as a column, the sample flag on line 1 and `-sample` in the file
+   name, text cells guarded against formulas), print (every schedule expanded, a Print button that loads the lazy schedules
+   first), and the hide-tickmarks setting. Then the end of slice 6: §12 and this file.
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
@@ -418,6 +440,11 @@ build them in.
     message types and `rentKey`: never import values from `engine.worker.ts` or
     `compute.ts`.
   - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
+  - `src/footing.ts`: the year figures as shown (`shownYears`, `shownStay`), shared by L-1, the bridge and L-6, and the BEA
+    indexes as shown (`indexDigits`, `shownIndexes`). Main thread; no place names (see "The year figures as shown").
+  - `src/TheWork.tsx` is L-6; `src/workpaper.ts` its view model (the year table's numbered lines, your stay's totals, the
+    payments by year and kind, each tax year's columns, the rate's digits), shared with `derive.ts`. Its payments come from
+    `paymentsJob` (`slowJobs.ts`), asked for with `workJob` (`protocol.ts`) while it's open.
   - `src/media.ts`: the layout's widths (`PHONE`, `TABLET`, as `styles.css` has them) as `useMedia`, the phone keyboard
     (`useKeyboardUp`) and `useFocusClearOfBars` (WCAG 2.4.11).
   - Show the work: each figure's metric id maps to a tickmark kind, a methodology section
@@ -432,7 +459,9 @@ build them in.
     mark), `Trace` (an input derivations can light up), `useRovingTicks`, and the context they
     read. No `react-dom`, nothing from `metrics.ts` at run time (see Bundles).
   - `src/Tickmarks.tsx`: `WorkProvider` (it provides that context, with each figure's tickmark
-    kind), the popover, and the derivations' lazy module; it re-exports the figures.
+    kind), the popover, and the derivations' lazy module; it re-exports the figures. The context object stays the same
+    while the page's context changes (it reads the latest through a ref), so a memoized subtree (L-6's tables) skips its
+    figures on each key: with L-6 open, a keystroke renders in ~10 ms, where it took 60-120 ms before.
   - `src/ByYear.tsx`: L-1 (the hand-built SVG chart, notes, table view) and the bridge.
   - `src/Later.tsx`: the schedules after L-1, each loaded as you scroll toward it
     (`useLoadNear` in `lazy.ts`). `src/Risk.tsx` is L-2; `src/cases.ts` its view model (values by
@@ -466,8 +495,9 @@ build them in.
   `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`), `serve-dist.ts` (the build for Playwright),
   `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 - `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
-  - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded,
-    when the page has settled); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
+  - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded, L-6 open on an
+    offer (`openWork`, after the schedules above have filled in: one filling in mid-click moves L-6), when the page has settled:
+    `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
   - `smoke.e2e.ts`, `keyboard.e2e.ts`; `mobile.e2e.ts` (the phone's tabs and the verdict bars, in the `phone` and
     `tablet` projects).

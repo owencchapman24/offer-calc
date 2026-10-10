@@ -6,7 +6,7 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
-import { BreakevenSlot, LeavingSlot, RiskSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, LeavingSlot, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -192,9 +192,13 @@ export function App() {
     ...(flip?.row && engine.flip.result ? { flip: engine.flip.result } : {}),
     ...(engine.breakeven.result ? { l3: engine.breakeven.result } : {}),
   };
+  // L-6, the work (docs/ui-design.md §4.8): closed by default; its payments and tax years come only while it's open.
+  const workOpen = session.ui.work?.open ?? false;
+  const workLetter = session.ui.work?.letter ?? null;
+  const payments = workOpen && engine.work.result?.length === letters.length ? { work: engine.work.result } : {};
   const work: WorkContext = {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
-    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties } } : {}),
+    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties, ...payments } } : {}),
   };
 
   return (
@@ -246,6 +250,11 @@ export function App() {
               onBasis={setLeaveBasis} />
           )}
           {work.results && <WarningsSlot ctx={work} sample={sample} status={stale} />}
+          {work.results && (
+            <TheWorkSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale} work={engine.work} requestSlow={requestSlow}
+              open={workOpen} letter={workLetter} onOpen={(open) => dispatch({ type: "ui", patch: { work: { ...session.ui.work, open } } })}
+              onLetter={(letter) => dispatch({ type: "ui", patch: { work: { open: true, letter } } })} />
+          )}
         </>
       )}
 

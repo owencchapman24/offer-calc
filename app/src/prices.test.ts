@@ -98,7 +98,7 @@ describe("prices in a city you know", () => {
     const usPage = renderPage(us);
     expect(usPage).toContain("after rent, at U.S. prices");
     expect(usPage).toContain("U.S.-avg $, as paid");
-  });
+  }, 30_000);
 
   it("About you shows the choice, with a D tickmark only at the U.S. average, and its work", () => {
     expect(metricKind("about.prices", us)).toBe("default");

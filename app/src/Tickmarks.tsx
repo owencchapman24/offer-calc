@@ -65,8 +65,14 @@ export function WorkProvider({ ctx, children, onOpen, onEdit }: {
   const editRef = useRef(onEdit);
   useEffect(() => { editRef.current = onEdit; });
   const edit = useCallback((target: EditTarget) => editRef.current?.(target), []);
-  const api = useMemo<WorkApi>(() => ({ ctx, kind: (id) => metricKind(id, ctx), openId, traced, toggle, push, edit }),
-    [ctx, openId, traced, toggle, push, edit]);
+  // The context is new with every edit, but the figures' API isn't: it reads the latest context through a ref, so a schedule
+  // that skips rendering until its own data changes (L-6's tables, memoized) doesn't re-render all its figures on each key.
+  // Every other figure re-renders with its schedule, which takes the context as a prop.
+  const latest = useRef(ctx);
+  latest.current = ctx;
+  const kind = useCallback((id: MetricId) => metricKind(id, latest.current), []);
+  const api = useMemo<WorkApi>(() => ({ get ctx() { return latest.current; }, kind, openId, traced, toggle, push, edit }),
+    [kind, openId, traced, toggle, push, edit]);
 
   return (
     <Api.Provider value={api}>

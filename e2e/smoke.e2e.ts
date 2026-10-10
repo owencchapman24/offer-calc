@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { openCompare, settled, verdictText } from "./lib/app";
+import { openCompare, openWork, settled, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -22,6 +22,31 @@ test("a salary edit updates the verdict", async ({ page }) => {
   expect(after.hero).not.toEqual(before.hero);
   expect(after.ranks[0]).toMatch(/^B/);
   await expect(page.locator(".lead .verdict-lede").first()).toHaveText(/^B leaves you about/);
+});
+
+test("L-6 asks the worker for its payments only once it's opened, and its totals tie to the rank list", async ({ page }) => {
+  // What the page asks the engine worker for: each message's lane.
+  await page.addInitScript(() => {
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, message: unknown, ...rest: unknown[]) {
+      const w = window as unknown as { lanes?: string[] };
+      (w.lanes ??= []).push((message as { lane?: string } | null)?.lane ?? "compare");
+      return (post as (...args: unknown[]) => void).call(this, message, ...rest);
+    };
+  });
+  const lanes = () => page.evaluate(() => (window as unknown as { lanes?: string[] }).lanes ?? []);
+  await openCompare(page);
+  // L-6 loads as you scroll toward it, closed: nothing asked for yet.
+  const title = page.locator("#l6-title");
+  for (let i = 0; i < 80 && !(await title.count()); i++) await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
+  await expect(page.locator(".l6-toggle")).toHaveAttribute("aria-expanded", "false");
+  await settled(page);
+  expect(await lanes()).not.toContain("work");
+  await openWork(page, "A");
+  expect(await lanes()).toContain("work");
+  // Its present value on the verdict's basis is the rank list's figure, and its stay is L-1's.
+  const shown = (sel: string) => page.locator(`${sel} .fig-value`).first().textContent();
+  expect(await shown('[data-metric="l6s.A.colAdjustedTotal.pv"]')).toBe(await shown(".lead .ranks li.offer-A .rank-value"));
 });
 
 test("export, then import: the same results", async ({ page }) => {
