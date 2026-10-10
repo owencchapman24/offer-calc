@@ -31,7 +31,7 @@ jobs:
       - run: npm run check-bundle
 
   # The bundle check catches regressions in what we ship; this measures what users feel: the Largest
-  # Contentful Paint on Lighthouse's mobile profile (simulated slow 4G, 4x CPU slowdown), median of three
+  # Contentful Paint on Lighthouse's mobile profile (simulated slow 4G, 4x CPU slowdown), after a discarded warm-up, median of three
   # runs, at most 2.5 s (scripts/lib/lighthouse.ts). The runner's preinstalled Chrome runs it.
   lighthouse:
     runs-on: ubuntu-latest
