@@ -43,7 +43,7 @@ stop C (the NVDA walkthrough, written; its run is deferred to before the public 
 is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). What's next is the user's call: see Next steps.
-- **Where things stand** (2026-10-12, slice 6 stop B, the print choice and 2027's HSA limits): `npm test` 445 passing; `npm run e2e` 154 passing
+- **Where things stand** (2026-10-12, slice 6 stop B, the print choice and 2027's HSA limits): `npm test` 448 passing; `npm run e2e` 154 passing
   (15 skip by design), the scan 186 scans with no violations and no exceptions; main thread 379.1 / 116.5 kB gzip
   against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
   in CI at stop B).
@@ -298,7 +298,7 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 445 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
+**Tests:** 448 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
 - `test/offer.test.ts` 127, `test/params.test.ts` 23, `test/tax.test.ts` 10,
@@ -307,7 +307,7 @@ print scan off a desktop).
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
   `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 14, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
   `app/src/phone.test.ts` 5,
-  `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
+  `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `scripts/lib/lock.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),
   the ties to L-1, the bridge and the rank list, the anniversary edge (a payment on your stay's last day is counted; on the
   day after, it's year 4's but past the stay), and works every L-6, L-1 and bridge derivation line by line as displayed
@@ -391,8 +391,9 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
 - `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node
   types), `tsc -p app` (DOM, React) and `tsc -p e2e` (the Playwright tests).
-- `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` with
-  `requirements.txt` (see README); the runner picks `.venv`'s Python automatically.
+- `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` installed from
+  `requirements.txt` with `requirements-lock.txt` as constraints (see README); the runner picks `.venv`'s Python
+  automatically, and warns first if the environment differs from the lock (`scripts/lib/lock.ts`).
 - `npm run offers`: sample comparison tables.
 - `npm run dev` / `npm run build` / `npm run preview`: the app (Vite, config in
   `app/vite.config.ts`), built to `dist/`.
@@ -546,7 +547,7 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     `Tickmarks.tsx`; `work.ts` and
     `Work.tsx` collide on a case-insensitive file system.
 - `scripts/`: `grid.ts` and `oracle.py` (validation), `run-oracle.ts`,
-  `offer-table.ts`, `bench.ts`, `check-engine.ts`, `check-bundle.ts` (with `lib/bundle.ts`),
+  `offer-table.ts`, `bench.ts`, `check-engine.ts`, `check-bundle.ts` (with `lib/bundle.ts`), `lib/lock.ts` (the oracle's locked environment, for `run-oracle.ts`),
   `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`), `serve-dist.ts` (the build for Playwright),
   `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 - `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
@@ -823,20 +824,27 @@ published for 2027 go in `FEDERAL_2027` and the rest of 2027 is projected.
   table B25064): the Census's ACS 1-year estimates, usually mid-September (2024's: Sep 11, 2025). By hand from data.census.gov,
   with the table and date in its comment; it matters only for places without an FMR (BEA state nonmetro portions).
 
-**The oracle's PolicyEngine-US:** pinned in `requirements.txt` to 2.30.3, the version the baseline was taken with (Validation
-workflow), so setting up a `.venv` never moves the baseline. Upgrading it is a deliberate step, a change of its own (its own branch
-and pull request), never folded into a data or engine change:
-1. Take the old report from `main` (`npm run oracle`, saved aside), then bump the pin and reinstall (`pip install -r requirements.txt`
-   in the `.venv`).
-2. Re-run `npm run oracle` with nothing else changed, and compare the reports.
-3. Explain every difference in the pull request: PolicyEngine fixed or updated something (then our engine may be the one that's
-   off: fix it, or add it to the known gaps), or changed how it models something (an intentional difference, or a gap). Update the
-   Validation workflow's baseline line (date, version, the match counts), M-4's figures, and "Intentional differences" and "Known
-   gaps" as they move.
-4. Only then use the new baseline for engine changes.
+**The oracle's Python environment:** `requirements.txt` pins PolicyEngine-US to 2.30.3, and `requirements-lock.txt` locks every
+package of the `.venv` the baseline was taken with (a `pip freeze`: Windows, Python 3.14.7, pip 26.2.1, 2026-10-12;
+`policyengine-core` 3.32.21 among them). Install with `python -m pip install -r requirements.txt -c requirements-lock.txt`, so
+setting up a `.venv` never moves the baseline; `npm run oracle` warns before it runs if the environment has drifted from the lock.
+The lock is from Windows: packages only macOS or Linux need (IPython's `pexpect`, `ptyprocess`) aren't in it, install unpinned
+there, and the runner lists them as not in the lock.
 
-Its own dependencies aren't pinned (`policyengine-core` is 3.32.21 in the `.venv`): if a fresh `.venv` moves the report with the pin
-unchanged, look there first.
+Upgrading PolicyEngine-US is a deliberate step, a change of its own (its own branch and pull request), never folded into a data or
+engine change, and the lock is regenerated with it, never on its own (a Python upgrade takes the same steps):
+1. Take the old report from `main` in the locked `.venv` (`npm run oracle`, saved aside).
+2. Bump the pin in `requirements.txt`. In a fresh `.venv` (nothing of the old environment left), install without the lock,
+   `python -m pip install -r requirements.txt`, so the dependencies resolve afresh.
+3. Regenerate the lock from that `.venv`: `python -m pip freeze` under the lock's header comment, with its date and the Python and
+   pip versions updated. `scripts/lib/lock.test.ts` checks that it pins the same PolicyEngine-US as `requirements.txt`. Commit the
+   two files together.
+4. Re-run `npm run oracle` with nothing else changed (it should say the environment matches the lock), and compare the reports.
+5. Explain every difference in the pull request: PolicyEngine fixed or updated something (then our engine may be the one that's
+   off: fix it, or add it to the known gaps), or changed how it models something (an intentional difference, or a gap); a change
+   in a dependency alone can move the report too. Update the Validation workflow's baseline line (date, version, the match
+   counts), M-4's figures, and "Intentional differences" and "Known gaps" as they move.
+6. Only then use the new baseline for engine changes.
 
 ## Intentional differences vs PolicyEngine (do not "fix")
 - SALT: PolicyEngine deducts *estimated withholding*; we deduct state/local tax *owed*

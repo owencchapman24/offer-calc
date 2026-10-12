@@ -67,19 +67,21 @@ The code: `src/tax` (the tax engine), `src/offer` (offers to dated, taxed paymen
   ones that are intentional, are listed in the methodology (M-4, M-10).
 
 To run the comparison yourself (a few minutes; it writes `oracle_report.json`), install PolicyEngine
-into a virtual environment named `.venv`, which `npm run oracle` uses automatically.
+into a virtual environment named `.venv`, which `npm run oracle` uses automatically. `requirements-lock.txt`
+holds every package at the version the comparison's baseline was taken with (Python 3.14 on Windows), so
+install with it as constraints; `npm run oracle` warns if your environment differs from it.
 
 macOS / Linux:
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements.txt -c requirements-lock.txt
 npm run oracle
 ```
 
 Windows (PowerShell):
 ```powershell
 py -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install -r requirements.txt -c requirements-lock.txt
 npm run oracle
 ```
 
