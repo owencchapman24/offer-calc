@@ -102,8 +102,9 @@ export function formatAssumption(a: Assumption): string {
         + "year's payments in proportion to their size.";
     case "residence": return `Taxed as a full-year resident of ${a.params.state}${a.params.locality ? ` and ${LOCALITY[a.params.locality]}` : ""}.`;
     case "projectedLaw":
-      return `Tax years after 2026 are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed, `
-        + "state law held at 2026 except statutory indexing (CA) and federal links.";
+      return `Tax years after 2026 are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed from the latest `
+        + "published (2026's, or a later year's where the IRS has published it), state law held at 2026 except statutory indexing (CA) "
+        + "and federal links.";
     case "salaryChanges":
       return `Salary changes (${a.params.scenario} scenario): ${a.params.changes
         .map((c) => `${c.date} ${c.reasons.map(reason).join(" + ")} to ${usd(round2(c.annual))}`).join("; ")}.`;

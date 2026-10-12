@@ -7,7 +7,11 @@ and show the work. Correctness and a clear methodology page matter more than fea
 ## Status (2026-10-12)
 **Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
 - **Tax engine:** 2026 law, validated against PolicyEngine-US. Projected later years come
-  from `paramsForYear`, cached and frozen.
+  from `paramsForYear`, cached and frozen. Amounts the IRS has published for a later year are used as published and projected on
+  from there (`ENACTED`): so far the 2027 HSA limits, $4,500 and $9,000 (Rev. Proc. 2026-24, `src/tax/params/federal2027.ts`).
+  The rest of 2027 is still projected: on 2026-10-12 the IRS's annual inflation revenue procedure, the 402(g) notice and SSA's
+  wage base weren't out (when to check again: "Data refresh calendar"). PolicyEngine-US 2.30.3 has no HSA-limit parameter; the
+  samples' numbers don't change (their HSA money is far under either limit).
 - **Offer model:**
   - salary, bonus and cash awards; RSUs and refreshers;
   - leave date, clawbacks and the leave-date sweep;
@@ -39,7 +43,7 @@ stop C (the NVDA walkthrough, written; its run is deferred to before the public 
 is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). What's next is the user's call: see Next steps.
-- **Where things stand** (2026-10-12, slice 6 stop B and the print choice): `npm test` 443 passing; `npm run e2e` 154 passing
+- **Where things stand** (2026-10-12, slice 6 stop B, the print choice and 2027's HSA limits): `npm test` 445 passing; `npm run e2e` 154 passing
   (15 skip by design), the scan 186 scans with no violations and no exceptions; main thread 379.1 / 116.5 kB gzip
   against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
   in CI at stop B).
@@ -294,10 +298,10 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 443 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
+**Tests:** 445 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
-- `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
+- `test/offer.test.ts` 127, `test/params.test.ts` 23, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
@@ -419,7 +423,8 @@ before going public.
 ## Code map
 - `src/tax/`
   - `index.ts`: `computeTaxes(input, params?)`.
-  - `params/`: 2026 data, `paramsForYear`, the SALT schedule.
+  - `params/`: 2026 data, `federal2027.ts` (amounts published for 2027 so far), `paramsForYear` (each federal amount projected
+    from its latest published value, `ENACTED`), the SALT schedule.
   - `federal.ts`, `state.ts`, `local.ts`.
 - `src/offer/`
   - `types.ts`.
@@ -652,7 +657,8 @@ before going public.
   to the annual rate. A rate change mid-month splits the month by days.
 - **Projected tax law:** `paramsForYear(year, { inflation })`. Inflation indexes tax law
   and is the default rent growth; it never moves pay. Pay growth comes from raises and
-  promotions.
+  promotions. A federal amount published for a later year (`ENACTED`, one file per year: `federal2027.ts`) is used as
+  published in its year, at any inflation, and later years scale it from there; everything else scales from 2026.
 
 **Scenarios, PV and comparisons**
 - **Scenarios:** bear/base/bull are joint scenarios, not percentiles. Each sets every
@@ -787,8 +793,8 @@ before going public.
   cuts such as KY and WV). Not yet itemized with sources.
 - Projected years, federal: the SS wage base is scaled by the inflation input, though it
   really tracks the national average wage index (usually faster). Indexed amounts aren't
-  rounded the way the IRS rounds them (at most ~$50 per threshold). The inflation input
-  stands in for chained CPI.
+  rounded the way the IRS rounds them (at most ~$50 per threshold), except those the IRS has published (`ENACTED`: so far
+  the 2027 HSA limits). The inflation input stands in for chained CPI.
 - State conformity: the engine excludes section 125 amounts (premiums, HSA) from every
   state's wages. CA and NJ actually tax HSA contributions.
 

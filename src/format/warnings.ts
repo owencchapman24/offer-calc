@@ -47,7 +47,8 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
     case "k401OverLimit": return `401(k) deferral exceeds the ${w.params.year} limit of $${PLAIN.format(w.params.limit)}.`;
     case "amtNotModeled": return "Alternative minimum tax is not modeled; check AMT above roughly $400k of income.";
     case "projectedLaw":
-      return `${w.params.year} tax law is projected from 2026: federal amounts indexed for inflation, state and local law held at 2026.`;
+      return `${w.params.year} tax law is projected from 2026: federal amounts indexed for inflation (from a later year's where the IRS `
+        + "has published it), state and local law held at 2026.";
     case "nycNonresident": return "NYC tax applies to NYC residents only; check your state selection.";
     case "phillyNonresident": return "Philadelphia nonresident wage tax applies only to days physically worked in the city.";
     case "flatLocalRate": return `${w.params.label}: user-supplied flat rate of ${(w.params.rate * 100).toFixed(2)}%.`;
