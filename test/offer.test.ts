@@ -653,6 +653,16 @@ describe("401(k), health, perks and hours", () => {
     expect(r.employmentYears[0].health).toMatchObject({ employeeHsa: 3_400, employerHsa: 1_000, net: -1_000 });
     expect(r.calendarYears[0].withOffer.input.section125).toBeCloseTo(3_400, 6);
   });
+  it("HSA in 2027: the IRS's $4,500 limit (Rev. Proc. 2026-24) at any inflation; 2028 projects from it", () => {
+    // 4,500 - 1,000 employer = 3,500 (projected from 2026 at 2.5% it was 4,510 - 1,000 = 3,510).
+    const o: OfferInput = { ...jan, startDate: "2027-01-01", health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0,
+      employeeHsa: 5_000, employerHsa: 1_000 } };
+    for (const inflation of [0, 0.025, 0.1]) {
+      expect(projectScenario(o, single, { years: 1, inflation }).employmentYears[0].health.employeeHsa).toBeCloseTo(3_500, 9);
+    }
+    // 2028 at 2.5%: 4,500 x 1.025 = 4,612.50, less 1,000 = 3,612.50.
+    expect(projectScenario(o, single, { years: 2 }).employmentYears[1].health.employeeHsa).toBeCloseTo(3_612.5, 9);
+  });
   it("perks: capped at $5,250 and $340/month, worth face / (1 - 29.65%) pre-tax", () => {
     // TX at $100k: 22% federal + 7.65% FICA marginal. 5,250 + 12 x 340 = 9,330; 9,330 / 0.7035 = 13,262.26.
     const r = projectScenario({ ...jan, perks: { section127: 6_000, commuterMonthly: 400 } }, single, { years: 1 });

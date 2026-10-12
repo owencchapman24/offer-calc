@@ -142,8 +142,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             <strong>Later years.</strong> Tax law after 2026 isn't known yet, so it's projected: federal brackets, deductions and
             limits rise with the inflation assumption ({percent(ASSUMPTIONS.inflation)} a year), and the SALT cap follows its
-            statutory schedule (101% a year through 2029, $10,000 from 2030). State law is held at 2026 rules, except California,
-            which indexes by statute, and amounts tied to federal ones.
+            statutory schedule (101% a year through 2029, $10,000 from 2030). Where the IRS has already published a later year's
+            amount, it's used as published and projected on from there: so far, the 2027 HSA limits ($4,500 self-only, $9,000
+            family; Rev. Proc. 2026-24). State law is held at 2026 rules, except California, which indexes by statute, and amounts
+            tied to federal ones.
           </p>
           <p>
             <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses and RSU vests
