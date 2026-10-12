@@ -1,5 +1,6 @@
 import type { FilingStatus, Schedule } from "../types";
 import { FEDERAL_2026, PAYROLL_2026 } from "./federal2026";
+import { FEDERAL_2027 } from "./federal2027";
 import { NYC_2026, PHILLY_2026 } from "./local2026";
 import { STATES_2026, type StateSpec } from "./states2026";
 
@@ -83,7 +84,7 @@ export type EnactedAmounts = Partial<Pick<FederalParams, "standardDeduction" | "
   | "commuterMonthlyLimit">> & { socialSecurityWageBase?: number };
 
 /** Enacted amounts by year, oldest first. */
-export const ENACTED: ReadonlyArray<readonly [year: number, amounts: EnactedAmounts]> = [];
+export const ENACTED: ReadonlyArray<readonly [year: number, amounts: EnactedAmounts]> = [[2027, FEDERAL_2027]];
 
 /** The base for projecting an amount to `year`: its latest enacted value at or before `year`, else 2026's, and that value's year. */
 function latest<K extends keyof EnactedAmounts>(key: K, year: number, base: NonNullable<EnactedAmounts[K]>): { value: NonNullable<EnactedAmounts[K]>; from: number } {
