@@ -1586,6 +1586,13 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
 - **The scan** adds L-2's table view with its CSV button, the page with tickmarks hidden (and Show the work so), and the printed page
   (after the Print button, in print media, on a desktop, light and dark).
 
+**After slice 6** (approved at stop B, 2026-10-12; each its own pull request):
+- **The print choice** (§9.5): the Print button is "Print…", and it offers a summary or the full workpaper before it prints. The summary
+  is the default: every schedule as above, and L-6's tables for every offer but its list of every payment, which it says is in the full
+  workpaper and in L-6's CSV. The full workpaper adds that list. The choice sits in a box under the masthead (not a dialog): focus starts
+  on it, Escape or Cancel goes back to "Print…". Ctrl+P prints the last choice made, the summary until one is; the choice isn't saved.
+  The samples print to 23 Letter pages as a summary and 37 as the full workpaper.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

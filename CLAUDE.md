@@ -39,9 +39,10 @@ stop C (the NVDA walkthrough, written; its run is deferred to before the public 
 is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). What's next is the user's call: see Next steps.
-- **Where things stand** (2026-10-12, slice 6 stop B): `npm test` 442 passing; `npm run e2e` 148 passing
-  (15 skip by design), the scan 178 scans with no violations and no exceptions; main thread 377.5 / 116.0 kB gzip
-  against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally.
+- **Where things stand** (2026-10-12, slice 6 stop B and the print choice): `npm test` 443 passing; `npm run e2e` 154 passing
+  (15 skip by design), the scan 186 scans with no violations and no exceptions; main thread 379.1 / 116.5 kB gzip
+  against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
+  in CI at stop B).
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
 - **CSV for each table** (slice 6, stop B; `csv.ts`, loaded on the first download): L-1's and L-2's table views ("Download CSV"
   once the table view is open) and L-6's four tables per offer (beside each part's heading). Built from the same view models and
@@ -51,14 +52,15 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
   `offer-calc-YYYY-MM-DD-<table>[-sample].csv` (`L-6-A-employment-years`, …). Text cells starting with `=`, `+`, `-`, `@`, a tab
   or a CR get a leading `'`; number cells never. `csv.test.ts` checks every figure in every CSV against the rendered tables. The
   button (`CsvButton`) lives in `figures.tsx` (see Bundles).
-- **Print** (slice 6, stop B; `print.ts`, loaded on the first click): the Print button (top of the comparison) sets the print
-  layout (the root's `printing` class and the `Printing` context in `ui.tsx`), loads L-2 to L-6 (`loadLater`), works out L-3, L-4
-  and L-6's payments as though on screen, waits for every schedule (12 s at most), then `window.print()`; `afterprint` restores the
-  screen. Ctrl+P sets the layout in `beforeprint` (`flushSync`, so charts re-measure at once: `useChartWidth` in `axes.ts`) but
-  prints only what's loaded. The layout is a 680 px column on screen and on paper, so charts are drawn at the print width; table
+- **Print** (slice 6, stop B; `print.ts`, loaded on the first click): "Print…" (top of the comparison) offers a summary (the
+  default: everything but L-6's list of every payment) or the full workpaper (`PrintChoice` in `App.tsx`; the `Printing` context
+  holds the choice, `usePrintScope`). Print then sets the print layout (the root's `printing` class), loads L-2 to L-6 (`loadLater`),
+  works out L-3, L-4 and L-6's payments as though on screen, waits for every schedule (12 s at most), then `window.print()`;
+  `afterprint` restores the screen. Ctrl+P sets the layout in `beforeprint` (`flushSync`, so charts re-measure at once: `useChartWidth` in `axes.ts`) but
+  prints only what's loaded, holding the last choice made (the summary until one is; not saved). The layout is a 680 px column on screen and on paper, so charts are drawn at the print width; table
   views open; L-6 open on every offer, each on a new page; the screen's controls hidden; inputs print as values; light colors from a
   dark screen; A solid, B dashed, C dotted (also under forced colors); page numbers in the margin; the footer flags samples and gives
-  the data vintages. The samples print to 37 Letter pages. A `<tfoot>` prints as a plain row group (Chromium repeats footers on
+  the data vintages. The samples print to 23 Letter pages as a summary, 37 as the full workpaper. A `<tfoot>` prints as a plain row group (Chromium repeats footers on
   each page, blank).
 - **The hide-tickmarks setting** (slice 6, stop B): "Show tickmarks | Hide tickmarks" radios in the footer (`ui.ticks`, saved with
   the session; JSON exports carry it as the theme, "shown" or "hidden"). Hidden, the root has `data-ticks="hidden"` and the
@@ -109,8 +111,8 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
   default, L-1's table view, L-1 to L-5 loaded, L-4 on your stay's last day, the methodology, the Data
   page's import review, its problems, a file it can't import and the delete confirmation; since stop B the
   verdict bar and the phone's tabs; since slice 6 L-6 open on A and on C, and a payment's tax worked out: 36; since stop B, L-2's table view, tickmarks hidden and
-  Show the work so, and print on a desktop, in print media: 40), in
-  desktop 1440 and phone 390 projects, light and dark, and the comparison page's states in tablet 820 projects: 178
+  Show the work so, and print on a desktop, in print media; then the Print button's choice, and the printed summary: 42), in
+  desktop 1440 and phone 390 projects, light and dark, and the comparison page's states in tablet 820 projects: 186
   scans. L-6's states are the longest pages (every schedule loaded, ~500 figures in its tables): their tests have 180 s. The verdict bar is scanned in its place (`position: static`):
   axe counts targets scrolled under a stuck bar as obscured, which is a scroll position, not the layout. Any WCAG 2.0/2.1/2.2 A or AA violation
   fails, unless `test/a11y-exceptions.json` accepts it with a rule, a selector and a reason (an entry
@@ -255,9 +257,9 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 377.5 / 116.0 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 6's stop B added 3.6 / 0.9 (the CSV button, the
-    tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
+  - **Main thread:** 379.1 / 116.5 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). The print choice added 1.6 / 0.5; slice 6's stop B
+    ended at 377.5 / 116.0, adding 3.6 / 0.9 (the CSV button, the tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
     L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8
     at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
     slice 5 at 355.7 / 109.1;
@@ -292,14 +294,14 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 442 passing (`npm test`), and 148 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
+**Tests:** 443 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 13, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
+  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 14, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
   `app/src/phone.test.ts` 5,
   `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),

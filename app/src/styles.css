@@ -845,6 +845,18 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* The Print button, beside the pages. */
 .print-bar { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 14px; }
 .print-status { font-size: 13px; color: var(--graphite); }
+/* The Print button's choice: a summary or the full workpaper, in a box of its own under the masthead, at its right. */
+.print-choice { flex-basis: 100%; max-width: 460px; margin: -4px 0 4px auto; padding: 10px 14px 12px; background: var(--sheet); border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--rule); }
+.print-choice fieldset { border: none; margin: 0; padding: 0; }
+.print-choice legend { padding: 0; margin-bottom: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
+.print-scope { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; cursor: pointer; font-size: 14px; line-height: 1.45; }
+.print-scope input { flex: none; accent-color: var(--ink); }
+.print-hint { color: var(--graphite); font-size: 13px; }
+.print-choice .data-actions { margin: 10px 0 0; }
+@media (max-width: 759px) {
+  .print-choice { max-width: none; margin-left: 0; }
+}
 .print-only { display: none; }
 
 /* ---- print (§9.5): a workpaper stylesheet -------------------------------------------------------------------------- */

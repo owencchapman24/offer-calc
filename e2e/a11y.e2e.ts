@@ -64,6 +64,13 @@ test.describe("compare", () => {
     await scan(page, "L-2's table view");
   });
 
+  test("the Print button's choice", async ({ page }) => {
+    await openCompare(page);
+    await page.getByRole("button", { name: "Print…" }).click();
+    await expect(page.locator("#print-choice")).toBeVisible();
+    await scan(page, "Print: a summary or the full workpaper");
+  });
+
   test("tickmarks hidden", async ({ page }) => {
     await openCompare(page);
     // The setting is at the foot of the page: going there brings L-2 to L-5 on screen. Load and work them out first, so the scan
@@ -146,14 +153,20 @@ test.describe("detailed mode", () => {
 test.describe("print", () => {
   test.beforeEach(({ page }) => test.skip((page.viewportSize()?.width ?? 0) < 1180, "printed from a desktop"));
 
-  test("print: every schedule, every offer's L-6", async ({ page }) => {
-    test.setTimeout(180_000);
+  test("print: the summary, then the full workpaper", async ({ page }) => {
+    test.setTimeout(240_000);
     await stubPrint(page);
     await openCompare(page);
     await printWithButton(page);
-    await expect(page.locator(".l6-offer")).toHaveCount(3);
+    await expect(page.locator(".l6-elsewhere")).toHaveCount(3);
     await page.emulateMedia({ media: "print" });
-    await scan(page, "print");
+    await scan(page, "print: the summary");
+    await page.emulateMedia({ media: "screen" });
+    await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+    await printWithButton(page, "full", 2);
+    await expect(page.locator(".l6-payments")).toHaveCount(3);
+    await page.emulateMedia({ media: "print" });
+    await scan(page, "print: the full workpaper");
   });
 });
 

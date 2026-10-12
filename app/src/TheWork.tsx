@@ -5,7 +5,7 @@ import { cashName, type MetricId, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, workJob, type WorkOffer } from "./protocol";
 import { figure, longDate } from "./text";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrintScope } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 import {
   KIND_NAME, moneyText as money, paymentFormula, paymentLabel, type PaymentYear, paymentYears, rateText, rowText as shown, sectionName, stayRows,
@@ -16,7 +16,7 @@ import {
 // Collapsed by default. Each offer's employment years come with the comparison (the fast lane); its payments and tax years
 // are worked out in the slow lane only once the tables are open. Every column adds up as shown (workpaper.ts), and the
 // totals tie (<) to the lead schedule and L-1. Loaded as you scroll toward it, like the schedules before it. Each table downloads
-// as CSV (csv.ts). In print, it's open on every offer, one after another.
+// as CSV (csv.ts). In print, it's open on every offer, one after another; a summary leaves out the list of every payment.
 
 export interface TheWorkProps {
   ctx: WorkContext;
@@ -41,7 +41,8 @@ export function TheWork(p: TheWorkProps) {
   useRovingTicks(ref);
   const job = p.compare ? workJob(p.compare) : null;
   const key = job && JSON.stringify(job);
-  const printing = usePrinting();
+  const scope = usePrintScope();
+  const printing = scope !== null;
   const { requestSlow, ready } = p;
   const open = p.open || printing;
   // The payments and tax years, only while the tables are open.
@@ -80,11 +81,18 @@ export function TheWork(p: TheWorkProps) {
         {p.sample && <Stamp>Illustrative samples</Stamp>}
         <StaleNote status={status} />
       </header>
-      <p className="l6-lede">
-        Every figure above, line by line, for {printing ? "each offer" : "one offer at a time"}: its employment years, every payment with its formula
-        and tax, and each calendar year's tax with and without the offer. Every column adds up as shown, and the totals tie to the lead schedule
-        and L-1.
-      </p>
+      {scope === "summary" ? (
+        <p className="l6-lede">
+          Every figure above, line by line, for each offer: its employment years and each calendar year's tax with and without the offer. Every
+          column adds up as shown, and the totals tie to the lead schedule and L-1. The list of every payment is in the full workpaper.
+        </p>
+      ) : (
+        <p className="l6-lede">
+          Every figure above, line by line, for {printing ? "each offer" : "one offer at a time"}: its employment years, every payment with its
+          formula and tax, and each calendar year's tax with and without the offer. Every column adds up as shown, and the totals tie to the lead
+          schedule and L-1.
+        </p>
+      )}
       <button type="button" className="got-it data-button l6-toggle no-print" aria-expanded={open} aria-controls="l6-body" onClick={() => p.onOpen(!open)}>
         {open ? "Hide the tables" : "Show the tables"}
       </button>
@@ -94,7 +102,7 @@ export function TheWork(p: TheWorkProps) {
             // In print, every offer's tables, one after another.
             <div key={l} className="l6-offer">
               <h3 className="chart-title l6-title"><OfferTitle ctx={ctx} letter={l} /></h3>
-              <OfferTables letter={l} {...modelsOf(l, !!r.work?.[r.letters.indexOf(l)])} error={p.work.error} />
+              <OfferTables letter={l} {...modelsOf(l, !!r.work?.[r.letters.indexOf(l)])} error={p.work.error} listed={scope === "full"} />
             </div>
           )) : (
             <>
@@ -136,9 +144,12 @@ function PartHead({ letter, part, title, name, csv }: { letter: Letter; part: L6
   );
 }
 
-/** One offer's tables. Memoized: it renders again only when its view models do. */
-const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes, error }: {
-  letter: Letter; t: YearTable; stay: StayRow[]; payments: PaymentYear[] | null; taxes: TaxTable[] | null; error: string | null;
+/**
+ * One offer's tables. Memoized: it renders again only when its view models do. `listed`: every payment is listed (on screen, and in
+ * the full workpaper; a printed summary says where they are instead).
+ */
+const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes, error, listed = true }: {
+  letter: Letter; t: YearTable; stay: StayRow[]; payments: PaymentYear[] | null; taxes: TaxTable[] | null; error: string | null; listed?: boolean;
 }) {
   return (
     <>
@@ -147,7 +158,8 @@ const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes
       <PartHead letter={letter} part="stay" title="Your stay, tied to the lead schedule and L-1" name="your stay" csv />
       <Scroll label={`L-6.${letter}, your stay`}><StayTable letter={letter} n={t.n} rows={stay} /></Scroll>
       <PartHead letter={letter} part="payments" title="Every payment" name="every payment" csv={!!payments} />
-      {payments ? <Scroll label={`L-6.${letter}, every payment`}><Payments letter={letter} years={payments} /></Scroll>
+      {!listed ? <p className="note l6-elsewhere">Every payment, with its formula and its tax, to the cent: in the full workpaper (Print…, then Full workpaper), and in L-6's CSV of every payment.</p>
+        : payments ? <Scroll label={`L-6.${letter}, every payment`}><Payments letter={letter} years={payments} /></Scroll>
         : <p className="note l6-wait">{error ?? "Working out every payment…"}</p>}
       <PartHead letter={letter} part="tax" title="Tax by calendar year, with and without the offer" name="tax by calendar year" csv={!!taxes} />
       {taxes ? <Scroll label={`L-6.${letter}, tax by calendar year`}><TaxYears letter={letter} tables={taxes} /></Scroll>

@@ -50,12 +50,21 @@ export function TickLegend() {
 }
 
 /**
- * The page is laid out for print (docs/ui-design.md §9.5): every schedule expanded, its table views open, L-6 open on every
- * offer, and L-3 and L-4 worked out as though on screen. Set by the Print button while it gets the page ready, and by the
- * browser's own print (beforeprint) for what's already loaded.
+ * What a print holds (docs/ui-design.md §9.5): "summary", every schedule but L-6's list of every payment (the default), or
+ * "full", the whole workpaper.
  */
-export const Printing = createContext(false);
-export const usePrinting = () => useContext(Printing);
+export type PrintScope = "summary" | "full";
+
+/**
+ * The page is laid out for print (docs/ui-design.md §9.5), and what it holds: every schedule expanded, its table views open, L-6
+ * open on every offer, and L-3 and L-4 worked out as though on screen. Null on screen. Set by the Print button while it gets the
+ * page ready, and by the browser's own print (beforeprint) for what's already loaded.
+ */
+export const Printing = createContext<PrintScope | null>(null);
+/** The page is laid out for print. */
+export const usePrinting = () => useContext(Printing) !== null;
+/** What the print holds, or null on screen. */
+export const usePrintScope = () => useContext(Printing);
 
 export function Stamp({ children, tone = "ink" }: { children: ReactNode; tone?: "ink" | "muted" }) {
   return <span className={`stamp stamp-${tone}`}>{children}</span>;
