@@ -1,6 +1,6 @@
-import { type KeyboardEvent, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import type { ISODate } from "../../src/offer/types";
-import { niceTicks } from "./axes";
+import { niceTicks, useChartWidth } from "./axes";
 import { Fig, useRovingTicks } from "./figures";
 import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
@@ -12,7 +12,7 @@ import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import type { CompareRequest, LeaveCurve, LeavePanel } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 import type { Engine, SlowJob, SlowState } from "./useEngine";
 
 // L-4 · Leaving early (docs/ui-design.md §4.5): what you keep if your last day is any day, after tax
@@ -50,7 +50,9 @@ const stepMonth = (axis: LeaveAxis, at: ISODate, by: number) => onAxis(axis, day
 export function Leaving(p: LeavingProps) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
-  const onScreen = useOnScreen(ref);
+  // Worked out while on screen, or for print.
+  const printing = usePrinting();
+  const onScreen = useOnScreen(ref) || printing;
   const r = p.ctx.results;
   const axis = r ? leaveAxis(r.view.row.window.start, r.view.row.years) : null;
   const at = axis ? onAxis(axis, p.at ?? firstLastDay(axis)) : null;
@@ -146,7 +148,7 @@ function LeaveChart({ lines, axis, at, onAt, said }: {
   /** What each offer keeps at `at`, in words, once the panel has it; null while it's worked out. */ said: string | null;
 }) {
   const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(720);
+  const width = useChartWidth(box, 720);
   // The slider's value, as a screen reader hears it: the date with what each offer keeps, from the panel, so its figures are
   // the panel's to the dollar, and a step is announced once, complete. Until the panel has the new date the slider keeps
   // what it last said (a moment: the panel follows the last day in ~150 ms); if the panel doesn't come, the date alone.
@@ -159,13 +161,6 @@ function LeaveChart({ lines, axis, at, onAt, said }: {
     const t = setTimeout(() => setValue({ at, text: longDate(at) }), 1500);
     return () => clearTimeout(t);
   }, [at, said]);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(320, Math.round(e.contentRect.width))));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   const span = daysBetween(axis.start, axis.end);
   const plotW = width - M.left - M.right;
   const x = (date: ISODate) => M.left + (daysBetween(axis.start, date) / span) * plotW;

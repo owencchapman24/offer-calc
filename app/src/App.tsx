@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useReducer, useState } from "react";
+import { flushSync } from "react-dom";
 import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
@@ -6,7 +7,7 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { ByYear } from "./ByYear";
 import { Lead, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
-import { BreakevenSlot, LeavingSlot, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -14,11 +15,11 @@ import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
-import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme } from "./session";
+import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme, type Ticks } from "./session";
 import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
-import { dayBefore, localToday } from "./text";
-import type { Stale } from "./ui";
+import { dayBefore, localToday, longDate } from "./text";
+import { Printing, type Stale, TickSetting } from "./ui";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
 import { SECTIONS, type SectionId } from "./sections";
@@ -89,6 +90,49 @@ export function App() {
     if (theme === "system") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
+  // Tickmarks hidden (docs/ui-design.md §9.1): the stylesheet hides the marks; every figure stays as it is, a button that opens
+  // its work, with a dotted underline.
+  const ticks: Ticks = session.ui.ticks ?? "shown";
+  useEffect(() => {
+    if (ticks === "hidden") document.documentElement.dataset.ticks = "hidden";
+    else delete document.documentElement.dataset.ticks;
+  }, [ticks]);
+  const tickSetting = useMemo(() => ({ hidden: ticks === "hidden", show: () => dispatch({ type: "ui", patch: { ticks: "shown" } }) }), [ticks]);
+
+  // Print (docs/ui-design.md §9.5): the page laid out for print (the root's "printing" class, and the Printing context: every
+  // schedule expanded). The Print button sets it and gets every schedule ready first; the browser's own print (Ctrl+P) sets it
+  // as it starts, for what's loaded, synchronously, so the charts are drawn at the print width before the page is printed.
+  const [printing, setPrinting] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  useEffect(() => {
+    const before = () => {
+      document.documentElement.classList.add("printing");
+      flushSync(() => setPrinting(true));
+    };
+    const after = () => {
+      document.documentElement.classList.remove("printing");
+      setPrinting(false);
+    };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, []);
+  const print = async () => {
+    if (preparing) return;
+    setPreparing(true);
+    try {
+      const m = await import("./print");
+      await m.printPage(() => {
+        document.documentElement.classList.add("printing");
+        setPrinting(true);
+      }, loadLater);
+    } finally {
+      setPreparing(false);
+    }
+  };
 
   const stayYears = session.household.stayYears;
   const wagesYear = firstYear(session.offers, today);
@@ -195,7 +239,7 @@ export function App() {
   // L-6, the work (docs/ui-design.md §4.8): closed by default; its payments and tax years come only while it's open.
   const workOpen = session.ui.work?.open ?? false;
   const workLetter = session.ui.work?.letter ?? null;
-  const payments = workOpen && engine.work.result?.length === letters.length ? { work: engine.work.result } : {};
+  const payments = (workOpen || printing) && engine.work.result?.length === letters.length ? { work: engine.work.result } : {};
   const work: WorkContext = {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
     ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties, ...payments } } : {}),
@@ -203,6 +247,8 @@ export function App() {
 
   return (
     <WorkProvider ctx={work} onEdit={edit} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
+    <TickSetting.Provider value={tickSetting}>
+    <Printing.Provider value={printing}>
     <div className="page">
       <header className="masthead">
         <a className="brand" href="#/">
@@ -215,6 +261,13 @@ export function App() {
           <a href="#/method" aria-current={route.page === "method" ? "page" : undefined}>Methodology</a>
           <a href="#/data" aria-current={route.page === "data" ? "page" : undefined}>Data</a>
         </nav>
+        {route.page === "compare" && (
+          <p className="print-bar no-print">
+            {/* Ctrl+P prints only what's loaded: the button loads every schedule and works them out first. */}
+            <button type="button" className="link" onClick={() => void print()}>Print</button>
+            <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
+          </p>
+        )}
       </header>
 
       {route.page === "method" ? (
@@ -232,7 +285,7 @@ export function App() {
 
           <main className="workpaper">
             <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} warnings={warnings} ui={session.ui}
-              dispatch={dispatch} tabbed={phone} />
+              dispatch={dispatch} tabbed={phone && !printing} />
             <div className="results">
               <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                 sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
@@ -259,23 +312,37 @@ export function App() {
       )}
 
       <footer className="colophon">
-        {/* Native radios: arrow keys move and choose, and Tab stops once, on the one chosen. */}
-        <fieldset className="theme">
-          <legend className="sr-only">Theme</legend>
-          {(["system", "light", "dark"] as Theme[]).map((t) => (
-            <label key={t} className={theme === t ? "is-on" : ""}>
-              <input type="radio" name="theme" value={t} checked={theme === t} className="sr-only" onChange={() => dispatch({ type: "theme", theme: t })} />
-              {t[0].toUpperCase() + t.slice(1)}
-            </label>
-          ))}
-        </fieldset>
-        <p>
+        <div className="settings no-print">
+          {/* Native radios: arrow keys move and choose, and Tab stops once, on the one chosen. */}
+          <fieldset className="theme">
+            <legend className="sr-only">Theme</legend>
+            {(["system", "light", "dark"] as Theme[]).map((t) => (
+              <label key={t} className={theme === t ? "is-on" : ""}>
+                <input type="radio" name="theme" value={t} checked={theme === t} className="sr-only" onChange={() => dispatch({ type: "theme", theme: t })} />
+                {t[0].toUpperCase() + t.slice(1)}
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="theme">
+            <legend className="sr-only">Tickmarks</legend>
+            {(["shown", "hidden"] as Ticks[]).map((t) => (
+              <label key={t} className={ticks === t ? "is-on" : ""}>
+                <input type="radio" name="ticks" value={t} checked={ticks === t} className="sr-only" onChange={() => dispatch({ type: "ui", patch: { ticks: t } })} />
+                {t === "shown" ? "Show tickmarks" : "Hide tickmarks"}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+        {/* In print, the footer says what the page is: samples or not, when, and the data's vintages (below). */}
+        {sample && <p className="print-only">Includes sample offers: illustrative inputs, not market data.</p>}
+        <p className="print-only">Printed {longDate(today)} from Offer Calc. Everything was worked out in this browser, from the inputs above.</p>
+        <p className="no-print">
           {saved ? "Saved in this browser only; nothing leaves this device." : "This browser isn't saving (private window?): your entries last until you close the tab."}{" "}
           <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>Reload the samples</button>
         </p>
         <p className="sources">
           Tax law 2026 (later years projected) · Prices: BEA Regional Price Parities {DATA_YEARS.rpp} · Rent estimates: HUD Fair
-          Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null ? `: ${engine.ms.toFixed(0)} ms in a Web Worker` : " in a Web Worker"}.
+          Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null && <span className="no-print">: {engine.ms.toFixed(0)} ms</span>} in a Web Worker.
           Not financial advice.
         </p>
       </footer>
@@ -284,6 +351,8 @@ export function App() {
         <VerdictBar view={view} stayYears={stayYears} place="bottom" updating={engine.updating} hidden={keyboardUp} />
       )}
     </div>
+    </Printing.Provider>
+    </TickSetting.Provider>
     </WorkProvider>
   );
 }

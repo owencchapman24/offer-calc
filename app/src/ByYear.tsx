@@ -1,12 +1,13 @@
-import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useLayoutEffect, useRef, useState } from "react";
+import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useRef, useState } from "react";
 import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext } from "./metrics";
 import type { Action, UiState } from "./session";
-import { niceTicks } from "./axes";
+import { niceTicks, useChartWidth } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Fig, useRovingTicks } from "./Tickmarks";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
+import { CsvButton } from "./figures";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
 // L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4).
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
@@ -24,10 +25,12 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
+  const printing = usePrinting();
   const r = ctx.results;
   if (!r?.detail || r.detail.years !== r.view.row.years) return null;
   const mode = ui.byYear?.mode ?? "each";
-  const table = ui.byYear?.table ?? false;
+  // In print, every table in full: the table view opens.
+  const table = (ui.byYear?.table ?? false) || printing;
   const basis = r.view.basis;
   const offers = r.letters.map((l) => byYear(ctx, l));
   const title = `${basisPhrase(pricesOf(ctx))[basis][0].toUpperCase() + basisPhrase(pricesOf(ctx))[basis].slice(1)}, each employment year`;
@@ -53,9 +56,12 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
           <Notes ctx={ctx} />
           <p className="caption">
             Each year is in that year's dollars, as paid; the verdict discounts them to today.{sample ? " (Sample inputs.)" : ""}{" "}
-            <button type="button" className="link" aria-expanded={table} aria-controls="l1-table" onClick={() => setView({ table: !table })}>
-              {table ? "Hide the table view" : "Table view"}
-            </button>
+            <span className="no-print">
+              <button type="button" className="link" aria-expanded={table} aria-controls="l1-table" onClick={() => setView({ table: !table })}>
+                {table ? "Hide the table view" : "Table view"}
+              </button>
+              {table && <>{" · "}<CsvButton table={{ kind: "l1", running: mode === "running" && basis !== "perHour" }} name="L-1, by year" /></>}
+            </span>
           </p>
           {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years} />}
           {table && (
@@ -78,15 +84,8 @@ const M = { top: 14, right: 132, bottom: 30, left: 52 };
 function Chart({ offers, basis, units, running, title }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean; title: string }) {
   const box = useRef<HTMLDivElement>(null);
   const hintId = useId();
-  const [width, setWidth] = useState(640);
+  const width = useChartWidth(box, 640);
   const [hover, setHover] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(320, Math.round(e.contentRect.width))));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const perHour = basis === "perHour";
   const series = offers.map((o) => {

@@ -489,6 +489,11 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             figures it uses highlighted on the page. On a keyboard, Tab reaches each schedule and the arrow keys move between its
             figures; Enter opens one and Escape closes it.
           </p>
+          <p>
+            For a cleaner read, "Hide tickmarks" at the foot of the page hides the marks: each figure keeps a dotted underline and still
+            opens its work. The inputs' D and E stay, since a default or an estimate always says so. A table's CSV has each figure's mark
+            in a column beside it, and the marks print, with each schedule's legend.
+          </p>
           <table className="method-table ticks">
             <tbody>
               {([

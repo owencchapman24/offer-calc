@@ -824,3 +824,81 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .l6-years td:nth-child(odd):not(:first-child), .l6-years thead th:nth-child(odd):not(:first-child) { background: var(--band); }
 .the-work .l6-scroll { transition: opacity 120ms; }
 .the-work.is-updating .l6-scroll { opacity: 0.6; }
+
+/* ---- slice 6, stop B: CSV, the tickmark setting, print ---------------------------------------------------------- */
+
+/* "Download CSV" beside each table; L-6's sit beside their parts' headings. */
+.csv-button { font-size: 13px; }
+.l6-part-head { display: flex; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; margin: 20px 0 0; }
+.l6-part-head .l6-part { margin: 0; }
+
+/* The footer's settings: the theme and the tickmarks, side by side. */
+.settings { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+/* Tickmarks hidden (§9.1): the marks go; every figure keeps a dotted underline and stays the button it was, with its name. The
+   inputs' D and E stay: a default or an estimate always says so (§3.6). */
+:root[data-ticks="hidden"] .fig .tick, :root[data-ticks="hidden"] .tie, :root[data-ticks="hidden"] .work-lines .tick,
+:root[data-ticks="hidden"] .work-ties .tick { display: none; }
+:root[data-ticks="hidden"] .fig .fig-value { text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 0.18em; }
+.legend-hidden .legend-title { margin-right: -10px; }
+
+/* The Print button, beside the pages. */
+.print-bar { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 14px; }
+.print-status { font-size: 13px; color: var(--graphite); }
+.print-only { display: none; }
+
+/* ---- print (§9.5): a workpaper stylesheet -------------------------------------------------------------------------- */
+
+/* Laid out for print: the Print button sets the root's "printing" class while it gets the page ready, and the browser's own
+   print sets it as it starts. The page is one column of a fixed width, the same on screen as on paper (Letter or A4), so a
+   chart drawn while the page gets ready is drawn at the width it prints at. */
+.printing .page { max-width: 680px; margin: 0 auto; padding: 0; }
+.printing .workpaper, .printing .by-year-grid { grid-template-columns: minmax(0, 1fr); }
+.printing .results { position: static; }
+.printing .ledger { grid-template-columns: 104px repeat(var(--cols), minmax(0, 1fr)); overflow: visible; scroll-snap-type: none; }
+.printing .l6-scroll { overflow: visible; }
+
+@media print {
+  @page {
+    margin: 12mm 12mm 14mm;
+    @bottom-right { content: "Offer Calc · page " counter(page) " of " counter(pages); font-family: system-ui, sans-serif; font-size: 8pt; color: #5d6862; }
+  }
+  /* Ink on paper, whatever the screen's theme. */
+  :root, :root[data-theme], :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --page: #ffffff; --sheet: #ffffff; --band: #f2f5f3; --ink: #121815; --graphite: #46504a; --muted: #5d6862; --rule: #cdd6d0;
+    --highlighter: #fff1a6; --offer-a: #2f5bd0; --offer-b: #b5307a; --offer-c: #8a6a00; --warning: #8a5a00;
+  }
+  body { background: #ffffff; }
+  /* What's for the screen: the pages, the switches and buttons, the hints, the popover, the sticky bars. Figures and tickmarks stay. */
+  .no-print, .masthead nav, .verdict-bar, .work, .help-toggle, .first-use, .hint-ticks, .segmented, .bridge-pick, .leave-steps,
+  .leave-controls .hint, .offer-tabs, .add, .remove, .chart-hit, .chart-tip, .got-it, button.link { display: none !important; }
+  .print-only { display: block; }
+  /* A workpaper reference prints as an outlined box: a filled one would print blank without background graphics. */
+  .ref { background: none; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .brand-mark { background: none; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .schedule { break-inside: auto; }
+  .schedule-head, .l6-part-head, .chart-bar, .extra-title, .chart-title, .l6-section { break-after: avoid; }
+  .chart, .bridge-table, .verdict, .ranks, .stays, .pipeline, tr, .tie-offer, .leave-offer, .warn-item, .risk-wins { break-inside: avoid; }
+  .the-work, .l6-offer + .l6-offer { break-before: page; }
+  .series, .line-key, .key, .who, .end-letter, .offer-head::before, .leave-mark, .leave-stay { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .colophon { margin-top: 20px; color: var(--graphite); }
+  /* An input prints as its value: no box, no arrow, no calendar. */
+  input:not([type="checkbox"]):not([type="radio"]), select { border: none !important; background: none; appearance: none; padding: 0 2px; min-height: 0; }
+  input::-webkit-calendar-picker-indicator { display: none; }
+  /* A table's total row prints once, at its end (a footer row group repeats on every page a table spans, and Chrome draws the
+     repeats without their figures); a short table stays on one page. */
+  tfoot { display: table-row-group; }
+  #l1-table, #l2-table, .bridge-table, .l6-stay { break-inside: avoid; }
+  .ledger .row > * { break-inside: avoid; }
+}
+
+/* Offer colors plus texture (§9.5): in print, or with forced colors (where every offer takes the same system color), each offer's
+   lines take a dash pattern of their own, and the legends' keys match: A solid, B dashed, C dotted. */
+@media print, (forced-colors: active) {
+  .series.offer-B .series-line { stroke-dasharray: 7 4; stroke-linecap: butt; }
+  .series.offer-C .series-line { stroke-dasharray: 2 3; stroke-linecap: butt; }
+  .line-key { height: 0; background: none; border-top: 2px solid var(--offer); }
+  .offer-B .line-key { border-top-style: dashed; }
+  .offer-C .line-key { border-top-style: dotted; }
+}

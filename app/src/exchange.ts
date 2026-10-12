@@ -20,7 +20,7 @@ export interface ExportFile {
   note?: string;
   household: AppHousehold;
   offers: AppOffer[];
-  /** View choices (basis, theme, mode); optional on import. */
+  /** View choices (basis, theme, mode, tickmarks); optional on import. */
   ui?: Partial<UiState>;
 }
 
@@ -29,7 +29,7 @@ export function exportSession(s: Session, today: string, now = new Date()): { fi
   const sample = s.offers.some((o) => o.sample !== null);
   const file: ExportFile = {
     format: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), ...(sample ? { note: SAMPLE_NOTE } : {}),
-    household: s.household, offers: s.offers, ui: { basis: s.ui.basis, theme: s.ui.theme, mode: s.ui.mode },
+    household: s.household, offers: s.offers, ui: { basis: s.ui.basis, theme: s.ui.theme, mode: s.ui.mode, ticks: s.ui.ticks ?? "shown" },
   };
   return { fileName: `offer-calc-${today}${sample ? "-sample" : ""}.json`, text: `${JSON.stringify(file, null, 2)}\n` };
 }
@@ -112,6 +112,7 @@ function pickUi(u: Partial<UiState>): Partial<UiState> {
   if (u.basis === "cash" || u.basis === "totalRewards" || u.basis === "colAdjustedTotal" || u.basis === "perHour") out.basis = u.basis;
   if (u.theme === "system" || u.theme === "light" || u.theme === "dark") out.theme = u.theme;
   if (u.mode === "quick" || u.mode === "detailed") out.mode = u.mode;
+  if (u.ticks === "shown" || u.ticks === "hidden") out.ticks = u.ticks;
   return out;
 }
 

@@ -1507,9 +1507,9 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   "In total rewards, A keeps …"). The figures are the panel's, said once the panel has the new date (a moment after the key), so
   a step is announced once, complete, and holding an arrow key says where you stop.
 
-- **UI slice 6** (in progress; plan in `docs/ui-slices-4-8-plan.md`), two review stops:
+- **UI slice 6** (done 2026-10-12; plan in `docs/ui-slices-4-8-plan.md`), two review stops:
   - **A** (2026-10-10): L-6, The work (§4.8), with the `<` ties moved to its rows, and the year figures as shown (below).
-  - **B** (next): CSV export of each table, print, and the hide-tickmarks setting (§9.1).
+  - **B** (2026-10-12): CSV export of each table, print, and the hide-tickmarks setting (§9.1), each below.
 
 **UI slice 6 versus this design** (stop A):
 - **One offer at a time:** L-6 is collapsed until "Show the tables"; then an A | B | C switch shows L-6.A, L-6.B or L-6.C, rather than
@@ -1542,6 +1542,50 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   comparison. A payment's figure, its tax and every tax-table figure open their work like any other.
 - **Not yet** (stop B): CSV, print, and the hide-tickmarks setting.
 
+**UI slice 6 versus this design** (stop B):
+- **CSV for each table** (§4.8, §10): L-1's and L-2's table views (the user's choice at stop B) and L-6's four tables, one file per table
+  and offer. "Download CSV" sits beside a table view once it's open, and beside each of L-6's part headings. The file:
+  - line 1 flags samples, whenever any offer is one ("Includes sample offers: illustrative inputs, not market data.", as the JSON
+    export's note; one quoted cell, since it has a comma); then a title (the workpaper reference, the offer's name, the table), the scope
+    (base case, your stay's dates, the export date), the header, the rows, and the tickmark legend last;
+  - each figure is the figure shown, as a plain number: its display text with the thousands separators, currency signs and parentheses
+    taken out, so a deduction is `-41724`, a payment `9166.67`, a rate as many decimals as shown (`27.2735`), L-2's drop `-17`; units in
+    the column headers ("Year 1 ($, as paid)", "Pay ($)", "Bear vs base (%)"), and in a label where a row's unit differs ("Hours worked
+    (hours)");
+  - each figure's tickmark (✓ ^ < T D E, by its kind) in a column beside it ("Year 1 tickmark");
+  - text cells that start with `=`, `+`, `-`, `@`, a tab or a carriage return get a leading `'`; number cells never do;
+  - UTF-8 with a byte-order mark (so a spreadsheet reads ✓ and –), CRLF line ends, RFC 4180 quoting;
+  - named `offer-calc-YYYY-MM-DD-<table>[-sample].csv` (`L-1-by-year`, `L-1-by-year-running-total`, `L-2-if-things-go-badly`,
+    `L-6-A-employment-years`, `-your-stay`, `-every-payment`, `-tax-by-year`), ending `-sample` as the JSON export's name does.
+  - L-1's per-hour footer reads "per hour" on screen (its figure opens the rank list's per hour); its CSV has that figure.
+- **Print** (§9.5):
+  - **A Print button** at the top of the comparison, beside the pages. It lays the page out for print, loads L-2 to L-6, works out L-3,
+    L-4 and L-6's payments as though they were on screen, waits for every schedule (12 s at most: inputs with a problem leave L-3 and L-4
+    waiting), then opens the browser's print. While it works, it says "Getting every schedule ready…".
+  - **Ctrl+P lays out what's loaded:** the page switches to its print layout as the print starts (`beforeprint`, synchronously, so the
+    charts are redrawn at the print width), but a schedule whose code or figures aren't there yet can't be waited for.
+  - **The print layout** is one column 680 px wide, on screen while the button gets it ready and on paper (Letter or A4), so a chart is
+    drawn at the width it prints at. L-1's and L-2's table views are open; L-6 is open on every offer, each on a new page; every schedule
+    prints its legend; a table's total prints once (Chromium repeats a footer row on each page, blank); a short table stays on one page.
+  - **On paper:** the screen's controls go (the pages, switches, buttons, hints, Show the work, the sticky bars); inputs print as their
+    values; a dark screen prints light; workpaper references print outlined. Page numbers sit in the margin ("Offer Calc · page 3 of
+    37", where the browser supports margin boxes: Chromium). The footer flags samples, gives the date printed and the data's vintages.
+  - **Offer colors plus texture:** the charts' lines take a dash pattern per offer, A solid, B dashed, C dotted, and the legends' keys
+    match. "Texture fill" in §9.5: these charts have lines and dots, no fills. The same patterns apply under forced colors.
+  - The samples print to 37 Letter pages, 29 of them L-6's (every payment, for three offers).
+- **The hide-tickmarks setting** (§9.1): "Show tickmarks | Hide tickmarks" in the footer, a radio group beside the theme's. Hidden:
+  - the marks go from every figure, from Show the work's lines and from the `<` ties; each figure keeps a dotted underline and stays the
+    button it was, with its name ("How A, year 1, 62,594 was worked out (recomputed)") and its place in the arrow keys' order;
+  - every legend says so, with "Show tickmarks"; the tickmark hint asks for "any underlined figure";
+  - the inputs' `D` and `E` stay: a default or an estimate always says so (§3.6), and they're lone marks with no figure to underline;
+  - it's saved with the session, and JSON exports carry it as they carry the theme (`ui.ticks`, "shown" or "hidden"; the user's choice
+    at stop B); the import review names it.
+- **Bundles:** the CSV code (`csv.ts`, 6.9 / 3.1 kB) loads on the first download, the print code (0.4 kB) on the first Print. The main
+  thread grew 3.6 / 0.9 kB (the button, the setting, the print layout). The CSV button lives in `figures.tsx`: as a module of its own,
+  imported by L-1 (main) and by L-2 and L-6 (lazy), it split React, `ui.tsx` and `text.ts` out of the main chunk (Rolldown).
+- **The scan** adds L-2's table view with its CSV button, the page with tickmarks hidden (and Show the work so), and the printed page
+  (after the Print button, in print media, on a desktop, light and dark).
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay
@@ -1561,7 +1605,7 @@ build order differs (below). The engine prerequisites came first and aren't numb
    (§4.7). Engine item 13 (the leave sweep by day), the worker's slow lane (§3.4) and the CI
    bundle check come with it.
 6. **The reconciliation schedule:** L-6 (§4.8), CSV export of each table, print, and the
-   hide-tickmarks setting (§9.1). (Stop A, L-6 and its ties, done 2026-10-10.) (JSON export/import moved to slice 3; the accessibility pass,
+   hide-tickmarks setting (§9.1). (Stop A, L-6 and its ties, done 2026-10-10; stop B, done 2026-10-12.) (JSON export/import moved to slice 3; the accessibility pass,
    phone tabs and sticky bars moved to slice 7.)
 7. **Mobile and accessibility** (rev 3, out of slice 6; done 2026-10-10): phone tabs, the sticky verdict bars
    (§3.2), Playwright smoke tests and axe in CI (§10), and a screen-reader walkthrough (its run deferred to before launch).

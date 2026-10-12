@@ -12,6 +12,9 @@ export type Theme = "system" | "light" | "dark";
 
 export type Hint = "ticks" | "afterRent";
 
+/** Whether the figures' tickmarks show. Hidden, every figure keeps a dotted underline and still opens its work. */
+export type Ticks = "shown" | "hidden";
+
 /** The ledger's sections in detailed mode (docs/ui-design.md §3.3), one open at a time. */
 export type LedgerSection = "pay" | "bonus" | "cash" | "equity" | "retirement" | "health" | "perks" | "hours" | "where";
 
@@ -35,6 +38,8 @@ export interface UiState {
   offerTab?: Letter;
   /** L-6, the work: whether its tables are open (closed by default), and the offer shown (missing, or gone: the first). */
   work?: { open: boolean; letter?: Letter };
+  /** Tickmarks shown beside the figures (the default), or hidden for a cleaner read (docs/ui-design.md §9.1). */
+  ticks?: Ticks;
 }
 
 export interface Session {
@@ -63,7 +68,7 @@ export type Action =
   | { type: "basis"; basis: Basis }
   | { type: "theme"; theme: Theme }
   | { type: "dismiss"; hint: Hint }
-  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab" | "work">> }
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab" | "work" | "ticks">> }
   /** An import: replaces every offer and About you, and takes the file's view choices, if any. */
   | { type: "replace"; household: AppHousehold; offers: AppOffer[]; ui?: Partial<UiState> }
   /** "Delete all data": back to the first visit, with the samples. */

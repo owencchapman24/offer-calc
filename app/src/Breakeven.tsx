@@ -7,7 +7,7 @@ import { basisPhrase, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, tieJob, type Ties } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 
 // L-3 · What it would take (docs/ui-design.md §4.6): for each offer behind the winner, the starting
@@ -33,7 +33,9 @@ const Who = ({ l }: { l: Letter }) => <strong className={`who offer-${l}`}>{l}</
 export function Breakeven(p: BreakevenProps) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
-  const onScreen = useOnScreen(ref);
+  // Worked out while on screen, or for print.
+  const printing = usePrinting();
+  const onScreen = useOnScreen(ref) || printing;
   const r = p.ctx.results;
   const c = p.compare;
   const basis = r ? (r.view.basis === "perHour" ? r.view.perHourOf : r.view.basis) : null;

@@ -3,7 +3,7 @@ import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { cashName, detailOf, indexOf, type L6Line, offerByLetter, pricesOf, res, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { type AppOffer, inNyc, type Letter } from "./model";
 import type { TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
-import { dayBefore, dollars, figure, longDate, percent } from "./text";
+import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 
 // L-6 · The work (docs/ui-design.md §4.8): each offer's employment years line by line (cash; total rewards and hours;
 // after rent), its stay's totals tied to the lead schedule and L-1, every payment with its formula and tax, and each calendar
@@ -141,6 +141,14 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   return { letter, n, years: ys, rows, ...(prices ? { prices } : {}) };
 }
 
+/** A dollar figure as the tables show it: a deduction in parentheses. */
+export const moneyText = (v: number) => (v < 0 ? `(${figure(-v)})` : figure(v));
+/** A year line's figure as the table shows it: dollars, hours, or dollars an hour. */
+export const rowText = (row: L6Row, v: number) => (row.unit === "perHour" ? cents(v) : row.unit === "hours" ? figure(v) : moneyText(v));
+/** The years table's sections, by name (the after-rent section takes its total's label). */
+export const SECTION_NAME: Record<L6Section, string> = { cash: "Cash", rewards: "Total rewards and hours", rent: "" };
+export const sectionName = (t: YearTable, s: L6Section) => (s === "rent" ? t.rows.find((x) => x.line === "total")!.label : SECTION_NAME[s]);
+
 const rowNo = (rows: L6Row[], l: L6Line) => rows.find((x) => x.line === l && x.kind !== "carried")?.no;
 
 /** A line's number in an offer's table (its first row, not a carried one). */
@@ -232,6 +240,8 @@ const TO_CENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maxim
 export const toCent = (x: number) => `${x < 0 ? "−" : ""}${TO_CENT.format(Math.abs(x))}`;
 
 export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback"];
+/** Each kind of payment's name in the list. */
+export const KIND_NAME: Record<Component, string> = { salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", clawback: "Clawbacks" };
 
 export interface PaymentGroup {
   component: Component;

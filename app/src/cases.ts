@@ -165,6 +165,9 @@ export interface RiskView {
   anyRange: boolean;
 }
 
+/** A bear case against its base, as shown: "−17%" (a drop), "+3%". */
+export const dropText = (x: RiskRow) => `${x.share >= 0 ? "−" : "+"}${Math.round(Math.abs(x.share) * 100)}%`;
+
 export function riskView(ctx: WorkContext): RiskView {
   const r = res(ctx);
   const row = r.view.row;

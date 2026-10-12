@@ -53,6 +53,43 @@ test("the theme switch is a radio group: arrow keys move and choose", async ({ p
   expect(await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type)).not.toBe("radio");
 });
 
+test("hiding tickmarks: the marks go; each figure stays a button, with its name, a dotted underline and its arrow-key place; saved", async ({ page }) => {
+  await openCompare(page);
+  const hero = page.locator('[data-metric="hero"]');
+  const name = (await hero.getAttribute("aria-label"))!;
+  expect(name).toMatch(/^How \$[\d,]+ a month was worked out \(recomputed\)$/);
+  // The setting is a radio group in the footer, beside the theme's.
+  const hide = page.getByRole("radio", { name: "Hide tickmarks" });
+  await page.getByRole("radio", { name: "Show tickmarks" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(hide).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-ticks", "hidden");
+  await expect(hero.locator(".tick")).toBeHidden();
+  expect(await hero.locator(".fig-value").evaluate((el) => `${getComputedStyle(el).textDecorationLine} ${getComputedStyle(el).textDecorationStyle}`))
+    .toBe("underline dotted");
+  await expect(page.getByRole("button", { name })).toBeVisible();
+  // The inputs' D and E stay: a default always says so.
+  await expect(page.locator(".about .tick-lone .tick").first()).toBeVisible();
+  // Still the schedule's figures in the arrow keys' order, and still opening their work.
+  await hero.focus();
+  await page.keyboard.press("ArrowRight");
+  expect(await page.evaluate(() => document.activeElement?.classList.contains("fig"))).toBe(true);
+  await page.keyboard.press("ArrowLeft");
+  await expect(hero).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".work .work-lines")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".lead .legend")).toContainText("Tickmarks are hidden: each figure keeps a dotted underline and still opens its work.");
+  // Saved in this browser (half a second after the last change): still hidden after a reload; the legend's button shows them again.
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("offer-calc:v1") ?? "{}").ui?.ticks)).toBe("hidden");
+  await page.reload();
+  await settled(page);
+  await expect(page.locator("html")).toHaveAttribute("data-ticks", "hidden");
+  await page.locator(".lead .legend").getByRole("button", { name: "Show tickmarks" }).click();
+  await expect(page.locator("html")).not.toHaveAttribute("data-ticks", /./);
+  await expect(hero.locator(".tick")).toBeVisible();
+});
+
 test("picking a city in the ledger keeps focus there, on Change", async ({ page }) => {
   await openCompare(page);
   const change = page.getByRole("button", { name: "Change offer A city" });

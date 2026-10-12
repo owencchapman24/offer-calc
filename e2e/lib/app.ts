@@ -162,6 +162,24 @@ export async function showTheWork(page: Page, metric: string) {
   await expect(page.locator(".work .work-lines")).toBeVisible();
 }
 
+/**
+ * The browser's print, stubbed before the page loads: it counts the calls (`printed`) instead of opening a dialog, and doesn't
+ * fire afterprint, so the page stays laid out for print for the test to look at.
+ */
+export const stubPrint = (page: Page) => page.addInitScript(() => {
+  window.print = () => {
+    const w = window as unknown as { printed?: number };
+    w.printed = (w.printed ?? 0) + 1;
+  };
+});
+export const printed = (page: Page) => page.evaluate(() => (window as unknown as { printed?: number }).printed ?? 0);
+
+/** The Print button, pressed, and the page printed: every schedule loaded and worked out first. */
+export async function printWithButton(page: Page) {
+  await page.getByRole("button", { name: "Print", exact: true }).click();
+  await expect.poll(() => printed(page), { timeout: 60_000 }).toBe(1);
+}
+
 /** Two frames: the page's own reaction to focus (a scroll that keeps it clear of a sticky bar) has run. */
 export const twoFrames = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 

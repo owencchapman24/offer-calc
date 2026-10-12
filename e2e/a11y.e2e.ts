@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
-import { EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, SECTIONS, selectOffer, settled, showTheWork } from "./lib/app";
+import {
+  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, printWithButton, SECTIONS, selectOffer, settled, showTheWork, stubPrint,
+} from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
 // four projects (desktop and phone widths, light and dark). Any WCAG A/AA violation fails, unless
@@ -47,9 +49,35 @@ test.describe("compare", () => {
 
   test("L-1's table view", async ({ page }) => {
     await openCompare(page);
-    await page.getByRole("button", { name: "Table view" }).click();
+    await page.locator(".by-year").getByRole("button", { name: "Table view" }).click();
     await expect(page.locator("#l1-table")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download CSV: L-1, by year" })).toBeVisible();
     await scan(page, "L-1's table view");
+  });
+
+  test("L-2's table view, with its CSV", async ({ page }) => {
+    await openCompare(page);
+    await loadSchedules(page);
+    await page.locator(".risk").getByRole("button", { name: "Table view" }).click();
+    await expect(page.locator("#l2-table")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download CSV: L-2, if things go badly" })).toBeVisible();
+    await scan(page, "L-2's table view");
+  });
+
+  test("tickmarks hidden", async ({ page }) => {
+    await openCompare(page);
+    // The setting is at the foot of the page: going there brings L-2 to L-5 on screen. Load and work them out first, so the scan
+    // never catches L-3 or L-4 dimmed while they're worked out (on a phone or tablet, the scan's unstuck bar moves them).
+    await loadSchedules(page);
+    await page.locator("label", { hasText: "Hide tickmarks" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-ticks", "hidden");
+    await page.locator(".by-year").getByRole("button", { name: "Table view" }).click();
+    await expect(page.locator("#l1-table")).toBeVisible();
+    await scan(page, "tickmarks hidden");
+    // Show the work with the marks hidden: the derivation's own marks go too.
+    await page.locator('[data-metric="hero"]').click();
+    await expect(page.locator(".work .work-lines")).toBeVisible();
+    await scan(page, "tickmarks hidden: Show the work");
   });
 
   test("Show the work", async ({ page }) => {
@@ -111,6 +139,22 @@ test.describe("detailed mode", () => {
       await scan(page, `editor: ${e.title}`);
     });
   }
+});
+
+// Print (docs/ui-design.md §9.5): the page as the Print button lays it out, in print media. On paper the width is the page's,
+// not the screen's, so the desktop projects cover it (light and dark: a dark screen prints light).
+test.describe("print", () => {
+  test.beforeEach(({ page }) => test.skip((page.viewportSize()?.width ?? 0) < 1180, "printed from a desktop"));
+
+  test("print: every schedule, every offer's L-6", async ({ page }) => {
+    test.setTimeout(180_000);
+    await stubPrint(page);
+    await openCompare(page);
+    await printWithButton(page);
+    await expect(page.locator(".l6-offer")).toHaveCount(3);
+    await page.emulateMedia({ media: "print" });
+    await scan(page, "print");
+  });
 });
 
 test("methodology", async ({ page }) => {
