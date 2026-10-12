@@ -382,8 +382,10 @@ Before the repo and the app go public (deferred, see Decisions):
 ## Next steps
 The plan for slices 4-8 (`docs/ui-slices-4-8-plan.md`) is done: slice 6's stop B (2026-10-12) was its last review stop. At
 stop B the user chose CSV for L-1's and L-2's table views as well as L-6's tables, and JSON exports that carry the
-hide-tickmarks setting as they carry the theme. Ask the user what's next: the Roadmap below, and the Pre-launch checklist
-before going public.
+hide-tickmarks setting as they carry the theme. Then (2026-10-12) three follow-ups: the print choice, 2027's published federal
+amounts, and the data refresh calendar below. The user is now putting the tool in front of a few people before deciding what to
+build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
+and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
@@ -750,6 +752,80 @@ before going public.
    The oracle checks 2026 only. Projected years are covered by `test/params.test.ts`.
    Offer-model changes don't touch the engine: check that `npm run grid` output is
    unchanged instead.
+
+## Data refresh calendar
+Every dataset the tool depends on: when it's usually published, how to refresh it, and what to re-run afterward. Dates in
+parentheses are the last ones seen. A refresh is a change like any other: its own branch and pull request.
+
+**Next checks** (set 2026-10-12):
+- **2026-10-14 and after: SSA's 2027 wage base** (with the COLA). Add `socialSecurityWageBase` to `FEDERAL_2027`.
+- **Now to mid-November 2026: the IRS's 2027 inflation revenue procedure** (brackets, standard deduction, 132(f), and
+  127, indexed from 2027) **and the 402(g) notice.** Add them to `FEDERAL_2027`. If neither is out by **2026-11-16**, check weekly.
+- **December 2026 to February 2027: BEA's 2025 RPPs, Pub. 15 and 15-T for 2027, the states' 2027 payroll caps, then the Tax
+  Foundation's 2027 state table** (the start of moving the base year to 2027, below).
+- **The Census's 2025 ACS 1-year estimates:** delayed with no date (the Census Bureau's advisory of Aug 4, 2026; still none in
+  September). Check its release schedule monthly.
+
+**After any tax data change:** `npm test` (hand-checked values in `test/tax.test.ts`, `test/params.test.ts` and
+`test/offer.test.ts` may move: redo their arithmetic), `npm run typecheck`, `npm run grid` (2026 only: byte-identical unless 2026
+law changed), and `npm run oracle` (2026 against PolicyEngine-US: byte-identical, or the diff explained, and M-4's match
+statistics updated with it; for a later year's amounts, compare with PolicyEngine-US's own parameters for that year where it has
+them). `npm run offers` shows what the samples do. Tax-engine changes go in separate commits, each passing the above.
+**After any price or rent data change:** `npm test` (a test fails if the city list is stale), `npm run offers`, `npm run build`,
+and `npm run e2e` if a figure the scan or smoke tests read moved.
+
+**Federal tax** (`src/tax/params/federal2026.ts`; amounts published for later years in `federal2027.ts` and so on, listed in
+`ENACTED` in `params/index.ts`, with their sources):
+- **Brackets, standard deduction, 132(f) commuter limit, and the 127 educational assistance limit (indexed from 2027):** the IRS's
+  annual inflation revenue procedure, October to mid-November for the next year (2026's: Rev. Proc. 2025-32, IR-2025-103,
+  Oct 9, 2025). Listed on IRS.gov, "Inflation-adjusted tax items by tax year".
+- **401(k) elective deferral limit, IRC 402(g):** an IRS notice on retirement plan limits, usually in November (2026's: Notice
+  2025-67, IR-2025-111, Nov 13, 2025).
+- **HSA contribution limits, IRC 223:** their own revenue procedure, in May for the next year (2027's: Rev. Proc. 2026-24, May 29,
+  2026; in `federal2027.ts`).
+- **SALT cap and phase-down, and the other OBBBA schedules (Pub. L. 119-21):** statutory, so nothing to fetch: the SALT cap is
+  $40,400 for 2026, 101% of the prior year's through 2029 and $10,000 from 2030 (`saltForYear`); the 2017 rates are permanent; 127
+  is indexed after 2026. Re-check only if Congress amends them, or if an IRS revenue procedure states the cap differently (the
+  statute has no rounding).
+- **Additional Medicare Tax thresholds:** statutory and not indexed ($200,000 / $250,000). No refresh.
+- **Supplemental withholding rates (22%, 37% over $1 million) and the percentage method** (`src/offer/withholding.ts`, which
+  builds its tables from the year's brackets and standard deduction): IRS Pub. 15 and Pub. 15-T, each December for the next year.
+
+**Payroll:**
+- **Social Security wage base:** SSA's COLA fact sheet, mid-October for the next year (2026's $184,500 was announced Oct 24, 2025,
+  late for the shutdown; usually around Oct 10-15). In `PAYROLL_2026`, or a later year's file (`socialSecurityWageBase`). State
+  payroll taxes capped at it (`wageCap: "ssWageBase"`) follow by themselves.
+- **State payroll taxes with their own caps and rates** (`payroll` in `states2026.ts`: NJ $171,100, NY Paid Family Leave $95,350,
+  MN $185,000, RI $100,000, and every rate): each state sets the next year's, usually September to December; PolicyEngine-US
+  carries them once it updates.
+
+**State and local tax** (`src/tax/params/states2026.ts`, special rules in `src/tax/state.ts`, `src/tax/params/local2026.ts`):
+- **State income tax law:** the Tax Foundation's "State Individual Income Tax Rates and Brackets" table each February (2026's: data
+  as of Feb 11, 2026), then `OVERRIDE:` entries for laws enacted after it, each with its bill or statute (most legislatures
+  adjourn by June; changes usually take effect Jan 1). PolicyEngine-US's releases are the cross-check, and where an override was
+  copied from it, it says so.
+- **Indexed state amounts** (`indexed`, so far CA only, and federal links such as `stdDeductionIsFederal`): projected from 2026 until
+  the base year moves.
+- **NYC income tax rates:** statutory; check NYS IT-201 instructions each January. **Philadelphia wage tax:** changes each July 1,
+  announced around June (2026's blend of the two halves is in `PHILLY_2026`).
+
+**Moving the base year** (from 2026 to 2027, once the Tax Foundation's 2027 table is out, about February 2027): new `federal2027`
+and `states2027` data, `BASE_YEAR`, the oracle's year and baseline, and the tests' hand-checked values. Until then, amounts
+published for 2027 go in `FEDERAL_2027` and the rest of 2027 is projected.
+
+**Prices and rent:**
+- **BEA Regional Price Parities** (`src/col/rpp.json`): annually, usually December, for the year two before (the 2024 RPPs came out
+  Feb 19, 2026, late). `npm run fetch-rpp` (it rebuilds the city list). The 16% housing weight (`HOUSING_WEIGHT` in `scripts/fetch-rpp.ts`,
+  baked into `rpp.json`, and in `app/src/footing.ts`; BEA SCB March 2022) changes only if BEA publishes new weights.
+- **HUD Fair Market Rents** (`src/col/fmr.json`): each August or September for the fiscal year starting Oct 1 (FY2027 was published
+  Aug 26, 2026). `npm run fetch-fmr -- <FY>`, or `--file` with a copy downloaded in a browser when HUD USER answers with an empty 202.
+- **The rent fallback's anchor, the U.S. median gross rent** (`US_MEDIAN_GROSS_RENT` in `src/col/rent.ts`, $1,487, ACS 2024 1-year,
+  table B25064): the Census's ACS 1-year estimates, usually mid-September (2024's: Sep 11, 2025). By hand from data.census.gov,
+  with the table and date in its comment; it matters only for places without an FMR (BEA state nonmetro portions).
+
+**The oracle's PolicyEngine-US:** `requirements.txt` asks for 2.30 or later, and the baseline is 2.30.3 (the `.venv`'s). A fresh
+`.venv` installs the latest, which can move the baseline by itself: when upgrading, take the new baseline from `main` first, then
+apply the change, and note the version beside the baseline (Validation workflow).
 
 ## Intentional differences vs PolicyEngine (do not "fix")
 - SALT: PolicyEngine deducts *estimated withholding*; we deduct state/local tax *owed*
