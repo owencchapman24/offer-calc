@@ -51,6 +51,15 @@ export async function quiet(page: Page) {
     await nearbyWorkedOut(page);
     const y = await page.evaluate(() => window.scrollY);
     for (const schedule of [".ties", ".leaving"]) {
+      // Loaded but never worked out, off screen: anything that scrolls mid-scan (axe's own checks can) would set it working, and
+      // it dims once its first half is in. Work it out first (seen in CI on a tablet, 2026-10-12).
+      const idle = page.locator(`${schedule}[data-ready='0']:not(.is-updating)`);
+      if (await idle.count()) {
+        await idle.scrollIntoViewIfNeeded();
+        await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+        await nearbyWorkedOut(page);
+        await page.evaluate((top) => window.scrollTo(0, top), y);
+      }
       const dimmed = page.locator(`${schedule}.is-updating`);
       if (!(await dimmed.count())) continue;
       await dimmed.scrollIntoViewIfNeeded();

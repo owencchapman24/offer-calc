@@ -543,7 +543,7 @@ before going public.
 - `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
   - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded, L-6 open on an
     offer (`openWork`, after the schedules above have filled in: one filling in mid-click moves L-6), when the page has settled:
-    `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
+    `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed, and works out any loaded off screen: since 2026-10-12, when CI caught L-4 starting mid-scan on a tablet); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
   - `smoke.e2e.ts` (with CSV downloads and the Print button), `keyboard.e2e.ts` (with the hide-tickmarks setting); `mobile.e2e.ts`
     (the phone's tabs and the verdict bars, in the `phone` and `tablet` projects). `lib/app.ts`'s `stubPrint` counts
