@@ -823,9 +823,20 @@ published for 2027 go in `FEDERAL_2027` and the rest of 2027 is projected.
   table B25064): the Census's ACS 1-year estimates, usually mid-September (2024's: Sep 11, 2025). By hand from data.census.gov,
   with the table and date in its comment; it matters only for places without an FMR (BEA state nonmetro portions).
 
-**The oracle's PolicyEngine-US:** `requirements.txt` asks for 2.30 or later, and the baseline is 2.30.3 (the `.venv`'s). A fresh
-`.venv` installs the latest, which can move the baseline by itself: when upgrading, take the new baseline from `main` first, then
-apply the change, and note the version beside the baseline (Validation workflow).
+**The oracle's PolicyEngine-US:** pinned in `requirements.txt` to 2.30.3, the version the baseline was taken with (Validation
+workflow), so setting up a `.venv` never moves the baseline. Upgrading it is a deliberate step, a change of its own (its own branch
+and pull request), never folded into a data or engine change:
+1. Take the old report from `main` (`npm run oracle`, saved aside), then bump the pin and reinstall (`pip install -r requirements.txt`
+   in the `.venv`).
+2. Re-run `npm run oracle` with nothing else changed, and compare the reports.
+3. Explain every difference in the pull request: PolicyEngine fixed or updated something (then our engine may be the one that's
+   off: fix it, or add it to the known gaps), or changed how it models something (an intentional difference, or a gap). Update the
+   Validation workflow's baseline line (date, version, the match counts), M-4's figures, and "Intentional differences" and "Known
+   gaps" as they move.
+4. Only then use the new baseline for engine changes.
+
+Its own dependencies aren't pinned (`policyengine-core` is 3.32.21 in the `.venv`): if a fresh `.venv` moves the report with the pin
+unchanged, look there first.
 
 ## Intentional differences vs PolicyEngine (do not "fix")
 - SALT: PolicyEngine deducts *estimated withholding*; we deduct state/local tax *owed*
