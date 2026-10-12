@@ -4,7 +4,7 @@ A job-offer comparison calculator. Differentiator: do the math correctly, in one
 gross comp -> after-tax -> location-adjusted -> per hour of your life, year by year (years 1-5),
 and show the work. Correctness and a clear methodology page matter more than features.
 
-## Status (2026-10-10)
+## Status (2026-10-12)
 **Engine: complete for v1** (`src/tax`, `src/offer`, `src/col`).
 - **Tax engine:** 2026 law, validated against PolicyEngine-US. Projected later years come
   from `paramsForYear`, cached and frozen.
@@ -36,7 +36,13 @@ and show the work. Correctness and a clear methodology page matter more than fea
 4-8: `docs/ui-slices-4-8-plan.md`; slices 4-8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
 done (2026-10-10): stop A (the automated accessibility scan and its fixes), stop B (phone tabs, sticky verdict bars) and
 stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). **Slice 6,
-stop A** (2026-10-10): L-6 and its ties, and the year figures as shown. Slice 6's stop B (CSV, print, hide-tickmarks) is next.
+stop A is complete and live** (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
+owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs"). Slice 6's stop B (CSV, print,
+hide-tickmarks) is next: see Next steps.
+- **Where things stand** (2026-10-12, `main` at `8d4a533`, CI green on it): `npm test` 425 passing; `npm run e2e` 131 passing
+  (13 skip by design), the scan 158 scans with no violations and no exceptions; main thread 373.9 / 115.1 kB gzip against the
+  120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.94 s against 2.5 s, performance 98, in CI and locally.
+  `npm run grid` output is byte-identical to before slice 6 (no engine change).
 - **L-6, The work** (slice 6, stop A; `TheWork.tsx`, view model `workpaper.ts`): collapsed until "Show the tables", then one offer
   at a time (A | B | C): its employment years as numbered lines (cash; total rewards and hours; after rent) by year and the years
   added; your stay's totals on each basis (the years, less what runs past the stay, = your stay as paid `<` L-1's; present value
@@ -238,7 +244,8 @@ stop A** (2026-10-10): L-6 and its ties, and the year figures as shown. Slice 6'
   - **Load time** (`npm run lighthouse`, Lighthouse 13 mobile: simulated slow 4G, 4x CPU slowdown,
     a discarded warm-up, then the median of 3 runs, LCP's and the score's each taken on its own): LCP at most 2.5 s,
     checked in CI. Before the warm-up (2026-10-10), CI's cold first run (TBT ~1 s) could be reported as the median. 2026-10-09: the production build 1.86 s,
-    performance 98; the live site 1.47 s, performance 100. The LCP element is About you's assumptions
+    performance 98; the live site 1.47 s, performance 100. 2026-10-10, after slice 6's stop A: 1.94 s in CI and locally,
+    performance 98. The LCP element is About you's assumptions
     line, which renders before the worker answers, so the main chunk's download and parse set LCP.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
@@ -329,14 +336,47 @@ Before the repo and the app go public (deferred, see Decisions):
     (June 2025) pins Lighthouse 12.6 and brought 17 npm advisories.
   - `scripts/lib/serve.ts` serves `dist/` compressed, with `vercel.json`'s headers, as Vercel does;
     `vite preview` sends files uncompressed.
+- **The year figures as shown: approved** (2026-10-12; built in slice 6, stop A; `app/src/footing.ts`, `workpaper.ts`). Every
+  figure is rounded once, where it's worked out (a year's salary is its payments, each to the cent, added, then rounded), and a
+  subtotal is the sum of the rounded items above it, so every column adds up as displayed and a figure shown in two places
+  (L-1, the bridge, L-6) is one figure. In a calendar year's tax with the offer, the federal income tax line absorbs the
+  rounding, and its working (Show the work) gives the unrounded figure. A few year figures differ by a dollar from the
+  engine's own rounding, and from W4/W4a in `docs/ui-design.md` (A's year 1 after rent is 62,594, not 62,595). Present values,
+  the verdict and per hour stay the engine's: a present value isn't a sum of the years. Apply the same rule to anything new
+  that adds up (CSV included); don't change it without the user.
 
 ## Next steps (in this order)
 The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
 and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
 build them in.
-1. **Slice 6, stop B:** CSV export of each table (tickmarks as a column, the sample flag on line 1 and `-sample` in the file
-   name, text cells guarded against formulas), print (every schedule expanded, a Print button that loads the lazy schedules
-   first), and the hide-tickmarks setting. Then the end of slice 6: §12 and this file.
+1. **Slice 6, stop B** (the plan's scope, `docs/ui-slices-4-8-plan.md` "Slice 6", with the user's requirements of 2026-10-12;
+   design: `docs/ui-design.md` §4.8, §9.1, §9.5 and §10). One branch and PR, then review stop B, which ends the slice.
+   - **CSV for each table** (§4.8: each table exports to CSV; §10: CSV for every table): at least L-6's four (employment years,
+     your stay, every payment, tax by calendar year), built from the same view models (`workpaper.ts`), so each figure is the
+     figure shown. Say at the start whether L-1's and L-2's table views get one too.
+     - **Money cells are plain numbers**, units in the column headers ("Year 1 ($, as paid)", "Pay ($)"), no thousands
+       separators, parentheses or currency signs; negatives as `-123.45`. Whole dollars where the table shows dollars, cents
+       where it shows cents (payments), rates as shown.
+     - **Tickmarks as a column** beside the figures they mark (each figure's kind from `metricKind`).
+     - **The sample flag on line 1** whenever any offer is a sample, and **`-sample` in the file name**, as the JSON export
+       does (`offer-calc-YYYY-MM-DD[-sample]…`, `exchange.ts`).
+     - **The formula guard on text cells only** (offer labels, award and grant names are free text): a text cell that starts
+       with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`. Number cells are never guarded, so `-123.45`
+       stays a number.
+   - **Print** (§9.5): every schedule expanded with its legend (L-6 open, every offer's tables); offer colors plus texture, so
+     the charts read in black and white (a dash pattern or marker shape per offer); the sample flag and the data vintages
+     in the footer. A Print button loads the lazy schedules first (and L-6's payments), then prints: Ctrl+P prints only what's
+     loaded, since `beforeprint` can't wait for a chunk.
+   - **The hide-tickmarks setting** (§9.1), saved with the session (`ui` in `session.ts`; decide whether JSON exports carry it,
+     as they carry the theme). With marks hidden, figures keep a dotted underline and stay buttons: clickable, in the roving
+     tabindex, with the same accessible name ("How 62,594 was worked out (recomputed)"). The legends say the marks are hidden.
+   - **The bundle budget:** CSV and print code load on first use (a lazy chunk on the button's click), like the schedules;
+     the main thread is 115.1 of 120 kB gzip. Check `npm run check-bundle` (one chunk) and `npm run lighthouse`.
+   - **Tests:** CSV cells as plain numbers, negatives, the guard (text only), the sample line and file name, a figure that
+     ties to the table shown; the setting saved and the figures still buttons with their names; print in the scan
+     (Playwright's `emulateMedia({ media: "print" })`) and a printed PDF of the samples for the review.
+   - **Then the end of slice 6:** `docs/ui-design.md` §12 "UI slice 6 versus this design" (stop B), the plan's status, and
+     this file. After slice 6 the plan's slices are done; ask the user what's next (the Roadmap, the Pre-launch checklist).
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
