@@ -183,10 +183,17 @@ export const stubPrint = (page: Page) => page.addInitScript(() => {
 });
 export const printed = (page: Page) => page.evaluate(() => (window as unknown as { printed?: number }).printed ?? 0);
 
-/** The Print button, pressed, and the page printed: every schedule loaded and worked out first. */
-export async function printWithButton(page: Page) {
-  await page.getByRole("button", { name: "Print", exact: true }).click();
-  await expect.poll(() => printed(page), { timeout: 60_000 }).toBe(1);
+/**
+ * Print… pressed, a summary (the default) or the full workpaper chosen, Print pressed, and the page printed: every schedule loaded
+ * and worked out first. `times`: the prints so far, this one included.
+ */
+export async function printWithButton(page: Page, scope: "summary" | "full" = "summary", times = 1) {
+  await page.getByRole("button", { name: "Print…" }).click();
+  const choice = page.locator("#print-choice");
+  await expect(choice.getByRole("radio", { name: /^Summary/ })).toBeVisible();
+  if (scope === "full") await choice.getByRole("radio", { name: /^Full workpaper/ }).check();
+  await choice.getByRole("button", { name: "Print", exact: true }).click();
+  await expect.poll(() => printed(page), { timeout: 60_000 }).toBe(times);
 }
 
 /** Two frames: the page's own reaction to focus (a scroll that keeps it clear of a sticky bar) has run. */

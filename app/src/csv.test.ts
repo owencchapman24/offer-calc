@@ -10,7 +10,7 @@ import { initialSession } from "./session";
 import { context, renderPage, renderWork, VALUATION, withWork } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
-import { Printing, TICKS, type TickKind } from "./ui";
+import { Printing, type PrintScope, TICKS, type TickKind } from "./ui";
 
 // CSV export of each table (slice 6, stop B; docs/ui-design.md §4.8, §10): every figure is the figure shown, as a plain number,
 // with its tickmark beside it; line 1 flags samples and the name ends -sample; text cells are guarded against formulas, numbers
@@ -191,23 +191,44 @@ describe("CSV: the formula guard, on text cells only", () => {
   });
 });
 
-describe("Print: every schedule expanded", () => {
+describe("Print: every schedule expanded; a summary or the full workpaper", () => {
   const ctx = withWork(context()).ctx;
-  const provide = (printing: boolean, el: ReturnType<typeof createElement>) =>
+  const provide = (printing: PrintScope | null, el: ReturnType<typeof createElement>) =>
     renderToStaticMarkup(createElement(WorkProvider, { ctx, children: createElement(Printing.Provider, { value: printing, children: el }) }));
-  it("L-6 is open on every offer, one after another, without its switches", () => {
+  const work = (scope: PrintScope) => {
     const w = withWork(context());
-    const html = provide(true, createElement(TheWork, { ...w.props, ctx: w.ctx, open: false }));
-    for (const l of LETTERS) expect(html).toContain(`data-metric="l6y.${l}.total.1"`);
+    return provide(scope, createElement(TheWork, { ...w.props, ctx: w.ctx, open: false }));
+  };
+  it("the full workpaper: L-6 open on every offer, one after another, every payment listed, without its switches", () => {
+    const html = work("full");
+    for (const l of LETTERS) {
+      expect(html).toContain(`data-metric="l6y.${l}.total.1"`);
+      expect(html).toContain(`data-metric="l6p.${l}.0.gross"`);
+      expect(html).toContain(`data-metric="l6t.${l}.2027.total.offer"`);
+    }
     expect(html.match(/class="l6-offer"/g)).toHaveLength(3);
+    expect(html.match(/class="year-table l6-table l6-payments"/g)).toHaveLength(3);
     expect(html).not.toContain('aria-label="Offer"');
     expect(html).toContain("for each offer");
   });
-  it("L-1's and L-2's table views are open", () => {
+  it("the summary: everything but the list of every payment, which it says where to find", () => {
+    const html = work("summary");
+    for (const l of LETTERS) {
+      expect(html).toContain(`data-metric="l6y.${l}.total.1"`);
+      expect(html).toContain(`data-metric="l6s.${l}.colAdjustedTotal.pv"`);
+      expect(html).toContain(`data-metric="l6t.${l}.2027.total.offer"`);
+    }
+    expect(html).not.toContain('data-metric="l6p.');
+    expect(html).not.toContain('data-metric="l6g.');
+    expect(html).not.toContain("l6-payments");
+    expect(html.match(/class="note l6-elsewhere"/g)).toHaveLength(3);
+    expect(html).toContain("The list of every payment is in the full workpaper.");
+  });
+  it("L-1's and L-2's table views are open, in either", () => {
     const ui = initialSession(VALUATION).ui;
-    expect(provide(false, createElement(ByYear, { ctx, ui, sample: true, dispatch: () => {} }))).not.toContain('id="l1-table"');
-    expect(provide(true, createElement(ByYear, { ctx, ui, sample: true, dispatch: () => {} }))).toContain('id="l1-table"');
-    expect(provide(false, createElement(Risk, { ctx, sample: true }))).not.toContain('id="l2-table"');
-    expect(provide(true, createElement(Risk, { ctx, sample: true }))).toContain('id="l2-table"');
+    for (const [scope, open] of [[null, false], ["summary", true], ["full", true]] as const) {
+      expect(provide(scope, createElement(ByYear, { ctx, ui, sample: true, dispatch: () => {} })).includes('id="l1-table"'), String(scope)).toBe(open);
+      expect(provide(scope, createElement(Risk, { ctx, sample: true })).includes('id="l2-table"'), String(scope)).toBe(open);
+    }
   });
 });

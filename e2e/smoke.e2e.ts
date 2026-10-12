@@ -80,7 +80,8 @@ test("CSV: a table downloads with the figures shown, as plain numbers, flagged a
   expect(pay.lines[4]).toContain(`,${gross.replace(/,/g, "")},✓,`);
 });
 
-test("Print: the button loads every schedule and works it out, then prints; Ctrl+P lays out what's loaded", async ({ page }) => {
+test("Print: a summary or the full workpaper; the button loads every schedule and works it out, then prints; Ctrl+P lays out what's loaded",
+  async ({ page }) => {
   await stubPrint(page);
   await openCompare(page);
   // The browser's own print: what's loaded is laid out for print at once (L-1's table view), before it prints.
@@ -91,18 +92,35 @@ test("Print: the button loads every schedule and works it out, then prints; Ctrl
   await expect(page.locator("#l1-table")).toHaveCount(0);
   expect(await printed(page)).toBe(0);
 
-  // The Print button: L-2 to L-6 loaded and worked out first (none of them was), every offer's L-6 open, then print.
+  // Print… offers a summary (chosen) or the full workpaper; Escape goes back to the button.
+  await page.getByRole("button", { name: "Print…" }).click();
+  await expect(page.getByRole("radio", { name: /^Summary/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Summary/ })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#print-choice")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Print…" })).toBeFocused();
+
+  // The summary: L-2 to L-6 loaded and worked out first (none of them was), every offer's L-6 open but its list of every payment.
   await expect(page.locator("#l6-title")).toHaveCount(0);
   await printWithButton(page);
   for (const id of ["l1", "l2", "l3", "l4", "l5", "l6"]) await expect(page.locator(`#${id}-title`)).toBeAttached();
   for (const s of [".ties", ".leaving", ".the-work"]) await expect(page.locator(s)).toHaveAttribute("data-ready", "1");
   await expect(page.locator(".l6-offer")).toHaveCount(3);
-  await expect(page.locator(".l6-payments")).toHaveCount(3);
+  await expect(page.locator("table.l6-tax")).toHaveCount(3);
+  await expect(page.locator(".l6-payments")).toHaveCount(0);
+  await expect(page.locator(".l6-elsewhere")).toHaveCount(3);
   await expect(page.locator("#l1-table, #l2-table")).toHaveCount(2);
+  await page.emulateMedia({ media: "screen" });
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+
+  // The full workpaper: every payment too.
+  await printWithButton(page, "full", 2);
+  await expect(page.locator(".l6-payments")).toHaveCount(3);
+  await expect(page.locator(".l6-elsewhere")).toHaveCount(0);
   await page.emulateMedia({ media: "print" });
   // On paper: every schedule's legend, no buttons but the figures, B's lines dashed and C's dotted, the footer's sample flag.
   await expect(page.locator(".schedule .legend")).toHaveCount(7);
-  await expect(page.getByRole("button", { name: "Print", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Print…" })).toBeHidden();
   await expect(page.locator(".segmented").first()).toBeHidden();
   const dash = (letter: string) => page.locator(`.by-year .series.offer-${letter} .series-line`).evaluate((el) => getComputedStyle(el).strokeDasharray);
   expect([await dash("A"), await dash("B"), await dash("C")]).toEqual(["none", "7px, 4px", "2px, 3px"]);

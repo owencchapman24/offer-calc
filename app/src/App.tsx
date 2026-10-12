@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useReducer, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
@@ -19,7 +19,7 @@ import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, ty
 import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
 import { dayBefore, localToday, longDate } from "./text";
-import { Printing, type Stale, TickSetting } from "./ui";
+import { Printing, type PrintScope, type Stale, TickSetting } from "./ui";
 import { WorkProvider } from "./Tickmarks";
 import { useEngine } from "./useEngine";
 import { SECTIONS, type SectionId } from "./sections";
@@ -100,18 +100,24 @@ export function App() {
   const tickSetting = useMemo(() => ({ hidden: ticks === "hidden", show: () => dispatch({ type: "ui", patch: { ticks: "shown" } }) }), [ticks]);
 
   // Print (docs/ui-design.md §9.5): the page laid out for print (the root's "printing" class, and the Printing context: every
-  // schedule expanded). The Print button sets it and gets every schedule ready first; the browser's own print (Ctrl+P) sets it
-  // as it starts, for what's loaded, synchronously, so the charts are drawn at the print width before the page is printed.
-  const [printing, setPrinting] = useState(false);
+  // schedule expanded, holding the summary or the full workpaper). The Print button offers the choice (the summary first), then
+  // gets every schedule ready; the browser's own print (Ctrl+P) lays out what's loaded as it starts, synchronously, so the charts
+  // are drawn at the print width before the page is printed, holding the last choice made (the summary until one is).
+  const [printing, setPrinting] = useState<PrintScope | null>(null);
+  const [scope, setScope] = useState<PrintScope>("summary");
+  const scopeNow = useRef(scope);
+  scopeNow.current = scope;
+  const [choosing, setChoosing] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const printToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const before = () => {
       document.documentElement.classList.add("printing");
-      flushSync(() => setPrinting(true));
+      flushSync(() => setPrinting((p) => p ?? scopeNow.current));
     };
     const after = () => {
       document.documentElement.classList.remove("printing");
-      setPrinting(false);
+      setPrinting(null);
     };
     window.addEventListener("beforeprint", before);
     window.addEventListener("afterprint", after);
@@ -122,12 +128,14 @@ export function App() {
   }, []);
   const print = async () => {
     if (preparing) return;
+    setChoosing(false);
+    printToggle.current?.focus();
     setPreparing(true);
     try {
       const m = await import("./print");
       await m.printPage(() => {
         document.documentElement.classList.add("printing");
-        setPrinting(true);
+        setPrinting(scope);
       }, loadLater);
     } finally {
       setPreparing(false);
@@ -263,10 +271,16 @@ export function App() {
         </nav>
         {route.page === "compare" && (
           <p className="print-bar no-print">
-            {/* Ctrl+P prints only what's loaded: the button loads every schedule and works them out first. */}
-            <button type="button" className="link" onClick={() => void print()}>Print</button>
+            {/* Ctrl+P prints only what's loaded: the button offers a summary or the full workpaper, then loads every schedule and works
+                them out first. */}
+            <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
+              onClick={() => setChoosing(!choosing)}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
           </p>
+        )}
+        {route.page === "compare" && choosing && (
+          <PrintChoice scope={scope} onScope={setScope} onPrint={() => void print()}
+            onCancel={() => { setChoosing(false); printToggle.current?.focus(); }} />
         )}
       </header>
 
@@ -354,5 +368,38 @@ export function App() {
     </Printing.Provider>
     </TickSetting.Provider>
     </WorkProvider>
+  );
+}
+
+const SCOPES: Array<{ scope: PrintScope; name: string; hint: string }> = [
+  { scope: "summary", name: "Summary", hint: "every schedule, with L-6's tables but not its list of every payment" },
+  { scope: "full", name: "Full workpaper", hint: "adds every payment, to the cent: many more pages" },
+];
+
+/**
+ * The Print button's choice (docs/ui-design.md §9.5): a summary (the default) or the full workpaper, then Print. Under the masthead,
+ * not a dialog: focus starts on the choice, and Escape or Cancel goes back to the Print button.
+ */
+function PrintChoice({ scope, onScope, onPrint, onCancel }: {
+  scope: PrintScope; onScope(s: PrintScope): void; onPrint(): void; onCancel(): void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => { box.current?.querySelector<HTMLInputElement>("input:checked")?.focus(); }, []);
+  return (
+    <div id="print-choice" className="print-choice no-print" ref={box} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }}>
+      <fieldset>
+        <legend>What to print</legend>
+        {SCOPES.map((x) => (
+          <label key={x.scope} className="print-scope">
+            <input type="radio" name="print-scope" value={x.scope} checked={scope === x.scope} onChange={() => onScope(x.scope)} />
+            <span><strong>{x.name}</strong> <span className="print-hint">{x.hint}</span></span>
+          </label>
+        ))}
+      </fieldset>
+      <p className="data-actions">
+        <button type="button" className="got-it data-button" onClick={onPrint}>Print</button>
+        <button type="button" className="link" onClick={onCancel}>Cancel</button>
+      </p>
+    </div>
   );
 }
