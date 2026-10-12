@@ -35,7 +35,7 @@ function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
 type FocusAfter = "cancelDelete" | "deleteButton" | "review" | "fileInput" | "imported";
 type Done = { at: "export" | "import" | "delete"; text: string };
 
-const UI_WORDS: Record<string, string> = { basis: "the basis", theme: "the theme", mode: "quick or detailed mode" };
+const UI_WORDS: Record<string, string> = { basis: "the basis", theme: "the theme", mode: "quick or detailed mode", ticks: "whether tickmarks show" };
 const FILING = { single: "single", joint: "married, filing jointly", headOfHousehold: "head of household" } as const;
 
 export default function DataPage({ session, dispatch, today, saved, clear }: {
@@ -119,6 +119,11 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
           <p>One JSON file with every offer, About you and your view choices. It's versioned, so a later version of this app can read it.</p>
           <p><button type="button" className="got-it data-button" onClick={save}>Download {download.fileName}</button></p>
           {sample && <p className="method-note">The file says it includes sample offers, and its name ends -sample.</p>}
+          <p>
+            For a spreadsheet, each table downloads as a CSV from its schedule: L-1's and L-2's table views, and L-6's four tables for each
+            offer. Each figure is the one shown, as a plain number, with its tickmark beside it. To print the comparison, use Print at the top
+            of the comparison: it works out every schedule first.
+          </p>
           {done?.at === "export" && <p className="note" role="status">{done.text}</p>}
         </section>
 

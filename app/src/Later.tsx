@@ -16,6 +16,9 @@ const leavingSchedule = lazyModule(() => import("./Leaving"));
 const warningsSchedule = lazyModule(() => import("./Warnings"));
 const workSchedule = lazyModule(() => import("./TheWork"));
 
+/** Every schedule's code, for the Print button: what Ctrl+P can't wait for. */
+export const loadLater = () => Promise.all([riskSchedule, breakevenSchedule, leavingSchedule, warningsSchedule, workSchedule].map((m) => m.load()));
+
 /** L-2, once its code has loaded. */
 export function RiskSlot({ ctx, sample, status }: { ctx: WorkContext; sample: boolean; status: Stale }) {
   const m = useLazyModule(riskSchedule);

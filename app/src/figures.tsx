@@ -1,4 +1,5 @@
-import { createContext, type MouseEvent, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect } from "react";
+import { createContext, type MouseEvent, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useState } from "react";
+import type { CsvTable } from "./csv";
 import { TICKS, type TickKind, tickWord } from "./ui";
 import type { EditTarget, MetricId, WorkContext } from "./metrics";
 
@@ -11,6 +12,9 @@ import type { EditTarget, MetricId, WorkContext } from "./metrics";
 // provider (`kind`). Measured 2026-10-09: when a lazy chunk reached react-dom or metrics.ts through
 // this module, Rolldown split React, the model and the help text out of the main chunk, for 1-2 kB more
 // gzip on every visit. `npm run check-bundle` catches it.
+//
+// The CSV button lives here too, for the same reason (2026-10-12): as a module of its own, imported by L-1 (main) and by L-2
+// and L-6 (lazy), it split React, ui.tsx and text.ts out of the main chunk. The CSV code itself (csv.ts) is a dynamic import.
 
 /** What figures read from the page's WorkProvider (Tickmarks.tsx). */
 export interface WorkApi {
@@ -144,4 +148,27 @@ export function useRovingTicks(ref: RefObject<HTMLElement | null>) {
       el.removeEventListener("keydown", onKey);
     };
   }, [ref]);
+}
+
+/**
+ * "Download CSV" beside a table (docs/ui-design.md §4.8, §10). The CSV code loads on the first click, and the file is built from
+ * the page's latest context: the figures on screen. `name` is the table, for a screen reader: "L-6.A, employment years".
+ */
+export function CsvButton({ table, name }: { table: CsvTable; name: string }) {
+  const api = useApi();
+  const [said, setSaid] = useState("");
+  const save = async () => {
+    try {
+      const csv = await import("./csv");
+      setSaid(`Saved ${csv.downloadCsv(api.ctx, table)}.`);
+    } catch (e) {
+      setSaid(`Couldn't make the CSV: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="link csv-button" aria-label={`Download CSV: ${name}`} onClick={() => void save()}>Download CSV</button>
+      <span className="sr-only" role="status">{said}</span>
+    </>
+  );
 }

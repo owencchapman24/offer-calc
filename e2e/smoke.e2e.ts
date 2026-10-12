@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { openCompare, openWork, settled, verdictText } from "./lib/app";
+import { openCompare, openWork, printed, printWithButton, settled, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -47,6 +47,71 @@ test("L-6 asks the worker for its payments only once it's opened, and its totals
   // Its present value on the verdict's basis is the rank list's figure, and its stay is L-1's.
   const shown = (sel: string) => page.locator(`${sel} .fig-value`).first().textContent();
   expect(await shown('[data-metric="l6s.A.colAdjustedTotal.pv"]')).toBe(await shown(".lead .ranks li.offer-A .rank-value"));
+});
+
+/** A downloaded CSV: its name, and its lines without the byte-order mark. */
+async function csvOf(page: Page, button: string) {
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: button }).click();
+  const d = await download;
+  const text = readFileSync(await d.path(), "utf8");
+  expect(text.charCodeAt(0)).toBe(0xfeff);
+  return { name: d.suggestedFilename(), lines: text.slice(1).split("\r\n") };
+}
+const shownText = async (page: Page, sel: string) => (await page.locator(`${sel} .fig-value`).first().textContent())!;
+
+test("CSV: a table downloads with the figures shown, as plain numbers, flagged as samples", async ({ page }) => {
+  await openCompare(page);
+  await page.locator(".by-year").getByRole("button", { name: "Table view" }).click();
+  const l1 = await csvOf(page, "Download CSV: L-1, by year");
+  expect(l1.name).toMatch(/^offer-calc-\d{4}-\d{2}-\d{2}-L-1-by-year-sample\.csv$/);
+  expect(l1.lines[0]).toBe('"Includes sample offers: illustrative inputs, not market data."');
+  // A's year 1, as the table shows it, without its thousands separator, and its tickmark beside it.
+  const a1 = await shownText(page, '#l1-table [data-metric="ey.A.1"]');
+  expect(l1.lines.find((x) => x.startsWith("Year 1,"))).toMatch(new RegExp(`^Year 1,${a1.replace(/,/g, "")},✓,`));
+  await expect(page.getByRole("status").filter({ hasText: l1.name })).toHaveCount(1);
+
+  await openWork(page, "C");
+  const pay = await csvOf(page, "Download CSV: L-6.C, every payment");
+  expect(pay.name).toMatch(/-L-6-C-every-payment-sample\.csv$/);
+  expect(pay.lines[3]).toBe("Employment year,Kind,Payment,Paid on,How it was worked out,Pay ($),Pay tickmark,Tax ($),Tax tickmark");
+  // The first payment, to the cent, as listed.
+  const gross = await shownText(page, '.l6-payments [data-metric="l6p.C.0.gross"]');
+  expect(pay.lines[4]).toContain(`,${gross.replace(/,/g, "")},✓,`);
+});
+
+test("Print: the button loads every schedule and works it out, then prints; Ctrl+P lays out what's loaded", async ({ page }) => {
+  await stubPrint(page);
+  await openCompare(page);
+  // The browser's own print: what's loaded is laid out for print at once (L-1's table view), before it prints.
+  expect(await page.evaluate(() => { window.dispatchEvent(new Event("beforeprint")); return !!document.getElementById("l1-table"); })).toBe(true);
+  await expect(page.locator("html")).toHaveClass(/printing/);
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await expect(page.locator("html")).not.toHaveClass(/printing/);
+  await expect(page.locator("#l1-table")).toHaveCount(0);
+  expect(await printed(page)).toBe(0);
+
+  // The Print button: L-2 to L-6 loaded and worked out first (none of them was), every offer's L-6 open, then print.
+  await expect(page.locator("#l6-title")).toHaveCount(0);
+  await printWithButton(page);
+  for (const id of ["l1", "l2", "l3", "l4", "l5", "l6"]) await expect(page.locator(`#${id}-title`)).toBeAttached();
+  for (const s of [".ties", ".leaving", ".the-work"]) await expect(page.locator(s)).toHaveAttribute("data-ready", "1");
+  await expect(page.locator(".l6-offer")).toHaveCount(3);
+  await expect(page.locator(".l6-payments")).toHaveCount(3);
+  await expect(page.locator("#l1-table, #l2-table")).toHaveCount(2);
+  await page.emulateMedia({ media: "print" });
+  // On paper: every schedule's legend, no buttons but the figures, B's lines dashed and C's dotted, the footer's sample flag.
+  await expect(page.locator(".schedule .legend")).toHaveCount(7);
+  await expect(page.getByRole("button", { name: "Print", exact: true })).toBeHidden();
+  await expect(page.locator(".segmented").first()).toBeHidden();
+  const dash = (letter: string) => page.locator(`.by-year .series.offer-${letter} .series-line`).evaluate((el) => getComputedStyle(el).strokeDasharray);
+  expect([await dash("A"), await dash("B"), await dash("C")]).toEqual(["none", "7px, 4px", "2px, 3px"]);
+  await expect(page.locator(".colophon")).toContainText("Includes sample offers: illustrative inputs, not market data.");
+  await expect(page.locator(".colophon")).toContainText("BEA Regional Price Parities");
+  // Done printing: back to the screen.
+  await page.emulateMedia({ media: "screen" });
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await expect(page.locator(".l6-offer")).toHaveCount(0);
 });
 
 test("export, then import: the same results", async ({ page }) => {

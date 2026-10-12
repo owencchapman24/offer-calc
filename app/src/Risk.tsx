@@ -1,12 +1,12 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Scenario } from "../../src/offer/types";
-import { rangeTicks } from "./axes";
+import { rangeTicks, useChartWidth } from "./axes";
 import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
-import { CASES, changeText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
+import { CASES, changeText, dropText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
 import { cents, dollars, figure } from "./text";
-import { Fig, useRovingTicks } from "./figures";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend } from "./ui";
+import { CsvButton, Fig, useRovingTicks } from "./figures";
+import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
 // L-2 · If things go badly (docs/ui-design.md §4.4): which offer holds up best. A sentence, a range chart
 // (bear and bull joined, base as a diamond), who wins each scenario, what goes wrong in the bear case,
@@ -24,7 +24,10 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
-  const [table, setTable] = useState(tableOpen);
+  const [open, setTable] = useState(tableOpen);
+  const printing = usePrinting();
+  // In print, every table in full: the table view opens.
+  const table = open || printing;
   const r = ctx.results;
   if (!r?.detail || r.detail.years !== r.view.row.years || !r.detail.offers.every((o) => o.cases)) return null;
   let v: RiskView;
@@ -68,9 +71,12 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
           <p className="caption">
             The bear case is one coherent bad story: every uncertain input at its bear value at once. It isn't the worst case.{" "}
             <a href="#/method/M-8">Methodology M-8</a>.{sample ? " (Sample inputs.)" : ""}{" "}
-            <button type="button" className="link" aria-expanded={table} aria-controls="l2-table" onClick={() => setTable(!table)}>
-              {table ? "Hide the table view" : "Table view"}
-            </button>
+            <span className="no-print">
+              <button type="button" className="link" aria-expanded={table} aria-controls="l2-table" onClick={() => setTable(!table)}>
+                {table ? "Hide the table view" : "Table view"}
+              </button>
+              {table && <>{" · "}<CsvButton table={{ kind: "l2" }} name="L-2, if things go badly" /></>}
+            </span>
           </p>
           {table && <CaseTable v={v} />}
         </>
@@ -109,8 +115,6 @@ function Lede({ v }: { v: RiskView }) {
   );
 }
 
-const dropText = (x: RiskRow) => `${x.share >= 0 ? "−" : "+"}${Math.round(Math.abs(x.share) * 100)}%`;
-
 // ---- the range chart ------------------------------------------------------------------------------
 
 const ROW = 36;
@@ -120,14 +124,7 @@ const NARROW = 520;
 
 function RangeChart({ v }: { v: RiskView }) {
   const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(320, Math.round(e.contentRect.width))));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const width = useChartWidth(box, 640);
   const values = v.rows.flatMap((x) => CASES.map((s) => x.values[s]));
   const ticks = rangeTicks(Math.min(...values), Math.max(...values));
   const lo = ticks[0];

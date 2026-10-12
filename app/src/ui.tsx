@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from "react";
+import { createContext, type ReactNode, useContext, useId, useState } from "react";
 import { figure, parseMoney, parseNumber, parsePercent } from "./text";
 
 // Small building blocks shared by the schedules.
@@ -22,7 +22,23 @@ export function Tick({ kind, note }: { kind: TickKind; note?: string }) {
   return <span className={`tick tick-${kind}`} title={note ? `${t.name}: ${note}` : t.name} aria-hidden="true">{t.mark}</span>;
 }
 
+/**
+ * The tickmark setting (docs/ui-design.md §9.1), for the legends: whether the figures' marks are hidden, and how to show them
+ * again. The page sets `data-ticks` on the root, and the stylesheet hides the marks; the figures stay as they are.
+ */
+export const TickSetting = createContext<{ hidden: boolean; show(): void } | null>(null);
+
 export function TickLegend() {
+  const setting = useContext(TickSetting);
+  if (setting?.hidden) {
+    return (
+      <p className="legend legend-hidden">
+        <a className="legend-title" href="#/method/M-13">Tickmarks</a>{" "}
+        <span>are hidden: each figure keeps a dotted underline and still opens its work.</span>{" "}
+        <button type="button" className="link" onClick={setting.show}>Show tickmarks</button>
+      </p>
+    );
+  }
   return (
     <p className="legend">
       <a className="legend-title" href="#/method/M-13">Tickmarks</a>
@@ -32,6 +48,14 @@ export function TickLegend() {
     </p>
   );
 }
+
+/**
+ * The page is laid out for print (docs/ui-design.md §9.5): every schedule expanded, its table views open, L-6 open on every
+ * offer, and L-3 and L-4 worked out as though on screen. Set by the Print button while it gets the page ready, and by the
+ * browser's own print (beforeprint) for what's already loaded.
+ */
+export const Printing = createContext(false);
+export const usePrinting = () => useContext(Printing);
 
 export function Stamp({ children, tone = "ink" }: { children: ReactNode; tone?: "ink" | "muted" }) {
   return <span className={`stamp stamp-${tone}`}>{children}</span>;

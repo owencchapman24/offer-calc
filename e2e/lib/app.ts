@@ -51,6 +51,15 @@ export async function quiet(page: Page) {
     await nearbyWorkedOut(page);
     const y = await page.evaluate(() => window.scrollY);
     for (const schedule of [".ties", ".leaving"]) {
+      // Loaded but never worked out, off screen: anything that scrolls mid-scan (axe's own checks can) would set it working, and
+      // it dims once its first half is in. Work it out first (seen in CI on a tablet, 2026-10-12).
+      const idle = page.locator(`${schedule}[data-ready='0']:not(.is-updating)`);
+      if (await idle.count()) {
+        await idle.scrollIntoViewIfNeeded();
+        await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+        await nearbyWorkedOut(page);
+        await page.evaluate((top) => window.scrollTo(0, top), y);
+      }
       const dimmed = page.locator(`${schedule}.is-updating`);
       if (!(await dimmed.count())) continue;
       await dimmed.scrollIntoViewIfNeeded();
@@ -160,6 +169,24 @@ export async function openEditor(page: Page, e: (typeof EDITORS)[number]) {
 export async function showTheWork(page: Page, metric: string) {
   await page.locator(`[data-metric="${metric}"], [data-tick="${metric}"]`).first().click();
   await expect(page.locator(".work .work-lines")).toBeVisible();
+}
+
+/**
+ * The browser's print, stubbed before the page loads: it counts the calls (`printed`) instead of opening a dialog, and doesn't
+ * fire afterprint, so the page stays laid out for print for the test to look at.
+ */
+export const stubPrint = (page: Page) => page.addInitScript(() => {
+  window.print = () => {
+    const w = window as unknown as { printed?: number };
+    w.printed = (w.printed ?? 0) + 1;
+  };
+});
+export const printed = (page: Page) => page.evaluate(() => (window as unknown as { printed?: number }).printed ?? 0);
+
+/** The Print button, pressed, and the page printed: every schedule loaded and worked out first. */
+export async function printWithButton(page: Page) {
+  await page.getByRole("button", { name: "Print", exact: true }).click();
+  await expect.poll(() => printed(page), { timeout: 60_000 }).toBe(1);
 }
 
 /** Two frames: the page's own reaction to focus (a scroll that keeps it clear of a sticky bar) has run. */

@@ -1,4 +1,4 @@
-import { type Dispatch, useEffect, useRef, useState } from "react";
+import { type Dispatch, useContext, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/issues";
 import type { Basis, BreakevenResult } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -7,7 +7,7 @@ import type { EditTarget } from "./metrics";
 import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
-import { Stamp, TickLegend } from "./ui";
+import { Stamp, TickLegend, TickSetting } from "./ui";
 import { basisPhrase, type RentNote } from "./metrics";
 import type { PriceWords } from "./prices";
 import { Fig, useRovingTicks } from "./Tickmarks";
@@ -161,6 +161,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
   const step = pipeline(prices).find((p) => p.basis === basis)!;
   const pv = basis !== "perHour";
   const extra = extraHoursView(view, letters);
+  const marksHidden = useContext(TickSetting)?.hidden ?? false;
   return (
     <>
       {basis === "colAdjustedTotal" && !dismissed?.afterRent && (
@@ -227,7 +228,8 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
         )}
         {!dismissed?.ticks && (
           <p className="hint-ticks">
-            <span>{touch() ? "Tap" : "Click"} any figure or <span className="tick" aria-hidden="true">✓</span><span className="sr-only">tickmark</span> to see how it's calculated.</span>
+            {marksHidden ? <span>{touch() ? "Tap" : "Click"} any underlined figure to see how it's calculated.</span>
+              : <span>{touch() ? "Tap" : "Click"} any figure or <span className="tick" aria-hidden="true">✓</span><span className="sr-only">tickmark</span> to see how it's calculated.</span>}
             <button type="button" className="got-it" onClick={() => dispatch({ type: "dismiss", hint: "ticks" })}>Got it</button>
           </p>
         )}

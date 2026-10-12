@@ -32,17 +32,39 @@ and show the work. Correctness and a clear methodology page matter more than fea
   - one projection 2.8 ms; `compareOffers` 23 ms; `horizonSweep` (stays of 2-5) 25 ms;
   - one breakeven 52 ms; one rent flip 5 ms; a 60-month leave sweep 92 ms.
 
-**UI: slices 1-5, 7 and 8 are complete, and slice 6's stop A (L-6), live at https://offer-calc.vercel.app** (plan for slices
-4-8: `docs/ui-slices-4-8-plan.md`; slices 4-8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
+**UI: slices 1-8 are complete and live at https://offer-calc.vercel.app**, so the plan for slices 4-8 is done (plan:
+`docs/ui-slices-4-8-plan.md`; slices 4-8 versus the design: `docs/ui-design.md` §12). **Slice 7** is
 done (2026-10-10): stop A (the automated accessibility scan and its fixes), stop B (phone tabs, sticky verdict bars) and
-stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). **Slice 6,
-stop A is complete and live** (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
-owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs"). Slice 6's stop B (CSV, print,
-hide-tickmarks) is next: see Next steps.
-- **Where things stand** (2026-10-12, `main` at `8d4a533`, CI green on it): `npm test` 425 passing; `npm run e2e` 131 passing
-  (13 skip by design), the scan 158 scans with no violations and no exceptions; main thread 373.9 / 115.1 kB gzip against the
-  120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.94 s against 2.5 s, performance 98, in CI and locally.
+stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). **Slice 6**
+is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
+owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
+print, the hide-tickmarks setting; below). What's next is the user's call: see Next steps.
+- **Where things stand** (2026-10-12, slice 6 stop B): `npm test` 442 passing; `npm run e2e` 148 passing
+  (15 skip by design), the scan 178 scans with no violations and no exceptions; main thread 377.5 / 116.0 kB gzip
+  against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally.
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
+- **CSV for each table** (slice 6, stop B; `csv.ts`, loaded on the first download): L-1's and L-2's table views ("Download CSV"
+  once the table view is open) and L-6's four tables per offer (beside each part's heading). Built from the same view models and
+  display formatting as the tables, so each figure is the figure shown, written as a plain number (`(41,724)` is `-41724`, a payment
+  `9166.67`, a rate as shown), units in the headers, each figure's tickmark (`metricKind`) in a column beside it. Line 1 flags samples
+  (one quoted cell), then a title, the scope, the header, the rows and the tickmark legend; UTF-8 with a BOM, CRLF. Named
+  `offer-calc-YYYY-MM-DD-<table>[-sample].csv` (`L-6-A-employment-years`, …). Text cells starting with `=`, `+`, `-`, `@`, a tab
+  or a CR get a leading `'`; number cells never. `csv.test.ts` checks every figure in every CSV against the rendered tables. The
+  button (`CsvButton`) lives in `figures.tsx` (see Bundles).
+- **Print** (slice 6, stop B; `print.ts`, loaded on the first click): the Print button (top of the comparison) sets the print
+  layout (the root's `printing` class and the `Printing` context in `ui.tsx`), loads L-2 to L-6 (`loadLater`), works out L-3, L-4
+  and L-6's payments as though on screen, waits for every schedule (12 s at most), then `window.print()`; `afterprint` restores the
+  screen. Ctrl+P sets the layout in `beforeprint` (`flushSync`, so charts re-measure at once: `useChartWidth` in `axes.ts`) but
+  prints only what's loaded. The layout is a 680 px column on screen and on paper, so charts are drawn at the print width; table
+  views open; L-6 open on every offer, each on a new page; the screen's controls hidden; inputs print as values; light colors from a
+  dark screen; A solid, B dashed, C dotted (also under forced colors); page numbers in the margin; the footer flags samples and gives
+  the data vintages. The samples print to 37 Letter pages. A `<tfoot>` prints as a plain row group (Chromium repeats footers on
+  each page, blank).
+- **The hide-tickmarks setting** (slice 6, stop B): "Show tickmarks | Hide tickmarks" radios in the footer (`ui.ticks`, saved with
+  the session; JSON exports carry it as the theme, "shown" or "hidden"). Hidden, the root has `data-ticks="hidden"` and the
+  stylesheet hides the figures' marks (and Show the work's, and the `<` ties); figures keep a dotted underline and stay the same
+  buttons with the same names and roving tabindex. Legends say so, with "Show tickmarks" (`TickSetting` context in `ui.tsx`). The
+  inputs' `D` and `E` stay. `ticks.test.ts`; `keyboard.e2e.ts` checks the names, the underline, the arrow keys and the save.
 - **L-6, The work** (slice 6, stop A; `TheWork.tsx`, view model `workpaper.ts`): collapsed until "Show the tables", then one offer
   at a time (A | B | C): its employment years as numbered lines (cash; total rewards and hours; after rent) by year and the years
   added; your stay's totals on each basis (the years, less what runs past the stay, = your stay as paid `<` L-1's; present value
@@ -86,8 +108,9 @@ hide-tickmarks) is next: see Next steps.
   33 states (quick mode, every detailed section and row editor, Show the work opened, drilled into and on a
   default, L-1's table view, L-1 to L-5 loaded, L-4 on your stay's last day, the methodology, the Data
   page's import review, its problems, a file it can't import and the delete confirmation; since stop B the
-  verdict bar and the phone's tabs; since slice 6 L-6 open on A and on C, and a payment's tax worked out: 36), in
-  desktop 1440 and phone 390 projects, light and dark, and the comparison page's states in tablet 820 projects: 158
+  verdict bar and the phone's tabs; since slice 6 L-6 open on A and on C, and a payment's tax worked out: 36; since stop B, L-2's table view, tickmarks hidden and
+  Show the work so, and print on a desktop, in print media: 40), in
+  desktop 1440 and phone 390 projects, light and dark, and the comparison page's states in tablet 820 projects: 178
   scans. L-6's states are the longest pages (every schedule loaded, ~500 figures in its tables): their tests have 180 s. The verdict bar is scanned in its place (`position: static`):
   axe counts targets scrolled under a stuck bar as obscured, which is a scroll position, not the layout. Any WCAG 2.0/2.1/2.2 A or AA violation
   fails, unless `test/a11y-exceptions.json` accepts it with a rule, a selector and a reason (an entry
@@ -232,8 +255,9 @@ hide-tickmarks) is next: see Next steps.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 373.9 / 115.1 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 6's stop A added 4.5 / 1.7 (the year figures as shown,
+  - **Main thread:** 377.5 / 116.0 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Slice 6's stop B added 3.6 / 0.9 (the CSV button, the
+    tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
     L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8
     at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
     slice 5 at 355.7 / 109.1;
@@ -245,18 +269,20 @@ hide-tickmarks) is next: see Next steps.
     a discarded warm-up, then the median of 3 runs, LCP's and the score's each taken on its own): LCP at most 2.5 s,
     checked in CI. Before the warm-up (2026-10-10), CI's cold first run (TBT ~1 s) could be reported as the median. 2026-10-09: the production build 1.86 s,
     performance 98; the live site 1.47 s, performance 100. 2026-10-10, after slice 6's stop A: 1.94 s in CI and locally,
-    performance 98. The LCP element is About you's assumptions
+    performance 98; 2026-10-12, after slice 6's stop B: 1.95 s locally, performance 98. The LCP element is About you's assumptions
     line, which renders before the worker answers, so the main chunk's download and parse set LCP.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
-    more gzip on every visit).
+    more gzip on every visit). Likewise a new module shared by the main chunk and a lazy schedule: `CsvButton.tsx`, imported
+    by L-1 and by L-2 and L-6, split React, `ui.tsx` and `text.ts` out (2026-10-12), so the button lives in `figures.tsx`.
+    `npm run build` then `grep -c modulepreload dist/index.html` is 0 when the main thread is one chunk.
   - **Loaded on first use** (raw / gzip, 2026-10-09): detailed mode 54 / 14 KB (sections, editors,
     controls, its help text), the derivations 69 / 22 KB (when a tickmark is hovered, focused or
     opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
     L-2 9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 14 / 5 KB plus its view model 4 / 2 KB
     (each view model shared with the derivations), L-5 6 / 3 KB, L-6 11 / 3 KB plus its view model 12 / 5 KB (2026-10-10; the
-    derivations are now 92 / 27 KB, with L-6's).
+    derivations are now 92 / 27 KB, with L-6's), the CSV code 7 / 3 KB and the print code 0.4 / 0.3 KB (2026-10-12).
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
@@ -266,13 +292,15 @@ hide-tickmarks) is next: see Next steps.
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 425 passing (`npm test`), and 131 Playwright tests (`npm run e2e`: the scan's tests in six projects, 3 smoke
-tests, 7 keyboard tests, and the phone and tablet tests; 13 more skip, each a phone's test on a tablet or the reverse).
+**Tests:** 442 passing (`npm test`), and 148 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
+tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
+print scan off a desktop).
 - `test/offer.test.ts` 126, `test/params.test.ts` 22, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
-  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/prices.test.ts` 13, `app/src/phone.test.ts` 5,
+  `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 13, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
+  `app/src/phone.test.ts` 5,
   `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),
   the ties to L-1, the bridge and the rank list, the anniversary edge (a payment on your stay's last day is counted; on the
@@ -345,38 +373,11 @@ Before the repo and the app go public (deferred, see Decisions):
   the verdict and per hour stay the engine's: a present value isn't a sum of the years. Apply the same rule to anything new
   that adds up (CSV included); don't change it without the user.
 
-## Next steps (in this order)
-The plan, approved 2026-10-09, is `docs/ui-slices-4-8-plan.md`: scope, build order, review stops
-and tests for each slice. `docs/ui-design.md` §12 keeps the slice numbers; this is the order to
-build them in.
-1. **Slice 6, stop B** (the plan's scope, `docs/ui-slices-4-8-plan.md` "Slice 6", with the user's requirements of 2026-10-12;
-   design: `docs/ui-design.md` §4.8, §9.1, §9.5 and §10). One branch and PR, then review stop B, which ends the slice.
-   - **CSV for each table** (§4.8: each table exports to CSV; §10: CSV for every table): at least L-6's four (employment years,
-     your stay, every payment, tax by calendar year), built from the same view models (`workpaper.ts`), so each figure is the
-     figure shown. Say at the start whether L-1's and L-2's table views get one too.
-     - **Money cells are plain numbers**, units in the column headers ("Year 1 ($, as paid)", "Pay ($)"), no thousands
-       separators, parentheses or currency signs; negatives as `-123.45`. Whole dollars where the table shows dollars, cents
-       where it shows cents (payments), rates as shown.
-     - **Tickmarks as a column** beside the figures they mark (each figure's kind from `metricKind`).
-     - **The sample flag on line 1** whenever any offer is a sample, and **`-sample` in the file name**, as the JSON export
-       does (`offer-calc-YYYY-MM-DD[-sample]…`, `exchange.ts`).
-     - **The formula guard on text cells only** (offer labels, award and grant names are free text): a text cell that starts
-       with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`. Number cells are never guarded, so `-123.45`
-       stays a number.
-   - **Print** (§9.5): every schedule expanded with its legend (L-6 open, every offer's tables); offer colors plus texture, so
-     the charts read in black and white (a dash pattern or marker shape per offer); the sample flag and the data vintages
-     in the footer. A Print button loads the lazy schedules first (and L-6's payments), then prints: Ctrl+P prints only what's
-     loaded, since `beforeprint` can't wait for a chunk.
-   - **The hide-tickmarks setting** (§9.1), saved with the session (`ui` in `session.ts`; decide whether JSON exports carry it,
-     as they carry the theme). With marks hidden, figures keep a dotted underline and stay buttons: clickable, in the roving
-     tabindex, with the same accessible name ("How 62,594 was worked out (recomputed)"). The legends say the marks are hidden.
-   - **The bundle budget:** CSV and print code load on first use (a lazy chunk on the button's click), like the schedules;
-     the main thread is 115.1 of 120 kB gzip. Check `npm run check-bundle` (one chunk) and `npm run lighthouse`.
-   - **Tests:** CSV cells as plain numbers, negatives, the guard (text only), the sample line and file name, a figure that
-     ties to the table shown; the setting saved and the figures still buttons with their names; print in the scan
-     (Playwright's `emulateMedia({ media: "print" })`) and a printed PDF of the samples for the review.
-   - **Then the end of slice 6:** `docs/ui-design.md` §12 "UI slice 6 versus this design" (stop B), the plan's status, and
-     this file. After slice 6 the plan's slices are done; ask the user what's next (the Roadmap, the Pre-launch checklist).
+## Next steps
+The plan for slices 4-8 (`docs/ui-slices-4-8-plan.md`) is done: slice 6's stop B (2026-10-12) was its last review stop. At
+stop B the user chose CSV for L-1's and L-2's table views as well as L-6's tables, and JSON exports that carry the
+hide-tickmarks setting as they carry the theme. Ask the user what's next: the Roadmap below, and the Pre-launch checklist
+before going public.
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
@@ -483,8 +484,11 @@ build them in.
   - `src/footing.ts`: the year figures as shown (`shownYears`, `shownStay`), shared by L-1, the bridge and L-6, and the BEA
     indexes as shown (`indexDigits`, `shownIndexes`). Main thread; no place names (see "The year figures as shown").
   - `src/TheWork.tsx` is L-6; `src/workpaper.ts` its view model (the year table's numbered lines, your stay's totals, the
-    payments by year and kind, each tax year's columns, the rate's digits), shared with `derive.ts`. Its payments come from
-    `paymentsJob` (`slowJobs.ts`), asked for with `workJob` (`protocol.ts`) while it's open.
+    payments by year and kind, each tax year's columns, the rate's digits, and the figures' display text: `moneyText`, `rowText`),
+    shared with `derive.ts` and `csv.ts`. Its payments come from `paymentsJob` (`slowJobs.ts`), asked for with `workJob`
+    (`protocol.ts`) while it's open, or the page is laid out for print.
+  - `src/csv.ts` (loaded on the first download): each table's CSV (`build`, `csvFile`, `downloadCsv`), from the view models.
+    `src/print.ts` (loaded on the first Print): the Print button's wait for every schedule, then `window.print()`.
   - `src/media.ts`: the layout's widths (`PHONE`, `TABLET`, as `styles.css` has them) as `useMedia`, the phone keyboard
     (`useKeyboardUp`) and `useFocusClearOfBars` (WCAG 2.4.11).
   - Show the work: each figure's metric id maps to a tickmark kind, a methodology section
@@ -496,8 +500,10 @@ build them in.
       `src/format`'s. Pure. The BEA indexes show the fewest decimals (3-6) at which every
       product foots to the dollar (`indexDigits`).
   - `src/figures.tsx`: `Fig` (a figure and its tickmark, one button), `TickButton` (a lone
-    mark), `Trace` (an input derivations can light up), `useRovingTicks`, and the context they
-    read. No `react-dom`, nothing from `metrics.ts` at run time (see Bundles).
+    mark), `Trace` (an input derivations can light up), `useRovingTicks`, the context they
+    read, and `CsvButton` (its CSV code a dynamic import). No `react-dom`, nothing from `metrics.ts` at run time (see Bundles).
+  - `src/ui.tsx` also holds the `TickSetting` context (the legends' "Show tickmarks") and `Printing` (the page laid out for print:
+    `usePrinting`). `src/axes.ts` has `useChartWidth`, the charts' width, measured again when the print layout comes and goes.
   - `src/Tickmarks.tsx`: `WorkProvider` (it provides that context, with each figure's tickmark
     kind), the popover, and the derivations' lazy module; it re-exports the figures. The context object stays the same
     while the page's context changes (it reads the latest through a ref), so a memoized subtree (L-6's tables) skips its
@@ -537,10 +543,12 @@ build them in.
 - `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
   - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded, L-6 open on an
     offer (`openWork`, after the schedules above have filled in: one filling in mid-click moves L-6), when the page has settled:
-    `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
+    `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed, and works out any loaded off screen: since 2026-10-12, when CI caught L-4 starting mid-scan on a tablet); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
-  - `smoke.e2e.ts`, `keyboard.e2e.ts`; `mobile.e2e.ts` (the phone's tabs and the verdict bars, in the `phone` and
-    `tablet` projects).
+  - `smoke.e2e.ts` (with CSV downloads and the Print button), `keyboard.e2e.ts` (with the hide-tickmarks setting); `mobile.e2e.ts`
+    (the phone's tabs and the verdict bars, in the `phone` and `tablet` projects). `lib/app.ts`'s `stubPrint` counts
+    `window.print()` calls instead of opening a dialog (and no afterprint follows, so the print layout stays to be scanned), and
+    `printWithButton` presses Print and waits for the call.
 
 ## Working agreements
 - **Pull requests** (adopted 2026-10-08, by agreement; not enforced): one branch per slice or
