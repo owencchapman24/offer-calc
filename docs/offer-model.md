@@ -306,9 +306,11 @@ employment-year and window totals all add up to the calendar-year totals.
 **Residence vs. employer state (decision 9).** Each offer has a `residence` (state +
 locality), which is what the engine taxes, and an `employerState`. If the employer state
 applies a convenience-of-employer rule and differs from the residence state, we warn that
-remote-work wages may also be taxed there. The rule states are NY, DE, NE and PA; CT and NJ
-apply it only to residents of states that have one (reciprocity). v1 warns but doesn't
-compute nonresident tax or the resident credit.
+remote-work wages may also be taxed there. The rule states are NY, DE and PA; CT and NJ
+apply it only to residents of states that have one (reciprocity), and NJ's list still names
+Nebraska. Nebraska itself counts only work done in Nebraska for taxable years from 2025 (Neb.
+Rev. Stat. 77-2733(8)(c), amended by LB1023), so a Nebraska employer raises no warning. v1 warns
+but doesn't compute nonresident tax or the resident credit.
 
 **Withholding vs liability (roadmap 5, built 2026-10-08).** Totals are liability: what you
 owe. `withholdingShortfall(offer, household)` estimates what your employer withholds for
@@ -748,8 +750,9 @@ export interface ProjectionOptions {
 }
 
 /** States applying a convenience-of-employer rule to remote employees' wages. CT and NJ
- *  apply it only to residents of states that have one (reciprocity). */
-export declare const CONVENIENCE_RULE_STATES: { always: ["NY", "DE", "NE", "PA"]; reciprocal: ["CT", "NJ"] };
+ *  apply it only to residents of states that have one (reciprocity); `named` are states without
+ *  one that NJ's list still names (NE, since LB1023 from 2025). */
+export declare const CONVENIENCE_RULE_STATES: { always: ["NY", "DE", "PA"]; reciprocal: ["CT", "NJ"]; named: ["NE"] };
 
 // ---- outputs ------------------------------------------------------------------
 export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback";
