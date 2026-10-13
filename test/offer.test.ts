@@ -187,6 +187,17 @@ describe("residence vs employer state (decision 9)", () => {
     expect(convenienceRuleWarning("NY", "CT")).toBeDefined();
     expect(convenienceRuleWarning("TX", "CT")).toBeUndefined();
   });
+  it("Nebraska sources only work done in Nebraska from 2025 (LB1023), so its employers raise no warning", () => {
+    expect(convenienceRuleWarning("IA", "NE")).toBeUndefined();
+    expect(convenienceRuleWarning("NY", "NE")).toBeUndefined();
+    const r = projectScenario({ ...worked, residence: { state: "IA" }, employerState: "NE" }, single);
+    expect(r.warnings).toEqual([]);
+  });
+  it("NJ's rule may still reach Nebraska residents (its FAQ names Nebraska), and so may CT's", () => {
+    expect(convenienceRuleWarning("NE", "NJ")).toEqual({ code: "convenienceRule", params: { residenceState: "NE", employerState: "NJ" } });
+    expect(convenienceRuleWarning("NE", "CT")).toBeDefined();
+    expect(convenienceRuleWarning("NE", "NY")).toBeDefined();
+  });
   it("no warning when you live where the employer is", () => {
     expect(convenienceRuleWarning("NY", "NY")).toBeUndefined();
   });
