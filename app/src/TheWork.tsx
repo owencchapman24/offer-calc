@@ -1,7 +1,8 @@
 import { memo, type ReactNode, useEffect, useMemo, useRef } from "react";
 import type { L6Part } from "./csv";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
-import { cashName, type MetricId, type WorkContext } from "./metrics";
+import { type MetricId, type WorkContext } from "./metrics";
+import { cashName } from "./byYearModel";
 import type { Letter } from "./model";
 import { type CompareRequest, workJob, type WorkOffer } from "./protocol";
 import { figure, longDate } from "./text";

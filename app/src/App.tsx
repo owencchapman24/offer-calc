@@ -4,10 +4,9 @@ import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
-import { ByYear } from "./ByYear";
 import { Lead, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
-import { BreakevenSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, ByYearSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -317,7 +316,7 @@ export function App() {
                 cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} />
             </div>
           </main>
-          {work.results && <ByYear ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
+          {work.results && <ByYearSlot ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
           {work.results && <RiskSlot ctx={work} sample={sample} status={stale} />}
           {work.results && (
             <BreakevenSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale} ties={engine.breakeven} requestSlow={requestSlow} />

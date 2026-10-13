@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
 import {
-  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, printWithButton, SECTIONS, selectOffer, settled, showTheWork, stubPrint,
+  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, printWithButton, SECTIONS, selectOffer, settled, showByYear, showTheWork,
+  stubPrint,
 } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
@@ -49,6 +50,7 @@ test.describe("compare", () => {
 
   test("L-1's table view", async ({ page }) => {
     await openCompare(page);
+    await showByYear(page);
     await page.locator(".by-year").getByRole("button", { name: "Table view" }).click();
     await expect(page.locator("#l1-table")).toBeVisible();
     await expect(page.getByRole("button", { name: "Download CSV: L-1, by year" })).toBeVisible();

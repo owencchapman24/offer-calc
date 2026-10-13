@@ -125,6 +125,16 @@ test.describe("phone", () => {
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(400);
     expect(await tabThrough(page, 30, "Shift+Tab")).toBeGreaterThan(5);
   });
+
+  test("See how we get there brings the bridge, though L-1 loads only as you scroll toward it", async ({ page }) => {
+    await openCompare(page);
+    // On a phone, L-1 and the bridge are screens below the first-use note: their code isn't loaded yet.
+    await expect(page.locator("#l1-title")).toHaveCount(0);
+    await page.getByRole("button", { name: "See how we get there" }).click();
+    await expect(page.locator("#bridge-title")).toBeFocused();
+    await expect(page.locator("#bridge-title")).toBeInViewport();
+    await settled(page);
+  });
 });
 
 test.describe("tablet", () => {

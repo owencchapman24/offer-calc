@@ -9,6 +9,7 @@ import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { Stamp, TickLegend, TickSetting } from "./ui";
 import { basisPhrase, type RentNote } from "./metrics";
+import { showBridge } from "./Later";
 import type { PriceWords } from "./prices";
 import { Fig, useRovingTicks } from "./Tickmarks";
 import {
@@ -164,11 +165,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
             plus what you save.
           </p>
           <p className="first-use-actions">
-            <button type="button" className="link" onClick={() => {
-              const b = document.getElementById("bridge");
-              b?.scrollIntoView({ behavior: "smooth", block: "start" });
-              document.getElementById("bridge-title")?.focus({ preventScroll: true });
-            }}>See how we get there</button>
+            <button type="button" className="link" onClick={() => void showBridge()}>See how we get there</button>
             <button type="button" className="got-it" onClick={() => dispatch({ type: "dismiss", hint: "afterRent" })}>Got it</button>
           </p>
         </div>

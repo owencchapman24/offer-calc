@@ -665,6 +665,14 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .risk-table { max-width: 760px; }
 .risk-wrong ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .later { min-height: 1px; }
+/* L-1's place before its code arrives, about as tall as L-1 itself (the samples, 2026-10-13: 705, 1,135 and 1,406 px), so the page
+   lays out as it will: the schedules below stay where they'd be, so they don't load early, and nothing shifts when L-1 comes.
+   Not in print: Ctrl+P prints what's loaded. */
+.later.l1-slot { min-height: 705px; }
+@media (max-width: 1179px) { .later.l1-slot { min-height: 1135px; } }
+@media (max-width: 759px) { .later.l1-slot { min-height: 1406px; } }
+@media print { .later.l1-slot { min-height: 0; } }
+.printing .later.l1-slot { min-height: 0; }
 
 /* ---- L-3 what it would take ------------------------------------------------------------------------- */
 

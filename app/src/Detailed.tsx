@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
+import "./quickHelp"; // and the ⓘ help of quick mode's fields, which detailed mode shows too
 import {
   BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
   PromotionsEditor, RefreshersEditor, VestingStepsEditor,

@@ -9,10 +9,11 @@ import {
   toOfferInput,
 } from "./model";
 import {
-  aboutIsDefault, type AboutField, basisPhrase, bridge, type BridgeLine, byYear, cityName, type Derivation, detailOf, type EditTarget, eyOfDate,
-  indexOf, type InputRef, join, type L6Line, metricKind, type MetricId, offerByLetter, pathOf, pricesOf, type PvPart, rentEstimate, rentNotes, res, rowFor,
-  shortCity, shownYearOf, type TaxLine, type WorkContext, type WorkLine, workedFrom, yearValue,
+  aboutIsDefault, type AboutField, basisPhrase, type BridgeLine, cityName, type Derivation, detailOf, type EditTarget, indexOf,
+  type InputRef, join, type L6Line, metricKind, type MetricId, offerByLetter, pathOf, pricesOf, type PvPart, rentEstimate, rentNotes, res,
+  rowFor, shortCity, type TaxLine, type WorkContext, type WorkLine,
 } from "./metrics";
+import { bridge, byYear, eyOfDate, shownYearOf, workedFrom, yearValue } from "./byYearModel";
 import type { OfferDetail, TaxRun } from "./protocol";
 import {
   BASIS_LINE as L6_BASIS_LINE, exactPay, FOOTS, lineNo, paymentAt, paymentLabel, paymentYears, rateText, stayRows, type TaxCol, taxTable, toCent,
