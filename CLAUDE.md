@@ -342,6 +342,8 @@ print scan off a desktop).
     order 5, 4, 8, 7, 6.
   - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
     export/import) and the public-repo prep after it.
+  - `docs/user-testing.md`: what testers raise, one row per finding (date, finding, how many testers, what it led to). Keep
+    adding to it as findings come in.
 
 ## Pre-launch checklist
 Before the repo and the app go public (deferred, see Decisions):
@@ -384,7 +386,9 @@ The plan for slices 4-8 (`docs/ui-slices-4-8-plan.md`) is done: slice 6's stop B
 stop B the user chose CSV for L-1's and L-2's table views as well as L-6's tables, and JSON exports that carry the
 hide-tickmarks setting as they carry the theme. Then (2026-10-12) three follow-ups: the print choice, 2027's published federal
 amounts, and the data refresh calendar below. The user is now putting the tool in front of a few people before deciding what to
-build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
+build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). User
+testing started on 2026-10-12; record each finding in `docs/user-testing.md` as it comes in (two testers asked for the comparison
+as a document: "Copy as document" is proposed, waiting on the go-ahead). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
 and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
