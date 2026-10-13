@@ -6,11 +6,12 @@ import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
   forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, sliderText, valueAt, worked,
 } from "./leaveModel";
+import { inSentence } from "./breakevenModel";
 import { shownStay } from "./footing";
 import { useOnScreen } from "./lazy";
 import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
-import type { CompareRequest, LeaveCurve, LeavePanel } from "./protocol";
+import { type CompareRequest, cursorJobFor, type LeaveCurve, type LeavePanel } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 import type { Engine, SlowJob, SlowState } from "./useEngine";
@@ -59,7 +60,7 @@ export function Leaving(p: LeavingProps) {
   const c = p.compare;
   const base = c ? { offers: c.offers, household: c.household, inflation: c.inflation } : null;
   const leaveJob: SlowJob | null = base && axis ? { lane: "leave", ...base, end: axis.end } : null;
-  const cursorJob: SlowJob | null = base && at ? { lane: "cursor", ...base, leaveDate: at } : null;
+  const cursorJob: SlowJob | null = c && at ? cursorJobFor(c, at) : null;
   const leaveKey = leaveJob && JSON.stringify(leaveJob);
   const cursorKey = cursorJob && JSON.stringify(cursorJob);
   const { requestSlow, ready } = p;
@@ -295,7 +296,7 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
         {owed.length > 0 && (
           <>
             , and repay <Fig id={`repay.${letter}`} label={`${dollars(panel.clawbackOwed)} of clawbacks`}>{dollars(panel.clawbackOwed)}</Fig>{" "}
-            of the {owed.map((c) => c.award).join(" and ")}
+            of the {owed.map((c) => inSentence(c.award)).join(" and ")}
             {owed.map((c) => {
               const s = segments.find((x) => x.award === c.award);
               return s ? <span key={c.award}> (prorated: it shrinks {dollars(s.perMonth)} a month until {longDate(s.until)})</span>

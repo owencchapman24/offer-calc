@@ -1,6 +1,7 @@
 import type { Basis, HorizonRow, HorizonSweep, Lead, ValueBasis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { type PriceWords, priceWords } from "./prices";
+import { cents, dollars } from "./text";
 
 // Turns the engine's horizon sweep into what the lead schedule shows. Pure: no React, no formatting.
 
@@ -107,6 +108,21 @@ export interface ExtraHoursLine {
   perExtraHour: number | null;
   /** When they pay less: the first pipeline step where they do pay, against `more`'s average there. */
   lower: { basis: ValueBasis; perExtraHour: number; average: number } | null;
+}
+
+/** A lead as the verdict states it: "$487" (a month) or "$19.47" (an hour). */
+export const marginText = (basis: Basis, lead: Lead) => (basis === "perHour" ? cents(lead.margin) : dollars(lead.perMonth ?? 0));
+/** "a month", or "an hour" per hour worked. */
+export const perText = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
+
+/** The verdict as one sentence: "C leaves you about $487 a month more than A, after rent, at U.S. prices." */
+export function verdictSentence(view: VerdictView): string {
+  const { lead, basis, prices } = view;
+  const step = pipeline(prices).find((p) => p.basis === basis)!;
+  return lead && lead.margin > 0
+    ? `${lead.winnerLetter} ${basis === "perHour" ? "pays about" : "leaves you about"} ${marginText(basis, lead)} ${perText(basis)} more than `
+      + `${lead.runnerUpLetter}, ${step.phrase}.`
+    : `The offers tie ${step.phrase}.`;
 }
 
 /** Pay per extra hour for the lead's winner against each other offer whose hours differ enough. */

@@ -8,7 +8,7 @@ import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
 import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
 import type { SectionId } from "./sections";
-import { dollars, monthName, percent, shortDate } from "./text";
+import { dollars, longDate, monthName, percent, shortDate } from "./text";
 import type { TickKind } from "./ui";
 import type { VerdictView } from "./verdict";
 
@@ -291,6 +291,27 @@ export function byYear(ctx: WorkContext, letter: L): ByYear {
   if (basis === "perHour") return { letter, years: out, sum: null, window: null };
   const s = shownStay(d, n);
   return { letter, years: out, sum: s.years[basis], window: s.stay[basis] };
+}
+
+/** L-1's notes on what bends the lines: a promotion in a year (base case), and the year the new-hire RSUs finish vesting. */
+export function yearNotes(ctx: WorkContext): Array<{ n: number; letter: L; text: string }> {
+  const r = res(ctx);
+  const notes: Array<{ n: number; letter: L; text: string }> = [];
+  r.letters.forEach((letter, i) => {
+    const d = r.detail!.offers[i];
+    const ys = d.employmentYears.slice(0, r.view.row.years);
+    const yearAt = (date: string) => ys.findIndex((y) => date >= y.start && date < y.end) + 1;
+    for (const a of d.assumptions) {
+      if (a.code !== "salaryChanges") continue;
+      for (const c of a.params.changes) {
+        const n = yearAt(c.date);
+        if (n > 0 && c.reasons.some((x) => x.kind === "promotion")) notes.push({ n, letter, text: `promotion (${longDate(c.date)}, base case)` });
+      }
+    }
+    const lastNewHire = d.rsus.filter((v) => !v.refresher).at(-1);
+    if (lastNewHire && lastNewHire.ey <= ys.length) notes.push({ n: lastNewHire.ey, letter, text: "new-hire RSUs finish vesting" });
+  });
+  return notes;
 }
 
 // ---- the bridge: offer letter to after rent ------------------------------------------------------

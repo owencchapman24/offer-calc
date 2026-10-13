@@ -72,7 +72,7 @@ describe("the methodology's live numbers: M-8 and M-9", () => {
     expect(t).toContain("C holds up best: it has the highest bear case.");
   });
   it("M-9: what leaving early would cost under each offer's terms, and L-4's panel once it's worked one out", () => {
-    expect(page(context())).toContain("A: its first bonus is paid Jan 31, 2027; you must be employed on each payout date; the $10,000 Sign-on is "
+    expect(page(context())).toContain("A: its first bonus is paid Jan 31, 2027; you must be employed on each payout date; the $10,000 sign-on is "
       + "repaid in full if you leave before Jul 12, 2027; its employer 401(k) money vests after 3 years of service.");
     // With L-4 at six months: A forfeits the 2026 stub (32,986.30) and 12 days toward 2027 (2,794.52): 35,780.82.
     expect(page(withLeave(context()).ctx)).toContain("At the last day picked in L-4, Jan 12, 2027, it keeps $41,200 after tax, repays $10,000 and "

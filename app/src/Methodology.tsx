@@ -5,7 +5,7 @@ import type { ValueBasis } from "../../src/offer/types";
 import { CASES, changeText, riskView } from "./cases";
 import { cashLever, changeText as tieChangeText } from "./breakevenModel";
 import { shownYears } from "./footing";
-import { addMonthsIso, forfeits } from "./leaveModel";
+import { forfeits, leaveTerms } from "./leaveModel";
 import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
 import { basisPhrase, bridge, pricesOf, shortCity, type WorkContext } from "./metrics";
 import { SECTIONS, type SectionId, sectionTitle } from "./sections";
@@ -714,26 +714,7 @@ function LeavingEarly({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
           const o = input && "offer" in input ? input.offer : null;
           const d = r.detail!.offers[i];
           if (!o) return null;
-          const facts: string[] = [];
-          const bonus = d.bonuses[0];
-          if (bonus) {
-            facts.push(`its first bonus is paid ${longDate(bonus.date)}; ${o.bonus?.mustBeEmployedOnPayDate === false
-              ? "leaving before a payout still pays the part earned by your last day" : "you must be employed on each payout date"}`);
-          }
-          for (const a of o.cashAwards ?? []) {
-            if (!a.clawback) continue;
-            const paid = typeof a.paidOn === "string" ? a.paidOn : addDaysIso(o.startDate, a.paidOn.daysAfterStart);
-            const clock = (a.clawback.from ?? "start") === "payment" ? paid : o.startDate;
-            const clear = dayBefore(addMonthsIso(clock, a.clawback.months));
-            facts.push(a.clawback.kind === "full"
-              ? `the ${dollars(a.amount)} ${a.label} is repaid in full if you leave before ${longDate(clear)}`
-              : `the ${dollars(a.amount)} ${a.label} is repaid in part, less each month, until ${longDate(clear)}`);
-          }
-          const vest = d.rsus[0];
-          if (vest) facts.push(`its first RSU vest is ${longDate(vest.date)} (${dollars(vest.gross)})`);
-          const v = o.retirement?.vesting;
-          if (v && v.kind === "cliff") facts.push(`its employer 401(k) money vests after ${v.years} ${v.years === 1 ? "year" : "years"} of service`);
-          if (v && v.kind === "graded") facts.push("its employer 401(k) money vests in steps with service");
+          const facts = leaveTerms(o, d);
           const p = leave?.panels[i];
           const lost = p ? forfeits(p.warnings, o.startDate).reduce((sum, f) => sum + f.earned, 0) : 0;
           return (
@@ -794,7 +775,6 @@ function WhatItWouldTake({ ctx, sample }: { ctx: WorkContext; sample: boolean })
   );
 }
 
-const addDaysIso = (date: string, days: number) => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** M-12: each offer's live assumptions, in words. */
 function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {

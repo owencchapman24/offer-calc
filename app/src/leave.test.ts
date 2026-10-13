@@ -77,10 +77,10 @@ describe("L-4's panel (W6)", () => {
   const text = page(ctx);
 
   it("keep, repay and leave behind, six months in: W6's figures", () => {
-    expect(text).toContain("A 6 months worked · keep $41,200 after tax, and repay $10,000 of the Sign-on (all of it).");
-    expect(text).toContain("B 6 months worked · keep $34,974 after tax, and repay $2,500 of the Sign-on (prorated: it shrinks $417 a month until "
+    expect(text).toContain("A 6 months worked · keep $41,200 after tax, and repay $10,000 of the sign-on (all of it).");
+    expect(text).toContain("B 6 months worked · keep $34,974 after tax, and repay $2,500 of the sign-on (prorated: it shrinks $417 a month until "
       + "Jul 12, 2027).");
-    expect(text).toContain("C 6 months worked · keep $47,506 after tax, and repay $5,000 of the Sign-on");
+    expect(text).toContain("C 6 months worked · keep $47,506 after tax, and repay $5,000 of the sign-on");
     expect(text).toContain("Left behind: $120,000 of RSUs not yet vested (at grant value).");
   });
   it("the next real cliff: A's bonus 19 days away (+$29,970, $26,057 of it the bonus); B skips its clawback steps to its bonus", () => {
@@ -99,7 +99,7 @@ describe("L-4's panel (W6)", () => {
     expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "85,000"], ["×", "0.0329"], ["=", "2,795"]]);
     expect(d.notes[0]).toBe("If you stayed through its payout on Jan 31, 2028 it would pay $85,000: $85,000 × 365 / 365 days.");
     expect(d.section).toBe("M-9");
-    expect(text).toContain("Repaying the Sign-on in 2027 for pay received in 2026: the Social Security and Medicare tax withheld on it isn't "
+    expect(text).toContain("Repaying the sign-on in 2027 for pay received in 2026: the Social Security and Medicare tax withheld on it isn't "
       + "refunded automatically");
   });
   it("kept = pay - clawbacks repaid - tax (net of relief) - premiums; the tax is the events' to within their rounding", () => {

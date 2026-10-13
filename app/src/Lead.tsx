@@ -1,6 +1,6 @@
 import { type Dispatch, useContext, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/issues";
-import type { Basis, BreakevenResult } from "../../src/offer/types";
+import type { BreakevenResult } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import { fieldName } from "./help";
 import type { EditTarget } from "./metrics";
@@ -11,24 +11,16 @@ import { Stamp, TickLegend, TickSetting } from "./ui";
 import { basisPhrase, type RentNote } from "./metrics";
 import type { PriceWords } from "./prices";
 import { Fig, useRovingTicks } from "./Tickmarks";
-import { extraHoursView, type ExtraHoursLine, pipeline, type StepView, totalsCaption, type VerdictView } from "./verdict";
+import {
+  extraHoursView, type ExtraHoursLine, marginText as margin, perText as per, pipeline, totalsCaption, verdictSentence, type VerdictView,
+} from "./verdict";
 
 // L · Lead schedule: the verdict, the "winner if you stay" row and the basis pipeline (docs/ui-design.md §4.1-4.2).
 
 /** The close-call line's breakeven (§4.1): the last one worked out for this pair of offers, and whether a newer one is on its way. */
 export interface FlipLine { row: BreakevenResult | null; updating: boolean; error: string | null }
 
-const margin = (basis: Basis, lead: NonNullable<StepView["lead"]>) =>
-  basis === "perHour" ? `${cents(lead.margin)}` : dollars(lead.perMonth ?? 0);
-const per = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
-/** The verdict as one sentence: "C leaves you about $487 a month more than A, after rent, at U.S. prices." */
-export function verdictSentence(view: VerdictView): string {
-  const { lead, basis, prices } = view;
-  const step = pipeline(prices).find((p) => p.basis === basis)!;
-  return lead && lead.margin > 0
-    ? `${lead.winnerLetter} ${basis === "perHour" ? "pays about" : "leaves you about"} ${margin(basis, lead)} ${per(basis)} more than ${lead.runnerUpLetter}, ${step.phrase}.`
-    : `The offers tie ${step.phrase}.`;
-}
+export { verdictSentence };
 
 /** How long the inputs must rest before a new verdict is announced. */
 export const ANNOUNCE_AFTER_MS = 1000;

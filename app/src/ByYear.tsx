@@ -1,7 +1,7 @@
 import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useRef, useState } from "react";
 import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
-import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext } from "./metrics";
+import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext, yearNotes } from "./metrics";
 import type { Action, UiState } from "./session";
 import { niceTicks, useChartWidth } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
@@ -196,22 +196,7 @@ function Chart({ offers, basis, units, running, title }: { offers: ByYearData[];
 
 /** Muted notes on what bends the lines: a promotion, the new-hire RSUs finishing. */
 function Notes({ ctx }: { ctx: WorkContext }) {
-  const r = ctx.results!;
-  const notes: string[] = [];
-  r.letters.forEach((letter, i) => {
-    const d = r.detail!.offers[i];
-    const ys = d.employmentYears.slice(0, r.view.row.years);
-    const yearOf = (date: string) => ys.findIndex((y) => date >= y.start && date < y.end) + 1;
-    for (const a of d.assumptions) {
-      if (a.code !== "salaryChanges") continue;
-      for (const c of a.params.changes) {
-        const n = yearOf(c.date);
-        if (n > 0 && c.reasons.some((x) => x.kind === "promotion")) notes.push(`Yr ${n} · ${letter}: promotion (${longDate(c.date)}, base case)`);
-      }
-    }
-    const lastNewHire = d.rsus.filter((v) => !v.refresher).at(-1);
-    if (lastNewHire && lastNewHire.ey <= ys.length) notes.push(`Yr ${lastNewHire.ey} · ${letter}: new-hire RSUs finish vesting`);
-  });
+  const notes = yearNotes(ctx).map((x) => `Yr ${x.n} · ${x.letter}: ${x.text}`);
   if (!notes.length) return null;
   return <ul className="chart-notes">{notes.sort().map((n) => <li key={n}>{n}</li>)}</ul>;
 }

@@ -71,6 +71,19 @@ test.describe("compare", () => {
     await scan(page, "Print: a summary or the full workpaper");
   });
 
+  test("Copy as document: copied, and waiting on a problem", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openCompare(page);
+    const button = page.getByRole("button", { name: "Copy as document" });
+    await button.click();
+    await expect(page.locator(".print-bar")).toContainText("Copied", { timeout: 30_000 });
+    await scan(page, "Copy as document: copied");
+    // A problem in the inputs: the button waits, and says why.
+    await page.locator("#in-A-startDate").fill("2025-06-01");
+    await expect(button).toHaveAttribute("aria-disabled", "true");
+    await scan(page, "Copy as document: waiting on a problem");
+  });
+
   test("tickmarks hidden", async ({ page }) => {
     await openCompare(page);
     // The setting is at the foot of the page: going there brings L-2 to L-5 on screen. Load and work them out first, so the scan

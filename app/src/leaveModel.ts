@@ -1,7 +1,8 @@
-import type { Cliff, ISODate, OfferWarning, WindowTotals } from "../../src/offer/types";
+import type { Cliff, ISODate, OfferInput, OfferWarning, WindowTotals } from "../../src/offer/types";
+import { inSentence } from "./breakevenModel";
 import type { StayFigures } from "./footing";
 import type { Letter } from "./model";
-import type { LeaveCurve, LeavePanel } from "./protocol";
+import type { LeaveCurve, LeavePanel, OfferDetail } from "./protocol";
 import { dayBefore, dollars, longDate, percent } from "./text";
 
 // L-4 · Leaving early (docs/ui-design.md §4.5), the view model: the axis (calendar dates, so offers with
@@ -147,11 +148,12 @@ export function cliffText(c: Cliff): string {
     const calendar = d.periodFrom === `${year}-01-01` && d.periodTo === `${year}-12-31`;
     return `your ${calendar ? `${year} ` : ""}bonus${calendar ? "" : ` for ${longDate(d.periodFrom)} – ${longDate(d.periodTo)}`} (${gross} before tax)`;
   }
-  if (d.kind === "cash") return `the ${d.award} (${gross} before tax)`;
+  if (d.kind === "cash") return `the ${inSentence(d.award)} (${gross} before tax)`;
   if (d.kind === "rsu") return `an RSU vest of ${gross} (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vesting to ${percent(d.vestedShare)} (${gross})`;
   if (d.kind === "clawbackStep") {
-    return c.kind === "clawbackCleared" ? `the end of the ${d.award} clawback (${gross} you'd no longer repay)` : `a ${d.award} clawback step (${gross})`;
+    return c.kind === "clawbackCleared" ? `the end of the ${inSentence(d.award)} clawback (${gross} you'd no longer repay)`
+      : `a ${inSentence(d.award)} clawback step (${gross})`;
   }
   return gross;
 }
@@ -205,11 +207,51 @@ export function leaveWarningTexts(warnings: OfferWarning[]): string[] {
   for (const w of warnings) {
     if (w.code !== "clawbackFica") continue;
     const p = w.params;
-    out.push(`Repaying the ${p.award} in ${p.repaidYear} for pay received in ${p.paidYear}: the Social Security and Medicare tax withheld on it `
+    out.push(`Repaying the ${inSentence(p.award)} in ${p.repaidYear} for pay received in ${p.paidYear}: the Social Security and Medicare tax withheld on it `
       + "isn't refunded automatically (your employer may return it on a corrected W-2c), and there's no state relief. This assumes you don't "
       + "get it back.");
   }
   return out;
+}
+
+// ---- an offer's terms ----------------------------------------------------------------------------------
+
+/** "after 3 years", "20% after 2 years, 40% after 3 … and 100% after 6": employer 401(k) money's vesting by years of service. */
+function vestingText(v: NonNullable<NonNullable<OfferInput["retirement"]>["vesting"]>): string | null {
+  if (v.kind === "cliff") return `vests after ${v.years} ${v.years === 1 ? "year" : "years"} of service`;
+  if (v.kind === "graded") {
+    const steps = [...v.steps].sort((a, b) => a.years - b.years).map((s, i) => `${percent(s.pct)} after ${s.years}${i ? "" : ` ${s.years === 1 ? "year" : "years"}`}`);
+    return `vests ${join(steps)} years of service`;
+  }
+  return null;
+}
+
+/**
+ * What leaving early would cost under an offer's terms, in words (M-9 and the document): the first bonus and its payout rule,
+ * each cash award's clawback window, the first RSU vest, and the employer 401(k) money's vesting.
+ */
+export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
+  const facts: string[] = [];
+  const bonus = d.bonuses[0];
+  if (bonus) {
+    facts.push(`its first bonus is paid ${longDate(bonus.date)}; ${o.bonus?.mustBeEmployedOnPayDate === false
+      ? "leaving before a payout still pays the part earned by your last day" : "you must be employed on each payout date"}`);
+  }
+  for (const a of o.cashAwards ?? []) {
+    if (!a.clawback) continue;
+    const paid = typeof a.paidOn === "string" ? a.paidOn : addDays(o.startDate, a.paidOn.daysAfterStart);
+    const clock = (a.clawback.from ?? "start") === "payment" ? paid : o.startDate;
+    const clear = dayBefore(addMonthsIso(clock, a.clawback.months));
+    const what = `the ${dollars(a.amount)} ${inSentence(a.label.trim() || "cash award")}`;
+    facts.push(a.clawback.kind === "full" ? `${what} is repaid in full if you leave before ${longDate(clear)}`
+      : `${what} is repaid in part, less each ${a.clawback.per === "day" ? "day" : "month"}, until ${longDate(clear)}`);
+  }
+  const vest = d.rsus[0];
+  if (vest) facts.push(`its first RSU vest is ${longDate(vest.date)} (${dollars(vest.gross)})`);
+  const v = o.retirement?.vesting;
+  const vests = v && vestingText(v);
+  if (vests) facts.push(`its employer 401(k) money ${vests}`);
+  return facts;
 }
 
 // ---- your stay's end -------------------------------------------------------------------------------
