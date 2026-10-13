@@ -1,12 +1,13 @@
-# v2 plan (proposed 2026-10-13)
+# v2 plan (proposed 2026-10-13; decisions recorded the same day)
 
-**Status: proposed, not approved. Nothing in it is built.** What to build after v1 (UI slices 1-8 and Copy as document), in
-priority order:
+**Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
+pull request #29 (below, "Decisions"). Nothing is built, and nothing starts until testers have answered each item's questions. What to
+build after v1 (UI slices 1-8 and Copy as document), in priority order:
 1. **Beyond the money:** what else each offer is worth to you, in dollars you name, and whether (and at what figure) that flips
    the verdict.
 2. **Market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
    (OEWS, May 2025).
-3. **Negotiation help:** L-3's ties and the market figures in one short summary, with an optional draft email: what would tie,
+3. **Negotiation help:** L-3's ties and the published wages in one short summary, with an optional draft email: what would tie,
    not advice.
 4. **Accuracy:** days off, commuting, relocation costs, remote work under convenience-of-employer rules, startup options as
    scenarios, and Public Service Loan Forgiveness.
@@ -24,8 +25,9 @@ stop.
 ## What v2 changes about the product's scope
 
 `docs/ui-design.md` §1 says what the tool isn't for: market data or salary benchmarks; telling you which job to take ("we compare
-money, time and prices; career fit is yours"); financial advice. Items 1-3 move those lines, so they need your approval before
-anything else (D1). Proposed:
+money, time and prices; career fit is yours"); financial advice. Items 1-3 move those lines. **Approved (D1, 2026-10-13), on this
+principle: "The tool informs the decision and shows its work; you make the call."** Nothing in v2 recommends a job or says an offer is
+too low. In practice:
 - **Career fit stays yours.** Item 1 adds up values you set. The tool never suggests one, and the money verdict and L-1 to L-6 stay
   money (L-3's ties too, unless you choose otherwise: D4).
 - **Market data is context, never an input.** Item 2's percentiles never enter the verdict, a total or a tie. They're published data,
@@ -33,7 +35,7 @@ anything else (D1). Proposed:
 - **Still not advice.** Item 3 restates figures the tool already has: what would tie, and where that sits among published wages. It
   never says what to ask for, and the draft is text you edit and send yourself.
 
-With approval, `docs/ui-design.md` rev 4 records the new §1 and each item's design as it's built.
+`docs/ui-design.md` rev 4 records the new §1, with the principle, as item 1's first stop; each item's design follows as it's built.
 
 ## Performance plan (every item)
 
@@ -172,36 +174,41 @@ against published wages for its occupation where you'd live, with what those fig
 only: it never enters the verdict, a total or a tie (D1).
 
 **Scope**
-- **A new schedule, L-7 · Against the market,** right after L-3 on the page (D6: references are stable IDs, so L-7 sits where it reads
+- **A new schedule, L-7 · Published wages,** right after L-3 on the page (D6: references are stable IDs, so L-7 sits where it reads
   best; its last part is item 3's summary). It loads as you scroll toward it, like L-2 to L-6.
 - **The occupation picker,** in L-7, per offer: a search over BLS's occupation titles (and alternate job titles, if the data allows;
   see Data), saved with the offer. It lives in L-7, not the ledger: it changes no money figure, and the ledger stays the money's inputs.
   Nothing is picked for you.
-- **Per offer, a strip:** the 10th, 25th, 50th, 75th and 90th percentile annual wages for that occupation in the offer's metro area,
-  with the offer's starting base salary marked in its offer color, and one sentence:
+- **Per offer, the range first** (decided 2026-10-13): BLS's full range for that occupation in the offer's metro area, the 10th to
+  the 90th percentile annual wage, labeled "all experience levels", with the 25th, 50th and 75th as ticks inside it and the offer's
+  starting base salary marked on it in its offer color. The median isn't singled out: it's one tick among five. Then one sentence:
 
 ```
- L-7 · AGAINST THE MARKET                       base salary vs BLS wage percentiles · May 2025 · every experience level
+ L-7 · PUBLISHED WAGES                          BLS, May 2025 · base salary · all experience levels
    A  Financial and investment analysts · New York metro area                                  [ Change occupation ]
-        10th     25th        median            75th              90th
+      All experience levels: $xx,xxxT (10th percentile) to $xxx,xxxT (90th)
+        10th     25th        50th              75th              90th
         ├─────────┼─────────────┼─────────────────┼─────────────────┤
-                                          ◆ A $110,000T
-      A's $110,000 is below the median ($128,930T).                (with the files, the sentence names its band)
+                                    ◆ A $110,000T
+      A's $110,000 falls between the xxth and xxth percentiles of that range.
 ```
-  (A layout sketch. The median is BLS's May 2025 figure for this occupation in the New York-Newark-Jersey City metro area, from its
-  query system, where the mean is $148,350 and the national median $102,740; the other percentiles are only in the downloadable
-  files, so they come at stop 2A.) The sample shows the main risk at once: a new grad's $110,000 sits below a median that covers every
-  experience level. Each published figure is `T`, traced to BLS with its table, area and vintage; the sentence is ✓, with its comparison
-  as the derivation. A table view and its CSV, as L-1's and L-2's.
-- **Placement words, not an invented percentile:** "below the 10th percentile", "between the 25th percentile and the median", "at or
-  above the 90th percentile". No interpolated "62nd percentile": BLS publishes five points, and a figure between them would be ours,
-  not theirs.
+  (A layout sketch: the figures come from BLS's files at stop 2A. For scale, BLS's query system gives this occupation's May 2025 median
+  in the New York-Newark-Jersey City metro area as $128,930, which is why the range, not the median, leads: a first job's salary set
+  against a median of every experience level reads as a verdict it isn't.) Each published figure is `T`, traced to BLS with its table,
+  area and vintage; the sentence is ✓, with its comparison as the derivation. A table view and its CSV, as L-1's and L-2's.
+- **Neutral placement words, not an invented percentile:** "falls between the 25th and 50th percentiles", "falls under the 10th
+  percentile", "falls at or over the 90th percentile". Never "below market", "above market", "low", "high", "underpaid", "competitive"
+  or the like (decided 2026-10-13); item 3's wording test covers L-7 too. No interpolated "62nd percentile": BLS publishes five points,
+  and a figure between them would be ours, not theirs.
+- **Entry-level pay isn't characterized** (decided 2026-10-13). L-7 says nothing about where entry-level pay usually falls unless a
+  verified source supports it, such as a state labor agency's published entry-wage method (several publish an "entry wage" from OEWS
+  data); stop 2A may look for one, and without one the tool doesn't say it. The caveats say only what BLS says.
 - **What's compared:** the starting base salary only (D7). BLS's wages leave out year-end bonuses, stock and benefits (below), so the
   offer's bonus, RSUs and the rest stay in the money comparison, where they belong.
 - **The caveats, always shown under the strips** (short, each linking to M-15, which quotes BLS):
   1. **Every experience level.** BLS: the survey "does not gather demographic information", and its data "do not contain information
      about pay according to the level of work performed"; trainees are counted in the occupation they're training for. So the
-     percentiles run from new hires to people decades in. A first job below the median isn't a low offer.
+     percentiles run from new hires to people decades in.
   2. **What BLS counts as wages:** "straight-time, gross pay, exclusive of premium pay": base pay, cost-of-living allowances, guaranteed
      pay, commissions, production bonuses and tips. Not overtime, on-call or shift pay, severance, nonproduction bonuses (BLS's FAQ
      lists year-end, holiday and profit-sharing payments, relocation allowances and stock bonuses), or benefits. Signing bonuses
@@ -217,7 +224,7 @@ only: it never enters the verdict, a total or a tie (D1).
   occupations. A missing metro figure falls back to the state, then the nation, and says which. From May 2025, BLS publishes many high
   percentiles as figures where it used to print "$239,200 or more"; where a cap remains, it shows as BLS shows it.
 - **No precision beyond BLS's:** BLS publishes relative standard errors only for employment and the mean, not for percentiles, and asks
-  for care with small differences; so the words stay coarse ("between the 25th percentile and the median"), and nothing averages
+  for care with small differences; so the words stay coarse ("between the 25th and 50th percentiles"), and nothing averages
   percentiles (BLS: it "does not recommend calculating averages of percentile wages").
 
 **Data**
@@ -254,27 +261,28 @@ only: it never enters the verdict, a total or a tie (D1).
 a percentile, under the 10th, over the 90th, a top-coded 90th, suppressed percentiles); L-7's figures in `metrics.test.ts`; the copied
 document's section; the scan (an occupation picked, the picker open, a fallback to the state, a phone).
 
-**In the copied document:** a short section, "Against published wages": each offer's occupation, area and placement sentence, the five
-figures, and the caveats in one paragraph. **In the methodology:** M-15, Against the market: the source and vintage, BLS's definitions
-quoted, the caveats at length, the area match and fallbacks; M-11 lists the dataset.
+**In the copied document:** a short section, "Published wages": each offer's occupation, area, the range (all experience levels) and
+placement sentence, the five figures, and the caveats in one paragraph. **In the methodology:** M-15, Published wages: the source and
+vintage, BLS's definitions quoted, the caveats at length, the area match and fallbacks; M-11 lists the dataset.
 
 **Bundle and LCP:** L-7's slot on the main thread (about 0.2 kB gzip). L-7, its picker and words in a lazy chunk (an estimated 5-7 kB
 gzip). The title index is fetched when the picker first opens and an occupation's file when it's picked (sizes at stop 2A). The worker
 doesn't change. L-7 is far below the first screen, so LCP doesn't move.
 
 **Risks**
-- **Misreading:** every-experience percentiles make a new grad's offer look low. The biggest risk; the caveats, the words, and the
-  testers' answers (question 3) decide whether the item ships.
+- **Misreading:** percentiles of every experience level can make a new grad's offer look low. The biggest risk: hence the range first,
+  labeled, the neutral words and their test, and the testers' answers (question 3), which decide whether the item ships.
 - **The wrong occupation:** SOC titles are broad and unfamiliar. Alternate titles help; testers will show whether they're needed.
 - **Area mismatch:** where you'd live vs where the job is, and BEA vs OEWS areas. Stated, and tested city by city.
-- **The scope line** (D1): once the tool shows market data, people may read it as "what you should be paid". The wording never says so.
+- **The scope line** (D1): once the tool shows published wages, people may read them as "what you should be paid". The wording never
+  says so, and never says an offer is too low.
 - **BLS blocks scripts:** `--file` covers it, as for HUD.
 - **Repository size:** several hundred small JSON files a year. Stop 2A measures it; the alternative is one compact file split at build.
 
 **Review stops**
 - **2A, the data:** `fetch-oews`, the files and their sizes, the area match report, BLS's definitions verified and quoted, and the
-  samples' occupations and metros printed (`npm run offers` gains a market table). No UI.
-- **2B, L-7:** the picker, the strips, the caveats, the table view and CSV, M-15, the copied document, print, the scan. Live screenshots.
+  samples' occupations and metros printed (`npm run offers` gains a published-wages table). No UI.
+- **2B, L-7:** the picker, the ranges, the caveats, the table view and CSV, M-15, the copied document, print, the scan. Live screenshots.
 
 ## 3. Negotiation help
 
@@ -287,26 +295,26 @@ form they can use, beside where the figure sits among published wages, without t
 ```
  PUTTING IT TOGETHER · what would tie C · after rent at U.S. prices · 4 years
    A  A starting salary of $118,626✓ (+$8,626✓, +7.8%) would tie C, or a sign-on of $45,487✓ instead of $10,000T.
-      Among financial and investment analysts in the New York metro area (BLS, May 2025, every experience level),
-      $118,626 is below the median ($128,930T); so is A's $110,000.
+      For financial and investment analysts in the New York metro area, BLS's range across all experience levels (May 2025)
+      is $xx,xxxT to $xxx,xxxT; $118,626 falls between its xxth and xxth percentiles.
       Counting what you said the rest is worth, A already leads C.                          (only with item 1's values)
    These are what would make the offers even on the numbers you entered, not advice on what to ask for.
                                                                                             [ Draft an email… ]
 ```
-  (The ties are W7a's, the samples at their fixed dates; the values line is item 1's example; the median is BLS's May 2025 figure, as in
+  (The ties are W7a's, the samples at their fixed dates; the values line is item 1's example; the range comes with stop 2A's data, as in
   L-7's sketch. Where the values don't already put an offer ahead, the salary that ties counting them needs L-3's switch, D4.)
 - **The draft email** (optional): "Draft an email…" opens an editable text box, filled from a template, with brackets for what the tool
   can't know ([Recruiter's name], [Company], [Your name]). You pick what it mentions: the gap to your other offer, in words; the salary
-  that ties; the sign-on that ties; the market band (off by default); the other offer's own figures (off by default: those are yours to
+  that ties; the sign-on that ties; BLS's range (off by default); the other offer's own figures (off by default: those are yours to
   share or not). "Copy" puts it on the clipboard as
   plain text. Nothing is sent or saved, and there's no `mailto:` link: the design keeps salary figures out of URLs (§10's "no share
   links").
 - **Its sentences are factual, in the first person:** "After taxes and rent, the other offer comes out about $487 a month ahead for me.
-  A starting salary of $118,626 would make the two about even." Never "deserve", "market rate", "you should", "ask for". A test fails
-  on a list of such words in the summary and the template, as `check-engine.ts` guards the engine.
+  A starting salary of $118,626 would make the two about even." Never "deserve", "market rate", "below market", "underpaid", "you
+  should", "ask for". A test fails on a list of such words in the summary, the template and L-7, as `check-engine.ts` guards the engine.
 - **Basis:** the summary follows the verdict's basis; the email speaks in starting salary and sign-on, the levers a recruiter knows, and
   names the basis in words ("after taxes and rent"). Per hour: the step-3 figures, as L-3.
-- **Without an occupation:** no market sentence; the summary is L-3's ties alone. Built before item 2 (D9), the summary is L-3's last
+- **Without an occupation:** no published-wages sentence; the summary is L-3's ties alone. Built before item 2 (D9), the summary is L-3's last
   part instead of L-7's, and moves to L-7 when L-7 arrives.
 
 **Data:** nothing new: L-3's ties (the slow lane's `tieJob`, shared), L-7's figures, item 1's values.
@@ -352,7 +360,7 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
   workers with paid vacation averaging 11 days after a year's service (16 after five), and paid holidays averaged 8 days in 2025.
 - **Scope:** per offer, in the Hours section, in place of weeks: "Vacation days you'd take" and "Paid holidays". Weeks worked = 52 −
   (vacation + holidays) ÷ 5. "Unlimited" PTO: the days you expect to take, and the help says so.
-- **Defaults** (D14): BLS's figures, 11 and 8 (`D`, each with its source), so 48.2 weeks. That's honest but moves every default per-hour
+- **Defaults** (D14, approved): BLS's figures, 11 and 8 (`D`, each with its source, editable), so 48.2 weeks. That's honest but moves every default per-hour
   figure about 4% (and pay per extra hour), once, explained in the stop's notes; `npm run offers`' hours and the hand-checked per-hour
   tests move with it; the grid doesn't. The alternative keeps one "days off" input at 10, today's 50 weeks, and moves nothing.
 - **Not in scope:** sick days (BLS: 7 a year on average in private industry; usage is personal), and paying out unused vacation when
@@ -520,14 +528,15 @@ change the plan.
    trust?
 2. Which occupation would you pick for each offer from BLS's titles? (Watch whether they can.)
 3. BLS's figures cover everyone in the occupation, new hires to veterans. Would those help you, or make your offer look low?
-4. What would you do with "between the median and the 75th percentile"?
+4. Shown your salary within BLS's range for all experience levels, what would you take from it?
 - **Would change it:** testers can't find their occupation (then curated titles for the audience's jobs); they read every-experience
-  percentiles as "underpaid" even with the caveats (then show only the lower half's figures for entry level, or drop the item).
+  percentiles as "underpaid" even with the range first and the caveats (then drop the item, or say where entry-level pay falls only
+  if stop 2A finds a verified source for it).
 
 **Item 3, Negotiation help**
 1. Did you negotiate any of these offers, or plan to? What did you ask for, and how did you arrive at it?
 2. Would you use a draft email? What would make you uncomfortable sending one built from a tool?
-3. Would you mention the other offer's figures, or the market's?
+3. Would you mention the other offer's figures, or BLS's?
 - **Would change it:** nobody negotiates (then the summary alone, no draft); testers read "would tie" as "ask for" (then wording again,
   before building).
 
@@ -542,24 +551,25 @@ change the plan.
 
 ## Decisions for you
 
-Each with the recommendation first.
+Recorded 2026-10-13: **D1 and D14 approved.** D2-D13 and D15 stand as recommended unless the user comments on pull request #29;
+a comment there that disagrees replaces the row.
 
 | # | Decision | Recommended | The alternative |
 |---|---|---|---|
-| D1 | The tool's scope (`docs/ui-design.md` §1) | Revise it as in "What v2 changes", for items 1-3 | Keep §1; build item 4 only |
+| D1 | The tool's scope (`docs/ui-design.md` §1) | **Approved:** revised as in "What v2 changes", on the principle "The tool informs the decision and shows its work; you make the call" | Keep §1; build item 4 only |
 | D2 | Room on the main thread | Step 0 first; the budget stays 120 kB | Raise the budget again, with Lighthouse holding LCP |
 | D3 | Where your values show | Their own block under the verdict; the hero stays money | A step in the pipeline that the verdict can follow |
 | D4 | L-3 with your values | Decide at stop 1A, once the block is seen | Build the switch with 1A |
 | D5 | A value's units | A year, today's dollars, rising with inflation at anniversaries; not taxed or priced | The same nominal dollars every year |
 | D6 | L-7's place | After L-3 on the page, as L-7 | A second part of L-3 |
-| D7 | What the market strip compares | Base salary against May 2025 wages as published | Wages aged to the offer's start by the ECI |
+| D7 | What L-7's range compares | Base salary against May 2025 wages as published | Wages aged to the offer's start by the ECI |
 | D8 | Where OEWS data lives | One file per occupation under `app/public/oews/<vintage>/`, committed | One compact file, split at build |
 | D9 | Item 3 without item 2 | Only if testers want negotiation help before market data | Always after 2B |
 | D10 | Item 4's order | 4a, 4b, 4c, 4d, 4e, then 4f's spike, reset by testers' answers | By tester demand alone |
 | D11 | Options vested at your stay's end | Shown beside the verdict, per scenario; not counted | Counted at the exit's value (an exception to the stay rule) |
 | D12 | Cross-state pairs (4d) | The multi-state metros' pairs first, each with sources and tests | Every state at once |
 | D13 | Public Service Loan Forgiveness | A spike first; forgiveness beside the verdict, never in it | Drop it from v2 |
-| D14 | Days off (4a) | Vacation and holidays apart, at BLS's 11 and 8 (per-hour figures move about 4%, once) | One "days off" input at 10, today's 50 weeks: nothing moves |
+| D14 | Days off (4a) | **Approved:** vacation and holidays apart, at BLS's 11 and 8, each a sourced default with its `D` tickmark, editable (per-hour figures move about 4%, once) | One "days off" input at 10, today's 50 weeks: nothing moves |
 | D15 | Commute time in per hour (4b) | Counted once every offer has a commute, labeled | Never; per hour stays hours worked |
 
 ## Order and stops
@@ -570,7 +580,7 @@ Each with the recommendation first.
 | 1A | Beyond the money: engine, lead block, ledger rows, M-14, session and export | testers (item 1), D3, D5 |
 | 1B | Beyond the money: the copied document, print, the scan; L-3's switch if chosen | 1A, D4 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
-| 2B | L-7, Against the market: picker, chart, caveats, M-15, the copied document | 2A, D6 |
+| 2B | L-7, Published wages: picker, ranges, caveats, M-15, the copied document | 2A, D6 |
 | 3A | Negotiation help: the summary, the draft email, the wording test | 2B (or 1A, D9), testers (item 3) |
 | 4a-4f | Accuracy, a stop per part (two for 4d and 4e; a spike for 4f) | testers (item 4), D10-D15 |
 
