@@ -286,7 +286,7 @@ export function App() {
             <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
               onClick={() => setChoosing(!choosing)}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
-            <CopyDocument blocked={copyBlocked} live={live} requestSlow={requestSlow} />
+            <CopyDocument blocked={copyBlocked} live={live} requestSlow={requestSlow} results={engine.sweep} />
           </p>
         )}
         {route.page === "compare" && choosing && (
@@ -396,11 +396,17 @@ const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
  * needs, since Safari allows a write only inside the click. A browser that won't take that gets "Copy now", which copies the ready
  * document through a copy event. Disabled (aria-disabled, so it stays focusable and says why) while the inputs have a problem.
  */
-function CopyDocument({ blocked, live, requestSlow }: {
+function CopyDocument({ blocked, live, requestSlow, results }: {
   blocked: string | null; live: { current: Live | null }; requestSlow: Engine["requestSlow"];
+  /** The comparison on the page: a new one makes what was copied, or got ready, an earlier comparison's. */
+  results: unknown;
 }) {
   const [state, setState] = useState<CopyState>(null);
   const ready = useRef<{ html: string; text: string } | null>(null);
+  useEffect(() => {
+    setState((s) => (s === "working" ? s : null));
+    ready.current = null;
+  }, [results, blocked]);
   const copy = () => {
     if (blocked || state === "working") return;
     setState("working");

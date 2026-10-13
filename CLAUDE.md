@@ -45,7 +45,7 @@ owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S."
 print, the hide-tickmarks setting; below). **Copy as document** is built (2026-10-12, from user testing; below). What's next is the
 user's call: see Next steps.
 - **Where things stand** (2026-10-12, Copy as document): `npm test` 473 passing; `npm run e2e` 163 passing
-  (15 skip by design), the scan 198 scans with no violations and no exceptions; main thread 381.5 / 117.3 kB gzip
+  (15 skip by design), the scan 198 scans with no violations and no exceptions; main thread 381.6 / 117.4 kB gzip
   against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
   in CI at stop B).
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
@@ -275,8 +275,8 @@ user's call: see Next steps.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 381.5 / 117.3 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's button added 2.4 / 0.8 (379.1 / 116.5
+  - **Main thread:** 381.6 / 117.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's button added 2.5 / 0.9 (379.1 / 116.5
     before). The print choice added 1.6 / 0.5; slice 6's stop B
     ended at 377.5 / 116.0, adding 3.6 / 0.9 (the CSV button, the tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
     L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8

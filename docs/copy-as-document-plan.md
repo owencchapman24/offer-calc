@@ -61,7 +61,7 @@ tax tables (print and CSV give them in full); tickmarks and workpaper references
 - **Samples are illustrative:** the sample line first and last, whenever any offer is a sample.
 - **Entirely client-side:** built in the browser; the clipboard is local; no new request.
 - **Loads on first use:** `app/src/copyDoc.ts` (27.9 / 11.2 kB raw / gzip) loads on the first click. The button and its reasons add
-  2.4 / 0.8 kB to the main thread (381.5 / 117.3 kB, budget 120 kB gzip), which stays one chunk.
+  2.5 / 0.9 kB to the main thread (381.6 / 117.4 kB, budget 120 kB gzip), which stays one chunk.
 
 ## How the copy works
 

@@ -176,16 +176,21 @@ test("Copy as document: where the browser won't write from a promise, Copy now c
   expect(got["text/html"]).toContain("Three job offers compared");
 });
 
-test("Copy as document waits, and says why, while the inputs have a problem", async ({ page }) => {
+test("Copy as document waits, and says why, while the inputs have a problem", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openCompare(page);
   const button = page.getByRole("button", { name: "Copy as document" });
   await expect(button).not.toHaveAttribute("aria-disabled");
+  // Copied, then an edit: the status was about the comparison before it, so it goes.
+  await button.click();
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
   // A start date before 2026: a problem the comparison waits on.
   const start = page.locator("#in-A-startDate");
   const was = await start.inputValue();
   await start.fill("2025-06-01");
   await expect(button).toHaveAttribute("aria-disabled", "true");
   await expect(button).toHaveAccessibleDescription("Fix the problems listed under the verdict to copy the comparison.");
+  await expect(page.locator(".print-bar")).not.toContainText("Copied");
   // Still focusable and clickable (aria-disabled), so it can say why; a click does nothing.
   await button.click({ force: true });
   await expect(page.locator(".print-bar")).not.toContainText("Getting the document ready");
