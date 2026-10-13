@@ -361,6 +361,10 @@ print scan off a desktop).
     `docs/copy-as-document-sample.html` (the samples on 2026-10-12; open it in a browser to paste-test).
   - `docs/user-testing.md`: what testers raise, one row per finding (date, finding, how many testers, what it led to). Keep
     adding to it as findings come in.
+  - `docs/v2-plan.md`: v2, **proposed (2026-10-13), not approved; nothing built.** In priority order: Beyond the money (your own
+    values per offer, and where they flip the verdict), market benchmarks (BLS OEWS, May 2025), negotiation help, and accuracy
+    (days off, commuting, relocation, cross-state tax, startup options, PSLF). With a performance plan (step 0 makes room on the
+    main thread first), questions for testers before each item, and decisions D1-D15 for the user.
 
 ## Pre-launch checklist
 Before the repo and the app go public (deferred, see Decisions):
@@ -405,8 +409,10 @@ hide-tickmarks setting as they carry the theme. Then (2026-10-12) three follow-u
 amounts, and the data refresh calendar below. The user is now putting the tool in front of a few people before deciding what to
 build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). User
 testing started on 2026-10-12; record each finding in `docs/user-testing.md` as it comes in (two testers asked for the comparison
-as a document: "Copy as document" is built; the testers' reaction to it isn't recorded yet). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
-and 402(g) notice any day now ("Data refresh calendar", Next checks).
+as a document: "Copy as document" is built; the user's own paste into Google Docs worked, and the other testers' reaction to it
+isn't recorded yet). **v2 is proposed in `docs/v2-plan.md` (2026-10-13), not approved:** don't build any of it until the user
+decides (D1-D15) and testers have answered its questions. Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's
+2027 inflation revenue procedure and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
 - `npm test`: unit tests (engine and app) plus the engine formatting guard.
