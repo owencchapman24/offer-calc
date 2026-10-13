@@ -5,18 +5,26 @@ import type { OfferWarning } from "./types";
  * convenience rather than the employer's necessity (decision 9, docs/offer-model.md). CT and NJ
  * apply the rule only to residents of states that have one (reciprocity). E.g. NY: 20 NYCRR
  * 132.18(a). We warn; nonresident tax and the resident credit aren't computed.
+ *
+ * Nebraska has no such rule for taxable years beginning on or after January 1, 2025: Neb. Rev.
+ * Stat. 77-2733(8)(c), as amended by Laws 2024, LB1023, section 13, counts "Only compensation paid
+ * to the individual for services performed within this state" (Nebraska Department of Revenue,
+ * "2024 Nebraska Legislative Changes"). The engine's years start in 2026, so it isn't in `always`.
+ * It's in `named`: New Jersey's FAQ on its rule (last updated Oct 30, 2025) still names Nebraska
+ * among the states whose residents it reaches, so NJ, and CT by the same test, may still apply theirs.
  */
 export const CONVENIENCE_RULE_STATES = {
-  always: ["NY", "DE", "NE", "PA"],
+  always: ["NY", "DE", "PA"],
   reciprocal: ["CT", "NJ"],
+  named: ["NE"],
 } as const;
 
 const has = (list: readonly string[], s: string) => list.includes(s);
 
 export function convenienceRuleWarning(residenceState: string, employerState: string): OfferWarning | undefined {
   if (residenceState === employerState) return undefined;
-  const { always, reciprocal } = CONVENIENCE_RULE_STATES;
-  const residenceHasRule = has(always, residenceState) || has(reciprocal, residenceState);
+  const { always, reciprocal, named } = CONVENIENCE_RULE_STATES;
+  const residenceHasRule = has(always, residenceState) || has(reciprocal, residenceState) || has(named, residenceState);
   if (!has(always, employerState) && !(has(reciprocal, employerState) && residenceHasRule)) return undefined;
   return { code: "convenienceRule", params: { residenceState, employerState } };
 }
