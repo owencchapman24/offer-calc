@@ -133,6 +133,11 @@ export interface LeavePanel {
   warnings: OfferWarning[];
 }
 
+/** L-4's panel at a last day for a comparison: L-4 and the document ask alike, so they share the result. */
+export const cursorJobFor = (c: CompareRequest, leaveDate: ISODate): Omit<CursorRequest, "gen"> => ({
+  lane: "cursor", offers: c.offers, household: c.household, inflation: c.inflation, leaveDate,
+});
+
 /**
  * Breakeven over your stay (docs/ui-design.md §4.6, §4.1): base case, present value on `basis`, over the
  * comparison window (the earliest start of every offer, for your stay). "flip": the close-call line's one,
