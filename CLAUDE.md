@@ -361,7 +361,7 @@ print scan off a desktop).
     `docs/copy-as-document-sample.html` (the samples on 2026-10-12; open it in a browser to paste-test).
   - `docs/user-testing.md`: what testers raise, one row per finding (date, finding, how many testers, what it led to). Keep
     adding to it as findings come in.
-  - `docs/v2-plan.md`: v2, **proposed (2026-10-13), not approved; nothing built.** In priority order: Beyond the money (your own
+  - `docs/v2-plan.md`: v2, **planned (2026-10-13; D1 and D14 approved), not built.** In priority order: Beyond the money (your own
     values per offer, and where they flip the verdict), market benchmarks (BLS OEWS, May 2025), negotiation help, and accuracy
     (days off, commuting, relocation, cross-state tax, startup options, PSLF). With a performance plan (step 0 makes room on the
     main thread first), questions for testers before each item, and decisions D1-D15 for the user.
@@ -410,8 +410,10 @@ amounts, and the data refresh calendar below. The user is now putting the tool i
 build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). User
 testing started on 2026-10-12; record each finding in `docs/user-testing.md` as it comes in (two testers asked for the comparison
 as a document: "Copy as document" is built; the user's own paste into Google Docs worked, and the other testers' reaction to it
-isn't recorded yet). **v2 is proposed in `docs/v2-plan.md` (2026-10-13), not approved:** don't build any of it until the user
-decides (D1-D15) and testers have answered its questions. Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's
+isn't recorded yet). **v2 is planned in `docs/v2-plan.md`** (2026-10-13): D1 (the scope, on the principle "The tool informs the
+decision and shows its work; you make the call") and D14 are approved, and D2-D15 stand as recommended unless the user comments on
+pull request #29. Don't start any v2 feature: the user is putting the plan's tester questions to testers first. Its performance step
+(step 0) is not a feature and was asked for on 2026-10-13. Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's
 2027 inflation revenue procedure and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
