@@ -42,9 +42,10 @@ done (2026-10-10): stop A (the automated accessibility scan and its fixes), stop
 stop C (the NVDA walkthrough, written; its run is deferred to before the public launch, see "Pre-launch checklist"). **Slice 6**
 is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and the year figures as shown, and
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
-print, the hide-tickmarks setting; below). What's next is the user's call: see Next steps.
-- **Where things stand** (2026-10-12, slice 6 stop B, the print choice and 2027's HSA limits): `npm test` 448 passing; `npm run e2e` 154 passing
-  (15 skip by design), the scan 186 scans with no violations and no exceptions; main thread 379.1 / 116.5 kB gzip
+print, the hide-tickmarks setting; below). **Copy as document** is built (2026-10-12, from user testing; below). What's next is the
+user's call: see Next steps.
+- **Where things stand** (2026-10-12, Copy as document): `npm test` 473 passing; `npm run e2e` 163 passing
+  (15 skip by design), the scan 198 scans with no violations and no exceptions; main thread 381.5 / 117.3 kB gzip
   against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
   in CI at stop B).
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
@@ -66,6 +67,19 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
   dark screen; A solid, B dashed, C dotted (also under forced colors); page numbers in the margin; the footer flags samples and gives
   the data vintages. The samples print to 23 Letter pages as a summary, 37 as the full workpaper. A `<tfoot>` prints as a plain row group (Chromium repeats footers on
   each page, blank).
+- **Copy as document** (2026-10-12, from user testing, finding 1; `copyDoc.ts`, loaded on the first click; plan and record:
+  `docs/copy-as-document-plan.md`): "Copy as document" beside "Print…" puts the comparison on the clipboard as HTML with a plain-text
+  fallback, about 3 pages, for someone who has never seen the tool (no tickmarks, workpaper references or "basis"): the answer and the
+  pipeline in plain English, with each step's totals and L-2's sentence when any offer has a range; the offers as entered, vesting and
+  refreshers described precisely; year 1's bridge for every offer side by side; the years to the answer; what would change it (L-3 as
+  a Now / Ties at / Change table, and the rent note); leaving early at L-4's last day (or six months in), pointing to L-4 for others;
+  the assumptions. One document model, two renderers (`toHtml`, `toText`): inline styles only, Arial, real headings, header rows in
+  `<thead>`, each cell's text in a zero-margin paragraph (Word otherwise doubles row heights); plain-text tables within 80 columns. Every
+  total adds up as displayed, and every calculation it states is listed in `worked`, which `copydoc.test.ts` checks, with the HTML's and
+  the text's figures identical. The click writes a `ClipboardItem` of promises at once (Safari); `prepare` asks the worker for L-3's
+  ties and L-4's panel as they do (`tieJob`, `cursorJobFor`), so the results are shared. "Copy now" (a copy event) where the browser
+  won't. Disabled (`aria-disabled`, with the reason) while the inputs have a problem or an offer is incomplete. The samples paste into
+  Word (Letter, 1-inch margins) at 3 pages.
 - **The hide-tickmarks setting** (slice 6, stop B): "Show tickmarks | Hide tickmarks" radios in the footer (`ui.ticks`, saved with
   the session; JSON exports carry it as the theme, "shown" or "hidden"). Hidden, the root has `data-ticks="hidden"` and the
   stylesheet hides the figures' marks (and Show the work's, and the `<` ties); figures keep a dotted underline and stay the same
@@ -261,8 +275,9 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 379.1 / 116.5 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). The print choice added 1.6 / 0.5; slice 6's stop B
+  - **Main thread:** 381.5 / 117.3 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's button added 2.4 / 0.8 (379.1 / 116.5
+    before). The print choice added 1.6 / 0.5; slice 6's stop B
     ended at 377.5 / 116.0, adding 3.6 / 0.9 (the CSV button, the tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
     L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8
     at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
@@ -288,7 +303,7 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
     opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
     L-2 9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 14 / 5 KB plus its view model 4 / 2 KB
     (each view model shared with the derivations), L-5 6 / 3 KB, L-6 11 / 3 KB plus its view model 12 / 5 KB (2026-10-10; the
-    derivations are now 92 / 27 KB, with L-6's), the CSV code 7 / 3 KB and the print code 0.4 / 0.3 KB (2026-10-12).
+    derivations are now 92 / 27 KB, with L-6's), the CSV code 7 / 3 KB and the print code 0.4 / 0.3 KB (2026-10-12), Copy as document's 28 / 11 KB (2026-10-12).
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
@@ -298,7 +313,7 @@ print, the hide-tickmarks setting; below). What's next is the user's call: see N
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 448 passing (`npm test`), and 154 Playwright tests (`npm run e2e`: the scan's tests in six projects, 5 smoke
+**Tests:** 473 passing (`npm test`), and 163 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
 - `test/offer.test.ts` 127, `test/params.test.ts` 23, `test/tax.test.ts` 10,
@@ -306,7 +321,7 @@ print scan off a desktop).
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
   `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 14, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
-  `app/src/phone.test.ts` 5,
+  `app/src/phone.test.ts` 5, `app/src/copydoc.test.ts` 25,
   `app/src/names.test.ts` 4, `scripts/lib/bundle.test.ts` 3, `scripts/lib/lighthouse.test.ts` 3, `scripts/lib/lock.test.ts` 3, `e2e/lib/exceptions.test.ts` 4.
 - `l6.test.ts` (slice 6) checks that every L-6 column adds up as displayed (the years, your stay, the payments, each tax year),
   the ties to L-1, the bridge and the rank list, the anniversary edge (a payment on your stay's last day is counted; on the
@@ -342,6 +357,8 @@ print scan off a desktop).
     order 5, 4, 8, 7, 6.
   - `docs/slice-3-plan.md`: the approved plan for UI slice 3 (detailed mode, JSON
     export/import) and the public-repo prep after it.
+  - `docs/copy-as-document-plan.md`: Copy as document, as approved (with the user's five changes) and built; its sample output,
+    `docs/copy-as-document-sample.html` (the samples on 2026-10-12; open it in a browser to paste-test).
   - `docs/user-testing.md`: what testers raise, one row per finding (date, finding, how many testers, what it led to). Keep
     adding to it as findings come in.
 
@@ -388,7 +405,7 @@ hide-tickmarks setting as they carry the theme. Then (2026-10-12) three follow-u
 amounts, and the data refresh calendar below. The user is now putting the tool in front of a few people before deciding what to
 build next: ask before starting anything new (the Roadmap below; the Pre-launch checklist before going public). User
 testing started on 2026-10-12; record each finding in `docs/user-testing.md` as it comes in (two testers asked for the comparison
-as a document: "Copy as document" is proposed, waiting on the go-ahead). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
+as a document: "Copy as document" is built; the testers' reaction to it isn't recorded yet). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's 2027 inflation revenue procedure
 and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
@@ -494,13 +511,17 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     imports engine types and `src/col/cities.ts` only. `src/protocol.ts` holds the
     message types and `rentKey`: never import values from `engine.worker.ts` or
     `compute.ts`.
-  - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour.
+  - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour and the verdict's sentence (`verdictSentence`).
   - `src/footing.ts`: the year figures as shown (`shownYears`, `shownStay`), shared by L-1, the bridge and L-6, and the BEA
     indexes as shown (`indexDigits`, `shownIndexes`). Main thread; no place names (see "The year figures as shown").
   - `src/TheWork.tsx` is L-6; `src/workpaper.ts` its view model (the year table's numbered lines, your stay's totals, the
     payments by year and kind, each tax year's columns, the rate's digits, and the figures' display text: `moneyText`, `rowText`),
     shared with `derive.ts` and `csv.ts`. Its payments come from `paymentsJob` (`slowJobs.ts`), asked for with `workJob`
     (`protocol.ts`) while it's open, or the page is laid out for print.
+  - `src/copyDoc.ts` (loaded on the first click of "Copy as document"): the document model (`buildDoc`: blocks and the calculations it
+    states, `worked`), its renderers (`toHtml`, `toText`), and `prepare` (asks for L-3's and L-4's slow jobs, waits, builds). The
+    button is `CopyDocument` in `App.tsx`. It shares wording with the page: `yearNotes` (L-1's notes, `metrics.ts`), `leaveTerms` (M-9's
+    terms, `leaveModel.ts`), `warningWords` (`src/warningWords.ts`, L-5's lines).
   - `src/csv.ts` (loaded on the first download): each table's CSV (`build`, `csvFile`, `downloadCsv`), from the view models.
     `src/print.ts` (loaded on the first Print): the Print button's wait for every schedule, then `window.print()`.
   - `src/media.ts`: the layout's widths (`PHONE`, `TABLET`, as `styles.css` has them) as `useMedia`, the phone keyboard
@@ -559,7 +580,7 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     offer (`openWork`, after the schedules above have filled in: one filling in mid-click moves L-6), when the page has settled:
     `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed, and works out any loaded off screen: since 2026-10-12, when CI caught L-4 starting mid-scan on a tablet); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.
-  - `smoke.e2e.ts` (with CSV downloads and the Print button), `keyboard.e2e.ts` (with the hide-tickmarks setting); `mobile.e2e.ts`
+  - `smoke.e2e.ts` (with CSV downloads, the Print button and Copy as document, read back from the clipboard), `keyboard.e2e.ts` (with the hide-tickmarks setting); `mobile.e2e.ts`
     (the phone's tabs and the verdict bars, in the `phone` and `tablet` projects). `lib/app.ts`'s `stubPrint` counts
     `window.print()` calls instead of opening a dialog (and no afterprint follows, so the print layout stays to be scanned), and
     `printWithButton` presses Print and waits for the call.

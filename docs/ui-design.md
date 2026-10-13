@@ -1164,6 +1164,8 @@ font requests.
     replaced.
   - CSV for every table, tickmarks included.
   - Print-to-PDF via the print stylesheet.
+  - "Copy as document" (2026-10-12, from user testing): a summary of the comparison on the clipboard, HTML with a plain-text
+    fallback, that pastes into Google Docs, Word and email (`docs/copy-as-document-plan.md`).
   - No share links. Offers are salary data, and URLs leak into browser history, server
     logs, chat-app previews and analytics. A file is an explicit act.
 - **Hosting:** a static build on GitHub Pages (or Vercel), with hash routing.
@@ -1592,6 +1594,13 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   workpaper and in L-6's CSV. The full workpaper adds that list. The choice sits in a box under the masthead (not a dialog): focus starts
   on it, Escape or Cancel goes back to "Print…". Ctrl+P prints the last choice made, the summary until one is; the choice isn't saved.
   The samples print to 23 Letter pages as a summary and 37 as the full workpaper.
+- **Copy as document** (2026-10-12, from user testing, finding 1 in `docs/user-testing.md`; plan and record in
+  `docs/copy-as-document-plan.md`): "Copy as document" beside "Print…" copies the comparison as a summary of about 3 pages, HTML with a
+  plain-text fallback, for someone who has never seen the tool: the answer and the pipeline in plain English, the offers as entered,
+  year 1's bridge for every offer side by side, the years to the answer, what would change it (L-3 and the rent note), leaving early at
+  L-4's last day, and the assumptions. No tickmarks or workpaper references; every total adds up as displayed and every calculation it
+  states is checked; samples flagged first and last. Disabled, saying why, while the inputs have a problem. Its code loads on the first
+  click; L-3's and L-4's figures come from their own slow-lane jobs, asked for alike.
 
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
