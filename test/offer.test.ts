@@ -198,6 +198,20 @@ describe("residence vs employer state (decision 9)", () => {
     expect(convenienceRuleWarning("NE", "CT")).toBeDefined();
     expect(convenienceRuleWarning("NE", "NY")).toBeDefined();
   });
+  it("NJ's rule doesn't reach Pennsylvania or Connecticut residents (NJ's FAQ, Oct 30, 2025)", () => {
+    // Pennsylvania: the NJ-PA reciprocal agreement. Connecticut: the reciprocal nature of its own law.
+    expect(convenienceRuleWarning("PA", "NJ")).toBeUndefined();
+    expect(convenienceRuleWarning("CT", "NJ")).toBeUndefined();
+    const r = projectScenario({ ...worked, residence: { state: "PA" }, employerState: "NJ" }, single);
+    expect(r.warnings).toEqual([]);
+    // The states it does name still are; and the exception is New Jersey's only, so Pennsylvania's and New York's rules still
+    // reach those residents, and an NJ resident with a CT employer is still warned (the FAQ speaks only for New Jersey's rule).
+    expect(convenienceRuleWarning("NY", "NJ")).toBeDefined();
+    expect(convenienceRuleWarning("DE", "NJ")).toBeDefined();
+    expect(convenienceRuleWarning("CT", "NY")).toBeDefined();
+    expect(convenienceRuleWarning("CT", "PA")).toBeDefined();
+    expect(convenienceRuleWarning("NJ", "CT")).toBeDefined();
+  });
   it("no warning when you live where the employer is", () => {
     expect(convenienceRuleWarning("NY", "NY")).toBeUndefined();
   });
