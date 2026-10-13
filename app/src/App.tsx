@@ -21,7 +21,8 @@ import { priceWords } from "./prices";
 import { dayBefore, localToday, longDate } from "./text";
 import { Printing, type PrintScope, type Stale, TickSetting } from "./ui";
 import { WorkProvider } from "./Tickmarks";
-import { useEngine } from "./useEngine";
+import { type Engine, useEngine } from "./useEngine";
+import type { Live } from "./copyDoc";
 import { SECTIONS, type SectionId } from "./sections";
 import { verdict } from "./verdict";
 
@@ -252,6 +253,15 @@ export function App() {
     today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
     ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties, ...payments } } : {}),
   };
+  // "Copy as document" (docs/copy-as-document-plan.md): waits while the inputs have a problem, and says why. It reads the page as it
+  // is when its figures come back (`live`), not as it was when the button was pressed.
+  const incomplete = session.offers.filter((o) => missing.has(o.id)).map((o) => o.letter);
+  const copyBlocked = !view || !compare ? "Fill in at least two offers to copy the comparison."
+    : engine.invalid ? "Fix the problems listed under the verdict to copy the comparison."
+    : engine.error ? "The comparison couldn't be worked out, so there's nothing to copy."
+    : incomplete.length ? `Fill in or remove offer ${incomplete.join(" and ")} to copy the comparison.` : null;
+  const live = useRef<Live | null>(null);
+  live.current = { work, compare, ready, breakeven: engine.breakeven, cursor: engine.cursor, leaveAt };
 
   return (
     <WorkProvider ctx={work} onEdit={edit} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
@@ -276,6 +286,7 @@ export function App() {
             <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
               onClick={() => setChoosing(!choosing)}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
+            <CopyDocument blocked={copyBlocked} live={live} requestSlow={requestSlow} />
           </p>
         )}
         {route.page === "compare" && choosing && (
@@ -368,6 +379,65 @@ export function App() {
     </Printing.Provider>
     </TickSetting.Provider>
     </WorkProvider>
+  );
+}
+
+type CopyState = "working" | "copied" | "again" | "failed" | null;
+const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
+  working: "Getting the document ready…",
+  copied: "Copied: paste it into a document or an email.",
+  again: "Ready. Press Copy now to put it on the clipboard.",
+  failed: "This browser wouldn't copy it. Print… gives the same figures.",
+};
+
+/**
+ * "Copy as document": the comparison as a 2-3 page summary on the clipboard, HTML with a plain-text fallback. The click writes to
+ * the clipboard at once, with the document as a promise its code (copyDoc.ts, loaded now) keeps once the slow lane has what it
+ * needs, since Safari allows a write only inside the click. A browser that won't take that gets "Copy now", which copies the ready
+ * document through a copy event. Disabled (aria-disabled, so it stays focusable and says why) while the inputs have a problem.
+ */
+function CopyDocument({ blocked, live, requestSlow }: {
+  blocked: string | null; live: { current: Live | null }; requestSlow: Engine["requestSlow"];
+}) {
+  const [state, setState] = useState<CopyState>(null);
+  const ready = useRef<{ html: string; text: string } | null>(null);
+  const copy = () => {
+    if (blocked || state === "working") return;
+    setState("working");
+    const doc = import("./copyDoc").then((m) => m.prepare(() => live.current!, requestSlow));
+    const blob = (type: "text/html" | "text/plain") => doc.then((d) => new Blob([type === "text/html" ? d.html : d.text], { type }));
+    let wrote: Promise<void>;
+    try {
+      wrote = navigator.clipboard.write([new ClipboardItem({ "text/html": blob("text/html"), "text/plain": blob("text/plain") })]);
+    } catch (e) {
+      wrote = Promise.reject(e);
+    }
+    wrote.then(() => setState("copied"), () => doc.then((d) => {
+      ready.current = d;
+      setState("again");
+    }, () => setState("failed")));
+  };
+  const copyNow = () => {
+    const d = ready.current;
+    if (!d) return;
+    const put = (e: ClipboardEvent) => {
+      e.clipboardData?.setData("text/html", d.html);
+      e.clipboardData?.setData("text/plain", d.text);
+      e.preventDefault();
+    };
+    document.addEventListener("copy", put, { once: true });
+    const ok = document.execCommand("copy");
+    document.removeEventListener("copy", put);
+    setState(ok ? "copied" : "failed");
+  };
+  return (
+    <>
+      <button type="button" className="link" aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? "copy-why" : undefined}
+        onClick={copy}>Copy as document</button>
+      {state === "again" && <button type="button" className="link" onClick={copyNow}>Copy now</button>}
+      <span className="print-status" role="status">{state ? COPY_SAID[state] : ""}</span>
+      {blocked && <span id="copy-why" className="print-status">{blocked}</span>}
+    </>
   );
 }
 

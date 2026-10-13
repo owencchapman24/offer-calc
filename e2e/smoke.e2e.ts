@@ -132,6 +132,67 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   await expect(page.locator(".l6-offer")).toHaveCount(0);
 });
 
+/** What the clipboard holds: each flavor's text. */
+const clipboard = (page: Page) => page.evaluate(async () => {
+  const out: Record<string, string> = {};
+  for (const item of await navigator.clipboard.read()) for (const type of item.types) out[type] = await (await item.getType(type)).text();
+  return out;
+});
+const SAMPLE_LINE = "Includes sample offers: illustrative inputs, not market data.";
+
+test("Copy as document: one click puts the comparison on the clipboard, as HTML and plain text, its code loaded only then", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const chunks: string[] = [];
+  page.on("request", (r) => { if (/\/assets\/copyDoc-/.test(r.url())) chunks.push(r.url()); });
+  await openCompare(page);
+  expect(chunks).toEqual([]);
+  // The hero as the page shows it, without its tickmark: "$500 a month".
+  const hero = (await verdictText(page)).hero[0].replace("✓", "").trim();
+  await page.getByRole("button", { name: "Copy as document" }).click();
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
+  expect(chunks).toHaveLength(1);
+  const got = await clipboard(page);
+  expect(Object.keys(got).sort()).toEqual(["text/html", "text/plain"]);
+  for (const flavor of [got["text/html"], got["text/plain"]]) {
+    expect(flavor).toContain(`C leaves you about ${hero} more than A, after rent, at U.S. prices.`);
+    expect(flavor).toContain(SAMPLE_LINE);
+    expect(flavor).toContain("If your last day were");
+    expect(flavor).toContain("To tie C's");
+  }
+  expect(got["text/html"]).toMatch(/<table style="/);
+  expect(got["text/plain"]).toMatch(/^THREE JOB OFFERS COMPARED/);
+});
+
+test("Copy as document: where the browser won't write from a promise, Copy now copies the ready document", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // A browser without ClipboardItem: the first click gets the document ready, the second copies it through a copy event.
+  await page.addInitScript(() => { delete (window as unknown as { ClipboardItem?: unknown }).ClipboardItem; });
+  await openCompare(page);
+  await page.getByRole("button", { name: "Copy as document" }).click();
+  await page.getByRole("button", { name: "Copy now" }).click({ timeout: 30_000 });
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.");
+  const got = await clipboard(page);
+  expect(got["text/plain"]).toMatch(/^THREE JOB OFFERS COMPARED/);
+  expect(got["text/html"]).toContain("Three job offers compared");
+});
+
+test("Copy as document waits, and says why, while the inputs have a problem", async ({ page }) => {
+  await openCompare(page);
+  const button = page.getByRole("button", { name: "Copy as document" });
+  await expect(button).not.toHaveAttribute("aria-disabled");
+  // A start date before 2026: a problem the comparison waits on.
+  const start = page.locator("#in-A-startDate");
+  const was = await start.inputValue();
+  await start.fill("2025-06-01");
+  await expect(button).toHaveAttribute("aria-disabled", "true");
+  await expect(button).toHaveAccessibleDescription("Fix the problems listed under the verdict to copy the comparison.");
+  // Still focusable and clickable (aria-disabled), so it can say why; a click does nothing.
+  await button.click({ force: true });
+  await expect(page.locator(".print-bar")).not.toContainText("Getting the document ready");
+  await start.fill(was);
+  await expect(button).not.toHaveAttribute("aria-disabled");
+});
+
 test("export, then import: the same results", async ({ page }) => {
   await openCompare(page);
   const before = await verdictText(page);
