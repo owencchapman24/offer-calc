@@ -75,19 +75,22 @@ export function Stamp({ children, tone = "ink" }: { children: ReactNode; tone?: 
  * longer help inline (not a hover tooltip); and "How this is used →", a link to the methodology.
  * `hintId` lets the inputs point at the hint with aria-describedby.
  */
-export function Help({ hint, hintId, section, extra, children }: {
-  hint: string; hintId?: string; section?: string; /** After the help: "Reset to default". */ extra?: ReactNode; children: ReactNode;
+export function Help({ hint, hintId, section, extra, onWant, children }: {
+  hint: string; hintId?: string; section?: string; /** After the help: "Reset to default". */ extra?: ReactNode;
+  /** The help's text may still be loading: called as a pointer or focus reaches the ⓘ, and when it opens. */ onWant?: () => void;
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
     <div className="help">
       <span className="hint" id={hintId}>{hint}</span>
-      <button type="button" className="help-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}
+      <button type="button" className="help-toggle" aria-expanded={open} aria-controls={id} onClick={() => { onWant?.(); setOpen(!open); }}
+        onPointerEnter={onWant} onFocus={onWant}
         aria-label={open ? "Hide help" : "More help"} title={open ? "Hide help" : "More help"}>ⓘ</button>
       {open && (
         <div id={id} className="help-body">
-          <p>{children}</p>
+          <p>{children || "Getting the help…"}</p>
           {extra}
           {section && <p><a href={`#/method/${section}`}>How this is used →</a></p>}
         </div>

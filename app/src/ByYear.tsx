@@ -1,15 +1,16 @@
 import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useRef, useState } from "react";
 import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
-import { basisPhrase, type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, type MetricId, pricesOf, type WorkContext, yearNotes } from "./metrics";
+import { basisPhrase, type MetricId, pricesOf, type WorkContext } from "./metrics";
+import { type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, yearNotes } from "./byYearModel";
 import type { Action, UiState } from "./session";
 import { niceTicks, useChartWidth } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
-import { Fig, useRovingTicks } from "./Tickmarks";
-import { CsvButton } from "./figures";
+import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
-// L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4).
+// L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4). It loads as you scroll
+// toward it (Later.tsx), so it imports figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
 // hairline grid, a legend plus direct end labels, and a crosshair readout of every offer at a year.
 
@@ -20,9 +21,11 @@ const unit = (basis: Basis, ctx: WorkContext): string => (basis === "colAdjusted
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
 
-export function ByYear({ ctx, ui, sample, dispatch, status = null }: {
+export interface ByYearProps {
   ctx: WorkContext; ui: UiState; sample: boolean; dispatch: Dispatch<Action>; /** Its figures are from earlier inputs. */ status?: Stale;
-}) {
+}
+
+export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
   const printing = usePrinting();

@@ -1,6 +1,7 @@
 import type { Basis } from "../../src/offer/types";
 import { CASES, dropText, riskView } from "./cases";
-import { basisPhrase, byYear, type MetricId, metricKind, pricesOf, res, type WorkContext } from "./metrics";
+import { basisPhrase, type MetricId, metricKind, pricesOf, res, type WorkContext } from "./metrics";
+import { byYear } from "./byYearModel";
 import type { Letter } from "./model";
 import { cents, dayBefore, figure, longDate } from "./text";
 import { TICKS, type TickKind } from "./ui";

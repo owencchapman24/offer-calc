@@ -7,9 +7,9 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { shownStay, shownYears } from "./footing";
 import { firstLastDay, forfeits, leaveAxis, leaveTerms, onAxis, worked as timeWorked } from "./leaveModel";
 import {
-  aboutIsDefault, type BridgeLine, bridge, cashName as cashNameOf, detailOf, offerByLetter, pricesOf, rentEstimate, rentNotes, res, shortCity,
-  shownYearOf, type WorkContext, yearNotes, yearValue,
+  aboutIsDefault, type BridgeLine, detailOf, offerByLetter, pricesOf, rentEstimate, rentNotes, res, shortCity, type WorkContext,
 } from "./metrics";
+import { bridge, cashName as cashNameOf, shownYearOf, yearNotes, yearValue } from "./byYearModel";
 import { ASSUMPTIONS, inNyc, type Letter } from "./model";
 import { type CompareRequest, cursorJobFor, type LeavePanel, tieJob, type Ties } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";

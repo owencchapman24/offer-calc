@@ -4,6 +4,7 @@ import type { OfferIssue } from "../../src/offer/validate";
 import type { OfferWarning } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { HELP, helpKey } from "./help";
+import { lazyModule, useLazyModule } from "./lazy";
 import type { AppOffer, Letter } from "./model";
 import type { MetricId } from "./metrics";
 import { TickButton, Trace } from "./Tickmarks";
@@ -72,8 +73,17 @@ export function Issues({ letter, path, exclude, exact }: {
   );
 }
 
+/**
+ * Quick mode's and About you's ⓘ help (quickHelp.ts), a chunk of its own: it starts loading when a pointer or focus reaches an ⓘ,
+ * and a label that shows help subscribes, so it re-renders when the text arrives. Defined here, not in help.ts: help.ts stays
+ * free of React, since the lazy chunks that fill it in import it (one that reached React through it split React out of the
+ * main chunk).
+ */
+export const quickHelp = lazyModule(() => import("./quickHelp"));
+
 /** A row's label and its help: the hint, the ⓘ, "How this is used →" and, for a default, "Reset to default". */
 export function RowLabel({ k, label }: { k: string; label?: string }) {
+  useLazyModule(quickHelp); // quick mode's ⓘ help, when it arrives
   const h = HELP[k];
   const d = defaultFor(k);
   const api = useLedger();
@@ -89,7 +99,7 @@ export function RowLabel({ k, label }: { k: string; label?: string }) {
               {o.letter}</button></span>
           ))}
         </p>
-      ) : null}>{h.help}</Help>
+      ) : null} onWant={() => void quickHelp.load()}>{h.help}</Help>
     </div>
   );
 }

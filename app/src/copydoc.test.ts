@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildDoc, type Doc, type DocOptions, num, SAMPLE_LINE, type Table, toHtml, toText, vestingText } from "./copyDoc";
 import { firstLastDay, leaveAxis } from "./leaveModel";
-import { bridge, byYear, type WorkContext } from "./metrics";
+import { type WorkContext } from "./metrics";
+import { bridge, byYear } from "./byYearModel";
 import type { AppOffer } from "./model";
 import { dollars, figure, longDate } from "./text";
 import { compareOf, context, withLeave, withTies } from "./testing";

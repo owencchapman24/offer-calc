@@ -8,7 +8,8 @@ import type { LedgerSection } from "./session";
 // and fails if one lacks any of them.
 //
 // Every field's name and place are here (field names, "Edit it" and the section flags need them), and
-// the text for quick mode and About you. Detailed mode's text (helpText.ts) loads with detailed mode.
+// the hints for quick mode and About you. Their ⓘ help (quickHelp.ts) loads on first use, and detailed
+// mode's text (helpText.ts) with detailed mode.
 
 export interface FieldMeta {
   /** The row's label. */
@@ -136,71 +137,29 @@ const META: Record<string, FieldMeta> = {
   "about.prices": { label: "Prices in", section: "M-6.1", group: "about" },
 };
 
-/** Quick mode's and About you's text. */
-const QUICK_TEXT: Record<string, FieldText> = {
-  label: {
-    hint: "Your own name for each offer.",
-    help: "A short name you'll recognize, such as the firm or the city. It appears beside the offer's letter in the bridge and the "
-      + "methodology. It doesn't change any number.",
-  },
-  "salary.annual": {
-    hint: "Per year, before tax.",
-    help: "Your starting base salary from the offer letter. Raises and promotions are separate inputs, under Pay in detailed mode. "
-      + "Pay accrues by calendar month, so a July start earns about half of it in its first calendar year.",
-  },
-  startDate: {
-    hint: "Your first day of work.",
-    help: "We compare every offer from the earliest start date, so a later start counts as pay you don't get yet. Tax data starts "
-      + "in 2026, so the date must be in 2026 or later. A date before today means present values count pay already received.",
-  },
-  "bonus.amount": {
-    hint: "Target bonus; the first one is prorated.",
-    help: "The target from your offer, as a % of salary or dollars a year; leave it blank for none. It's paid once a year for the "
-      + "year before, so a July start gets a partial first bonus the next spring. Its timing is under Bonus in detailed mode.",
-  },
-  "costOfLiving.area": {
-    hint: "Where you'd live, not the office.",
-    help: "We tax you as a resident of this state (and New York City, if you say so) and price your spending with this metro's "
-      + "price level (BEA Regional Price Parities). If you'd commute across a state line, pick where you'd live.",
-  },
-  "costOfLiving.monthlyRent": {
-    hint: "What you'd pay there.",
-    help: "If you leave it blank we use HUD's Fair Market Rent: what recent movers pay for a typical 1-bedroom across the metro "
-      + "(the 40th percentile, utilities included). City-center rents usually run higher, so enter yours if you know it.",
-  },
-  "about.filing": {
-    hint: "How you'd file your federal return.",
-    help: "It sets the tax brackets and the standard deduction for every offer. Single is the default: most new grads file single. "
-      + "Married filing jointly adds your spouse's wages, if any.",
-  },
-  "about.stay": {
-    hint: "Sets how many years we compare.",
-    help: "We compare every offer over the same stretch, starting on the earliest start date. Pay after that isn't counted. The row "
-      + "under the verdict shows whether the winner changes if you stay 2, 3, 4 or 5 years.",
-  },
-  "about.wages": {
-    hint: "An internship or the job you're leaving.",
-    help: "Pay you earn in the year the earliest offer starts, before the new job begins. It's taxed in the same year, so it changes "
-      + "the new job's first-year tax. Leave it at $0 if there's none.",
-  },
-  "about.prices": {
-    hint: "Show after-rent figures in a city's dollars you know.",
-    help: "After rent, every offer's spending money is priced as in one place, so offers in different cities compare in the same "
-      + "dollars. The U.S. average is the default. Pick a city you know, such as where you live now, to read the figures in its "
-      + "dollars: its own price factor is 1. Spending scales by the same ratio for every offer; savings stay at face value.",
-  },
-  "about.healthUsage": {
-    hint: "Which of your out-of-pocket estimates counts.",
-    help: "Each health plan takes your low, medium or high out-of-pocket estimate; this picks one for every offer. Medium is the "
-      + "default: the middle of your own estimates.",
-  },
+/** Quick mode's and About you's hints, always shown. Their ⓘ help loads on first use (quickHelp.ts). */
+const QUICK_HINTS: Record<string, string> = {
+  label: "Your own name for each offer.",
+  "salary.annual": "Per year, before tax.",
+  startDate: "Your first day of work.",
+  "bonus.amount": "Target bonus; the first one is prorated.",
+  "costOfLiving.area": "Where you'd live, not the office.",
+  "costOfLiving.monthlyRent": "What you'd pay there.",
+  "about.filing": "How you'd file your federal return.",
+  "about.stay": "Sets how many years we compare.",
+  "about.wages": "An internship or the job you're leaving.",
+  "about.prices": "Show after-rent figures in a city's dollars you know.",
+  "about.healthUsage": "Which of your out-of-pocket estimates counts.",
 };
 
-/** Every input's help. A detailed field's hint and help are empty until detailed mode's text arrives (addHelpText). */
-export const HELP: Record<string, FieldHelp> = Object.fromEntries(Object.entries(META).map(([k, m]) => [k, { ...m, ...(QUICK_TEXT[k] ?? { hint: "", help: "" }) }]));
+/**
+ * Every input's help. A detailed field's hint and help are empty until detailed mode's text arrives, and quick mode's and About
+ * you's ⓘ help until quickHelp.ts does (addHelpText).
+ */
+export const HELP: Record<string, FieldHelp> = Object.fromEntries(Object.entries(META).map(([k, m]) => [k, { ...m, hint: QUICK_HINTS[k] ?? "", help: "" }]));
 
-/** Fills in detailed mode's text (helpText.ts, loaded with detailed mode). */
-export function addHelpText(text: Record<string, FieldText>): void {
+/** Fills in help text: detailed mode's (helpText.ts, loaded with detailed mode) and the ⓘ help for quick mode and About you (quickHelp.ts). */
+export function addHelpText(text: Record<string, Partial<FieldText>>): void {
   for (const [k, t] of Object.entries(text)) if (HELP[k]) Object.assign(HELP[k], t);
 }
 

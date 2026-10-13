@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import type { ByYearProps } from "./ByYear";
 import type { BreakevenProps } from "./Breakeven";
 import type { LeavingProps } from "./Leaving";
 import type { TheWorkProps } from "./TheWork";
@@ -6,10 +7,11 @@ import { lazyModule, useLazyModule, useLoadNear } from "./lazy";
 import type { WorkContext } from "./metrics";
 import type { Stale } from "./ui";
 
-// The schedules after L-1 (docs/ui-design.md §4, §10). Each loads as you scroll toward it, so a quick
-// visit that never gets there doesn't download it, and the main chunk stays in budget
-// (`npm run check-bundle`). They import figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
+// The schedules under the two columns, L-1 to L-6 (docs/ui-design.md §4, §10). Each loads as you scroll toward it, so a
+// quick visit that never gets there doesn't download it, and the main chunk stays in budget (`npm run check-bundle`). They
+// import figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
 
+const byYearSchedule = lazyModule(() => import("./ByYear"));
 const riskSchedule = lazyModule(() => import("./Risk"));
 const breakevenSchedule = lazyModule(() => import("./Breakeven"));
 const leavingSchedule = lazyModule(() => import("./Leaving"));
@@ -17,7 +19,27 @@ const warningsSchedule = lazyModule(() => import("./Warnings"));
 const workSchedule = lazyModule(() => import("./TheWork"));
 
 /** Every schedule's code, for the Print button: what Ctrl+P can't wait for. */
-export const loadLater = () => Promise.all([riskSchedule, breakevenSchedule, leavingSchedule, warningsSchedule, workSchedule].map((m) => m.load()));
+export const loadLater = () =>
+  Promise.all([byYearSchedule, riskSchedule, breakevenSchedule, leavingSchedule, warningsSchedule, workSchedule].map((m) => m.load()));
+
+/** L-1 and the bridge, once their code has loaded. */
+export function ByYearSlot(props: ByYearProps) {
+  const m = useLazyModule(byYearSchedule);
+  const ref = useRef<HTMLDivElement>(null);
+  useLoadNear(byYearSchedule, ref, m !== null);
+  return m ? <m.ByYear {...props} /> : <div ref={ref} className="later l1-slot" />;
+}
+
+/**
+ * "See how we get there" (the first-use note): the bridge, loading L-1's code first if it isn't here yet, then scrolled to,
+ * with focus on its heading once it has rendered.
+ */
+export async function showBridge() {
+  await byYearSchedule.load();
+  for (let i = 0; i < 120 && !document.getElementById("bridge-title"); i++) await new Promise((r) => requestAnimationFrame(r));
+  document.getElementById("bridge")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("bridge-title")?.focus({ preventScroll: true });
+}
 
 /** L-2, once its code has loaded. */
 export function RiskSlot({ ctx, sample, status }: { ctx: WorkContext; sample: boolean; status: Stale }) {

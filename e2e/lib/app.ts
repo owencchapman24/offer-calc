@@ -94,19 +94,28 @@ export async function openCompare(page: Page) {
   await settled(page);
 }
 
+/** Scrolls down until a schedule that loads as you near it (L-1 to L-6) is on the page, and shows it. */
+async function scrollTo(page: Page, id: string) {
+  const title = page.locator(`#${id}-title`);
+  for (let i = 0; i < 60 && !(await title.count()); i++) {
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
+    await page.waitForTimeout(100);
+  }
+  await expect(title).toBeVisible();
+}
+
+/** L-1 and the bridge: they load as you scroll toward them, so on a phone they're further down than the first screen. */
+export async function showByYear(page: Page) {
+  await scrollTo(page, "l1");
+  await settled(page);
+}
+
 /**
- * L-2 to L-5 load as you scroll toward them, and L-3 and L-4 work out their numbers while they're on screen: scroll down to
+ * L-1 to L-5 load as you scroll toward them, and L-3 and L-4 work out their numbers while they're on screen: scroll down to
  * each in turn, and wait for those two to be ready.
  */
 export async function loadSchedules(page: Page) {
-  for (const id of ["l2", "l3", "l4", "l5"]) {
-    const title = page.locator(`#${id}-title`);
-    for (let i = 0; i < 60 && !(await title.count()); i++) {
-      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
-      await page.waitForTimeout(100);
-    }
-    await expect(title).toBeVisible();
-  }
+  for (const id of ["l1", "l2", "l3", "l4", "l5"]) await scrollTo(page, id);
   for (const schedule of [".ties", ".leaving"]) {
     await page.locator(schedule).scrollIntoViewIfNeeded();
     await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });

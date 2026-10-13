@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { derive, indexText } from "./derive";
 import Methodology from "./Methodology";
-import { bridge, type MetricId, metricKind, rentNotes, type WorkContext } from "./metrics";
+import { type MetricId, metricKind, rentNotes, type WorkContext } from "./metrics";
+import { bridge } from "./byYearModel";
 import { priceWords, shortCity, US_PRICES } from "./prices";
 import { context, renderPage, withLeave, withTies } from "./testing";
 

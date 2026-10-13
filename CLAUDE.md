@@ -44,10 +44,10 @@ is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and 
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). **Copy as document** is built (2026-10-12, from user testing; below). What's next is the
 user's call: see Next steps.
-- **Where things stand** (2026-10-12, Copy as document): `npm test` 473 passing; `npm run e2e` 163 passing
-  (15 skip by design), the scan 198 scans with no violations and no exceptions; main thread 381.6 / 117.4 kB gzip
-  against the 120 kB budget, one chunk; Lighthouse (mobile, median of 3) LCP 1.95 s against 2.5 s, performance 98, locally (1.91 s
-  in CI at stop B).
+- **Where things stand** (2026-10-13, v2's step 0): `npm test` 473 passing; `npm run e2e` 164 passing
+  (16 skip by design), the scan 198 scans with no violations and no exceptions; main thread 358.9 / 109.7 kB gzip
+  against the 120 kB budget, one chunk (117.4 before step 0); Lighthouse (mobile, median of 3) LCP 1.87 s against 2.5 s,
+  performance 98, locally (1.95 s before step 0, measured side by side).
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
 - **CSV for each table** (slice 6, stop B; `csv.ts`, loaded on the first download): L-1's and L-2's table views ("Download CSV"
   once the table view is open) and L-6's four tables per offer (beside each part's heading). Built from the same view models and
@@ -275,9 +275,10 @@ user's call: see Next steps.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 381.6 / 117.4 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's button added 2.5 / 0.9 (379.1 / 116.5
-    before). The print choice added 1.6 / 0.5; slice 6's stop B
+  - **Main thread:** 358.9 / 109.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). v2's step 0 (2026-10-13) took 22.6 / 7.7 off: L-1 and the
+    bridge on first use 6.6 kB gzip, quick mode's ⓘ help 1.0 (381.6 / 117.4 before). Copy as document's button added 2.5 / 0.9
+    (379.1 / 116.5 before). The print choice added 1.6 / 0.5; slice 6's stop B
     ended at 377.5 / 116.0, adding 3.6 / 0.9 (the CSV button, the tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
     L-6's slot and lane); slice 7 ended at 369.4 / 113.4; its stop A at 364.3 / 111.9; slice 8
     at 362.7 / 111.4; slice 4 at 357.9 / 109.7;
@@ -290,20 +291,28 @@ user's call: see Next steps.
     a discarded warm-up, then the median of 3 runs, LCP's and the score's each taken on its own): LCP at most 2.5 s,
     checked in CI. Before the warm-up (2026-10-10), CI's cold first run (TBT ~1 s) could be reported as the median. 2026-10-09: the production build 1.86 s,
     performance 98; the live site 1.47 s, performance 100. 2026-10-10, after slice 6's stop A: 1.94 s in CI and locally,
-    performance 98; 2026-10-12, after slice 6's stop B: 1.95 s locally, performance 98. The LCP element is About you's assumptions
-    line, which renders before the worker answers, so the main chunk's download and parse set LCP.
+    performance 98; 2026-10-12, after slice 6's stop B: 1.95 s locally, performance 98. 2026-10-13, v2's step 0, `main` and the branch
+    built side by side and run alternately, two rounds each: LCP 1.95 s to 1.87 s (both rounds), TBT about 91 ms to 45 ms, performance
+    98 both. The LCP element is About you's assumptions line, which renders before the worker answers, so the main chunk's download
+    and parse set LCP. CLS read 0.020 on the branch (0 on `main`): a 24 px shift both have, from Copy as document's "Fill in at least two
+    offers…" showing until the first results arrive, which Chrome flagged as following input on `main` (so not counted). A preload of the
+    body font was tried and dropped: LCP 2.35 s, and the shift stayed.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
     more gzip on every visit). Likewise a new module shared by the main chunk and a lazy schedule: `CsvButton.tsx`, imported
     by L-1 and by L-2 and L-6, split React, `ui.tsx` and `text.ts` out (2026-10-12), so the button lives in `figures.tsx`.
-    `npm run build` then `grep -c modulepreload dist/index.html` is 0 when the main thread is one chunk.
+    And `help.ts` stays free of React: the lazy chunks that fill it in (`quickHelp.ts`, `helpText.ts`) import it, and when it
+    imported `lazy.ts` for `quickHelp`'s lazy module, React, `lazy.ts` and `text.ts` split out (2026-10-13), so that module is
+    in `fields.tsx`. `npm run build` then `grep -c modulepreload dist/index.html` is 0 when the main thread is one chunk.
   - **Loaded on first use** (raw / gzip, 2026-10-09): detailed mode 54 / 14 KB (sections, editors,
     controls, its help text), the derivations 69 / 22 KB (when a tickmark is hovered, focused or
     opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
     L-2 9 / 3 KB plus its view model 4 / 2 KB, L-3 7 / 2 KB, L-4 14 / 5 KB plus its view model 4 / 2 KB
     (each view model shared with the derivations), L-5 6 / 3 KB, L-6 11 / 3 KB plus its view model 12 / 5 KB (2026-10-10; the
-    derivations are now 92 / 27 KB, with L-6's), the CSV code 7 / 3 KB and the print code 0.4 / 0.3 KB (2026-10-12), Copy as document's 28 / 11 KB (2026-10-12).
+    derivations are now 92 / 27 KB, with L-6's), the CSV code 7 / 3 KB and the print code 0.4 / 0.3 KB (2026-10-12), Copy as document's 28 / 11 KB (2026-10-12);
+    since step 0 (2026-10-13), L-1 and the bridge 11.6 / 4.0 KB plus `byYearModel.ts` 5.7 / 2.5 and `footing.ts` 3.2 / 1.4, and
+    quick mode's ⓘ help 2.7 / 1.3.
   - `src/format` is split into modules (numbers, issues, schedule, warnings; `index.ts`
     re-exports them) so each chunk takes only the words it uses: a module lands in one chunk
     with every export any chunk uses.
@@ -313,8 +322,8 @@ user's call: see Next steps.
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 473 passing (`npm test`), and 163 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
-tests, 8 keyboard tests, and the phone and tablet tests; 15 more skip, each a phone's test on a tablet or the reverse, or the
+**Tests:** 473 passing (`npm test`), and 164 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
+tests, 8 keyboard tests, and the phone and tablet tests; 16 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
 - `test/offer.test.ts` 127, `test/params.test.ts` 23, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
@@ -489,8 +498,9 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     schema 3 ("Prices in", `household.pricesIn`), migrating v1 and v2. `revision` counts imports and resets.
   - `src/prices.ts`: "Prices in" and its words ("after rent, at Charlotte prices", "Charlotte $"),
     `US_PRICES`, and `shortCity` (a metro's first principal city, by the Census title rules).
-  - Inputs: `help.ts` (every field's name and place, and quick mode's help text),
-    `helpText.ts` (detailed mode's help text, loaded with it), `defaults.ts` (the defaults
+  - Inputs: `help.ts` (every field's name and place, and quick mode's hints; no React: see Bundles), `quickHelp.ts` (quick
+    mode's and About you's ⓘ help, loaded as a pointer or focus reaches an ⓘ, or with detailed mode; its lazy module,
+    `quickHelp`, is in `fields.tsx`), `helpText.ts` (detailed mode's help text, loaded with it), `defaults.ts` (the defaults
     registry), `fields.tsx` (rows and their help, problems at the field: what quick mode
     needs), `controls.tsx` (detailed mode's controls: numbers, "+ range", choices, plans, the
     row editor, the engine's warnings at their field), `rows.tsx` (quick mode's fields),
@@ -528,9 +538,10 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     (`useKeyboardUp`) and `useFocusClearOfBars` (WCAG 2.4.11).
   - Show the work: each figure's metric id maps to a tickmark kind, a methodology section
     (`src/sections.ts`) and a derivation built from the engine's numbers.
-    - `src/metrics.ts`: what the page renders: the ids, their tickmark kinds, the lookups,
-      and the view models behind L-1 (`byYear`) and the bridge (`bridge`), so the figures and
-      their derivations share one source.
+    - `src/metrics.ts`: what the page renders: the ids, their tickmark kinds, the lookups, the rent note.
+    - `src/byYearModel.ts`: the view models behind L-1 (`byYear`, `yearNotes`) and the bridge (`bridge`), so the figures and
+      their derivations share one source; shared with `derive.ts`, `copyDoc.ts`, `csv.ts`, L-6 and the methodology. It loads
+      with L-1, and `footing.ts` with it (step 0, 2026-10-13).
     - `src/derive.ts` (loaded on first use): the derivations and their words, beside
       `src/format`'s. Pure. The BEA indexes show the fewest decimals (3-6) at which every
       product foots to the dollar (`indexDigits`).
@@ -543,9 +554,10 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
     kind), the popover, and the derivations' lazy module; it re-exports the figures. The context object stays the same
     while the page's context changes (it reads the latest through a ref), so a memoized subtree (L-6's tables) skips its
     figures on each key: with L-6 open, a keystroke renders in ~10 ms, where it took 60-120 ms before.
-  - `src/ByYear.tsx`: L-1 (the hand-built SVG chart, notes, table view) and the bridge.
-  - `src/Later.tsx`: the schedules after L-1, each loaded as you scroll toward it
-    (`useLoadNear` in `lazy.ts`). `src/Risk.tsx` is L-2; `src/cases.ts` its view model (values by
+  - `src/ByYear.tsx`: L-1 (the hand-built SVG chart, notes, table view) and the bridge. Loaded as you scroll toward it, like
+    L-2 to L-6, since step 0 (2026-10-13); the first-use note's "See how we get there" loads it first (`showBridge`).
+  - `src/Later.tsx`: the schedules under the two columns, L-1 to L-6, each loaded as you scroll toward it
+    (`useLoadNear` in `lazy.ts`), and `loadLater` (all of them, for Print…). `src/Risk.tsx` is L-2; `src/cases.ts` its view model (values by
     scenario, the leads, what differs in a scenario, in words), shared with `derive.ts`.
   - `src/jobs.ts`: the worker's two lanes. Edits run ahead of the next chunk of any slow job;
     slow jobs are keyed generators, replaced by a newer job with the same key; a higher priority runs
@@ -576,7 +588,8 @@ and 402(g) notice any day now ("Data refresh calendar", Next checks).
   `lighthouse.ts` (with `lib/lighthouse.ts` and `lib/serve.ts`), `serve-dist.ts` (the build for Playwright),
   `fetch-rpp.ts`, `fetch-fmr.ts`, and `lib/zip.ts` (zip and xlsx readers for the fetch scripts).
 - `e2e/`: Playwright (its own `tsconfig.json`; files end `.e2e.ts`, so vitest skips them).
-  - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-2 to L-5 loaded, L-6 open on an
+  - `a11y.e2e.ts`: the scan's states. `lib/app.ts` drives the app (sections, editors, L-1 shown (`showByYear`: on a phone it's
+    screens down), L-1 to L-5 loaded, L-6 open on an
     offer (`openWork`, after the schedules above have filled in: one filling in mid-click moves L-6), when the page has settled:
     `quiet` also waits for L-3 or L-4 near the screen that are working out their first figures, which axe would catch dimmed, and works out any loaded off screen: since 2026-10-12, when CI caught L-4 starting mid-scan on a tablet); `lib/axe.ts` scans and applies `test/a11y-exceptions.json`
     (`lib/exceptions.ts`); `lib/reporter.ts` writes `.a11y/report.md`.

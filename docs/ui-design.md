@@ -1602,6 +1602,14 @@ loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
   states is checked; samples flagged first and last. Disabled, saying why, while the inputs have a problem. Its code loads on the first
   click; L-3's and L-4's figures come from their own slow-lane jobs, asked for alike.
 
+**v2's step 0** (2026-10-13; `docs/v2-plan.md`, "Performance plan"): room on the main thread before any v2 feature, with nothing on screen
+changed. L-1 and the bridge load as you scroll toward them, like L-2 to L-6 (§10's "every schedule after the lead loads on first use" now
+holds for L-1 too); their view models moved from `metrics.ts` to `byYearModel.ts`, and the year figures as shown (`footing.ts`) go with
+them. Until its code arrives, L-1's place is held at about its own height, so the schedules below stay where they were (and don't load
+early) and nothing shifts when it comes. The first-use note's "See how we get there" loads it first. Quick mode's and About you's ⓘ help
+loads as a pointer or focus reaches an ⓘ; the hints stay. The main thread went from 117.35 to 109.69 kB gzip, one chunk. One change off
+screen: Ctrl+P on a phone before scrolling prints without L-1, as it already printed without L-2 to L-6 (Print… loads them all).
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

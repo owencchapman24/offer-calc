@@ -1,6 +1,7 @@
 import type { Component, ValueBasis } from "../../src/offer/types";
 import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
-import { cashName, detailOf, indexOf, type L6Line, offerByLetter, pricesOf, res, shortCity, type TaxLine, type WorkContext } from "./metrics";
+import { detailOf, indexOf, type L6Line, offerByLetter, pricesOf, res, shortCity, type TaxLine, type WorkContext } from "./metrics";
+import { cashName } from "./byYearModel";
 import { type AppOffer, inNyc, type Letter } from "./model";
 import type { TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";

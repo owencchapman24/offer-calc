@@ -5,7 +5,9 @@ import { ASSUMPTIONS } from "./model";
 import { priceWords, US_PRICES } from "./prices";
 import type { Action, Session } from "./session";
 import { dollars, longDate } from "./text";
+import { quickHelp } from "./fields";
 import { HELP } from "./help";
+import { useLazyModule } from "./lazy";
 import { Help, MoneyInput } from "./ui";
 import { TickButton, Trace, useRovingTicks } from "./Tickmarks";
 
@@ -133,6 +135,7 @@ function PricesField({ code, set }: { code: string; set: (code: string) => void 
 }
 
 function AboutHelp({ k }: { k: string }) {
+  useLazyModule(quickHelp); // the ⓘ help, when it arrives
   const h = HELP[k];
-  return <Help hint={h.hint} hintId={`hint-${k.replace(/\./g, "-")}`} section={h.section}>{h.help}</Help>;
+  return <Help hint={h.hint} hintId={`hint-${k.replace(/\./g, "-")}`} section={h.section} onWant={() => void quickHelp.load()}>{h.help}</Help>;
 }
