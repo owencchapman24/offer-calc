@@ -55,7 +55,10 @@ too low. In practice:
 1. **Nothing new on the main thread but entry points.** Each item's code loads on first use, in a chunk of its own or an existing lazy
    one (as L-2 to L-6, detailed mode, the derivations, CSV, print and Copy as document do). Each item's data loads where it's used: the
    worker, or a same-origin fetch. The target is at most 0.5 kB gzip on the main thread per item, reported at each stop.
-2. **Make room first** (step 0: its own pull request, before item 1, no change on screen). Aim for 6-9 kB gzip back:
+2. **Make room first** (step 0: its own pull request, before item 1, no change on screen). Aim for 6-9 kB gzip back. **Built (pull
+   request #31, 2026-10-13): 117.35 to 109.69 kB gzip (−7.66), one chunk; LCP 1.95 s to 1.87 s side by side; nothing on screen
+   changed.** As planned, with one addition: L-1's place is held at about its own height until its code arrives, or the schedules below
+   it came near the screen and loaded at once.
    - **L-1 and the bridge load as you scroll toward them,** as L-2 to L-6 do: they sit under the two columns, far below the first screen
      on a phone (Lighthouse's profile) and near its foot on a desktop; the stop checks the LCP element doesn't change. About 5-7 kB:
      `ByYear.tsx`, L-1's and the bridge's view models (out of `metrics.ts`), and
@@ -433,8 +436,11 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
     nonresidents' earnings; Philadelphia's wage tax follows the workplace.
   - **Reciprocity:** where two states agree only the residence state taxes wages (New Jersey and Pennsylvania, for one), no nonresident
     tax and no credit.
-- **v1's warning is out of date:** `CONVENIENCE_RULE_STATES` (`src/offer/location.ts`) still lists Nebraska, so a Nebraska employer
-  raises a warning that no longer applies. That's a fix to make now, on its own (flagged separately), not part of v2.
+- **v1's warning was out of date:** `CONVENIENCE_RULE_STATES` (`src/offer/location.ts`) listed Nebraska, so a Nebraska employer raised a
+  warning that no longer applied. Fixed on its own, outside v2 (pull request #30, 2026-10-13): Nebraska employers raise none, and a
+  Nebraska resident is still warned for a New Jersey or Connecticut employer, since New Jersey's FAQ still names Nebraska. Still to fix,
+  from the same FAQ: New Jersey's rule doesn't reach Pennsylvania residents (the reciprocal agreement) or Connecticut residents, and the
+  tool warns them.
 - **Scope:** per offer, days a week in the employer's state (shared with 4b), and whether remote days are for the employer's necessity
   (default: your convenience, the usual case). The engine works out the wages sourced to the employer's state (the days worked there,
   plus remote days under a convenience rule), that state's nonresident tax on them by its own method, the residence state's credit by its
