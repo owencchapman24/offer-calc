@@ -3,53 +3,16 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { derive } from "./derive";
 import { shownStay } from "./footing";
-import { type Derivation, type MetricId, type WorkContext } from "./metrics";
+import { type MetricId, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import { type AppOffer, blankDraft, type Letter } from "./model";
-import { context, renderPage, renderWork, withWork } from "./testing";
+import { context, footsAsDisplayed, renderPage, renderWork, withWork } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { addCents, exactPay, FOOTS, paymentYears, stayRows, taxTables, yearCell, yearTable } from "./workpaper";
 
 // L-6 · The work (docs/ui-design.md §4.8; slice 6, stop A): every column adds up as displayed, the tables tie to L-1, the bridge and
 // the lead schedule, the payments tie to the years, and each calendar year's tax foots with and without the offer.
-
-const parse = (s: string) => {
-  const t = s.replace(/[$,]/g, "").replace(/^\((.*)\)$/, "-$1").replace("−", "-");
-  if (t.endsWith("%")) return Number(t.slice(0, -1)) / 100;
-  const frac = t.match(/^(\d+)\/(\d+)$/);
-  return frac ? Number(frac[1]) / Number(frac[2]) : Number(t);
-};
-/** Half a unit in the last place shown: "1,234" -> 0.5, "9,166.67" -> 0.005, "30.52027%" -> 0.0000005. */
-const half = (s: string) => {
-  const d = s.replace(/[%)]/g, "").split(".")[1]?.length ?? 0;
-  return (0.5 * 10 ** -d) / (s.endsWith("%") ? 100 : 1);
-};
-
-/**
- * A derivation's lines, worked as displayed: each op applies to the running figure, and each "=" line must be it, to the
- * precision shown (the figure shown is the result rounded). A line with no op after an "=" starts again. Fails with the line.
- */
-function footsAsDisplayed(id: MetricId, d: Derivation) {
-  let acc: number | null = null;
-  let tol = 0;
-  for (const l of d.lines) {
-    if (!l.value || l.value === "below $0") { acc = null; continue; }
-    const v = parse(l.value);
-    if (Number.isNaN(v)) { acc = null; continue; }
-    if (!l.op || acc === null) { acc = v; tol = 0; continue; }
-    switch (l.op) {
-      case "+": acc += v; break;
-      case "−": acc -= v; break;
-      case "×": tol = Math.abs(acc * half(l.value)) + Math.abs(v) * tol; acc *= v; break;
-      case "÷": acc /= v; tol /= Math.abs(v); break;
-      case "=":
-        expect(Math.abs(acc - v), `${id}: ${l.label} = ${l.value}, worked out ${acc}`).toBeLessThanOrEqual(half(l.value) + 1e-9);
-        acc = v;
-        tol = 0;
-    }
-  }
-}
 
 /** The samples, and the same with B starting later (its last year runs past your stay) and other wages in the first year. */
 const later = () => context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)),
