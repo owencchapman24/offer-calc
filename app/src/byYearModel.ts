@@ -1,7 +1,7 @@
 import type { Basis, EmploymentYearResult, ValueBasis } from "../../src/offer/types";
 import { type ShownYear, shownStay, shownYears } from "./footing";
 import { type BridgeLine, detailOf, join, type MetricId, offerByLetter, pricesOf, res, shortCity, type WorkContext, yearOf } from "./metrics";
-import { type AppOffer, inNyc, type Letter } from "./model";
+import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { OfferDetail } from "./protocol";
 import { dollars, longDate, monthName, percent, shortDate } from "./text";
 
@@ -159,7 +159,8 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
 
   const taxYears = d.split.filter((s) => s.ey === n).map((s) => s.year);
   const kinds = d.taxYears.filter((t) => taxYears.includes(t.year));
-  const locality = o && inNyc(o.draft) ? "NYC" : "local";
+  const city = o ? cityTax(o.draft) : null;
+  const locality = city ? CITY_TAX[city].line : "local";
   const who = [
     kinds.some((t) => t.parts.federal) && "federal", kinds.some((t) => t.parts.fica) && "FICA",
     kinds.some((t) => t.parts.state) && (o?.draft.residence.state ?? "state"), kinds.some((t) => t.parts.local) && locality,

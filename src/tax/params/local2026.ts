@@ -9,7 +9,8 @@ export const NYC_2026: Record<"single" | "joint", Schedule> = {
 /**
  * Philadelphia Wage Tax, 2026. Rate changes mid-year (pay dates from Jul 1, 2026),
  * so we blend the two halves assuming pay is earned evenly.
- * Source: City of Philadelphia Dept. of Revenue (via ustax.tools, Aug 2026).
+ * Source: City of Philadelphia Department of Revenue, "Wage Tax (employers)", phila.gov (checked 2026-10-14):
+ * residents 3.74% from Jul 1, 2025 and 3.735% from Jul 1, 2026; nonresidents 3.43% and 3.425%.
  */
 export const PHILLY_2026 = {
   resident: (0.0374 + 0.03735) / 2,

@@ -137,8 +137,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <strong>What's included:</strong> federal income tax (2026 brackets and standard deduction, or itemizing when that's
             lower, with state and local tax capped at the 2026 SALT limit); Social Security (6.2% up to the wage base) and Medicare
             (1.45%, plus 0.9% above $200,000 single); state income tax for all 50 states and DC, and state payroll taxes such as
-            California's SDI; New York City and Philadelphia resident taxes. Your 401(k) deferrals and health premiums come out
-            before income tax.
+            California's SDI; New York City's income tax and Philadelphia's wage tax, for residents (you say whether you'd live inside
+            the city). Your 401(k) deferrals and health premiums come out before income tax; Philadelphia's wage tax is on pay
+            before your 401(k).
           </p>
           <p>
             <strong>Later years.</strong> Tax law after 2026 isn't known yet, so it's projected: federal brackets, deductions and
@@ -423,6 +424,11 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <li>California and New Jersey tax HSA contributions; we don't.</li>
             <li>The Social Security wage base grows with inflation here, though it really tracks wages.</li>
           </ul>
+          <h3 className="method-sub">Where you'd live and work</h3>
+          <ul>
+            <li>You're taxed as a resident of where you'd live, for the whole year. Tax a city levies on people who work there but live
+              elsewhere, such as Philadelphia's wage tax on nonresidents (3.425%), isn't counted.</li>
+          </ul>
           <h3 className="method-sub">Pay and benefits</h3>
           <ul>
             <li>RSUs are assumed sold at vest; options and private-company equity count as $0.</li>
@@ -466,7 +472,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
                   <li>District of Columbia: decoupled from the federal deduction increase (2025 D-40 instructions)</li>
                 </ul>
                 Most were read as modeled in PolicyEngine-US.</td><td>2026</td></tr>
-              <tr><th scope="row">NYS IT-201 instructions; City of Philadelphia Dept. of Revenue</th><td>New York City and Philadelphia
+              <tr><th scope="row">NYS IT-201 instructions; City of Philadelphia Department of Revenue, Wage Tax rates</th><td>New York City and Philadelphia
                 resident tax</td><td>2026</td></tr>
               <tr><th scope="row">BEA Regional Price Parities (MARPP, PARPP, SARPP)</th><td>Price levels for every metro area, state and
                 state nonmetro area</td><td>{DATA_YEARS.rpp}, released Feb 19, 2026</td></tr>

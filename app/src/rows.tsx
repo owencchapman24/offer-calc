@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
-import { type AppOffer, bonusBasis, type BonusDraft, NYC_METRO, statesFor, withBase } from "./model";
+import { type AppOffer, bonusBasis, type BonusDraft, NYC_METRO, PHILADELPHIA_METRO, statesFor, withBase } from "./model";
 import { dollars } from "./text";
 import { DefaultTick, FieldRow, fieldId, hintId, issuesAt, useLedger } from "./fields";
 import { TickButton } from "./Tickmarks";
@@ -155,6 +155,13 @@ function CityField({ offer, set }: { offer: AppOffer; set: (values: Record<strin
         <label className="sub check">
           <input type="checkbox" checked={d.residence.nyc} data-help="costOfLiving.area" onChange={(e) => set({ "residence.nyc": e.target.checked })} />
           <span>Inside NYC (city tax)</span>
+        </label>
+      )}
+      {area === PHILADELPHIA_METRO && state === "PA" && (
+        <label className="sub check">
+          <input type="checkbox" checked={d.residence.philadelphia !== false} data-help="costOfLiving.area"
+            onChange={(e) => set({ "residence.philadelphia": e.target.checked })} />
+          <span>Inside Philadelphia (city wage tax)</span>
         </label>
       )}
     </div>

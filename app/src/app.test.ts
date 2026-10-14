@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { horizonSweep } from "../../src/offer/compare";
+import { horizonSweep, projectOffer } from "../../src/offer/compare";
 import type { OfferInput } from "../../src/offer/types";
 import { VESTING_PRESETS } from "../../src/offer/vesting";
 import { SAMPLE_OFFERS } from "../../src/samples";
@@ -104,6 +104,24 @@ describe("drafts to the engine's input", () => {
     expect(d.equity.grants[0].grantDate).toBe("2027-08-01");
     expect(a.draft.equity.grants[0].grantDate).toBeNull();
     expect(d.salary).toBe(a.draft.salary);
+  });
+  it("Philadelphia's resident wage tax, for an offer inside the city (audit C2), as New York City's tax is asked for", () => {
+    const b = blankOffer("A");
+    const philly = (residence: Partial<AppOffer["draft"]["residence"]>, state = "PA", area = "37980"): AppOffer => ({ ...b, draft: { ...b.draft,
+      salary: { ...b.draft.salary, annual: 100_000 }, startDate: "2026-07-13", residence: { ...b.draft.residence, state, ...residence },
+      costOfLiving: { ...b.draft.costOfLiving, area } } });
+    const locality = (o: AppOffer) => (toOfferInput(o) as { offer: OfferInput }).offer.residence.locality;
+    expect(locality(philly({}))).toEqual({ kind: "philadelphia", resident: true }); // a blank draft: inside, the default
+    expect(locality(philly({ philadelphia: true }))).toEqual({ kind: "philadelphia", resident: true });
+    expect(locality(philly({ philadelphia: false }))).toBeUndefined(); // the suburbs
+    expect(locality(philly({}, "NJ"))).toBeUndefined(); // Camden's side of the metro
+    expect(locality(philly({}, "PA", "38300"))).toBeUndefined(); // Pittsburgh
+    // Hand-checked: 2026 pay from Jul 13 is 100,000 / 12 x (19/31 + 5) = 46,774.19; the city's rate for 2026 blends its two halves,
+    // (3.74% + 3.735%) / 2 = 3.7375%, so 46,774.19 x 0.037375 = 1,748.19 of wage tax, on pay before any 401(k).
+    const offer = (toOfferInput(philly({})) as { offer: OfferInput }).offer;
+    const y2026 = projectOffer(offer, toHousehold(DEFAULT_HOUSEHOLD, 2026), { valuationDate: "2026-07-13" }).scenarios.base.calendarYears[0];
+    expect(y2026.withOffer.result.localIncomeTax).toBeCloseTo(1_748.19, 2);
+    expect(y2026.withoutOffer.result.localIncomeTax).toBe(0);
   });
   it("other wages go to the earliest start date's calendar year, or this year before any start date", () => {
     expect(toHousehold({ ...DEFAULT_HOUSEHOLD, otherWagesThisYear: 12_000 }, 2027).otherWages).toEqual({ 2027: 12_000 });

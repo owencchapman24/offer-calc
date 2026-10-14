@@ -78,8 +78,8 @@ describe("tax: each year's tax on the offer stacks on the household's other inco
       && c.offers.every((o) => outsideCities.includes(o.place))), taxStacksOnTheHousehold), runs(40));
   });
 
-  // Audit C2: the app never sets Philadelphia as a locality, so its 3.74% resident wage tax is never applied.
-  it.fails("Philadelphia residents pay its wage tax", () => {
+  // Audit C2: the app never set Philadelphia as a locality, so its 3.74% resident wage tax was never applied.
+  it("Philadelphia residents pay its wage tax", () => {
     fc.assert(fc.property(simple.filter((c) => c.household.filingStatus !== "joint" && c.offers.some((o) => o.place.city === "philadelphia")),
       taxStacksOnTheHousehold), runs(40));
   });

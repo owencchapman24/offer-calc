@@ -22,7 +22,7 @@ addHelpText({
       + "year before, so a July start gets a partial first bonus the next spring. Its timing is under Bonus in detailed mode.",
   },
   "costOfLiving.area": {
-    help: "We tax you as a resident of this state (and New York City, if you say so) and price your spending with this metro's "
+    help: "We tax you as a resident of this state (and of New York City or Philadelphia, if you say so) and price your spending with this metro's "
       + "price level (BEA Regional Price Parities). If you'd commute across a state line, pick where you'd live.",
   },
   "costOfLiving.monthlyRent": {

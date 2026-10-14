@@ -2,7 +2,7 @@ import type { Component, ValueBasis } from "../../src/offer/types";
 import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { detailOf, indexOf, type L6Line, offerByLetter, pricesOf, res, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { cashName } from "./byYearModel";
-import { type AppOffer, inNyc, type Letter } from "./model";
+import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 
@@ -63,7 +63,8 @@ export interface YearTable {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-const inNycOf = (o: AppOffer | undefined) => !!o && inNyc(o.draft);
+/** "NYC" or "Philadelphia", for an offer taxed by the city it's in; null otherwise. */
+const cityLine = (o: AppOffer | undefined) => (o && cityTax(o.draft) ? CITY_TAX[cityTax(o.draft)!].line : null);
 
 /** L-6's employment-year table for one offer, over your stay. */
 export function yearTable(ctx: WorkContext, letter: L): YearTable {
@@ -175,7 +176,7 @@ function taxWho(ctx: WorkContext, letter: L): string {
   const t = d.taxYears;
   return [
     t.some((x) => x.parts.federal) && "federal", t.some((x) => x.parts.fica) && "FICA",
-    t.some((x) => x.parts.state) && (o?.draft.residence.state ?? "state"), t.some((x) => x.parts.local) && (inNycOf(o) ? "NYC" : "local"),
+    t.some((x) => x.parts.state) && (o?.draft.residence.state ?? "state"), t.some((x) => x.parts.local) && (cityLine(o) ?? "local"),
   ].filter(Boolean).join(", ");
 }
 
@@ -410,7 +411,7 @@ export function taxTables(ctx: WorkContext, letter: L): TaxTable[] {
   const w = workOf(ctx, letter);
   const o = offerByLetter(ctx, letter);
   const st = o?.draft.residence.state ?? "State";
-  const local = inNycOf(o) ? "NYC" : "Local";
+  const local = cityLine(o) ?? "Local";
   const joint = ctx.household.filingStatus === "joint";
   const n = res(ctx).view.row.years;
   // Worked out once for a result (the derivations ask for a year at a time).

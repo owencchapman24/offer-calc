@@ -164,7 +164,12 @@ const none = oneOf("none");
 
 const DRAFT: Shape = obj({
   label: str,
-  residence: obj({ state: nullable(str), nyc: bool }),
+  residence: (v, p, ps) => {
+    obj({ state: nullable(str), nyc: bool })(v, p, ps);
+    // Inside Philadelphia arrived on 2026-10-14: optional, so earlier exports still import.
+    const philly = (v as { philadelphia?: unknown } | null)?.philadelphia;
+    if (v && typeof v === "object" && philly !== undefined) bool(philly, `${p}.philadelphia`, ps);
+  },
   employerState: nullable(str),
   startDate: nullable(date),
   salary: obj({
