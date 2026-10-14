@@ -4,7 +4,7 @@ import { rangeTicks, useChartWidth } from "./axes";
 import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { CASES, changeText, dropAmount, dropText, leadText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
-import { cents, dollars, figure } from "./text";
+import { cents, figure } from "./text";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
