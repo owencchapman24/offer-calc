@@ -88,8 +88,11 @@ export function renderLedger(ctx: WorkContext, ui: Pick<UiState, "mode" | "secti
 /** Every view of the inputs: About you, quick mode, and detailed mode with each section open, and each row editor open for each offer. */
 export function renderAllInputs(ctx: WorkContext): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
+  // About you as it is, and filing jointly (the spouse's wages show then).
+  const joint = { ...session, household: { ...session.household, filingStatus: "joint" as const } };
   const parts = [
     renderToStaticMarkup(tree(ctx, [createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear })])),
+    renderToStaticMarkup(tree(ctx, [createElement(About, { key: "a", session: joint, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear })])),
     renderLedger(ctx, { mode: "quick" }),
   ];
   const editors = [...new Set(Object.values(HELP).flatMap((h) => (h.editor ? [`${h.group}|${h.editor}`] : [])))];

@@ -72,8 +72,8 @@ describe("tax: each year's tax on the offer stacks on the household's other inco
       taxStacksOnTheHousehold), runs(40));
   });
 
-  // Audit C1: About you has no spouse's wages, so a joint return taxes the offer as if the spouse earned nothing.
-  it.fails("married, filing jointly: the offer's pay stacks on the spouse's wages", () => {
+  // Audit C1: About you had no spouse's wages, so a joint return taxed the offer as if the spouse earned nothing.
+  it("married, filing jointly: the offer's pay stacks on the spouse's wages", () => {
     fc.assert(fc.property(simple.filter((c) => c.household.filingStatus === "joint" && c.household.spouseWages > 0
       && c.offers.every((o) => outsideCities.includes(o.place))), taxStacksOnTheHousehold), runs(40));
   });

@@ -141,8 +141,10 @@ export function cases(opts: { simple?: boolean; offers?: [number, number] } = {}
 
 /** About you, as the app takes it from a household as described. */
 export function aboutYou(h: Household): AppHousehold {
-  // Spouse wages: About you has no field for them yet (audit C1), so a married couple's second earner can't be entered.
-  return { filingStatus: h.filingStatus, stayYears: h.stayYears, otherWagesThisYear: h.otherWagesThisYear, pricesIn: h.pricesIn, healthUsage: h.healthUsage };
+  return {
+    filingStatus: h.filingStatus, stayYears: h.stayYears, otherWagesThisYear: h.otherWagesThisYear, pricesIn: h.pricesIn, healthUsage: h.healthUsage,
+    ...(h.filingStatus === "joint" ? { spouseWages: h.spouseWages } : {}),
+  };
 }
 
 /** The app's offers for a case, A, B and C. */

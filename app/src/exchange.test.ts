@@ -48,6 +48,10 @@ describe("import", () => {
     s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "hours.weeksPerYear": 48 } });
     s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
     expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
+    // A spouse's wages (2026-10-14) round-trip; exports from before them import as none.
+    const joint = reducer(s, { type: "household", patch: { filingStatus: "joint", spouseWages: 65_000 } });
+    const read = readImport(exportSession(joint, TODAY, NOW).text);
+    expect(read.ok && read.household).toMatchObject({ filingStatus: "joint", spouseWages: 65_000 });
     const r = readImport(exportSession(s, TODAY, NOW).text);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -76,6 +80,7 @@ describe("import", () => {
       ["an id twice", bad((x) => { x.offers[1].id = x.offers[0].id; }), "offers.1.id: \"sample-A\" appears twice; each offer needs its own."],
       ["four offers", bad((x) => { x.offers.push(x.offers[0]); }), "offers: 4 offers; the app holds 1 to 3."],
       ["a bad stay", bad((x) => { x.household.stayYears = 0; }), "household.stayYears: should be a whole number of years from 1 to 10."],
+      ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }), "household.spouseWages: should be an amount of $0 or more."],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],
     ];
     for (const [name, text, problem] of cases) {

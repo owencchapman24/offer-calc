@@ -429,7 +429,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <li>Totals are tax owed; withholding (what's taken from each paycheck) is estimated for federal income tax only.</li>
             <li>The 401(k) has no catch-up contributions, growth or tax on withdrawal.</li>
             <li>Health costs are held flat; the HSA limit isn't prorated for a partial year.</li>
-            <li>Spouse wages are the same for every offer.</li>
+            <li>Your spouse's wages (filing jointly) are the same for every offer, growing with inflation from the year you enter.</li>
           </ul>
           <h3 className="method-sub">Cost of living and leaving</h3>
           <ul>

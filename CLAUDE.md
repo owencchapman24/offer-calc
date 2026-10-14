@@ -228,7 +228,8 @@ user's call: see Next steps.
     one get ids of their own (`uniqueIds`).
 - **Features:**
   - quick mode for 2-3 offers;
-  - About you, with "How long do you expect to stay?" (default 4 years);
+  - About you, with "How long do you expect to stay?" (default 4 years), and, filing jointly, the spouse's wages (2026-10-14, audit
+    C1: `spouseWages`, the first year's, grown with inflation by `spouseByYear` from 2026 on; L-6's tax tables show them);
   - HUD rent estimates;
   - the lead schedule: verdict, rank list, basis pipeline, the "if you stay 2-5 years"
     row, the disagreement line, and pay per extra hour;

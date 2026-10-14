@@ -29,7 +29,9 @@ import { verdict } from "./verdict";
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
 const QUICK_FIELDS = new Set(["salary.annual", "bonus.amount", "costOfLiving.area", "startDate", "costOfLiving.monthlyRent", "label"]);
-const ABOUT_FIELDS = { filing: "about-filing", stay: "stay", wages: "about-wages", healthUsage: "about-health", prices: "about-prices" } as const;
+const ABOUT_FIELDS = {
+  filing: "about-filing", stay: "stay", wages: "about-wages", spouse: "about-spouse", healthUsage: "about-health", prices: "about-prices",
+} as const;
 // The methodology is code-split: it loads when you open it.
 const Methodology = lazy(() => import("./Methodology"));
 // The Data page (export, import, delete) loads when it's opened too.

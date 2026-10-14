@@ -638,7 +638,9 @@ function assumptions(ctx: WorkContext, opts: DocOptions, add: Add) {
     `Today's dollars: each payment discounted at ${percent(r.sweep.discountRate)} a year to ${longDate(ctx.today)}. Inflation, ${percent(ASSUMPTIONS.inflation)} a `
       + "year, moves tax brackets and rent, never pay.",
     `Tax: 2026 law, later years projected; filing ${FILING[h.filingStatus]}${def("filing")}; ${h.otherWagesThisYear
-      ? `${dollars(h.otherWagesThisYear)} of other wages in ${ctx.wagesYear}` : "no other wages"}${def("wages")}; each offer taxed where you'd live, for the whole year.`,
+      ? `${dollars(h.otherWagesThisYear)} of other wages in ${ctx.wagesYear}` : "no other wages"}${def("wages")}${h.filingStatus === "joint"
+      ? `; ${h.spouseWages ? `your spouse's wages of ${dollars(h.spouseWages)} in ${ctx.wagesYear}, growing with inflation` : "no spouse's wages"}${def("spouse")}`
+      : ""}; each offer taxed where you'd live, for the whole year.`,
   ];
   const infos = ds.map((d) => d.costOfLiving);
   if (infos.some(Boolean)) {

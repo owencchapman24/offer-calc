@@ -31,7 +31,7 @@ addHelpText({
   },
   "about.filing": {
     help: "It sets the tax brackets and the standard deduction for every offer. Single is the default: most new grads file single. "
-      + "Married filing jointly adds your spouse's wages, if any.",
+      + "Married filing jointly asks for your spouse's wages, since each offer's pay is taxed on top of theirs.",
   },
   "about.stay": {
     help: "We compare every offer over the same stretch, starting on the earliest start date. Pay after that isn't counted. The row "
@@ -40,6 +40,10 @@ addHelpText({
   "about.wages": {
     help: "Pay you earn in the year the earliest offer starts, before the new job begins. It's taxed in the same year, so it changes "
       + "the new job's first-year tax. Leave it at $0 if there's none.",
+  },
+  "about.spouse": {
+    help: "Filing jointly, each offer's pay is taxed on top of your spouse's, often in a higher bracket. Enter what they'll earn in "
+      + "the year the earliest offer starts; later years grow with inflation, the same for every offer. Leave it at $0 if they don't work.",
   },
   "about.prices": {
     help: "After rent, every offer's spending money is priced as in one place, so offers in different cities compare in the same "

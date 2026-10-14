@@ -24,6 +24,23 @@ test("a salary edit updates the verdict", async ({ page }) => {
   await expect(page.locator(".lead .verdict-lede").first()).toHaveText(/^B leaves you about/);
 });
 
+test("filing jointly, a spouse's wages raise every offer's tax, and are saved", async ({ page }) => {
+  await openCompare(page);
+  await page.locator("#about-filing").selectOption("joint");
+  await settled(page);
+  const alone = await Promise.all(["A", "B", "C"].map((l) => rankValue(page, l)));
+  await expect(page.locator("#about-spouse")).toHaveValue("0");
+  await page.locator("#about-spouse").fill("120000");
+  // Each offer's pay is now taxed on top of the spouse's, in higher brackets: every after-rent total falls.
+  await expect.poll(() => rankValue(page, "A")).toBeLessThan(alone[0]);
+  await settled(page);
+  const stacked = await Promise.all(["A", "B", "C"].map((l) => rankValue(page, l)));
+  stacked.forEach((v, i) => expect(v, "ABC"[i]).toBeLessThan(alone[i]));
+  await page.waitForTimeout(800); // the save waits half a second
+  await page.reload();
+  await expect(page.locator("#about-spouse")).toHaveValue("120,000");
+});
+
 test("L-6 asks the worker for its payments only once it's opened, and its totals tie to the rank list", async ({ page }) => {
   // What the page asks the engine worker for: each message's lane.
   await page.addInitScript(() => {

@@ -14,6 +14,11 @@ test.describe("compare", () => {
   test("quick mode", async ({ page }) => {
     await openCompare(page);
     await scan(page, "quick mode");
+    // Filing jointly, About you asks for the spouse's wages.
+    await page.locator("#about-filing").selectOption("joint");
+    await page.locator("#about-spouse").fill("70000");
+    await settled(page);
+    await scan(page, "About you, filing jointly");
   });
 
   test("the schedules, L-1 to L-5", async ({ page }) => {
