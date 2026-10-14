@@ -22,22 +22,23 @@ import type { OfferWarning } from "./types";
  * - Connecticut: "Based on the reciprocal nature of Connecticut's law, an employee who works from home
  *   in Connecticut for a New Jersey employer will not be subject to New Jersey's convenience of the
  *   employer rule."
- * - Pennsylvania's rule doesn't reach New Jersey residents: under the two states' reciprocal compensation agreement, Pennsylvania
- *   doesn't tax a New Jersey resident's wages at all. PA Department of Revenue, 2025 PA-40 instructions, Line 1a, "Reciprocal
+ * - Pennsylvania's rule doesn't reach residents of its reciprocal-agreement states (Indiana, Maryland, New Jersey, Ohio, Virginia
+ *   and West Virginia): under those agreements Pennsylvania doesn't tax their wages at all. PA Department of Revenue, 2025 PA-40 instructions, Line 1a, "Reciprocal
  *   Compensation Agreement States": "Pennsylvania has agreements with Indiana, Maryland, New Jersey, Ohio, Virginia, and West
  *   Virginia. Generally, under these agreements, one state will not tax a resident of the other state on compensation that is
  *   subject to employer withholding. These agreements apply to most types of W-2 compensation ..."; and a reciprocal state's
  *   resident whose employer withheld PA tax may get it back: "You report zero taxable compensation on Line 1a". The same in the
  *   PA Personal Income Tax Guide, "Gross Compensation", "Reciprocal Compensation Agreements". That guidance doesn't name the
  *   convenience doctrine (the guide states it under "Nonresident - Allocation of Pennsylvania Compensation"), but the doctrine only
- *   allocates compensation Pennsylvania taxes, and it taxes none of a New Jersey resident's W-2 pay. The agreements cover Indiana,
- *   Maryland, Ohio, Virginia and West Virginia residents alike; only New Jersey's is entered so far.
+ *   allocates compensation Pennsylvania taxes, and it taxes none of these residents' W-2 pay. The instructions' exceptions don't
+ *   touch the salary modeled here (miscellaneous and non-employee compensation, pay earned while a PA resident), except one this
+ *   tool can't represent: an Ohio resident who owns 20 percent or more of the PA S corporation paying them.
  */
 export const CONVENIENCE_RULE_STATES = {
   always: ["NY", "DE", "PA"],
   reciprocal: ["CT", "NJ"],
   named: ["NE"],
-  notReaching: { NJ: ["PA", "CT"], PA: ["NJ"] },
+  notReaching: { NJ: ["PA", "CT"], PA: ["IN", "MD", "NJ", "OH", "VA", "WV"] },
 } as const;
 
 const has = (list: readonly string[], s: string) => list.includes(s);

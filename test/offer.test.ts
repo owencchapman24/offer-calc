@@ -223,6 +223,15 @@ describe("residence vs employer state (decision 9)", () => {
     expect(convenienceRuleWarning("NJ", "NY")).toBeDefined();
     expect(convenienceRuleWarning("NJ", "DE")).toBeDefined();
   });
+  // The same instruction lists all six of PA's reciprocal-agreement states: "Pennsylvania has agreements with Indiana, Maryland,
+  // New Jersey, Ohio, Virginia, and West Virginia." Each one's residents, with a PA employer, are clear of its rule.
+  it.each(["IN", "MD", "OH", "VA", "WV"])("PA's rule doesn't reach %s residents either (the same PA-40 Line 1a instruction)", (state) => {
+    expect(convenienceRuleWarning(state, "PA")).toBeUndefined();
+    const r = projectScenario({ ...worked, residence: { state }, employerState: "PA" }, single);
+    expect(r.warnings).toEqual([]);
+    // The agreement is with Pennsylvania only: New York's rule still reaches them.
+    expect(convenienceRuleWarning(state, "NY")).toBeDefined();
+  });
   it("no warning when you live where the employer is", () => {
     expect(convenienceRuleWarning("NY", "NY")).toBeUndefined();
   });
