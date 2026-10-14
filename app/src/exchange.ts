@@ -213,6 +213,9 @@ const HOUSEHOLD: Shape = (v, p, ps) => {
   obj({ filingStatus: oneOf("single", "joint", "headOfHousehold"), stayYears: num, otherWagesThisYear: num })(v, p, ps);
   const h = v as Partial<AppHousehold> | null;
   if (h && typeof h === "object" && h.healthUsage !== undefined) oneOf("low", "medium", "high")(h.healthUsage, `${p}.healthUsage`, ps);
+  // Spouse's wages arrived on 2026-10-14: optional, so earlier exports still import.
+  if (h && typeof h === "object" && h.spouseWages !== undefined && !(typeof h.spouseWages === "number" && Number.isFinite(h.spouseWages)
+    && h.spouseWages >= 0)) fail(ps, `${p}.spouseWages`, "an amount of $0 or more");
   if (h && typeof h.stayYears === "number" && !(Number.isInteger(h.stayYears) && h.stayYears >= 1 && h.stayYears <= 10)) {
     fail(ps, `${p}.stayYears`, "a whole number of years from 1 to 10");
   }

@@ -133,6 +133,7 @@ const META: Record<string, FieldMeta> = {
   "about.filing": { label: "Filing status", section: "M-4", group: "about" },
   "about.stay": { label: "How long do you expect to stay?", section: "M-7.3", group: "about" },
   "about.wages": { label: "Other wages", section: "M-4", group: "about" },
+  "about.spouse": { label: "Spouse's wages", section: "M-4", group: "about" },
   "about.healthUsage": { label: "Health use", section: "M-5.2", group: "about" },
   "about.prices": { label: "Prices in", section: "M-6.1", group: "about" },
 };
@@ -148,6 +149,7 @@ const QUICK_HINTS: Record<string, string> = {
   "about.filing": "How you'd file your federal return.",
   "about.stay": "Sets how many years we compare.",
   "about.wages": "An internship or the job you're leaving.",
+  "about.spouse": "Their pay that year; later years grow with inflation.",
   "about.prices": "Show after-rent figures in a city's dollars you know.",
   "about.healthUsage": "Which of your out-of-pocket estimates counts.",
 };

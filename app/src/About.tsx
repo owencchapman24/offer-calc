@@ -55,6 +55,17 @@ export function About({ session, dispatch, today, wagesYear }: {
             describedBy="hint-about-wages" onChange={(v) => dispatch({ type: "household", patch: { otherWagesThisYear: v ?? 0 } })} />
           <AboutHelp k="about.wages" />
         </Trace>
+        {h.filingStatus === "joint" && (
+          <Trace id="about.spouse" className="about-field">
+            <span className="about-label">
+              <label htmlFor="about-spouse">Spouse's wages in {wagesYear}</label>
+              {!h.spouseWages && <TickButton id="about.spouse" label={`spouse's wages of ${dollars(0)}`} />}
+            </span>
+            <MoneyInput id="about-spouse" label={`Your spouse's wages in ${wagesYear}`} value={h.spouseWages ?? 0} help="about.spouse"
+              describedBy="hint-about-spouse" onChange={(v) => dispatch({ type: "household", patch: { spouseWages: v ?? 0 } })} />
+            <AboutHelp k="about.spouse" />
+          </Trace>
+        )}
         <Trace id="about.healthUsage" className="about-field">
           <span className="about-label">
             <label htmlFor="about-health">Health use</label>

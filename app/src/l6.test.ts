@@ -88,6 +88,25 @@ describe("L-6: every column adds up as displayed", () => {
   }, 60_000);
 });
 
+describe("L-6: a joint return with a spouse's wages (audit C1)", () => {
+  it("each year's tax shows the spouse's wages, the same with and without the offer, grown with inflation, and foots", () => {
+    const ctx = withWork(context("colAdjustedTotal", undefined, 4, { filingStatus: "joint", spouseWages: 90_000 })).ctx;
+    for (const letter of LETTERS) {
+      for (const tt of taxTables(ctx, letter)) {
+        const row = tt.rows.find((x) => x.line === "spouse")!;
+        const expected = Math.round(90_000 * 1.025 ** (tt.year - 2026));
+        expect([row.with, row.without, row.offer], `${letter} ${tt.year}`).toEqual([expected, expected, 0]);
+        for (const col of ["with", "without"] as const) footsAsDisplayed(`l6t.${letter}.${tt.year}.spouse.${col}`, derive(`l6t.${letter}.${tt.year}.spouse.${col}`, ctx));
+      }
+    }
+    // The offer's tax is higher on top of the spouse's wages than on its own: A's first year, at 12% and 22% joint brackets and New York's.
+    const alone = withWork(context("colAdjustedTotal", undefined, 4, { filingStatus: "joint" })).ctx;
+    const tax = (c: typeof ctx) => taxTables(c, "A")[0].rows.find((x) => x.line === "total")!.offer!;
+    expect(tax(ctx)).toBeGreaterThan(tax(alone));
+    expect(derive("about.spouse", ctx).lines[0].value).toBe("$90,000");
+  });
+});
+
 describe("L-6 ties to L-1, the bridge and the lead schedule", () => {
   const ctx = withWork(context()).ctx;
   it("each year's after-tax pay, total rewards and after-rent figure is L-1's and the bridge's", () => {

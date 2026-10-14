@@ -188,6 +188,11 @@ export interface AppHousehold {
    */
   otherWagesThisYear: number;
   /**
+   * Married, filing jointly: your spouse's wages in that same calendar year (the earliest start's). Later years grow with
+   * inflation, the same for every offer. Absent (sessions and exports from before 2026-10-14): none.
+   */
+  spouseWages?: number;
+  /**
    * "Prices in": the BEA area whose prices every after-rent figure is stated in (the engine's reference location).
    * "00000", the U.S. average, is the default; a city in the list instead (slice 8, session schema 3).
    */
@@ -501,13 +506,27 @@ export function firstYear(offers: AppOffer[], today: string): number {
 }
 
 export function toHousehold(h: AppHousehold, year: number): Household {
+  const spouse = h.filingStatus === "joint" ? h.spouseWages ?? 0 : 0;
   return {
     filingStatus: h.filingStatus,
     healthUsage: h.healthUsage ?? "medium",
     costOfLiving: { reference: h.pricesIn, savingsRate: 0 },
     ...(h.otherWagesThisYear > 0 ? { otherWages: { [year]: h.otherWagesThisYear } } : {}),
+    ...(spouse > 0 ? { spouseWages: spouseByYear(spouse, year) } : {}),
   };
 }
+
+/**
+ * A spouse's wages by calendar year, for the engine: the amount entered for `year`, grown with inflation each year after it and
+ * shrunk by it each year before (a payment before the start date can fall in an earlier year, from 2026, when tax data starts),
+ * through every year a comparison can reach (a 10-year stay starting up to a year out, and the calendar year it ends in).
+ */
+export function spouseByYear(wages: number, year: number): Record<number, number> {
+  const years = Array.from({ length: year + SPOUSE_YEARS_AFTER - FIRST_TAX_YEAR }, (_, i) => FIRST_TAX_YEAR + i);
+  return Object.fromEntries(years.map((y) => [y, wages * (1 + ASSUMPTIONS.inflation) ** (y - year)]));
+}
+const FIRST_TAX_YEAR = 2026;
+const SPOUSE_YEARS_AFTER = 20;
 
 // ---- samples -------------------------------------------------------------------------------
 

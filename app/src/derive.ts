@@ -5,7 +5,7 @@ import { HOUSING_WEIGHT, indexText, shownIndexes, type ShownYear, shownStay } fr
 export { indexText } from "./footing";
 import { HELP, helpKey } from "./help";
 import {
-  alsoCounted, type AppOffer, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft,
+  alsoCounted, type AppOffer, ASSUMPTIONS, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, inNyc, type Letter, type OfferDraft, type ScheduleDraft,
   toOfferInput,
 } from "./model";
 import {
@@ -61,7 +61,9 @@ const INPUT_SECTION: Record<string, SectionId> = {
   hours: "M-5.4", costOfLiving: "M-6.2", residence: "M-4", employerState: "M-4", also: "M-5",
 };
 const inputSection = (path: string): SectionId => HELP[helpKey(path)]?.section ?? INPUT_SECTION[path.split(".")[0]] ?? "M-1";
-const ABOUT_SECTION: Record<AboutField, SectionId> = { filing: "M-4", stay: "M-7.3", wages: "M-4", healthUsage: "M-5.2", prices: "M-6.1" };
+const ABOUT_SECTION: Record<AboutField, SectionId> = {
+  filing: "M-4", stay: "M-7.3", wages: "M-4", spouse: "M-4", healthUsage: "M-5.2", prices: "M-6.1",
+};
 const BRIDGE_SECTION: Record<BridgeLine, SectionId> = {
   letter: "M-2", salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", clawback: "M-9", paid: "M-1", tax: "M-4", premiums: "M-5.2",
   afterTax: "M-1", retirement: "M-5.1", perks: "M-5.3", hsa: "M-5.2", oop: "M-5.2", totalRewards: "M-1", rent: "M-6.2", prices: "M-6.1",
@@ -79,7 +81,8 @@ const READ_ONLY_NAME: Record<string, string> = {
 };
 const inputName = (path: string) => READ_ONLY_NAME[path] ?? lowerFirst(HELP[helpKey(path)]?.label) ?? path;
 const ABOUT_NAME: Record<AboutField, string> = {
-  filing: "your filing status", stay: "your stay", wages: "your other wages", healthUsage: "your health use", prices: "the prices setting",
+  filing: "your filing status", stay: "your stay", wages: "your other wages", spouse: "your spouse's wages", healthUsage: "your health use",
+  prices: "the prices setting",
 };
 const PART: Record<PvPart, { label: string; gloss: string }> = {
   gross: { label: "Gross pay", gloss: "salary, bonuses, cash awards and RSU vests paid in your stay" },
@@ -2141,6 +2144,21 @@ function l6TaxWork(ctx: WorkContext, letter: L, year: number, line: TaxLine, col
   }
   const key = KEY[line]!;
   const v = runOf(col)[key];
+  if (line === "spouse") {
+    const grown = year - ctx.wagesYear;
+    const entered = ctx.household.spouseWages ?? 0;
+    return {
+      title, scope,
+      lines: grown !== 0
+        ? [{ label: `Your spouse's wages in ${ctx.wagesYear}`, value: figure(entered), ref: "about.spouse" as MetricId },
+          { op: "×", label: grown > 0 ? `Grown ${grown} ${grown === 1 ? "year" : "years"} at 2.5%` : `${-grown} ${grown === -1 ? "year" : "years"} earlier, at 2.5%`,
+            value: ((1 + ASSUMPTIONS.inflation) ** grown).toFixed(6) },
+          { op: "=", label: `In ${year}`, value: figure(v), rule: "double" }]
+        : [{ label: `Your spouse's wages in ${year}`, value: figure(v), ref: "about.spouse" as MetricId }],
+      notes: ["From About you: the same with and without the offer, so the offer's tax is what its pay adds on top of theirs."],
+      ties: [], uses: ["about.spouse"],
+    };
+  }
   return {
     title, scope,
     lines: [{ label: row.label, value: figure(col === "with" ? row.with! : row.without!) }],
@@ -2379,6 +2397,12 @@ function aboutWork(ctx: WorkContext, field: AboutField): Work {
         notes: [isDefault ? "The default: none." : "As you entered it.",
           `Pay from another job in ${ctx.wagesYear} is taxed in the same year, so it raises the new job's first-year tax.`],
         ties: [], uses: [], edit: { about: "wages" } };
+    case "spouse":
+      return { title: `Your spouse's wages in ${ctx.wagesYear}`, lines: [{ label: "Their wages", value: dollars(h.spouseWages ?? 0), tick }],
+        notes: [isDefault ? "The default: none." : "As you entered it; each later year grows with inflation (2.5% a year).",
+          "Filing jointly, each offer's pay is taxed on top of your spouse's wages: the offer's tax is the household's tax with it, less without "
+          + "it. The same for every offer."],
+        ties: [], uses: [], edit: { about: "spouse" } };
     case "healthUsage": {
       const usage = h.healthUsage ?? "medium";
       return { title: "Health use", lines: [{ label: "Out-of-pocket estimate that counts", value: usage[0].toUpperCase() + usage.slice(1), tick }],

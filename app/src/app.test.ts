@@ -108,6 +108,15 @@ describe("drafts to the engine's input", () => {
   it("other wages go to the earliest start date's calendar year, or this year before any start date", () => {
     expect(toHousehold({ ...DEFAULT_HOUSEHOLD, otherWagesThisYear: 12_000 }, 2027).otherWages).toEqual({ 2027: 12_000 });
     expect(toHousehold(DEFAULT_HOUSEHOLD, 2027).otherWages).toBeUndefined();
+    // A spouse's wages (audit C1): filing jointly only; the year entered, grown with inflation after it and shrunk before it, from 2026.
+    const joint = toHousehold({ ...DEFAULT_HOUSEHOLD, filingStatus: "joint", spouseWages: 80_000 }, 2027).spouseWages!;
+    expect(joint[2027]).toBe(80_000);
+    expect(joint[2028]).toBeCloseTo(82_000, 9); // 80,000 x 1.025
+    expect(joint[2026]).toBeCloseTo(78_048.780488, 5); // 80,000 / 1.025
+    expect(Math.min(...Object.keys(joint).map(Number))).toBe(2026);
+    expect(Math.max(...Object.keys(joint).map(Number))).toBe(2046);
+    expect(toHousehold({ ...DEFAULT_HOUSEHOLD, filingStatus: "single", spouseWages: 80_000 }, 2027).spouseWages).toBeUndefined();
+    expect(toHousehold({ ...DEFAULT_HOUSEHOLD, filingStatus: "joint" }, 2027).spouseWages).toBeUndefined();
     const [a, b] = sampleOffers(TODAY); // both start 2027-07-13
     expect(firstYear([a, b], TODAY)).toBe(2027);
     const earlier: AppOffer = { ...b, draft: { ...b.draft, startDate: "2026-12-01" } };

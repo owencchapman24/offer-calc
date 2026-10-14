@@ -19,7 +19,7 @@ import type { VerdictView } from "./verdict";
 // kind, a section or a derivation.
 
 type L = Letter;
-export type AboutField = "filing" | "stay" | "wages" | "healthUsage" | "prices";
+export type AboutField = "filing" | "stay" | "wages" | "spouse" | "healthUsage" | "prices";
 export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | "perks" | "healthExtra" | "savings" | "rent" | "faceValue";
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
 export type BridgeLine =
@@ -242,6 +242,7 @@ export function aboutIsDefault(h: AppHousehold, f: AboutField): boolean {
     case "filing": return h.filingStatus === DEFAULT_HOUSEHOLD.filingStatus;
     case "stay": return h.stayYears === DEFAULT_HOUSEHOLD.stayYears;
     case "wages": return h.otherWagesThisYear === DEFAULT_HOUSEHOLD.otherWagesThisYear;
+    case "spouse": return !h.spouseWages;
     case "healthUsage": return !h.healthUsage;
     case "prices": return h.pricesIn === US_PRICES;
   }
