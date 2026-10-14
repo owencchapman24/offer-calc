@@ -309,7 +309,9 @@ applies a convenience-of-employer rule and differs from the residence state, we 
 remote-work wages may also be taxed there. The rule states are NY, DE and PA; CT and NJ
 apply it only to residents of states that have one (reciprocity), and NJ's list still names
 Nebraska. NJ's rule doesn't reach Pennsylvania residents (the reciprocal agreement) or
-Connecticut residents (NJ's FAQ, last updated Oct 30, 2025), so those pairs raise none. Nebraska itself counts only work done in Nebraska for taxable years from 2025 (Neb.
+Connecticut residents (NJ's FAQ, last updated Oct 30, 2025), and PA's doesn't reach residents
+of its reciprocal-agreement states, IN, MD, NJ, OH, VA and WV (PA taxes none of their wages, per
+its 2025 PA-40 instructions), so those pairs raise none. Nebraska itself counts only work done in Nebraska for taxable years from 2025 (Neb.
 Rev. Stat. 77-2733(8)(c), amended by LB1023), so a Nebraska employer raises no warning. v1 warns
 but doesn't compute nonresident tax or the resident credit.
 
@@ -753,9 +755,10 @@ export interface ProjectionOptions {
 /** States applying a convenience-of-employer rule to remote employees' wages. CT and NJ
  *  apply it only to residents of states that have one (reciprocity); `named` are states without
  *  one that NJ's list still names (NE, since LB1023 from 2025); `notReaching`, residents an
- *  employer state's rule doesn't reach (NJ's: PA and CT, per its FAQ). */
+ *  employer state's rule doesn't reach (NJ's: PA and CT, per its FAQ; PA's: its six reciprocal-agreement
+ *  states, per the PA-40). */
 export declare const CONVENIENCE_RULE_STATES: {
-  always: ["NY", "DE", "PA"]; reciprocal: ["CT", "NJ"]; named: ["NE"]; notReaching: { NJ: ["PA", "CT"] };
+  always: ["NY", "DE", "PA"]; reciprocal: ["CT", "NJ"]; named: ["NE"]; notReaching: { NJ: ["PA", "CT"]; PA: ["IN", "MD", "NJ", "OH", "VA", "WV"] };
 };
 
 // ---- outputs ------------------------------------------------------------------

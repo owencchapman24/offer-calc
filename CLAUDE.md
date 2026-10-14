@@ -44,7 +44,7 @@ is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and 
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). **Copy as document** is built (2026-10-12, from user testing; below). What's next is the
 user's call: see Next steps.
-- **Where things stand** (2026-10-13, v2's step 0): `npm test` 479 passing; `npm run e2e` 164 passing
+- **Where things stand** (2026-10-13, v2's step 0): `npm test` 485 passing; `npm run e2e` 164 passing
   (16 skip by design), the scan 198 scans with no violations and no exceptions; main thread 359.2 / 109.8 kB gzip
   against the 120 kB budget, one chunk (117.4 before step 0); Lighthouse (mobile, median of 3) LCP 1.87 s against 2.5 s,
   performance 98, locally (1.95 s before step 0, measured side by side).
@@ -326,10 +326,10 @@ user's call: see Next steps.
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 479 passing (`npm test`), and 164 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
+**Tests:** 485 passing (`npm test`), and 164 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 16 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
-- `test/offer.test.ts` 130, `test/params.test.ts` 23, `test/tax.test.ts` 10,
+- `test/offer.test.ts` 136, `test/params.test.ts` 23, `test/tax.test.ts` 10,
   `test/validate.test.ts` 57, `app/src/app.test.ts` 27, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
@@ -949,7 +949,8 @@ engine change, and the lock is regenerated with it, never on its own (a Python u
   - **Nonresident tax:** taxed as a full-year resident of the residence state only. No
     part-year residency in a relocation year, and no nonresident tax or resident credit
     for the employer state; the convenience-of-employer rule (NY, DE, PA; CT/NJ
-    reciprocal; NJ's not reaching PA or CT residents) only triggers a warning.
+    reciprocal; NJ's not reaching PA or CT residents, PA's not reaching residents of its reciprocal-agreement states, IN, MD, NJ,
+    OH, VA and WV) only triggers a warning.
   - **Spouse wages:** shared across offers; they can't vary per offer.
   - **Other jobs:** wages from another job in the same year count for tax, but those
     deferrals don't count toward the 402(g) cap.
