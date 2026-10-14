@@ -11,7 +11,7 @@ import { shownStay } from "./footing";
 import type { WorkContext } from "./metrics";
 import type { LeaveCurve, LeavePanel } from "./protocol";
 import { cursorJob, leaveJob, sweepDays } from "./slowJobs";
-import { compareOf, context, runJob, VALUATION, withLeave } from "./testing";
+import { compareOf, context, footsAsDisplayed, runJob, VALUATION, withLeave } from "./testing";
 import { dayBefore } from "./text";
 import { WorkProvider } from "./Tickmarks";
 
@@ -96,7 +96,9 @@ describe("L-4's panel (W6)", () => {
     expect(text).toContain("Leaving then forfeits the 2026 bonus, $3,742, all of it earned (paid Mar 15, 2027; it counts from your start) and $258 "
       + "earned toward the 2027 bonus (target $8,112, paid Mar 15, 2028)");
     const d = derive("forgone.A.1", withLeave(ctx).ctx);
-    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "85,000"], ["×", "0.0329"], ["=", "2,795"]]);
+    // The days as a fraction, exactly (it was 0.0329, which doesn't multiply out: 85,000 × 0.0329 = 2,796.50).
+    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "85,000"], ["×", "12/365"], ["=", "2,795"]]);
+    footsAsDisplayed("forgone.A.1", d);
     expect(d.notes[0]).toBe("If you stayed through its payout on Jan 31, 2028 it would pay $85,000: $85,000 × 365 / 365 days.");
     expect(d.section).toBe("M-9");
     expect(text).toContain("Repaying the sign-on in 2027 for pay received in 2026: the Social Security and Medicare tax withheld on it isn't "

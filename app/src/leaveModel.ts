@@ -1,4 +1,4 @@
-import type { Cliff, ISODate, OfferInput, OfferWarning, WindowTotals } from "../../src/offer/types";
+import type { BonusDetail, Cliff, ISODate, OfferInput, OfferWarning, WindowTotals } from "../../src/offer/types";
 import { inSentence } from "./breakevenModel";
 import type { StayFigures } from "./footing";
 import type { Letter } from "./model";
@@ -187,11 +187,22 @@ export interface Forfeit {
   stub: boolean;
 }
 
+/**
+ * What a bonus's detail works out to, before any rounding: rate × salary earned, or the amount × the days worked of the period's.
+ * Shown rounded once, so its work (and the panel) never reads a dollar off from the engine's cent-rounded figure (audit C13's pattern).
+ */
+export const bonusWorked = (d: BonusDetail) =>
+  (d.basis === "percentOfSalary" ? d.rate * d.salaryEarned : (d.amount * d.daysEmployed) / d.periodDays);
+
 export function forfeits(warnings: OfferWarning[], start: ISODate): Forfeit[] {
-  return warnings.flatMap((w) => (w.code === "bonusForfeited" ? [w.params] : [])).map((p, index) => ({
-    index, period: periodText(p.periodFrom, p.periodTo), earned: p.earned, full: p.full, payDate: p.payDate,
-    all: Math.abs(p.full - p.earned) < 0.5, stub: p.periodFrom < start,
-  }));
+  return warnings.flatMap((w) => (w.code === "bonusForfeited" ? [w.params] : [])).map((p, index) => {
+    const earned = bonusWorked(p.detail);
+    const full = bonusWorked(p.fullDetail);
+    return {
+      index, period: periodText(p.periodFrom, p.periodTo), earned, full, payDate: p.payDate,
+      all: Math.abs(full - earned) < 0.5, stub: p.periodFrom < start,
+    };
+  });
 }
 
 /** "$1,151 earned toward the 2027 bonus (target $36,000, paid Mar 15, 2028)", the amount left to the caller to tick. */

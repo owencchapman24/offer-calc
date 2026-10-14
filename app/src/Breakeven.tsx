@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { RentFlipResult } from "../../src/offer/types";
-import { changeText, inSentence, rentCity, rentTies, type TieLine, type TieView, tieView } from "./breakevenModel";
+import { changeText, inSentence, rentCity, rentTie, rentTies, type TieLine, type TieView, tieView } from "./breakevenModel";
+import { shownIndexes } from "./footing";
 import { Fig, useRovingTicks } from "./figures";
 import { useOnScreen } from "./lazy";
-import { basisPhrase, pricesOf, type WorkContext } from "./metrics";
+import { basisPhrase, detailOf, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, tieJob, type Ties } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
@@ -135,6 +136,7 @@ function Behind({ x, v, ctx }: { x: TieLine & { letter: Letter }; v: TieView; ct
 /** "C still wins unless your New York rent for A is under $3,292 a month (now $3,800, first lease year)." */
 function RentLine({ r, letter, winner, ctx }: { r: RentFlipResult | undefined; letter: Letter; winner: Letter; ctx: WorkContext }) {
   if (!r || r.outcome === "noRent") return null;
+  const to = rentTie(r, shownIndexes(detailOf(ctx, letter))).to;
   const city = cityOf(ctx, letter);
   const now = <Fig id={`in.${letter}.costOfLiving.monthlyRent`} label={`${dollars(r.from)}, ${letter}'s rent`}>{dollars(r.from)}</Fig>;
   if (!rentTies(r)) {
@@ -143,7 +145,7 @@ function RentLine({ r, letter, winner, ctx }: { r: RentFlipResult | undefined; l
   return (
     <p className="tie-line tie-or">
       <Who l={winner} /> still wins unless your {city} rent for <Who l={letter} /> is under{" "}
-      <Fig id={`tie.${letter}.rent`} label={`${dollars(r.to)} a month, the rent that ties ${winner}`}>{dollars(r.to)}</Fig> a month (now {now}, first
+      <Fig id={`tie.${letter}.rent`} label={`${dollars(to)} a month, the rent that ties ${winner}`}>{dollars(to)}</Fig> a month (now {now}, first
       lease year).
     </p>
   );
@@ -185,7 +187,8 @@ function Cushion({ x, v, ctx }: { x: TieLine & { letter: Letter }; v: TieView; c
       {r && r.outcome === "tie" && (
         <p className="tie-line tie-or">
           <Who l={W} />'s lead goes if your {cityOf(ctx, W)} rent for <Who l={W} /> is over{" "}
-          <Fig id={`tie.${W}.rent`} label={`${dollars(r.to)} a month, the rent at which ${R} ties`}>{dollars(r.to)}</Fig> a month (now{" "}
+          <Fig id={`tie.${W}.rent`} label={`${dollars(rentTie(r, shownIndexes(detailOf(ctx, W))).to)} a month, the rent at which ${R} ties`}>
+            {dollars(rentTie(r, shownIndexes(detailOf(ctx, W))).to)}</Fig> a month (now{" "}
           <Fig id={`in.${W}.costOfLiving.monthlyRent`} label={`${dollars(r.from)}, ${W}'s rent`}>{dollars(r.from)}</Fig>, first lease year).
         </p>
       )}

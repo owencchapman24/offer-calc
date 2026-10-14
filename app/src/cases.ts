@@ -1,7 +1,8 @@
 import type { Basis, ByScenario, OfferInput, Scenario, WindowTotals } from "../../src/offer/types";
 import { type Letter, toOfferInput } from "./model";
 import { detailOf, indexOf, join, offerByLetter, res, type WorkContext } from "./metrics";
-import { dollars, percent } from "./text";
+import { cents, dollars, percent } from "./text";
+import { monthOf, shownGap } from "./verdict";
 
 // L-2 · If things go badly (docs/ui-design.md §4.4), the view model: each offer's bear, base and bull
 // values over your stay on the selected basis, who wins each, who has the most to lose, and which inputs
@@ -145,6 +146,12 @@ export interface RiskRow {
   ranged: boolean;
 }
 
+/** A lead as L-2 states it: a month on a dollar basis, as the verdict does, or an hour per hour worked. */
+export const leadText = (v: { perHour: boolean }, lead: CaseLead) => (v.perHour ? cents(lead.margin) : dollars(lead.perMonth!));
+/** How far an offer falls to its bear case: a month (the drop between the totals as shown ÷ the factor as shown), or an hour. */
+export const dropAmount = (v: { perHour: boolean; factor: number }, x: { drop: number; values: Record<Scenario, number> }) =>
+  (v.perHour ? cents(x.drop) : dollars(monthOf(shownGap(x.values.base, x.values.bear), v.factor)));
+
 export interface CaseLead { winner: Letter; runnerUp: Letter; margin: number; /** Dollar bases: the margin a month, as the verdict states it. */ perMonth: number | null }
 
 export interface RiskView {
@@ -187,7 +194,9 @@ export function riskView(ctx: WorkContext): RiskView {
     // Ties go to the earlier offer, as in the engine's horizon sweep.
     const order = rows.map((x, i) => ({ x, i })).sort((a, b) => b.x.values[s] - a.x.values[s] || a.i - b.i).map((o) => o.x);
     const margin = order[0].values[s] - order[1].values[s];
-    return [s, { winner: order[0].letter, runnerUp: order[1].letter, margin, perMonth: perHour ? null : margin / row.annuityFactor }];
+    // A month as the verdict states it: the gap between the totals as shown, ÷ the annuity factor as shown.
+    return [s, { winner: order[0].letter, runnerUp: order[1].letter, margin,
+      perMonth: perHour ? null : monthOf(shownGap(order[0].values[s], order[1].values[s]), row.annuityFactor) }];
   })) as Record<Scenario, CaseLead>;
   const sorted = rows.map((x, i) => ({ x, i })).sort((a, b) => b.x.values.bear - a.x.values.bear || a.i - b.i).map((o) => o.x);
   const worst = [...rows].sort((a, b) => b.drop - a.drop)[0];

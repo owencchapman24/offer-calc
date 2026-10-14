@@ -1,10 +1,10 @@
 import { DATA_YEARS } from "../../src/col/cities";
 import { describeSchedule } from "../../src/format/schedule";
 import type { AnnualBonus, Equity, ISODate, OfferInput, ValueBasis, VestingSchedule } from "../../src/offer/types";
-import { inSentence, scalesText, tieView } from "./breakevenModel";
+import { inSentence, rentTie, scalesText, tieView } from "./breakevenModel";
 import { CASES, dropText, riskCarriers, riskView } from "./cases";
 import { asymmetries, asymmetryText } from "./comparability";
-import { shownStay, shownYears } from "./footing";
+import { shownIndexes, shownStay, shownYears } from "./footing";
 import { firstLastDay, forfeits, leaveAxis, leaveTerms, onAxis, worked as timeWorked } from "./leaveModel";
 import {
   aboutIsDefault, type BridgeLine, detailOf, offerByLetter, pricesOf, rentEstimate, rentNotes, res, shortCity, type WorkContext,
@@ -520,8 +520,9 @@ function tiesSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Worke
     const rent = x.row.rent;
     if (rent && rent.outcome !== "noRent") {
       rents = true;
-      rows.push({ label: `${l}: ${city(l)} rent, a month`, cells: rent.outcome === "tie"
-        ? [dollars(rent.from), dollars(rent.to), change(worked, dollars(rent.from), dollars(rent.to), false)] : [dollars(rent.from), "no rent ties", DASH] });
+      const to = rent.outcome === "tie" ? rentTie(rent, shownIndexes(detailOf(ctx, l))).to : null;
+      rows.push({ label: `${l}: ${city(l)} rent, a month`, cells: to !== null
+        ? [dollars(rent.from), dollars(to), change(worked, dollars(rent.from), dollars(to), false)] : [dollars(rent.from), "no rent ties", DASH] });
     }
   }
   const W = tv.winner;
@@ -539,7 +540,8 @@ function tiesSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Worke
   const rent = c.row.rent;
   if (rent && rent.outcome === "tie") {
     rents = true;
-    rows.push({ label: `${W}: ${city(W)} rent, a month`, cells: [dollars(rent.from), dollars(rent.to), change(worked, dollars(rent.from), dollars(rent.to), false)] });
+    const to = rentTie(rent, shownIndexes(detailOf(ctx, W))).to;
+    rows.push({ label: `${W}: ${city(W)} rent, a month`, cells: [dollars(rent.from), dollars(to), change(worked, dollars(rent.from), dollars(to), false)] });
   }
   add({ kind: "table", table: { head: ["", "Now", "Ties at", "Change"], rows } });
   const scales = [...new Set([...tv.behind, c].map((x) => scalesText(x.letter, x.offer, ties.basis)))];

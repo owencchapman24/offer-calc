@@ -59,8 +59,25 @@ export interface VerdictView {
 
 const join = (ls: string[]) => (ls.length <= 1 ? ls.join("") : `${ls.slice(0, -1).join(", ")} and ${ls[ls.length - 1]}`);
 
-const withLetters = (lead: Lead | undefined, letters: Letter[]) =>
-  lead ? { ...lead, winnerLetter: letters[lead.winner], runnerUpLetter: letters[lead.runnerUp] } : null;
+/** A gap between two totals as shown: each rounded to the dollar, then subtracted, so it's the difference of the figures on the page. */
+export const shownGap = (a: number, b: number) => Math.round(a) - Math.round(b);
+/** The annuity factor as shown, to 4 decimals. */
+export const shownFactor = (factor: number) => Number(factor.toFixed(4));
+/**
+ * "A month": a present-value gap as shown ÷ the annuity factor as shown, rounded once where it's displayed. The verdict, its work,
+ * the stays row, the pipeline and L-2 all state it so (the engine's perMonth is rounded to the cent first, so it could read $488
+ * where the work said $487: audit C13).
+ */
+export const monthOf = (gap: number, factor: number) => gap / shownFactor(factor);
+
+/** A lead with its letters; on a dollar basis, its month as every schedule states it (monthOf). */
+function withLetters(lead: Lead | undefined, letters: Letter[], row: HorizonRow, basis: Basis): StepView["lead"] {
+  if (!lead) return null;
+  const values = row.values[basis];
+  const perMonth = basis === "perHour" || !values ? lead.perMonth
+    : monthOf(shownGap(values[lead.winner], values[lead.runnerUp]), row.annuityFactor);
+  return { ...lead, ...(perMonth !== undefined ? { perMonth } : {}), winnerLetter: letters[lead.winner], runnerUpLetter: letters[lead.runnerUp] };
+}
 
 /**
  * Picks the stay row and basis; falls back to the first available basis when the chosen one can't be shown.
@@ -73,7 +90,7 @@ export function verdict(
   if (!row) return null;
   const steps: StepView[] = pipeline(prices).map((p) => ({
     basis: p.basis, step: p.step, title: p.title,
-    lead: withLetters(row.leads[p.basis], letters),
+    lead: withLetters(row.leads[p.basis], letters, row, p.basis),
     unavailable: row.leads[p.basis] ? null
       : p.basis === "perHour" ? `Add weekly hours for ${noHours.length && noHours.length < letters.length ? join(noHours) : "every offer"}.`
       : p.basis === "colAdjustedTotal" ? "Needs a city for every offer." : "Not available.",
@@ -90,7 +107,7 @@ export function verdict(
     steps,
     disagreement: disagreement(steps),
     stays: sweep.rows.map((r) => ({
-      years: r.years, lead: withLetters(r.leads[chosen.basis], letters), current: r.years === stayYears,
+      years: r.years, lead: withLetters(r.leads[chosen.basis], letters, r, chosen.basis), current: r.years === stayYears,
     })),
   };
 }

@@ -6,7 +6,7 @@ import Methodology from "./Methodology";
 import { type MetricId, metricKind, rentNotes, type WorkContext } from "./metrics";
 import { bridge } from "./byYearModel";
 import { priceWords, shortCity, US_PRICES } from "./prices";
-import { context, renderPage, withLeave, withTies } from "./testing";
+import { context, footsAsDisplayed, renderPage, withLeave, withTies } from "./testing";
 
 // Slice 8, prices in a city you know (docs/ui-design.md §5, item 6), and the lead's rent note.
 
@@ -163,16 +163,15 @@ describe("the rent note under the verdict", () => {
     const d = derive("rentnote.A", withTies(ctx).ctx);
     expect(d.section).toBe("M-7.4");
     const v = d.lines.map((l) => parse(l.value));
-    expect(d.lines.map((l) => l.op ?? "")).toEqual(["", "−", "=", "×", "÷", "=", "÷", "=", "", "", "="]);
-    expect(Math.abs(v[0] - v[1] - v[2])).toBeLessThanOrEqual(1); // 334,357 − 313,175 = 21,182
-    expect(Math.abs((v[2] * v[3]) / v[4] - v[5])).toBeLessThan(1); // × 105.696 ÷ 99.880 = 22,415
-    expect(Math.abs(v[5] / v[6] - v[7])).toBeLessThan(1); // ÷ 45.1155 = $497
-    expect(v[8]).toBe(3_303); // the rent that ties: $3,800 − $497
-    expect(d.lines[8]).toMatchObject({ label: "Rent that ties C: your $3,800 − $497", ref: "tie.A.rent" });
-    expect(d.lines[9]).toMatchObject({ value: "$2,729", tick: "estimate", label: "HUD's Fair Market Rent for New York, 1 bedroom (FY2027)" });
-    expect(v[10]).toBe(574); // 3,303.16 − 2,729
-    // At HUD's estimate A would lead by 574.16 × 0.9450 × 45.1155 = 24,478 in present value, $562 a month (÷ 43.5191).
-    expect(d.notes[0]).toContain("at the estimate A would, by about $562 a month (24,478 in present value");
+    expect(d.lines.map((l) => l.op ?? "")).toEqual(["", "−", "=", "×", "÷", "=", "÷", "=", "", "−", "=", "", "−", "="]);
+    // Exactly as displayed (footsAsDisplayed): 334,357 − 313,175 = 21,182; × 105.696 ÷ 99.880 = 22,415.1, shown 22,415; ÷ 45.1155 =
+    // 496.84, shown $497; $3,800 − $497 = $3,303, the rent that ties; $3,303 − HUD's $2,729 = $574.
+    footsAsDisplayed("rentnote.A", d);
+    expect([v[2], v[5], v[7], v[10], v[13]]).toEqual([21_182, 22_415, 497, 3_303, 574]);
+    expect(d.lines[10]).toMatchObject({ label: "The rent that ties C", ref: "tie.A.rent" });
+    expect(d.lines[12]).toMatchObject({ value: "$2,729", tick: "estimate", label: "HUD's Fair Market Rent for New York, 1 bedroom (FY2027)" });
+    // At HUD's estimate A would lead by 574 × 0.9450 × 45.1155 = 24,471 in present value, $562 a month (÷ 43.5191).
+    expect(d.notes[0]).toContain("at the estimate A would, by about $562 a month (24,471 in present value");
     expect(d.edit).toEqual({ letter: "A", path: "costOfLiving.monthlyRent" });
   });
 
@@ -182,8 +181,14 @@ describe("the rent note under the verdict", () => {
     expect(words(renderPage(high))).toContain("This depends on rent: at HUD's estimate for New York ($2,729), A wins; at HUD's "
       + "estimate for C's rent in Seattle ($3,500), A wins.");
     const d = derive("rentnote.C", high);
-    expect(d.lines.map((l) => l.label).slice(-4)).toEqual(["More rent a month it can carry", "Rent that ties A: your $2,600 + $486",
-      "HUD's Fair Market Rent for Seattle, 1 bedroom (FY2027)", "Over the rent that ties by"]);
+    // C's lead, 334,357 − 313,175 = 21,182, × 103.4795 ÷ 99.8802 = 21,945 in Seattle dollars, ÷ 45.1155 = $486 more rent it can carry:
+    // $2,600 + $486 = $3,086, and HUD's $3,500 is over it by $414.
+    footsAsDisplayed("rentnote.C", d);
+    expect(d.lines[0].label).toBe("C: 4-year total after rent, at U.S. prices, at your rent");
+    expect(d.lines.map((l) => [l.op ?? "", l.label, l.value]).slice(-6)).toEqual([
+      ["", "Your rent a month", "$2,600"], ["+", "More rent it can carry", "$486"], ["=", "The rent that ties A", "$3,086"],
+      ["", "HUD's Fair Market Rent for Seattle, 1 bedroom (FY2027)", "$3,500"], ["−", "The rent that ties A", "$3,086"],
+      ["=", "Over the rent that ties by", "$414"]]);
   });
 
   it("no note: off the after-rent basis, for an estimated rent, or with the estimate on the same side as your rent", () => {

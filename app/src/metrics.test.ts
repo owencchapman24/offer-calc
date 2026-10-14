@@ -7,7 +7,7 @@ import { derive, highlightedSentence, metricSection } from "./derive";
 import { type MetricId, metricKind, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import { SECTIONS } from "./sections";
-import { context, renderAllInputs, renderPage, renderWork, withLeave, withTies, withWork } from "./testing";
+import { context, footsAsDisplayed, renderAllInputs, renderPage, renderWork, withLeave, withTies, withWork } from "./testing";
 import { dayBefore, figure } from "./text";
 import { extraHoursView } from "./verdict";
 import type { OfferInput } from "../../src/offer/types";
@@ -68,14 +68,14 @@ describe("show the work: an offer's totals", () => {
     const d = derive("pv.A.colAdjustedTotal", ctx);
     const v = (label: string) => parse(d.lines.find((l) => l.label.startsWith(label))!.value);
     const local = v("Take-home pay") - v("Rent");
-    expect(local).toBeCloseTo(v("Spending money after rent"), -1); // whole-dollar display
+    expect(local).toBe(v("Spending money after rent")); // as displayed: the lines above it, as shown
     // The two BEA indexes, not a factor: the product foots to the dollar as displayed (here at 3 decimals).
     const us = d.lines.find((l) => l.label === "U.S. non-housing prices (BEA)")!;
     const ny = d.lines.find((l) => l.label === "New York non-housing prices (BEA)")!;
     expect([us.op, us.value, us.ref, ny.op, ny.value, ny.ref]).toEqual(["×", "99.880", "rpp.A.ref", "÷", "105.696", "rpp.A.area"]);
-    expect(Math.abs((v("Spending money after rent") * parse(us.value)) / parse(ny.value) - v("The same spending"))).toBeLessThan(1);
+    expect(Math.round((v("Spending money after rent") * parse(us.value)) / parse(ny.value))).toBe(v("The same spending"));
     const total = v("The same spending") - v("Out-of-pocket") + v("Saved, at face value");
-    expect(Math.abs(total - v("After rent, at U.S. prices"))).toBeLessThanOrEqual(2);
+    expect(total).toBe(v("After rent, at U.S. prices")); // exactly: the money saved at face value takes the rounding
     expect(d.lines[d.lines.length - 1].value).toBe("313,175");
     expect(d.notes[1]).toMatch(/= 313,175\.$/); // total rewards - rent + (factor - 1) x (spending - out-of-pocket)
     expect(d.uses).toEqual(["in.A.costOfLiving.monthlyRent", "in.A.costOfLiving.area"]);
@@ -83,7 +83,7 @@ describe("show the work: an offer's totals", () => {
   it("after-tax pay is gross - tax - premiums, in present value", () => {
     const d = derive("pv.C.cash", ctx);
     const [gross, tax, premiums, net] = d.lines.map((l) => parse(l.value));
-    expect(Math.abs(gross - tax - premiums - net)).toBeLessThanOrEqual(2);
+    expect(gross - tax - premiums).toBe(net); // exactly: the tax line takes the rounding
     expect(d.lines.map((l) => l.ref)).toEqual(["part.C.gross", "part.C.tax", "part.C.premiums", undefined]);
   });
 });
@@ -100,7 +100,9 @@ describe("pay per extra hour (docs/ui-design.md §4.2)", () => {
     // A's average after tax: its 4-year after-tax pay as paid / 16,000 hours (80 a week x 50 weeks x 4 years).
     expect(ac.lower!.average).toBeCloseTo(ctx.results!.view.row.nominal.cash![0] / 16_000, 9);
     const d = derive("extra.AC.colAdjustedTotal", ctx);
-    expect(d.lines.find((l) => l.label === "A pays less")!.value).toBe("−22,307"); // -5,576.87 x 4
+    // The two 4-year totals as shown, subtracted: −22,308 (−5,576.87 × 4 = −22,307.48 before rounding them); ÷ 4 = −5,577.
+    expect(d.lines.find((l) => l.label === "A pays less")!.value).toBe("−22,308");
+    footsAsDisplayed("extra.AC.colAdjustedTotal", d);
     expect(d.lines[d.lines.length - 1].value).toBe("−5,577");
   });
   it("only pairs with the lead's winner are shown: B vs C, not A vs B", () => {
