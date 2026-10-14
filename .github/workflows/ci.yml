@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels its older run; pushes to main each run to the end.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -55,11 +60,16 @@ jobs:
 
   # Playwright on the production build, served with vercel.json's headers (e2e/playwright.config.ts): the accessibility
   # scan, axe for WCAG 2.2 A and AA in every state of the app, at desktop and phone widths, light and dark, failing on any
-  # violation that test/a11y-exceptions.json doesn't accept with a reason; then the smoke and keyboard tests. The scan's
-  # report (.a11y/report.md) and Playwright's are uploaded.
-  e2e:
+  # violation that test/a11y-exceptions.json doesn't accept with a reason; then the smoke and keyboard tests. In four shards
+  # (one job ran 17-19 minutes against a 20-minute limit, audit T3); each uploads a blob report.
+  e2e-shard:
+    name: e2e (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -68,8 +78,46 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+      - id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run e2e -- --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: .playwright/blob/
+          include-hidden-files: true
+          retention-days: 1
+
+  # The shards' reports merged into one: the accessibility report (.a11y/report.md) and Playwright's HTML report, uploaded as
+  # a11y-report. It fails when any shard failed, so "e2e" stays the one check to require.
+  e2e:
+    needs: e2e-shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - run: npx playwright merge-reports --config e2e/merge.config.ts all-blob-reports
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -77,6 +125,9 @@ jobs:
           path: |
             .a11y/
             .playwright/report/
-            .playwright/results/
           include-hidden-files: true
           retention-days: 14
+      - if: needs.e2e-shard.result != 'success'
+        run: |
+          echo "::error::An e2e shard failed (${{ needs.e2e-shard.result }})."
+          exit 1

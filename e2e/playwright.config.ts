@@ -7,8 +7,12 @@ import { defineConfig, type PlaywrightTestConfig } from "@playwright/test";
 // - the smoke and keyboard tests (smoke.e2e.ts, keyboard.e2e.ts), once, on a desktop; the phone's tabs and the verdict
 //   bars (mobile.e2e.ts), on a phone and a tablet.
 // Locally it drives the installed Edge, so nothing is downloaded; CI installs Chromium.
+// CI runs the suite in shards (.github/workflows/ci.yml, `--shard`): each shard writes a blob report, and the e2e job merges
+// them (merge.config.ts) into Playwright's HTML report and the accessibility report, one of each for the whole run.
+// E2E_BLOB=1 writes the blob locally too, to try the merge.
 
 const CI = !!process.env.CI;
+const BLOB = CI || !!process.env.E2E_BLOB;
 const PORT = 4180;
 
 type Use = NonNullable<PlaywrightTestConfig["use"]>;
@@ -28,12 +32,9 @@ export default defineConfig({
   workers: CI ? 3 : undefined,
   timeout: 90_000,
   expect: { timeout: 15_000 },
-  reporter: [
-    ["list"],
-    ...(CI ? [["github"] as const] : []),
-    ["html", { outputFolder: "../.playwright/report", open: "never" }],
-    ["./lib/reporter.ts", { out: ".a11y" }],
-  ],
+  reporter: BLOB
+    ? [["list"], ...(CI ? [["github"] as const] : []), ["blob", { outputDir: "../.playwright/blob" }]]
+    : [["list"], ["html", { outputFolder: "../.playwright/report", open: "never" }], ["./lib/reporter.ts", { out: ".a11y" }]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}/`,
     ...(CI ? {} : { channel: "msedge" }),
