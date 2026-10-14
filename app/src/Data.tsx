@@ -6,7 +6,8 @@ import { fieldName } from "./help";
 import { type AppOffer, type Missing, toOfferInput } from "./model";
 import { priceWords } from "./prices";
 import type { EngineResponse } from "./protocol";
-import { type Action, type Session, STORAGE_KEY } from "./session";
+import { downloadSaved } from "./Recovery";
+import { type Action, BACKUP_KEY, type KeyValueStore, readBackup, type SaveStatus, type Session, STORAGE_KEY } from "./session";
 import { dollars, localToday, longDate } from "./text";
 import { Stamp } from "./ui";
 
@@ -15,6 +16,14 @@ import { Stamp } from "./ui";
 // format and shape here, every offer's values by the engine's validateOffer in a worker of its own.
 
 type Checked = Extract<ImportResult, { ok: true }> & { issues: Array<{ letter: string; issue: OfferIssue }>; missing: Array<{ letter: string; missing: Missing[] }> };
+
+function storage(): KeyValueStore | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Checks imported offers' values with the engine, in a worker (the main thread never loads the engine). */
 function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
@@ -33,13 +42,13 @@ function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
 
 /** Where focus goes after a step, so the keyboard never drops to the page: the element that replaced the one used. */
 type FocusAfter = "cancelDelete" | "deleteButton" | "review" | "fileInput" | "imported";
-type Done = { at: "export" | "import" | "delete"; text: string };
+type Done = { at: "export" | "import" | "delete" | "backup"; text: string };
 
 const UI_WORDS: Record<string, string> = { basis: "the basis", theme: "the theme", mode: "quick or detailed mode", ticks: "whether tickmarks show" };
 const FILING = { single: "single", joint: "married, filing jointly", headOfHousehold: "head of household" } as const;
 
 export default function DataPage({ session, dispatch, today, saved, clear }: {
-  session: Session; dispatch: Dispatch<Action>; today: string; /** Saving in this browser works. */ saved: boolean;
+  session: Session; dispatch: Dispatch<Action>; today: string; /** Whether saving in this browser works. */ saved: SaveStatus;
   /** Deletes what this browser stores. */ clear: () => void;
 }) {
   const top = useRef<HTMLHeadingElement>(null);
@@ -61,6 +70,8 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
   const then = (k: FocusAfter) => { focusAfter.current = k; };
   const sample = session.offers.some((o) => o.sample !== null);
   const download = exportSession(session, today);
+  // What was saved before it was set aside: it couldn't be read, or you started again from the recovery screen.
+  const backup = readBackup(storage());
 
   const save = () => {
     const url = URL.createObjectURL(new Blob([download.text], { type: "application/json" }));
@@ -106,12 +117,22 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
         <section className="method-section" aria-labelledby="data-stored">
           <h2 id="data-stored"><span className="ref">D-1</span> What's stored</h2>
           <p>
-            {saved ? "This browser saves" : "This browser isn't saving (a private window, or blocked storage), so nothing is kept after you close the tab. It holds"}{" "}
+            {saved === "saved" ? "This browser saves"
+              : saved === "newer" ? "This browser holds a newer version's save, which this page can't read and won't save over (download it at the top of the page). This page holds"
+              : "This browser isn't saving (a private window, or blocked storage), so nothing is kept after you close the tab. It holds"}{" "}
             {session.offers.length} {session.offers.length === 1 ? "offer" : "offers"} ({session.offers.map((o) => `${o.letter}${o.draft.label ? ` ${o.draft.label}` : ""}`).join(", ")}),
             About you, and your view choices, under the key <code>{STORAGE_KEY}</code>. Nothing is sent anywhere: there's no account,
             no server and no analytics.
           </p>
           {sample && <p><Stamp>Illustrative samples</Stamp> Some offers are samples: illustrative inputs, not market data.</p>}
+          {backup && (
+            <p>
+              Also kept, under <code>{BACKUP_KEY}</code>: what was saved before {backup.why === "startedAgain" ? "you started again" : "it couldn't be read"},
+              on {longDate(backup.on)}.{" "}
+              <button type="button" className="link" onClick={() => setDone({ at: "backup", text: `Saved ${downloadSaved(backup.saved)}.` })}>Download it</button>
+            </p>
+          )}
+          {done?.at === "backup" && <p className="note" role="status">{done.text}</p>}
         </section>
 
         <section className="method-section" aria-labelledby="data-export">
@@ -158,7 +179,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
 
         <section className="method-section" aria-labelledby="data-delete">
           <h2 id="data-delete"><span className="ref">D-4</span> Delete all data</h2>
-          <p>Deletes everything you've entered in this browser and starts again with the sample offers.</p>
+          <p>Deletes everything you've entered in this browser{backup ? ", and what was set aside," : ""} and starts again with the sample offers.</p>
           {!confirmDelete ? (
             <p>
               <button type="button" className="got-it data-button" ref={refs.deleteButton as RefObject<HTMLButtonElement>}
@@ -166,7 +187,10 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
             </p>
           ) : (
             <div className="stale" role="alertdialog" aria-labelledby="delete-confirm">
-              <p className="stale-head" id="delete-confirm">Delete {session.offers.length} {session.offers.length === 1 ? "offer" : "offers"} and About you? This can't be undone; export first to keep a copy.</p>
+              <p className="stale-head" id="delete-confirm">
+                Delete {session.offers.length} {session.offers.length === 1 ? "offer" : "offers"} and About you{saved === "newer" ? ", and the newer version's save" : ""}?
+                {" "}This can't be undone; export first to keep a copy.
+              </p>
               <p className="data-actions">
                 <button type="button" className="got-it data-button danger" onClick={() => {
                   clear();

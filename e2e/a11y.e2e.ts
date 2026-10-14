@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
 import {
-  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWork, printWithButton, SECTIONS, selectOffer, settled, showByYear, showTheWork,
-  stubPrint,
+  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWithSaved, openWork, printWithButton, SAVED, SECTIONS, selectOffer, settled,
+  showByYear, showTheWork, stubPrint,
 } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
@@ -182,6 +182,22 @@ test.describe("print", () => {
     await expect(page.locator(".l6-payments")).toHaveCount(3);
     await page.emulateMedia({ media: "print" });
     await scan(page, "print: the full workpaper");
+  });
+});
+
+test.describe("recovery", () => {
+  test("the recovery screen", async ({ page }) => {
+    await openWithSaved(page, SAVED.broken);
+    await expect(page.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await scan(page, "recovery: a saved session it can't show");
+  });
+
+  test("a newer version's save", async ({ page }) => {
+    await openWithSaved(page, SAVED.newer);
+    await expect(page.locator(".newer-save")).toBeVisible();
+    await settled(page);
+    await scan(page, "recovery: a newer version's save");
   });
 });
 

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { openCompare, openWork, printed, printWithButton, settled, stubPrint, verdictText } from "./lib/app";
+import { openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -232,4 +232,59 @@ test("export, then import: the same results", async ({ page }) => {
   await page.getByRole("button", { name: /^Download offer-calc-/ }).click();
   const second = JSON.parse(readFileSync(await (await again).path(), "utf8"));
   expect({ ...second, exportedAt: null }).toEqual({ ...JSON.parse(file), exportedAt: null });
+});
+
+// Nothing saved is lost (audit C22, C23): a saved session the page can't show brings up the recovery screen, not a blank page, on
+// every page; a newer version's save is never saved over.
+test.describe("recovery", () => {
+  const savedNow = (page: Page) => page.evaluate(() => localStorage.getItem("offer-calc:v1"));
+  const downloaded = async (page: Page, click: () => Promise<void>) => {
+    const download = page.waitForEvent("download");
+    await click();
+    return readFileSync(await (await download).path(), "utf8");
+  };
+
+  test("a saved session it can't show: download it, start again with the samples, and it's kept aside", async ({ page }) => {
+    await openWithSaved(page, SAVED.broken);
+    await expect(page.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
+    // The Data page, where "Delete all data" is, too.
+    await page.goto("/#/data");
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
+    const file = JSON.parse(await downloaded(page, () => page.getByRole("button", { name: "Download what's saved" }).click()));
+    expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 3, offers: [{ id: "mine", draft: {} }] });
+    await expect(page.getByRole("status")).toHaveText(/^Saved offer-calc-saved-\d{4}-\d{2}-\d{2}\.json\./);
+
+    await page.getByRole("button", { name: "Start again with the samples" }).click();
+    await settled(page);
+    expect(JSON.parse((await savedNow(page))!).offers.map((o: { sample: string }) => o.sample)).toEqual(["sample", "sample", "sample"]);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("offer-calc:backup")!))).toMatchObject({ why: "startedAgain", saved: SAVED.broken });
+    // The Data page offers what was set aside, until all data is deleted.
+    await page.getByRole("link", { name: "Data" }).click();
+    await expect(page.getByText(/what was saved before you started again/)).toBeVisible();
+    const kept = JSON.parse(await downloaded(page, () => page.getByRole("button", { name: "Download it" }).click()));
+    expect(kept.offers[0].id).toBe("mine");
+    await page.getByRole("button", { name: "Delete all data…" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    expect(await page.evaluate(() => localStorage.getItem("offer-calc:backup"))).toBeNull();
+    await expect(page.getByText(/what was saved before/)).toHaveCount(0);
+  });
+
+  test("a newer version's save: the page says so, offers it as a download, and never saves over it", async ({ page }) => {
+    await openWithSaved(page, SAVED.newer);
+    await expect(page.getByText("Your saved offers are from a newer version of Offer Calc")).toBeVisible();
+    await settled(page);
+    await expect(page.locator(".colophon")).toContainText("Not saving: this browser holds a newer version's save");
+    // An edit, past the save's half-second wait: before this fix, the samples were saved over it once the page had loaded.
+    await page.locator("#in-B-salary-annual").fill("400000");
+    await settled(page);
+    await page.waitForTimeout(1_000);
+    expect(await savedNow(page)).toBe(SAVED.newer);
+    const file = JSON.parse(await downloaded(page, () => page.getByRole("button", { name: "Download your saved offers" }).click()));
+    expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 4, offers: [{ draft: { label: "From the future" } }] });
+    // A reload (the newer version, once it's deployed again) still finds it.
+    await page.reload();
+    await expect(page.getByText("Your saved offers are from a newer version of Offer Calc")).toBeVisible();
+    expect(await savedNow(page)).toBe(SAVED.newer);
+  });
 });
