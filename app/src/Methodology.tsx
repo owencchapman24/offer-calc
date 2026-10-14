@@ -317,8 +317,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-7.3">
           <p>
             Every offer is compared over the same stretch: from the earliest start date for the number of years you expect to
-            stay. An offer that starts later has less pay inside it, which is the real cost of starting later. Pay after the
-            stay isn't counted. The stay's last calendar year is still taxed as though you kept earning through December, as at a
+            stay. An offer that starts later has less pay inside it, which is the real cost of starting later: exactly the days it
+            starts later, since its pay, benefits and rent count for each of its own days in the stretch, its last partial month
+            included. Money paid before an offer's start date, such as relocation paid before day one, counts from the start date
+            (it's taxed in the year it's paid). Pay after the stay isn't counted. The stay's last calendar year is still taxed as though you kept earning through December, as at a
             next job, so a short stay doesn't get an artificially low tax rate. Leaving at the end of the stay doesn't trigger
             clawbacks here; leaving early is <Ref id="M-9" />. The row under the verdict shows the winner for stays of 2 to 5 years.
           </p>

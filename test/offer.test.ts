@@ -1277,6 +1277,79 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
   });
 });
 
+describe("offers starting on different days (audit C3, C4, C5)", () => {
+  const tx = (startDate: string, extra: Partial<OfferInput> = {}): OfferInput => ({
+    label: startDate, residence: { state: "TX" }, employerState: "TX", startDate, salary: { annual: 120_000 }, ...extra,
+  });
+  const window = { start: "2026-07-13", years: 4 };
+  const salaryIn = (o: OfferInput) => projectScenario(o, single, { window }).events
+    .filter((e) => e.inWindow && e.component === "salary").reduce((s, e) => s + e.gross, 0);
+
+  it("a later start's last month in the window counts for its own days: 3 weeks later costs those 3 weeks, no more (C3)", () => {
+    // A, from the window's start: 48 months x 10,000 = 480,000.
+    expect(salaryIn(tx("2026-07-13"))).toBeCloseTo(480_000, 2);
+    // B starts Aug 3: Aug 3-31 is 29/31 of 10,000 = 9,354.84; Sep 2026 to Jun 2030, 46 x 10,000 = 460,000; Jul 1-12, 2030 (the window
+    // ends Jul 13) is 12/31 of 10,000 = 3,870.97: 473,225.81. Before the fix July 2030 was one piece dated Jul 31, outside: 469,354.84.
+    expect(salaryIn(tx("2026-08-03"))).toBeCloseTo(473_225.81, 2);
+    // The edge: the window's last day (Jul 12) ends a piece inside it; the next day starts one outside.
+    const events = projectScenario(tx("2026-08-03"), single, { window }).events.filter((e) => e.component === "salary");
+    expect(events.find((e) => e.date === "2030-07-12")).toMatchObject({ inWindow: true, gross: 3_870.97 });
+    expect(events.find((e) => e.date === "2030-07-31")).toMatchObject({ inWindow: false, gross: 6_129.03 }); // 19/31 of 10,000
+  });
+
+  it("the cut at the window's end splits benefits and rent too, and hours already were (per hour ties at the same pay rate)", () => {
+    const withAll = (startDate: string) => tx(startDate, {
+      health: { premium: 1_200, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0 }, hours: { weekly: { bear: 40, base: 40, bull: 40 } },
+      costOfLiving: { area: "12420", monthlyRent: 1_550 },
+    });
+    const w = (o: OfferInput) => projectScenario(o, single, { window, valuationDate: "2026-07-13" }).window;
+    const a = w(withAll("2026-07-13"));
+    const b = w(withAll("2026-08-03"));
+    // Premiums: 100 a month, B's July 2030 piece is 12/31 of it.
+    expect(b.nominal.premiums).toBeCloseTo(100 * (29 / 31 + 46 + 12 / 31), 2);
+    // Rent: 1,550 a month, growing 2.5% at each of B's anniversaries (Aug 3), so years 1-3 are 12 months each (Aug 3 to Aug 2); year 4,
+    // Aug 3, 2029 to the window's end, is 29/31 + 10 + 12/31 months.
+    expect(b.costOfLiving!.nominal.rent).toBeCloseTo(1_550 * (12 + 12 * 1.025 + 12 * 1.025 ** 2 + (29 / 31 + 10 + 12 / 31) * 1.025 ** 3), 2);
+    expect(a.costOfLiving!.nominal.rent).toBeCloseTo(1_550 * 12 * (1 + 1.025 + 1.025 ** 2 + 1.025 ** 3), 2);
+    // Hours were already cut at the window's end: 2,000 a year for B's days in it.
+    expect(b.hours! / a.hours!).toBeCloseTo((at("2030-07-13") - at("2026-08-03")) / (at("2030-07-13") - at("2026-07-13")), 2);
+  });
+
+  it("relocation money paid before day one counts in the comparison from the start date, taxed when it's paid (C4)", () => {
+    const o = tx("2027-01-04", { salary: { annual: 125_000 }, cashAwards: [{ label: "Relocation", amount: 20_000, paidOn: "2026-12-15" }] });
+    const r = projectScenario(o, single, { years: 4, valuationDate: "2026-10-14" });
+    const relo = r.events.find((e) => e.component === "cash")!;
+    expect(relo).toMatchObject({ date: "2026-12-15", calendarYear: 2026, employmentYear: 1, inWindow: true });
+    // 2026's tax is the relocation money's alone.
+    expect(r.calendarYears[0]).toMatchObject({ year: 2026 });
+    expect(r.calendarYears[0].offerGross.total).toBe(20_000);
+    // Employment years 1-4 and the window agree: 4 x 125,000 + 20,000.
+    const years = r.employmentYears.slice(0, 4).reduce((s, y) => s + y.gross.total, 0);
+    expect(years).toBeCloseTo(520_000, 2);
+    expect(r.window.nominal.gross).toBeCloseTo(520_000, 2);
+    // Another offer starting earlier doesn't change that: the window starts at the earlier start, and the award is in it.
+    const shared = projectScenario(o, single, { window: { start: "2026-11-02", years: 4 } });
+    expect(shared.events.find((e) => e.component === "cash")!.inWindow).toBe(true);
+  });
+
+  it("a guaranteed first bonus is the target in every scenario, though the cutoff skips the period you start in (C5)", () => {
+    // Start Nov 2, 2026, after the Oct 1 cutoff: the 2026 period is skipped, so the first payout is Mar 15, 2028, for 2027 (a full year,
+    // 120,000 x 10% = 12,000 in every scenario). Before the fix the guarantee went to the skipped period: the bear case paid $0.
+    const o = tx("2026-11-02", { bonus: { basis: "percentOfSalary", amount: { bear: 0, base: 0.1, bull: 0.15 }, payOn: { month: 3, day: 15 },
+      cutoff: { month: 10, day: 1 }, firstPayoutGuaranteed: true } });
+    const first = (scenario: "bear" | "base" | "bull") => projectScenario(o, single, { scenario }).events.filter((e) => e.component === "bonus");
+    for (const s of ["bear", "base", "bull"] as const) expect(first(s)[0], s).toMatchObject({ date: "2028-03-15", gross: 12_000 });
+    // The next one takes the scenario's rate: 0%, 10%, 15% of 2028's 120,000.
+    expect(first("bear")[1]?.gross ?? 0).toBe(0);
+    expect(first("bull")[1]).toMatchObject({ date: "2029-03-15", gross: 18_000 });
+    // Starting before the cutoff, the 2026 stub is the guaranteed one: a Sep 1 start earns 4 months, 40,000 x 10% = 4,000.
+    const early = tx("2026-09-01", { bonus: { ...o.bonus!, cutoff: { month: 10, day: 1 } } });
+    const bear = projectScenario(early, single, { scenario: "bear" }).events.filter((e) => e.component === "bonus");
+    expect(bear[0]).toMatchObject({ date: "2027-03-15", gross: 4_000 });
+    expect(bear[1].gross).toBe(0);
+  });
+});
+
 describe("input validation", () => {
   it("rejects start dates before 2026 and bad horizons", () => {
     expect(() => projectScenario({ ...worked, startDate: "2025-12-01" }, single)).toThrow(/2026/);

@@ -81,8 +81,9 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   },
   "bonus.firstPayoutGuaranteed": {
     hint: "The first bonus pays the target in every scenario.",
-    help: "Some offers guarantee the first bonus at target, so the bear case can't cut it, only later ones. No is the default. It "
-      + "changes the bear and bull cases, not the verdict, which is the base case.",
+    help: "Some offers guarantee the first bonus at target, so the bear case can't cut it, only later ones; starting after the "
+      + "cutoff, that's the first one actually paid. No is the default. It changes the bear and bull cases, not the verdict, which is "
+      + "the base case.",
   },
   "bonus.mustBeEmployedOnPayDate": {
     hint: "Leave before payout and you lose that bonus.",
@@ -177,7 +178,8 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   "cashAwards.paidOn": {
     hint: "Days after you start, or a date.",
     help: "When the payment lands. 30 days after your start date is the default: sign-ons usually come with the first paycheck or "
-      + "two. Dates before 2026 aren't supported.",
+      + "two. A date before your start, such as relocation paid before day one, counts with your first year, taxed in the year it's "
+      + "paid. Dates before 2026 aren't supported.",
   },
   "cashAwards.clawback": {
     hint: "What you'd owe back if you left early.",

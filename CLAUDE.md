@@ -740,7 +740,9 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 - **Present value:** each event's after-tax cash is discounted by
   (1 + r)^-((date - valuationDate) / 365.25), default r = 5% nominal. The UI passes
   today's date.
-- **Comparison window:** earliest start + horizon, so a later start counts as lost pay.
+- **Comparison window:** earliest start + horizon, so a later start counts as lost pay: exactly its days, since accrued pay, benefits
+  and rent are cut at the window's edges as at anniversaries (`cuts` in `project.ts`, 2026-10-14, audit C3). A payment before the
+  start date counts in the window from the start date, taxed when it's paid (audit C4).
   The engine defaults to 5 years; the UI's "How long do you expect to stay?" defaults to 4.
 - **Breakeven:** bisection to the cent on base-scenario PV, on after-tax comp, total
   rewards or the COL-adjusted total. "alreadyAhead" (B leads even at $0) is an outcome,

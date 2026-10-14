@@ -137,6 +137,8 @@ export function bonusEvents(
   let year = yearOfDay(start);
   if (dayIn(year, periodStart) > start) year -= 1; // the period containing the start date
   const out: RawEvent[] = [];
+  // The guarantee is for the first payout: the first period that pays, which isn't the first period when the cutoff skips it (audit C5).
+  let firstPayout = true;
   for (let first = true; ; first = false, year++) {
     const from = dayIn(year, periodStart);
     const to = dayIn(year + 1, periodStart);
@@ -153,7 +155,7 @@ export function bonusEvents(
       }
     }
     const pick = (v: { bear: number; base: number; bull: number }) =>
-      (first && bonus.firstPayoutGuaranteed ? v.base : v[scenario]);
+      (firstPayout && bonus.firstPayoutGuaranteed ? v.base : v[scenario]);
     const workedFrom = Math.max(from, start);
     /** The period's bonus for work from `workedFrom` up to (not including) `workedTo`. */
     const forWork = (workedTo: number): { gross: number; detail: BonusDetail } => {
@@ -175,10 +177,12 @@ export function bonusEvents(
       const full = forWork(to);
       warnings.push({ code: "bonusForfeited", params: { leaveDate: fromDays(leave), ...period, payDate: fromDays(payDay),
         earned: round2(now.gross), full: round2(full.gross), detail: now.detail, fullDetail: full.detail } });
+      firstPayout = false;
       continue;
     }
     const b = forWork(leave !== undefined ? Math.min(to, leave + 1) : to);
     out.push({ day: payDay, component: "bonus", gross: b.gross, detail: b.detail });
+    firstPayout = false;
   }
   return out;
 }
