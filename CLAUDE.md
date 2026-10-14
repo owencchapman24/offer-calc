@@ -944,7 +944,7 @@ engine change, and the lock is regenerated with it, never on its own (a Python u
   - **Nonresident tax:** taxed as a full-year resident of the residence state only. No
     part-year residency in a relocation year, and no nonresident tax or resident credit
     for the employer state; the convenience-of-employer rule (NY, DE, PA; CT/NJ
-    reciprocal; NJ's not reaching PA or CT residents) only triggers a warning.
+    reciprocal; NJ's not reaching PA or CT residents, PA's not reaching NJ residents) only triggers a warning.
   - **Spouse wages:** shared across offers; they can't vary per offer.
   - **Other jobs:** wages from another job in the same year count for tax, but those
     deferrals don't count toward the 402(g) cap.

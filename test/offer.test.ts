@@ -212,6 +212,17 @@ describe("residence vs employer state (decision 9)", () => {
     expect(convenienceRuleWarning("CT", "PA")).toBeDefined();
     expect(convenienceRuleWarning("NJ", "CT")).toBeDefined();
   });
+  it("PA's rule doesn't reach New Jersey residents: under the reciprocal agreement PA taxes none of their wages (2025 PA-40 instructions)", () => {
+    // PA-40 instructions, Line 1a, "Reciprocal Compensation Agreement States": a New Jersey resident reports "zero taxable compensation".
+    expect(convenienceRuleWarning("NJ", "PA")).toBeUndefined();
+    const r = projectScenario({ ...worked, residence: { state: "NJ" }, employerState: "PA" }, single);
+    expect(r.warnings).toEqual([]);
+    // Residents of states without an agreement still are; and a New Jersey resident still is for other states' rules.
+    expect(convenienceRuleWarning("NY", "PA")).toBeDefined();
+    expect(convenienceRuleWarning("DE", "PA")).toBeDefined();
+    expect(convenienceRuleWarning("NJ", "NY")).toBeDefined();
+    expect(convenienceRuleWarning("NJ", "DE")).toBeDefined();
+  });
   it("no warning when you live where the employer is", () => {
     expect(convenienceRuleWarning("NY", "NY")).toBeUndefined();
   });
