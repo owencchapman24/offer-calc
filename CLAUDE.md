@@ -270,8 +270,10 @@ user's call: see Next steps.
   - `check`: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, `npm run check-bundle`;
   - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); a warm-up, then three runs; the median LCP's run's report is
     uploaded as the `lighthouse-report` artifact;
-  - `e2e`: builds, installs Playwright's Chromium, then `npm run e2e` (the scan, smoke and keyboard tests;
-    one retry for a slow runner); the scan's report and Playwright's are uploaded as `a11y-report`.
+  - `e2e (1/4)` to `e2e (4/4)`: four shards (`--shard`), each building, installing Playwright's Chromium (cached) and running
+    its quarter of `npm run e2e` (one retry for a slow runner), writing a blob report; then `e2e` merges them
+    (`e2e/merge.config.ts`) into one accessibility report and one Playwright report, uploaded as `a11y-report`, and fails if
+    any shard did. A newer push to a pull request cancels its older run.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
