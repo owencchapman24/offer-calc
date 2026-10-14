@@ -44,8 +44,8 @@ is done: stop A (2026-10-10; owencchapman24/offer-calc#17, L-6 and its ties and 
 owencchapman24/offer-calc#18, derivation titles that keep their capitals: "U.S.", "NY", "RSUs") and stop B (2026-10-12: CSV,
 print, the hide-tickmarks setting; below). **Copy as document** is built (2026-10-12, from user testing; below). What's next is the
 user's call: see Next steps.
-- **Where things stand** (2026-10-13, v2's step 0): `npm test` 476 passing; `npm run e2e` 164 passing
-  (16 skip by design), the scan 198 scans with no violations and no exceptions; main thread 358.9 / 109.7 kB gzip
+- **Where things stand** (2026-10-13, v2's step 0): `npm test` 479 passing; `npm run e2e` 164 passing
+  (16 skip by design), the scan 198 scans with no violations and no exceptions; main thread 359.2 / 109.8 kB gzip
   against the 120 kB budget, one chunk (117.4 before step 0); Lighthouse (mobile, median of 3) LCP 1.87 s against 2.5 s,
   performance 98, locally (1.95 s before step 0, measured side by side).
   `npm run grid` output is byte-identical to before slice 6 (no engine change).
@@ -78,7 +78,8 @@ user's call: see Next steps.
   total adds up as displayed, and every calculation it states is listed in `worked`, which `copydoc.test.ts` checks, with the HTML's and
   the text's figures identical. The click writes a `ClipboardItem` of promises at once (Safari); `prepare` asks the worker for L-3's
   ties and L-4's panel as they do (`tieJob`, `cursorJobFor`), so the results are shared. "Copy now" (a copy event) where the browser
-  won't. Disabled (`aria-disabled`, with the reason) while the inputs have a problem or an offer is incomplete. The samples paste into
+  won't. Disabled (`aria-disabled`, with the reason) while the inputs have a problem or an offer is incomplete; while the comparison
+  is first worked out, its reason ("Working out the comparison…") is for screen readers only, so nothing moves (`copyBlock`, 2026-10-13). The samples paste into
   Word (Letter, 1-inch margins) at 3 pages.
 - **The hide-tickmarks setting** (slice 6, stop B): "Show tickmarks | Hide tickmarks" radios in the footer (`ui.ticks`, saved with
   the session; JSON exports carry it as the theme, "shown" or "hidden"). Hidden, the root has `data-ticks="hidden"` and the
@@ -275,8 +276,9 @@ user's call: see Next steps.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
 - **Bundles** (raw / gzip):
-  - **Main thread:** 358.9 / 109.7 kB for a quick-mode visit by `npm run check-bundle` (Node's
-    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). v2's step 0 (2026-10-13) took 22.6 / 7.7 off: L-1 and the
+  - **Main thread:** 359.2 / 109.8 kB for a quick-mode visit by `npm run check-bundle` (Node's
+    gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's waiting reason (`copyBlock`) added
+    0.3 / 0.1 (2026-10-13). v2's step 0 (2026-10-13) took 22.6 / 7.7 off: L-1 and the
     bridge on first use 6.6 kB gzip, quick mode's ⓘ help 1.0 (381.6 / 117.4 before). Copy as document's button added 2.5 / 0.9
     (379.1 / 116.5 before). The print choice added 1.6 / 0.5; slice 6's stop B
     ended at 377.5 / 116.0, adding 3.6 / 0.9 (the CSV button, the tickmark setting, the print layout and button); its stop A ended at 373.9 / 115.1, adding 4.5 / 1.7 (the year figures as shown,
@@ -294,9 +296,11 @@ user's call: see Next steps.
     performance 98; 2026-10-12, after slice 6's stop B: 1.95 s locally, performance 98. 2026-10-13, v2's step 0, `main` and the branch
     built side by side and run alternately, two rounds each: LCP 1.95 s to 1.87 s (both rounds), TBT about 91 ms to 45 ms, performance
     98 both. The LCP element is About you's assumptions line, which renders before the worker answers, so the main chunk's download
-    and parse set LCP. CLS read 0.020 on the branch (0 on `main`): a 24 px shift both have, from Copy as document's "Fill in at least two
-    offers…" showing until the first results arrive, which Chrome flagged as following input on `main` (so not counted). A preload of the
-    body font was tried and dropped: LCP 2.35 s, and the shift stayed.
+    and parse set LCP. CLS read 0.020 on the branch (0 on `main`): a 24 px shift both had, from Copy as document's "Fill in at least two
+    offers…" showing until the first results arrived, which Chrome flagged as following input on `main` (so not counted). A preload of the
+    body font was tried and dropped: LCP 2.35 s, and the shift stayed. Fixed the same day (`copyBlock`): CLS 0.000 in every run, LCP
+    1.89 s. Two 3-4 px bumps in About you's "Prices in" row remain in a throttled load (0.0015, on `main` too); Lighthouse doesn't
+    register them.
   - **Keep the main thread in one chunk:** a lazy schedule imports `figures.tsx`, never
     `Tickmarks.tsx`. When a lazy chunk reached `react-dom` or `metrics.ts`' run-time code through
     its figures, Rolldown split React, the model and the help text out of the main chunk (1-2 kB
@@ -322,11 +326,11 @@ user's call: see Next steps.
     jobs, the close-call line's breakeven, and L-6's payments (only while it's open), run in the slow lane.
   - Only the worker holds the engine and the BEA/HUD tables.
 
-**Tests:** 476 passing (`npm test`), and 164 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
+**Tests:** 479 passing (`npm test`), and 164 Playwright tests (`npm run e2e`: the scan's tests in six projects, 8 smoke
 tests, 8 keyboard tests, and the phone and tablet tests; 16 more skip, each a phone's test on a tablet or the reverse, or the
 print scan off a desktop).
 - `test/offer.test.ts` 130, `test/params.test.ts` 23, `test/tax.test.ts` 10,
-  `test/validate.test.ts` 57, `app/src/app.test.ts` 24, `app/src/metrics.test.ts` 31,
+  `test/validate.test.ts` 57, `app/src/app.test.ts` 27, `app/src/metrics.test.ts` 31,
   `app/src/defaults.test.ts` 43, `app/src/comparability.test.ts` 8, `app/src/help.test.ts` 7,
   `app/src/exchange.test.ts` 7, `app/src/jobs.test.ts` 6, `app/src/leave.test.ts` 14, `app/src/l3.test.ts` 19,
   `app/src/l5.test.ts` 6, `app/src/l6.test.ts` 13, `app/src/csv.test.ts` 14, `app/src/ticks.test.ts` 4, `app/src/prices.test.ts` 13,
@@ -421,8 +425,9 @@ testing started on 2026-10-12; record each finding in `docs/user-testing.md` as 
 as a document: "Copy as document" is built; the user's own paste into Google Docs worked, and the other testers' reaction to it
 isn't recorded yet). **v2 is planned in `docs/v2-plan.md`** (2026-10-13): D1 (the scope, on the principle "The tool informs the
 decision and shows its work; you make the call") and D14 are approved, and D2-D15 stand as recommended unless the user comments on
-pull request #29. Don't start any v2 feature: the user is putting the plan's tester questions to testers first. Its performance step
-(step 0) is not a feature and was asked for on 2026-10-13. Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's
+pull request #29 (merged 2026-10-13). Don't start any v2 feature: the user is putting the plan's tester questions to testers first, and
+will come back with the answers. Step 0, the plan's performance step, is done (pull request #31: the main thread 117.35 to 109.69 kB
+gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from Oct 14, and the IRS's
 2027 inflation revenue procedure and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands

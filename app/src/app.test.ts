@@ -7,6 +7,7 @@ import {
   type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
   toOfferInput, withBase,
 } from "./model";
+import { copyBlock } from "./App";
 import { PRESETS, presetOf } from "./presets";
 import { priceWords, US_PRICES } from "./prices";
 import { type KeyValueStore, initialSession, loadSession, reducer, saveSession, STORAGE_KEY, type V1Offer, type V1Session } from "./session";
@@ -283,5 +284,23 @@ describe("text", () => {
   });
   it("today is the local date", () => {
     expect(localToday(new Date(2026, 9, 8, 23, 59))).toBe("2026-10-08");
+  });
+});
+
+describe("why Copy as document waits (copyBlock)", () => {
+  const ok = { compare: true, view: true, invalid: false, error: false, incomplete: [] as string[] };
+  it("while the first comparison is worked out, it waits without a visible reason, so nothing moves", () => {
+    expect(copyBlock({ ...ok, view: false })).toEqual({ why: "Working out the comparison…", shown: false });
+  });
+  it("a problem with the offers is said beside the button", () => {
+    expect(copyBlock({ ...ok, compare: false, view: false })).toEqual({ why: "Fill in at least two offers to copy the comparison.", shown: true });
+    expect(copyBlock({ ...ok, invalid: true })?.why).toBe("Fix the problems listed under the verdict to copy the comparison.");
+    // A stored session with a problem, before any results: the problem, not "fill in".
+    expect(copyBlock({ ...ok, view: false, invalid: true })).toEqual({ why: "Fix the problems listed under the verdict to copy the comparison.", shown: true });
+    expect(copyBlock({ ...ok, error: true })?.shown).toBe(true);
+    expect(copyBlock({ ...ok, incomplete: ["C"] })).toEqual({ why: "Fill in or remove offer C to copy the comparison.", shown: true });
+  });
+  it("with results and no problem, it's ready", () => {
+    expect(copyBlock(ok)).toBeNull();
   });
 });
