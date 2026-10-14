@@ -41,6 +41,23 @@ test("filing jointly, a spouse's wages raise every offer's tax, and are saved", 
   await expect(page.locator("#about-spouse")).toHaveValue("120,000");
 });
 
+test("living inside Philadelphia adds its wage tax; the suburbs don't", async ({ page }) => {
+  await openCompare(page);
+  await page.getByRole("button", { name: "Change offer B city" }).click();
+  await page.getByRole("combobox", { name: "Offer B city" }).fill("Philadelphia-Camden-Wilmington, PA-NJ-DE-MD");
+  await page.getByRole("combobox", { name: "Offer B state you'd live in" }).selectOption("PA");
+  const inside = page.getByRole("checkbox", { name: "Inside Philadelphia (city wage tax)" });
+  await expect(inside).toBeChecked(); // the default, as for New York City
+  await settled(page);
+  const city = await rankValue(page, "B");
+  await inside.uncheck();
+  // About 3.7% of B's pay, every year, no longer taxed.
+  await expect.poll(() => rankValue(page, "B")).toBeGreaterThan(city);
+  // Only in Pennsylvania: New Jersey's side of the metro isn't asked.
+  await page.getByRole("combobox", { name: "Offer B state you'd live in" }).selectOption("NJ");
+  await expect(inside).toHaveCount(0);
+});
+
 test("L-6 asks the worker for its payments only once it's opened, and its totals tie to the rank list", async ({ page }) => {
   // What the page asks the engine worker for: each message's lane.
   await page.addInitScript(() => {

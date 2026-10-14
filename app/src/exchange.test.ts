@@ -80,6 +80,8 @@ describe("import", () => {
       ["an id twice", bad((x) => { x.offers[1].id = x.offers[0].id; }), "offers.1.id: \"sample-A\" appears twice; each offer needs its own."],
       ["four offers", bad((x) => { x.offers.push(x.offers[0]); }), "offers: 4 offers; the app holds 1 to 3."],
       ["a bad stay", bad((x) => { x.household.stayYears = 0; }), "household.stayYears: should be a whole number of years from 1 to 10."],
+      ["inside Philadelphia, not yes or no", bad((x) => { x.offers[0].draft.residence.philadelphia = "maybe"; }),
+        "offers.0.draft.residence.philadelphia: should be true or false."],
       ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }), "household.spouseWages: should be an amount of $0 or more."],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],
     ];

@@ -27,6 +27,11 @@ export interface OfferDraft {
     state: string | null;
     /** Inside New York City (city income tax); asked only for the New York metro in NY. */
     nyc: boolean;
+    /**
+     * Inside Philadelphia (its resident wage tax); asked only for the Philadelphia metro in PA. Absent (drafts from before
+     * 2026-10-14): inside, the default, as for New York City.
+     */
+    philadelphia?: boolean;
   };
   /** Null: the state you'd live in. */
   employerState: string | null;
@@ -201,6 +206,7 @@ export interface AppHousehold {
 
 export const DEFAULT_HOUSEHOLD: AppHousehold = { filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: US_PRICES };
 export const NYC_METRO = "35620";
+export const PHILADELPHIA_METRO = "37980";
 export const ASSUMPTIONS = { inflation: 0.025, discountRate: 0.05 } as const;
 
 /**
@@ -236,6 +242,16 @@ export type Missing = "salary" | "city" | "start date";
 
 /** Taxed by New York City: the New York metro, living in NY, inside the city. */
 export const inNyc = (d: OfferDraft) => d.residence.nyc && d.costOfLiving.area === NYC_METRO && d.residence.state === "NY";
+/** Taxed by Philadelphia as a resident: the Philadelphia metro, living in PA, inside the city. */
+export const inPhiladelphia = (d: OfferDraft) => d.residence.philadelphia !== false && d.costOfLiving.area === PHILADELPHIA_METRO
+  && d.residence.state === "PA";
+/** The city whose resident tax an offer pays, if any. */
+export const cityTax = (d: OfferDraft): "nyc" | "philadelphia" | null => (inNyc(d) ? "nyc" : inPhiladelphia(d) ? "philadelphia" : null);
+/** Its name: on a tax line ("NYC income tax") and in a sentence ("inside New York City"). */
+export const CITY_TAX = {
+  nyc: { line: "NYC", place: "New York City" },
+  philadelphia: { line: "Philadelphia", place: "Philadelphia" },
+} as const;
 
 /** The bonus basis, with its default. */
 export const bonusBasis = (b: BonusDraft): AnnualBonus["basis"] => b.basis ?? "percentOfSalary";
@@ -272,7 +288,7 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   const state = d.residence.state!;
   const offer: OfferInput = {
     label: d.label || `Offer ${o.letter}`,
-    residence: { state, ...(inNyc(d) ? { locality: { kind: "nyc" } } : {}) },
+    residence: { state, ...(inNyc(d) ? { locality: { kind: "nyc" } } : inPhiladelphia(d) ? { locality: { kind: "philadelphia", resident: true } } : {}) },
     employerState: d.employerState ?? state,
     startDate: d.startDate!,
     salary: {
@@ -411,7 +427,8 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
   const h = o.health;
   return {
     label,
-    residence: { state: o.residence.state, nyc: o.residence.locality?.kind === "nyc" },
+    residence: { state: o.residence.state, nyc: o.residence.locality?.kind === "nyc",
+      ...(o.residence.locality?.kind === "philadelphia" ? { philadelphia: o.residence.locality.resident } : {}) },
     employerState: o.employerState === o.residence.state ? null : o.employerState,
     startDate: o.startDate,
     salary: {

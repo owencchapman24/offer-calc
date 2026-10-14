@@ -101,7 +101,7 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       firstPayoutGuaranteed: g.guaranteed, mustBeEmployedOnPayDate: g.mustBeEmployed,
     };
     return {
-      ...b, label: "Generated", residence: { state: place.state, nyc: place.city === "nyc" }, startDate: start,
+      ...b, label: "Generated", residence: { state: place.state, nyc: place.city === "nyc", philadelphia: place.city === "philadelphia" }, startDate: start,
       salary: { annual: g.salary, raise: g.raise, raiseOn: g.raiseOn,
         promotions: g.promotion ? [{ on: addDays(start, g.promotion.afterDays), stepUp: g.promotion.stepUp, scenarios: null }] : [] },
       bonus,

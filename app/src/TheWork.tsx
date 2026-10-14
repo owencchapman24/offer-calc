@@ -59,7 +59,7 @@ export function TheWork(p: TheWorkProps) {
   // or a word they use (its label, state, cash awards' name, an estimated rent, the prices picked). Not on every key.
   const o = p.ctx.offers.find((x) => x.letter === letter);
   const words = [letter, open, p.ctx.household.pricesIn, p.ctx.household.filingStatus, p.ctx.household.healthUsage, o?.draft.label, o?.draft.residence.state,
-    o?.draft.residence.nyc, cashName(o), o?.draft.costOfLiving.monthlyRent === null, o?.sample].join("|");
+    o?.draft.residence.nyc, o?.draft.residence.philadelphia, cashName(o), o?.draft.costOfLiving.monthlyRent === null, o?.sample].join("|");
   const current = r?.detail && r.detail.years === r.view.row.years ? r : null;
   const workOffer = current?.work?.[current.letters.indexOf(letter)];
   const ctx = p.ctx;

@@ -10,7 +10,7 @@ import {
   aboutIsDefault, type BridgeLine, detailOf, offerByLetter, pricesOf, rentEstimate, rentNotes, res, shortCity, type WorkContext,
 } from "./metrics";
 import { bridge, cashName as cashNameOf, shownYearOf, yearNotes, yearValue } from "./byYearModel";
-import { ASSUMPTIONS, inNyc, type Letter } from "./model";
+import { ASSUMPTIONS, CITY_TAX, cityTax, type Letter } from "./model";
 import { type CompareRequest, cursorJobFor, type LeavePanel, tieJob, type Ties } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import type { SlowJob, SlowState } from "./useEngine";
@@ -321,7 +321,8 @@ function offersSection(ctx: WorkContext, opts: DocOptions, add: Add) {
     if (o.equity && (o.equity.grants.length || (o.equity.refreshers?.value.base ?? 0) > 0)) parts.push(equityText(o.equity));
     if (o.hours) parts.push(`${o.hours.weekly.base} hours a week${o.hours.weeksPerYear && o.hours.weeksPerYear !== 50 ? `, ${o.hours.weeksPerYear} weeks a year` : ""}`);
     const info = d.costOfLiving;
-    const where = draft && inNyc(draft) ? "New York City" : info ? `${shortCity(info.area.name)}, ${o.residence.state}` : o.residence.state;
+    const city = draft ? cityTax(draft) : null;
+    const where = city ? CITY_TAX[city].place : info ? `${shortCity(info.area.name)}, ${o.residence.state}` : o.residence.state;
     const rent = info ? `, rent ${dollars(info.monthlyRent)} a month${info.rentSource === "fmr" ? " (HUD's estimate)" : info.rentSource === "derived" ? " (an estimate)" : ""}` : "";
     parts.push(`${where}${rent}`);
     if (!together) parts.push(`starts ${longDate(o.startDate)}`);

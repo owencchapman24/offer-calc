@@ -965,6 +965,9 @@ engine change, and the lock is regenerated with it, never on its own (a Python u
 
 ## Known gaps — offer model
 - **Residence and household:**
+  - **City taxes:** New York City's income tax and Philadelphia's resident wage tax (2026-10-14, audit C2: `inPhiladelphia`, the
+    "Inside Philadelphia" checkbox for the Philadelphia metro in PA, default inside) are counted; Philadelphia's nonresident wage tax
+    (3.425%, on commuters) isn't, though the engine has it (`resident: false`).
   - **Nonresident tax:** taxed as a full-year resident of the residence state only. No
     part-year residency in a relocation year, and no nonresident tax or resident credit
     for the employer state; the convenience-of-employer rule (NY, DE, PA; CT/NJ
