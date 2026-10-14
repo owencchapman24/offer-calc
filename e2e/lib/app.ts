@@ -94,6 +94,26 @@ export async function openCompare(page: Page) {
   await settled(page);
 }
 
+/**
+ * Saved sessions for the recovery tests: one this version reads but can't show (an offer whose draft is empty: it threw on
+ * every page before there was a recovery screen), and one a newer version saved (schema 4).
+ */
+const household = { filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: "00000" };
+export const SAVED = {
+  broken: JSON.stringify({ schemaVersion: 3, household, offers: [{ id: "mine", letter: "A", sample: null, draft: {} }], ui: { basis: "cash", theme: "system" } }),
+  newer: JSON.stringify({ schemaVersion: 4, household, offers: [{ id: "mine", letter: "A", sample: null, draft: { label: "From the future" } }], ui: {} }),
+};
+
+/** Opens the app with a saved session in this browser, as a returning visitor's (once: a reload keeps what the app does with it). */
+export async function openWithSaved(page: Page, saved: string) {
+  await page.addInitScript((v) => {
+    if (sessionStorage.getItem("seeded")) return;
+    sessionStorage.setItem("seeded", "1");
+    localStorage.setItem("offer-calc:v1", v);
+  }, saved);
+  await page.goto("/#/");
+}
+
 /** Scrolls down until a schedule that loads as you near it (L-1 to L-6) is on the page, and shows it. */
 async function scrollTo(page: Page, id: string) {
   const title = page.locator(`#${id}-title`);

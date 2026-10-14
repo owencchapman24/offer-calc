@@ -72,6 +72,8 @@ describe("import", () => {
       ["a salary that isn't a number", bad((x) => { x.offers[0].draft.salary.annual = "lots"; }), "offers.0.draft.salary.annual: should be a number."],
       ["a missing field", bad((x) => { delete x.offers[1].draft.hours; }), "offers.1.draft.hours: should be present."],
       ["a letter twice", bad((x) => { x.offers[1].letter = "A"; }), "offers.1.letter: A appears twice."],
+      // Offers are edited and removed by id: with one id twice, an edit to A changed B too, and removing A removed both (audit C25).
+      ["an id twice", bad((x) => { x.offers[1].id = x.offers[0].id; }), "offers.1.id: \"sample-A\" appears twice; each offer needs its own."],
       ["four offers", bad((x) => { x.offers.push(x.offers[0]); }), "offers: 4 offers; the app holds 1 to 3."],
       ["a bad stay", bad((x) => { x.household.stayYears = 0; }), "household.stayYears: should be a whole number of years from 1 to 10."],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],

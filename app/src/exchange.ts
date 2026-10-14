@@ -60,6 +60,8 @@ export function readImport(text: string): ImportResult {
   if (Array.isArray(f.offers) && (list.length < 1 || list.length > 3)) problems.push(`offers: ${list.length} offers; the app holds 1 to 3.`);
   const offers: AppOffer[] = [];
   const letters = new Set<string>();
+  // Offers are edited and removed by id: two with one id would change together.
+  const ids = new Set<string>();
   list.forEach((o, i) => {
     const x = o as Partial<AppOffer> & Partial<V1Offer>;
     const where = `offers.${i}`;
@@ -68,6 +70,8 @@ export function readImport(text: string): ImportResult {
     else if (letters.has(x.letter!)) problems.push(`${where}.letter: ${x.letter} appears twice.`);
     letters.add(x.letter as string);
     if (typeof x.id !== "string") problems.push(`${where}.id: should be text.`);
+    else if (ids.has(x.id)) problems.push(`${where}.id: "${x.id}" appears twice; each offer needs its own.`);
+    if (typeof x.id === "string") ids.add(x.id);
     if (!(x.sample === null || x.sample === "sample" || x.sample === "edited")) problems.push(`${where}.sample: should be null, "sample" or "edited".`);
     if (f.schemaVersion === 1) {
       const before = problems.length;

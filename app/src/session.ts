@@ -52,6 +52,13 @@ export interface Session {
 }
 
 export const STORAGE_KEY = "offer-calc:v1";
+/**
+ * What was saved before it was set aside (one at a time, the latest): a saved value this version couldn't read, or the one
+ * "Start again" (the recovery screen) replaced. The Data page offers it as a download; "Delete all data" deletes it too.
+ */
+export const BACKUP_KEY = "offer-calc:backup";
+/** The schema this version saves. A saved value with a higher one is a newer version's: never read as ours, never saved over. */
+export const SCHEMA = 3;
 
 export function initialSession(today: string): Session {
   return { schemaVersion: 3, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
@@ -103,35 +110,105 @@ const byLetter = (x: AppOffer, y: AppOffer) => x.letter.localeCompare(y.letter);
 /** Storage that may be missing or blocked (private windows, previews): reads and writes never throw. */
 export interface KeyValueStore { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem?(key: string): void }
 
-export function loadSession(store: KeyValueStore | undefined, today: string): Session {
-  try {
-    const raw = store?.getItem(STORAGE_KEY);
-    if (raw) {
-      const s = migrate(JSON.parse(raw));
-      if (s) return s;
-    }
-  } catch { /* unreadable or blocked: start fresh */ }
-  return initialSession(today);
+export interface Loaded {
+  session: Session;
+  /** What's saved is from a newer version of the app (this schema): it's left as it is, and the samples show meanwhile. */
+  newer: number | null;
 }
 
-/** Deletes what this browser holds for the app. True when done (or nothing was stored). */
+export function loadSession(store: KeyValueStore | undefined, today: string): Loaded {
+  let raw: string | null = null;
+  try {
+    raw = store?.getItem(STORAGE_KEY) ?? null;
+  } catch { /* blocked: start fresh */ }
+  if (raw) {
+    const newer = newerSchema(raw);
+    if (newer !== null) return { session: initialSession(today), newer };
+    try {
+      const s = migrate(JSON.parse(raw));
+      if (s) return { session: s, newer: null };
+    } catch { /* unreadable */ }
+    // Unreadable: kept aside, since the next save replaces it.
+    setAside(store, raw, "unreadable", today);
+  }
+  return { session: initialSession(today), newer: null };
+}
+
+/** The schema of a saved value from a newer version of the app; null for ours, an older one's, or anything unreadable. */
+export function newerSchema(raw: string | null): number | null {
+  if (!raw) return null;
+  try {
+    const v = (JSON.parse(raw) as { schemaVersion?: unknown } | null)?.schemaVersion;
+    return typeof v === "number" && v > SCHEMA ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A saved value set aside: when, why, and the value as it was stored. */
+export interface Backup { on: string; why: "unreadable" | "startedAgain"; saved: string }
+
+export function setAside(store: KeyValueStore | undefined, saved: string, why: Backup["why"], today: string): boolean {
+  try {
+    store?.setItem(BACKUP_KEY, JSON.stringify({ on: today, why, saved } satisfies Backup));
+    return !!store;
+  } catch {
+    return false;
+  }
+}
+
+export function readBackup(store: KeyValueStore | undefined): Backup | null {
+  try {
+    const b = JSON.parse(store?.getItem(BACKUP_KEY) ?? "null") as Partial<Backup> | null;
+    return b && typeof b.saved === "string" && typeof b.on === "string" ? { on: b.on, why: b.why === "startedAgain" ? b.why : "unreadable", saved: b.saved } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A saved value as a file to download: an export (the Data page imports it) when it has offers and About you, whatever its
+ * schema, so a newer version can import its own; the text as it was otherwise.
+ */
+export function savedFile(saved: string, today: string, now = new Date()): { fileName: string; text: string } {
+  try {
+    const x = JSON.parse(saved) as Partial<Session> | null;
+    if (x && typeof x === "object" && Array.isArray(x.offers) && x.household) {
+      const file = { format: "offer-calc", schemaVersion: x.schemaVersion, exportedAt: now.toISOString(), household: x.household, offers: x.offers,
+        ...(x.ui && typeof x.ui === "object" ? { ui: x.ui } : {}) };
+      return { fileName: `offer-calc-saved-${today}.json`, text: `${JSON.stringify(file, null, 2)}
+` };
+    }
+  } catch { /* not JSON: as it was */ }
+  return { fileName: `offer-calc-saved-${today}.txt`, text: saved };
+}
+
+/** Deletes what this browser holds for the app, the set-aside copy too. True when done (or nothing was stored). */
 export function clearSession(store: KeyValueStore | undefined): boolean {
   try {
     store?.removeItem?.(STORAGE_KEY);
+    store?.removeItem?.(BACKUP_KEY);
     return true;
   } catch {
     return false;
   }
 }
 
-/** True when saved; false when storage is unavailable (the app then keeps state in memory only). */
-export function saveSession(store: KeyValueStore | undefined, s: Session): boolean {
+/** Saved; or not: storage is unavailable (the app keeps state in memory only), or it holds a newer version's save. */
+export type SaveStatus = "saved" | "unavailable" | "newer";
+
+/**
+ * Saves, unless what's saved is a newer version's (a rollback, or a tab still on an older build): saving over it would lose
+ * offers this version can't even read.
+ */
+export function saveSession(store: KeyValueStore | undefined, s: Session): SaveStatus {
   try {
-    if (!store) return false;
+    if (!store) return "unavailable";
+    if (newerSchema(store.getItem(STORAGE_KEY)) !== null) return "newer";
     store.setItem(STORAGE_KEY, JSON.stringify(s));
-    return true;
+    return "saved";
   } catch {
-    return false;
+    return "unavailable";
   }
 }
 
@@ -161,12 +238,26 @@ export interface V2Session { schemaVersion: 2; household: V2Household; offers: A
 export function migrate(s: unknown): Session | null {
   const x = s as Partial<Session> | Partial<V2Session> | Partial<V1Session> | null;
   if (!x || !Array.isArray(x.offers) || !x.household || !x.ui) return null;
-  if (x.schemaVersion === 3) return { ...(x as Session), household: migrateHousehold(x.household) };
-  if (x.schemaVersion === 2) return { ...(x as V2Session), schemaVersion: 3, household: migrateHousehold(x.household) };
+  if (x.schemaVersion === 3) return { ...(x as Session), household: migrateHousehold(x.household), offers: uniqueIds((x as Session).offers) };
+  if (x.schemaVersion === 2) return { ...(x as V2Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: uniqueIds((x as V2Session).offers) };
   if (x.schemaVersion === 1) {
-    return { ...(x as V1Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: (x as V1Session).offers.map(migrateOffer) };
+    return { ...(x as V1Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: uniqueIds((x as V1Session).offers.map(migrateOffer)) };
   }
   return null;
+}
+
+/**
+ * Offers are edited and removed by id: two with one id would change together (an import could once save them; it's
+ * refused now). A repeated id gets a mark added until it's unique.
+ */
+function uniqueIds(offers: AppOffer[]): AppOffer[] {
+  const seen = new Set<string>();
+  return offers.map((o) => {
+    let id = o.id;
+    while (seen.has(id)) id += "'";
+    seen.add(id);
+    return id === o.id ? o : { ...o, id };
+  });
 }
 
 /**

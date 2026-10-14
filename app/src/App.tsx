@@ -14,7 +14,8 @@ import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
-import { clearSession, type KeyValueStore, loadSession, reducer, saveSession, type Theme, type Ticks } from "./session";
+import { NewerSave } from "./Recovery";
+import { clearSession, type KeyValueStore, loadSession, reducer, type SaveStatus, saveSession, type Theme, type Ticks } from "./session";
 import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
 import { dayBefore, localToday, longDate } from "./text";
@@ -72,8 +73,10 @@ export function App() {
   const page = route.page;
   // Back on the comparison from the methodology, start at the top.
   useEffect(() => { if (page === "compare") window.scrollTo(0, 0); }, [page]);
-  const [session, dispatch] = useReducer(reducer, undefined, () => loadSession(storage(), today));
-  const [saved, setSaved] = useState(true);
+  const [loaded] = useState(() => loadSession(storage(), today));
+  const [session, dispatch] = useReducer(reducer, loaded.session);
+  // A newer version's save is never saved over: the page says so (NewerSave) while it's there.
+  const [saved, setSaved] = useState<SaveStatus>(loaded.newer !== null ? "newer" : "saved");
   // Phones show one offer at a time and the verdict bar at the bottom; tablets, the bar at the top (docs/ui-design.md §3.2).
   const phone = useMedia(PHONE);
   const tablet = useMedia(TABLET);
@@ -291,6 +294,7 @@ export function App() {
             onCancel={() => { setChoosing(false); printToggle.current?.focus(); }} />
         )}
       </header>
+      {saved === "newer" && <NewerSave schema={loaded.newer} />}
 
       {route.page === "method" ? (
         <Suspense fallback={<p className="note">Loading the methodology…</p>}>
@@ -359,7 +363,9 @@ export function App() {
         {sample && <p className="print-only">Includes sample offers: illustrative inputs, not market data.</p>}
         <p className="print-only">Printed {longDate(today)} from Offer Calc. Everything was worked out in this browser, from the inputs above.</p>
         <p className="no-print">
-          {saved ? "Saved in this browser only; nothing leaves this device." : "This browser isn't saving (private window?): your entries last until you close the tab."}{" "}
+          {saved === "saved" ? "Saved in this browser only; nothing leaves this device."
+            : saved === "newer" ? "Not saving: this browser holds a newer version's save (above), which this page won't save over."
+            : "This browser isn't saving (private window?): your entries last until you close the tab."}{" "}
           <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>Reload the samples</button>
         </p>
         <p className="sources">

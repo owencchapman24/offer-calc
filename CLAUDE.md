@@ -220,6 +220,12 @@ user's call: see Next steps.
   - The engine runs in a Web Worker: inputs debounced 200 ms, stale results dropped.
   - State is saved in this browser only (localStorage `offer-calc:v1`). No backend, no
     login.
+  - **Recovery** (2026-10-14, audit C22, C23; `Recovery.tsx`): a root error boundary shows "Something went wrong" with
+    "Download what's saved" (an export the Data page imports, `savedFile`), "Start again with the samples" (the saved value set
+    aside under `offer-calc:backup`, offered on the Data page until "Delete all data") and "Reload the page". A save from a newer
+    schema is never saved over (`saveSession` returns "newer"): the page shows the samples with a notice and a download. An
+    unreadable save is set aside before anything replaces it. Imports with one offer id twice are refused; saved sessions with
+    one get ids of their own (`uniqueIds`).
 - **Features:**
   - quick mode for 2-3 offers;
   - About you, with "How long do you expect to stay?" (default 4 years);

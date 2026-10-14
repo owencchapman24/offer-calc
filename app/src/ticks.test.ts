@@ -20,8 +20,8 @@ describe("the tickmark setting is saved, exported and imported", () => {
     const mem = new Map<string, string>();
     const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
     const s = reducer(initialSession(VALUATION), { type: "ui", patch: { ticks: "hidden" } });
-    expect(saveSession(store, s)).toBe(true);
-    expect(loadSession(store, VALUATION).ui.ticks).toBe("hidden");
+    expect(saveSession(store, s)).toBe("saved");
+    expect(loadSession(store, VALUATION).session.ui.ticks).toBe("hidden");
     // Sessions from before it load with the marks shown.
     expect(initialSession(VALUATION).ui.ticks).toBeUndefined();
   });

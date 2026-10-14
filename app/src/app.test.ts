@@ -8,13 +8,19 @@ import {
   toOfferInput, withBase,
 } from "./model";
 import { copyBlock } from "./App";
+import { readImport } from "./exchange";
 import { PRESETS, presetOf } from "./presets";
 import { priceWords, US_PRICES } from "./prices";
-import { type KeyValueStore, initialSession, loadSession, reducer, saveSession, STORAGE_KEY, type V1Offer, type V1Session } from "./session";
+import {
+  BACKUP_KEY, clearSession, type KeyValueStore, initialSession, loadSession as load, readBackup, reducer, savedFile, saveSession, STORAGE_KEY, type V1Offer,
+  type V1Session,
+} from "./session";
 import { localToday, parseMoney, parsePercent } from "./text";
 import { disagreement, type StepView, totalsCaption, verdict } from "./verdict";
 
 const TODAY = "2026-10-08";
+/** The saved session as loaded (what the app starts with). */
+const loadSession = (store: KeyValueStore | undefined, today: string) => load(store, today).session;
 
 describe("samples in the app", () => {
   it("move forward by whole years so they start on or after today: July 2026 -> July 2027", () => {
@@ -132,14 +138,75 @@ describe("session", () => {
     const mem = new Map<string, string>();
     const store: KeyValueStore = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v) };
     const edited = reducer(s0, { type: "household", patch: { stayYears: 3 } });
-    expect(saveSession(store, edited)).toBe(true);
+    expect(saveSession(store, edited)).toBe("saved");
     expect(loadSession(store, TODAY).household.stayYears).toBe(3);
     mem.set(STORAGE_KEY, "{not json");
     expect(loadSession(store, TODAY).household.stayYears).toBe(4);
     const blocked: KeyValueStore = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
     expect(loadSession(blocked, TODAY).offers).toHaveLength(3);
-    expect(saveSession(blocked, s0)).toBe(false);
-    expect(saveSession(undefined, s0)).toBe(false);
+    expect(saveSession(blocked, s0)).toBe("unavailable");
+    expect(saveSession(undefined, s0)).toBe("unavailable");
+  });
+});
+
+describe("recovery: nothing saved is lost (audit C22, C23)", () => {
+  const memory = (entries: Array<[string, string]> = []) => {
+    const mem = new Map(entries);
+    const store: KeyValueStore = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) };
+    return { mem, store };
+  };
+  const s0 = initialSession(TODAY);
+  const newer = JSON.stringify({ schemaVersion: 4, household: { filingStatus: "joint" }, offers: [{ id: "x", letter: "A", future: true }], ui: {} });
+
+  it("a newer version's save loads as the samples, says so, and is never saved over", () => {
+    const { mem, store } = memory([[STORAGE_KEY, newer]]);
+    const loaded = load(store, TODAY);
+    expect(loaded.newer).toBe(4);
+    expect(loaded.session.offers.map((o) => o.sample)).toEqual(["sample", "sample", "sample"]);
+    // Before this fix the app saved the samples over it 500 ms after loading.
+    expect(saveSession(store, reducer(loaded.session, { type: "household", patch: { stayYears: 2 } }))).toBe("newer");
+    expect(mem.get(STORAGE_KEY)).toBe(newer);
+    // A tab still on this version, after the newer one saved in another tab: the same.
+    const other = memory([[STORAGE_KEY, JSON.stringify(s0)]]);
+    other.mem.set(STORAGE_KEY, newer);
+    expect(saveSession(other.store, s0)).toBe("newer");
+    expect(other.mem.get(STORAGE_KEY)).toBe(newer);
+    // "Delete all data" is the one way to replace it, on purpose: then saving works again.
+    expect(clearSession(store)).toBe(true);
+    expect(saveSession(store, s0)).toBe("saved");
+  });
+
+  it("a newer version's save downloads as an export the newer version can import; anything else as it was", () => {
+    const f = savedFile(newer, TODAY, new Date("2026-10-08T15:00:00Z"));
+    expect(f.fileName).toBe("offer-calc-saved-2026-10-08.json");
+    expect(JSON.parse(f.text)).toEqual({ format: "offer-calc", schemaVersion: 4, exportedAt: "2026-10-08T15:00:00.000Z",
+      household: { filingStatus: "joint" }, offers: [{ id: "x", letter: "A", future: true }], ui: {} });
+    expect(savedFile("{not json", TODAY)).toEqual({ fileName: "offer-calc-saved-2026-10-08.txt", text: "{not json" });
+    // One of this version's own saves round-trips through import.
+    const mine = reducer(s0, { type: "household", patch: { stayYears: 2 } });
+    const r = readImport(savedFile(JSON.stringify(mine), TODAY).text);
+    expect(r.ok && r.household.stayYears).toBe(2);
+  });
+
+  it("an unreadable save is set aside before anything replaces it, and \"Delete all data\" deletes that too", () => {
+    const { mem, store } = memory([[STORAGE_KEY, "{not json"]]);
+    expect(load(store, TODAY).newer).toBeNull();
+    expect(readBackup(store)).toEqual({ on: TODAY, why: "unreadable", saved: "{not json" });
+    expect(saveSession(store, s0)).toBe("saved");
+    expect(readBackup(store)?.saved).toBe("{not json");
+    clearSession(store);
+    expect(mem.has(BACKUP_KEY)).toBe(false);
+    expect(readBackup(store)).toBeNull();
+  });
+
+  it("offers saved with one id twice (an import could once do it) get ids of their own", () => {
+    const twice = { ...s0, offers: s0.offers.map((o) => ({ ...o, id: "same" })) };
+    const { session } = load(memory([[STORAGE_KEY, JSON.stringify(twice)]]).store, TODAY);
+    expect(session.offers.map((o) => o.id)).toEqual(["same", "same'", "same''"]);
+    // So an edit changes one offer, and a removal removes one.
+    const edited = reducer(session, { type: "edit", id: "same'", set: { "salary.annual": 1 } });
+    expect(edited.offers.map((o) => o.draft.salary.annual)).toEqual([s0.offers[0].draft.salary.annual, 1, s0.offers[2].draft.salary.annual]);
+    expect(reducer(session, { type: "removeOffer", id: "same" }).offers).toHaveLength(2);
   });
 });
 
