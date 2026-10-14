@@ -255,10 +255,7 @@ export function App() {
   // "Copy as document" (docs/copy-as-document-plan.md): waits while the inputs have a problem, and says why. It reads the page as it
   // is when its figures come back (`live`), not as it was when the button was pressed.
   const incomplete = session.offers.filter((o) => missing.has(o.id)).map((o) => o.letter);
-  const copyBlocked = !view || !compare ? "Fill in at least two offers to copy the comparison."
-    : engine.invalid ? "Fix the problems listed under the verdict to copy the comparison."
-    : engine.error ? "The comparison couldn't be worked out, so there's nothing to copy."
-    : incomplete.length ? `Fill in or remove offer ${incomplete.join(" and ")} to copy the comparison.` : null;
+  const copyBlocked = copyBlock({ compare: !!compare, view: !!view, invalid: !!engine.invalid, error: !!engine.error, incomplete });
   const live = useRef<Live | null>(null);
   live.current = { work, compare, ready, breakeven: engine.breakeven, cursor: engine.cursor, leaveAt };
 
@@ -285,7 +282,8 @@ export function App() {
             <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
               onClick={() => setChoosing(!choosing)}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
-            <CopyDocument blocked={copyBlocked} live={live} requestSlow={requestSlow} results={engine.sweep} />
+            <CopyDocument blocked={copyBlocked?.why ?? null} quietly={copyBlocked ? !copyBlocked.shown : false} live={live}
+              requestSlow={requestSlow} results={engine.sweep} />
           </p>
         )}
         {route.page === "compare" && choosing && (
@@ -381,6 +379,22 @@ export function App() {
   );
 }
 
+/**
+ * Why "Copy as document" waits, if it does: a problem with the offers, said beside the button; or, while the comparison is first
+ * being worked out (two offers are complete, its results aren't in yet), a reason said only to screen readers. Shown, that reason
+ * was "Fill in at least two offers…", which wasn't so, and on a phone it wrapped onto a line of its own and was gone a moment later,
+ * moving everything under it up 24 px (a layout shift of 0.020 in Lighthouse's mobile run, 2026-10-13).
+ */
+export function copyBlock(s: { compare: boolean; view: boolean; invalid: boolean; error: boolean; incomplete: string[] }):
+  { why: string; shown: boolean } | null {
+  if (!s.compare) return { why: "Fill in at least two offers to copy the comparison.", shown: true };
+  if (s.invalid) return { why: "Fix the problems listed under the verdict to copy the comparison.", shown: true };
+  if (s.error) return { why: "The comparison couldn't be worked out, so there's nothing to copy.", shown: true };
+  if (s.incomplete.length) return { why: `Fill in or remove offer ${s.incomplete.join(" and ")} to copy the comparison.`, shown: true };
+  if (!s.view) return { why: "Working out the comparison…", shown: false };
+  return null;
+}
+
 type CopyState = "working" | "copied" | "again" | "failed" | null;
 const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
   working: "Getting the document ready…",
@@ -395,8 +409,9 @@ const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
  * needs, since Safari allows a write only inside the click. A browser that won't take that gets "Copy now", which copies the ready
  * document through a copy event. Disabled (aria-disabled, so it stays focusable and says why) while the inputs have a problem.
  */
-function CopyDocument({ blocked, live, requestSlow, results }: {
-  blocked: string | null; live: { current: Live | null }; requestSlow: Engine["requestSlow"];
+function CopyDocument({ blocked, quietly = false, live, requestSlow, results }: {
+  blocked: string | null; /** The reason is for screen readers only (copyBlock). */ quietly?: boolean;
+  live: { current: Live | null }; requestSlow: Engine["requestSlow"];
   /** The comparison on the page: a new one makes what was copied, or got ready, an earlier comparison's. */
   results: unknown;
 }) {
@@ -441,7 +456,7 @@ function CopyDocument({ blocked, live, requestSlow, results }: {
         onClick={copy}>Copy as document</button>
       {state === "again" && <button type="button" className="link" onClick={copyNow}>Copy now</button>}
       <span className="print-status" role="status">{state ? COPY_SAID[state] : ""}</span>
-      {blocked && <span id="copy-why" className="print-status">{blocked}</span>}
+      {blocked && <span id="copy-why" className={quietly ? "sr-only" : "print-status"}>{blocked}</span>}
     </>
   );
 }
