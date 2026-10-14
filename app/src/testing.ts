@@ -1,4 +1,5 @@
 import { createElement, type ReactElement } from "react";
+import { expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Basis } from "../../src/offer/types";
 import { About } from "./About";
@@ -18,8 +19,10 @@ import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowRespons
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import { detailedModule, Ledger } from "./Ledger";
-import { type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type Letter, type Missing, sampleOffers, toHousehold, toOfferInput } from "./model";
-import { rentNotes, type WorkContext } from "./metrics";
+import {
+  type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, firstYear, type Letter, type Missing, sampleOffers, toHousehold, toOfferInput,
+} from "./model";
+import { type Derivation, type MetricId, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
 import { initialSession, type UiState } from "./session";
 import { derivations, WorkProvider } from "./Tickmarks";
@@ -39,23 +42,36 @@ export const VALUATION = "2026-07-13";
 /** The offers compared, by letter, and the comparison's work context. `about` changes About you (Prices in, say). */
 export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4,
   about: Partial<AppHousehold> = {}): WorkContext {
-  const offers = tweak(sampleOffers(VALUATION));
+  const ctx = contextOf(tweak(sampleOffers(VALUATION)), { ...DEFAULT_HOUSEHOLD, ...about, stayYears: stay }, VALUATION, basis);
+  if ("issues" in ctx) throw new Error(`The samples don't compare: ${JSON.stringify(ctx.issues)}`);
+  return ctx;
+}
+
+/** The stays the lead's "if you stay" row compares, as the app asks for them: 2 to 5 years, and yours. */
+const staysFor = (stayYears: number) => [...new Set([2, 3, 4, 5, stayYears])].sort((a, b) => a - b);
+
+/**
+ * Any offers' work context, as the app builds it on `today`: other wages in the earliest start's calendar year, the stays it
+ * compares, the verdict on `basis`. The engine's problems with the inputs instead, when it has any.
+ */
+export function contextOf(offers: AppOffer[], household: AppHousehold, today: string, basis: Basis = "colAdjustedTotal"):
+  WorkContext | { issues: unknown } {
   const inputs = offers.map((o) => {
     const r = toOfferInput(o);
-    if (!("offer" in r)) throw new Error("incomplete sample");
+    if (!("offer" in r)) throw new Error(`Offer ${o.letter} is incomplete: ${r.missing.join(", ")}`);
     return r.offer;
   });
   const letters = offers.map((o) => o.letter);
-  const household = { ...DEFAULT_HOUSEHOLD, ...about };
+  const wagesYear = firstYear(offers, today);
   const out = compute({
-    compare: { offers: inputs, household: toHousehold(household, 2026), stays: [2, 3, 4, 5], stayYears: stay, valuationDate: VALUATION,
-      inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
+    compare: { offers: inputs, household: toHousehold(household, wagesYear), stays: staysFor(household.stayYears), stayYears: household.stayYears,
+      valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
-  if (!out.sweep) throw new Error(`The samples don't compare: ${JSON.stringify(out.issues)}`);
-  const view = verdict(out.sweep, letters, basis, stay, offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter), priceWords(household.pricesIn))!;
-  return { today: VALUATION, household: { ...household, stayYears: stay }, wagesYear: 2026, offers, rents: out.rents,
-    results: { sweep: out.sweep, detail: out.detail, view, letters } };
+  if (!out.sweep) return { issues: out.issues };
+  const noHours = offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter);
+  const view = verdict(out.sweep, letters, basis, household.stayYears, noHours, priceWords(household.pricesIn))!;
+  return { today, household, wagesYear, offers, rents: out.rents, results: { sweep: out.sweep, detail: out.detail, view, letters } };
 }
 
 const noop = () => {};
@@ -92,7 +108,8 @@ export function renderAllInputs(ctx: WorkContext): string {
 export function compareOf(ctx: WorkContext): CompareRequest {
   return {
     offers: ctx.results!.letters.map((l) => (toOfferInput(ctx.offers.find((o) => o.letter === l)!) as { offer: CompareRequest["offers"][number] }).offer),
-    household: toHousehold(ctx.household, 2026), stays: [2, 3, 4, 5], stayYears: ctx.household.stayYears, valuationDate: VALUATION,
+    household: toHousehold(ctx.household, ctx.wagesYear), stays: staysFor(ctx.household.stayYears), stayYears: ctx.household.stayYears,
+    valuationDate: ctx.today,
     inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   };
 }
@@ -196,4 +213,43 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
     ...(opts.leave ? [createElement(Leaving, { key: "v", ...opts.leave })] : []),
     createElement(Warnings, { key: "w", ctx, sample: true }),
   ]));
+}
+
+// ---- figures as displayed ---------------------------------------------------------------------------
+
+export const parseShown = (s: string) => {
+  const t = s.replace(/[$,]/g, "").replace(/^\((.*)\)$/, "-$1").replace("−", "-");
+  if (t.endsWith("%")) return Number(t.slice(0, -1)) / 100;
+  const frac = t.match(/^(\d+)\/(\d+)$/);
+  return frac ? Number(frac[1]) / Number(frac[2]) : Number(t);
+};
+/** Half a unit in the last place shown: "1,234" -> 0.5, "9,166.67" -> 0.005, "30.52027%" -> 0.0000005. */
+export const half = (s: string) => {
+  const d = s.replace(/[%)]/g, "").split(".")[1]?.length ?? 0;
+  return (0.5 * 10 ** -d) / (s.endsWith("%") ? 100 : 1);
+};
+
+/**
+ * A derivation's lines, worked as displayed: each op applies to the running figure, and each "=" line must be it, to the
+ * precision shown (the figure shown is the result rounded). A line with no op after an "=" starts again. Fails with the line.
+ */
+export function footsAsDisplayed(id: MetricId, d: Derivation) {
+  let acc: number | null = null;
+  let tol = 0;
+  for (const l of d.lines) {
+    if (!l.value || l.value === "below $0") { acc = null; continue; }
+    const v = parseShown(l.value);
+    if (Number.isNaN(v)) { acc = null; continue; }
+    if (!l.op || acc === null) { acc = v; tol = 0; continue; }
+    switch (l.op) {
+      case "+": acc += v; break;
+      case "−": acc -= v; break;
+      case "×": tol = Math.abs(acc * half(l.value)) + Math.abs(v) * tol; acc *= v; break;
+      case "÷": acc /= v; tol /= Math.abs(v); break;
+      case "=":
+        expect(Math.abs(acc - v), `${id}: ${l.label} = ${l.value}, worked out ${acc}`).toBeLessThanOrEqual(half(l.value) + 1e-9);
+        acc = v;
+        tol = 0;
+    }
+  }
 }

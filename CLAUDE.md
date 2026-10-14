@@ -361,6 +361,13 @@ print scan off a desktop).
   any tickmark's figure lacks a tickmark kind, a methodology section or a derivation,
   drill-downs included, or if a section has no anchor on the methodology page. It also
   checks the hero against §4.1 and the bridge against W4 to the dollar.
+- **Property tests** (2026-10-14, audit T4; fast-check, generators in `app/src/arbitrary.ts`): random valid offers and households
+  (joint filing with a spouse's wages, NYC and Philadelphia, start dates on any day, rent of $0, cash before day one, guaranteed
+  first bonuses, ranges). `properties.test.ts`: each year's tax on the offer stacks on the household as described, salary in the
+  window is pay for the offer's own days, a stay's payments are in the window, a guaranteed first bonus is the target in every
+  scenario. `display.test.ts`: the whole page, L-3, L-4, L-6, the CSVs and the copied document are worked out without NaN; every
+  derivation on the page foots as displayed (`footsAsDisplayed`, now in `testing.ts`); a figure reads the same wherever it appears;
+  the verdict's month is its work's and L-2's. `it.fails` marks a property a known bug breaks: the fix turns it into `it`.
 - Hand-checked values carry their arithmetic in comments.
 - `npm test` also runs `scripts/check-engine.ts`, the no-formatting-in-the-engine guard.
 
@@ -446,6 +453,9 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
   `requirements.txt` with `requirements-lock.txt` as constraints (see README); the runner picks `.venv`'s Python
   automatically, and warns first if the environment differs from the lock (`scripts/lib/lock.ts`).
 - `npm run offers`: sample comparison tables.
+- `npm run fuzz`: the property tests (`app/src/properties.test.ts`, `display.test.ts`) on a random seed with ten times the runs,
+  shrinking each counterexample; it prints the seed (`FUZZ_SEED=<seed> npm run fuzz` replays it). `npm test` runs them on a fixed
+  seed.
 - `npm run dev` / `npm run build` / `npm run preview`: the app (Vite, config in
   `app/vite.config.ts`), built to `dist/`.
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
