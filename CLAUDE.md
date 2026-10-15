@@ -21,7 +21,8 @@ behind every figure.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
-  (T2), the performance gates (P1-P4), CI hygiene (S2, in part) and this file (D2, D5, D6). What's left: section 3.
+  (T2), the performance gates (P1-P4), CI hygiene (S2, in part) and this file (D2, D5, D6); and the `main` ruleset is on (S1, in
+  part). What's left: section 3.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -48,8 +49,8 @@ finding in `docs/user-testing.md` as it comes in.
 
 **Pre-launch checklist** (before the public launch):
 1. **Visibility and settings:** decide public or private now (section 2). For public: `docs/slice-3-plan.md`, "Public-repo prep",
-   item 7, has each setting. Rulesets are free on a public repository: require `check`, `lighthouse` and `e2e`, with branches up to
-   date (audit S1), so the agreement below is enforced; and have Vercel wait for them before promoting.
+   item 7, has each setting; the ruleset it plans is in place (section 4). What's left of audit S1: Vercel still deploys every push
+   to `main` without waiting for CI; have it wait for the checks before promoting.
 2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files).
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 30 minutes, after D11's updates to it): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
@@ -58,8 +59,10 @@ finding in `docs/user-testing.md` as it comes in.
 5. **Retake the README's screenshot** (D10), and check the README and M-4 against the oracle report, and the docs against the code.
 
 ## 4. Working agreements
-- **Pull requests** (by agreement; not enforced until the rulesets above): one branch per slice or fix; every change reaches `main`
-  through a pull request. Never push `main` directly.
+- **Pull requests:** one branch per slice or fix; every change reaches `main` through a pull request. Enforced since 2026-10-15 by
+  the repository's `main` ruleset: a pull request, the seven CI checks passing (`check`, `lighthouse`, `e2e` and its four shards) on a
+  branch up to date with `main`, no force-push or deletion, no one exempt. So after one pull request merges, bring the next up to
+  date (rebase onto `main`) and let CI run again.
   1. `git switch -c <branch>`, commit, `git push -u origin <branch>`;
   2. `gh pr create` (the body ends with the Claude Code line);
   3. CI must pass (`gh pr checks --watch`, or the desktop app's PR monitor);
