@@ -111,4 +111,4 @@ design, decisions and review by the author. Every commit carries a "Co-Authored-
 
 ## License
 
-All rights reserved; source shown for review only.
+© 2026 Owen Chapman. All rights reserved. Source shown for review only.
