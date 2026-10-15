@@ -1,16 +1,22 @@
-# v2 plan (proposed 2026-10-13; decisions recorded the same day)
+# v2 plan (proposed 2026-10-13; decisions recorded the same day; the offer breakdown approved 2026-10-15)
 
 **Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
-pull request #29 (below, "Decisions"). Nothing is built, and nothing starts until testers have answered each item's questions. What to
-build after v1 (UI slices 1-8 and Copy as document), in priority order:
-1. **Beyond the money:** what else each offer is worth to you, in dollars you name, and whether (and at what figure) that flips
-   the verdict.
-2. **Market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
-   (OEWS, May 2025).
-3. **Negotiation help:** L-3's ties and the published wages in one short summary, with an optional draft email: what would tie,
-   not advice.
-4. **Accuracy:** days off, commuting, relocation costs, remote work under convenience-of-employer rules, startup options as
-   scenarios, and Public Service Loan Forgiveness.
+pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next section), is approved (2026-10-15): B1-B12 as
+recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
+built (pull request #31); nothing else is, and nothing starts until testers have answered each item's questions. What to build after v1
+(UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
+was 1, 2, 3, 4):
+1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
+   appears with two or more offers. Quick mode starts from one offer.
+2. **Item 2, market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
+   (OEWS, May 2025), as a part of that offer's breakdown.
+3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs.
+4. **Item 3, negotiation help:** what each lever (salary, sign-on) is worth to you, from one offer; L-3's ties once there are two;
+   the published wages; an optional draft email. Facts, not advice.
+5. **Item 1, beyond the money:** what else each offer is worth to you, in dollars you name, and whether (and at what figure) that flips
+   the verdict. Comparison-only.
+6. **Items 4d-4f, accuracy, the large parts:** remote work and working across a state line, startup options as scenarios, and Public
+   Service Loan Forgiveness.
 
 A fresh session should be able to build an approved item from this file, `CLAUDE.md` and `docs/ui-design.md`.
 
@@ -21,6 +27,527 @@ answers in `docs/user-testing.md`; each item says which answers would change it.
 the engine guard and an unchanged grid before each merge; `npm run build` for UI work; tax-engine changes on their own branch in
 separate commits, each with the oracle byte-identical (or the difference explained); live screenshots, light and dark, at each UI
 stop.
+
+## 5. Offer breakdown (approved 2026-10-15, with conditions; first in priority)
+
+**Status: approved, not built.** Proposed and approved on 2026-10-15 (pull request #45): B1-B12 as recommended, with the conditions
+below on B4, B5 and B8 and a rule for labels (B13), which the rest of this section follows. No code until the audit's items under
+"Before stop 5A" are done and the testers' first question is answered.
+
+**The conditions** (the user's review of pull request #45, 2026-10-15):
+1. **Own-city dollars stay inside one breakdown (B4).** An offer's own city's dollars are for its breakdown alone. Two offers' figures
+   never sit side by side in their own cities' dollars as if they were comparable: wherever they sit together (the ledger's "On its
+   own" row, the comparison, any table, chart, print or document with more than one offer), they're in the common reference dollars
+   (the prices picked under "Prices in", the U.S. average by default), or the conversion step sits inline beside them ("New York $7,563
+   − New York prices $367 = U.S.-avg $7,196"). And every figure says which dollars it's in: an after-rent figure names its place's
+   prices on the figure itself ("New York $6,671", "U.S.-avg $7,196"); figures before rent and prices are dollars as paid, and say so
+   ("$, as paid"); a column's unit sits in its head, and every figure's accessible name, Show the work title, CSV header and line in the
+   copied document carry it.
+2. **The sample comparison stays one click away (B5).** The first screen has "See a sample comparison" next to "Start with my offer",
+   both in view without scrolling on a phone and on a desktop; one click loads the three samples, compared.
+3. **Comparison-only warnings stay with the comparison (B8).** L-5's warnings about one offer fold into that offer's A-6. A warning about
+   more than one offer (the comparability warning: a cost or benefit counted for one offer but not another) stays with the comparison,
+   under the verdict.
+4. **Every rate and share states its period (B13).** "Tax: 32.4% of its pay over your stay", not "tax 32.4%"; "$27.27 of each $100 of
+   year-1 pay"; "17% under the base case, over your stay"; "a month over your stay" or "a month in year 1". On the figure's label, and in
+   its accessible name, its Show the work title, CSV headers and the copied document.
+
+**Their test** (stop 5A, like `prices.test.ts`): it renders every breakdown part, the "On its own" row, the comparison, the CSVs and the
+copied document, and fails on an after-rent figure that doesn't name its dollars, two offers' own-city figures in one row, table or chart,
+or a rate or share that doesn't state its period.
+
+**Why.** From user testing (`docs/user-testing.md`): the project's owner, using the tool with a real offer, had only that one, so had
+to compare it against a sample, which made the real offer harder to understand (finding 2); two testers had already asked for each
+offer's numbers and logic in a document they could read at their own pace (finding 1). The conclusion: the product should be
+**evaluator-first**. Every offer gets its own standalone breakdown, and the comparison is a layer that appears once there are two or
+more offers. Nothing here changes a figure the engine works out; it changes what one offer can show on its own, and what the page
+leads with.
+
+**Today** (checked in the code, 2026-10-15): one offer shows nothing.
+- The worker computes only once two offers are complete (`App.tsx`: `compare` is null under two; `horizonSweep` throws under two). The
+  lead says "Fill in at least two offers to compare them.", and Copy as document is disabled with the same reason.
+- An offer's × shows only while there are three (`Ledger.tsx`), and "Start with my offers" makes two blank offers (`session.ts`).
+- Yet nearly everything a breakdown needs is per offer already: the fast lane's `OfferDetail` (your stay's window totals, bear and
+  bull, withholding, employment years, tax by calendar year, payments as posted, bonuses and vests), the year figures as shown
+  (`footing.ts`), the bridge, L-6's tables, L-4's cliffs and panel, M-9's terms. The breakdown is mostly those, worked out for one
+  offer and laid out for one reader.
+
+### What a breakdown holds
+
+One offer, read top to bottom. Its workpaper references are the offer's letter and a part (B9): `A-1` to `A-7` now, `A-8` and `A-9`
+when items 2 and 3 arrive, each placed where it reads best (references are stable IDs, as D6 has it). A printed or copied breakdown
+cites its parts the way the comparison cites `L-2`. Every figure is ticked, opens its work and foots as displayed, as everywhere.
+
+The sketches are sample A at the samples' fixed dates (start Jul 13, 2026, valued that day, a 4-year stay, 5%, 2.5% inflation), worked
+out with the engine on `main` (2026-10-15); `x` is a figure not worked out yet.
+
+**A-1 · The bottom line** (the breakdown's head)
+- **A month to spend after rent, plus what you save, over your stay, in today's dollars.** Each is the level monthly amount over the
+  stay with the same present value: M-7.2's annuity, over this offer's own stay (B3).
+  - **To spend:** take-home − planned savings − rent − expected out-of-pocket health costs.
+  - **Saved:** the face-value money: planned savings, your 401(k) and HSA, vested employer 401(k), employer HSA, perks.
+  - **Their sum** is the after-rent total at this offer's own prices, which is total rewards − rent (M-6.3's identity at a price
+    factor of 1). So there's no new engine arithmetic: the window totals already carry the local spending (`nonHousingLocal`, and the
+    out-of-pocket costs) and the face-value money. The total a month is the engine's present value ÷ the annuity factor as shown,
+    rounded once; saved likewise; to spend is the difference, so one line takes the rounding, as `shownPv` has it.
+- **In this offer's own dollars** (B4): what you'd actually have where you'd live, with no price conversion, which is the comparison's
+  step. Each figure names them ("New York $6,671"). When "Prices in" names a city (yours, say), or once there's a comparison to tie to,
+  one more line restates the total at those prices with the conversion step inline ("New York $7,563 − New York prices $367 = U.S.-avg
+  $7,196 a month over your stay"), so the figure the comparison uses sits beside the own-city one, never in place of it (condition 1).
+- **Year 1, as paid:** the same split, nominal, for the first employment year, since a first budget is year 1's, with one line saying
+  why the stay's figure differs, from L-1's notes (`yearNotes`).
+- **The effective tax rate:** the offer's tax over your stay ÷ its pay, nominal, the tax worked out as everywhere (household tax with
+  the offer minus without it). Its help says it isn't your top rate.
+- **Per hour worked,** when hours are entered: the after-rent total at its own prices, nominal, ÷ the hours worked in the stay (the
+  comparison's per hour, at the offer's own prices).
+- **The bad case,** in a line, from A-4: a month over your stay, and how far under the base case, over your stay.
+
+```
+ A-1 · A · NYC INVESTMENT BANKING ANALYST · ON ITS OWN                                              [ SAMPLE ]
+   Your 4-year stay (Jul 13, 2026 – Jul 12, 2030), a month, in today's dollars at New York prices:
+     New York $6,671✓ to spend after rent  +  New York $892✓ saved  =  New York $7,563✓ a month over your stay
+   Year 1, as paid: New York $4,647✓ a month to spend after rent + New York $825✓ a month saved, in year 1. Later years
+   pay more: the bonus rises each year, and the 2029 promotion (base case).
+   Tax: 32.4%✓ of its pay over your stay · Per hour worked over your stay, after tax and rent: New York $22.96✓
+   Bear case: New York $6,245✓ a month over your stay, 17%✓ under the base case over your stay
+   With a comparison: New York $7,563✓ − New York prices $367✓ = U.S.-avg $7,196✓ a month over your stay
+```
+
+(Checked: $6,671.23 + $892.09 = $7,563.32 a month, × the annuity factor 43.5191 = $329,149 of present value, which is A's total
+rewards less its rent, each a present value; at U.S. prices it's $313,175, the rank list's figure. Year 1: $55,762 to spend and $9,900
+saved, ÷ 12. Tax $265,889 ÷ pay $821,486. Per hour: the after-rent total at New York prices, nominal, ÷ 16,000 hours. The prices
+step: $7,563.32 − $7,196.26 = $367.06 a month.)
+
+**A-2 · Where the money goes** (year 1, or any year)
+- **Of every $100 paid to you in the year:** tax, rent, health costs (premiums and expected out-of-pocket), saved (your 401(k) and HSA,
+  planned savings) and left to spend, to the cent, adding to $100.00. Each part is the year's figure as shown ÷ the year's pay as shown,
+  and the money left to spend takes the rounding (the year figures as shown, in `footing.ts`). Each share states its year ("$27.27 of
+  each $100 of year-1 pay"), and the bridge's figures are dollars as paid until the after-rent line, which names its prices.
+- **Then what the employer adds, outside the $100:** 401(k) money (and how much of it vests by your stay's end), HSA money, perks.
+- **A bar with its numbers beside it:** each segment labeled in words, a table view, no color alone.
+- **The bridge under it, in dollars** (B7): from the offer letter to after rent, at this offer's own prices, for any year. It's L-1's
+  bridge (`bridge()` in `byYearModel.ts`), moved here. With a comparison it keeps its last two lines (the prices line, then after rent
+  at U.S. prices, which ties to L-1), so a figure in A-2 and in L-1 is one figure.
+- **A negative year** (rent over take-home) shows the money left to spend in parentheses, and A-1 says so in words.
+
+```
+ A-2 · WHERE THE MONEY GOES · year 1 (Jul 13, 2026 – Jul 12, 2027), as paid                          [ Year 1 ▾ ]
+   Paid to you in year 1: $152,986✓, as paid. Where each $100 of it goes:
+     tax                $27.27✓ of each $100 of year-1 pay
+     rent               $29.81✓ of each $100 of year-1 pay
+     health costs        $2.16✓ of each $100 of year-1 pay
+     saved               $4.31✓ of each $100 of year-1 pay
+     left to spend      $36.45✓ of each $100 of year-1 pay
+                       $100.00^
+     [████████████████████████████|█████████████████████████████|██|████|████████████████████████████████████]
+   Your employer adds $3,300✓ of 401(k) money in year 1, on top: it vests at 3 years, and you stay 4.
+
+                                                                                $, as paid
+   Offer letter: salary + target bonus + sign-on                                190,000T
+     less  first bonus is a stub                                                (37,014)✓  paid Jan 31 for Jul–Dec only
+   Paid in year 1                                                               152,986^
+     less  tax                                                                  (41,724)✓  federal, FICA, NY, NYC
+     less  health premiums                                                       (1,800)T
+   After-tax pay                                                                109,462^
+     plus  employer 401(k)                                                         3,300✓  vested by the end of your stay
+     less  expected out-of-pocket health costs                                   (1,500)T
+   Total rewards                                                                111,262^
+     less  rent                                                                 (45,600)T  $3,800 a month
+   After rent, at New York prices                                       New York $65,662^
+     = New York $4,647✓ a month to spend after rent + New York $825✓ a month saved, in year 1 (your 401(k) and the match)
+```
+
+(Year 1's figures as shown: $152,986 − $41,724 tax − $45,600 rent − $3,300 health costs − $6,600 of your own 401(k) = $55,762 left to
+spend. The shares: 27.27 + 29.81 + 2.16 + 4.31 + 36.45 = 100.00.)
+
+**A-3 · Pay by year, and when it arrives**
+- **Gross pay by employment year and component:** salary, bonus, sign-on and other cash, stock vests, clawbacks repaid. Stacked
+  columns with a table view, the year figures as shown (`shownYears`), so they tie to A-2 and to L-1.
+- **When it arrives:** a dated line for each payment that isn't salary (each bonus with the period it's for, each cash award, each
+  vest with its grant), from the fast lane's `bonuses` and `rsus` and the awards' dates; salary as a monthly figure. It answers "a
+  sign-on in August, a first bonus in January for half a year, then each January's bonus".
+- **The year's notes,** as L-1's (`yearNotes`): a promotion, new-hire RSUs finishing.
+- Gross and as paid, not on the comparison's selected basis: that's L-1, across offers.
+
+**A-4 · Terms that can bite**
+- **The terms, in words:** each bonus condition (its pay date and period, whether you must be employed on the payout date, a cutoff, a
+  guaranteed first payout); each clawback window (in full or in part, until when); each vesting cliff (the first RSU vest, the employer
+  401(k) money's vesting). From the inputs: M-9's `leaveTerms` (`leaveModel.ts`), extended to the cutoff and the guarantee.
+- **The cliffs inside your stay,** dated, each with what leaving the day before costs: a bonus forfeited, a clawback owed, a vest or
+  401(k) money left behind (`cliffs()`; L-4's markers and `cliffText`). From the slow lane while A-4 is on screen, about 4-8 ms an offer.
+- **The next cliff** from your start (from today, once the offer has started), and what staying until it is worth after tax: `nextCliff`,
+  as L-4's panel has it, past a prorated clawback's monthly steps.
+- **If you left on a day you pick** (B6): what you'd keep after tax, repay and leave behind, L-4's panel for this offer (the same job,
+  `cursorJob`, and with a comparison the same last day as L-4's, so the figures are one figure). L-4's chart stays in the comparison.
+- **The bad case:** the bottom line in the bear and bull cases, and what goes wrong in the bear case, generated from the inputs (L-2's
+  `caseChanges`, `changeText` and `riskCarriers`, `cases.ts`); with no ranges, "no ranges entered", and where to add one, as L-2 says it.
+
+```
+ A-4 · TERMS THAT CAN BITE
+   Bonus       Paid each Jan 31, for the year before; you must be employed on the payout date. The first, Jan 31, 2027, is
+               for Jul 13 – Dec 31, 2026 only.
+   Sign-on     $10,000T, paid Aug 12, 2026; repaid in full if you leave before Jul 12, 2027.
+   401(k)      The employer's money vests after 3 years, all at once: leave before then and you keep none of it.
+   In your stay  Jan 31, 2027  first bonus, $32,986✓: leave the day before and it's forfeited
+                 Jul 12, 2027  the sign-on's clawback ends: work through this day and it's yours
+                 Jul 12, 2029  the employer's 401(k) money vests, $x✓: work through this day and it's yours
+   Next cliff  …, worth $x✓ after tax to stay until it.
+   Bad case    New York $6,245✓ a month over your stay in the bear case, 17%✓ under the base case over your stay; New York
+               $8,391✓ a month in the bull case. In the bear case, bonuses are 20% under target and the 2029 promotion doesn't come.
+   If you left on [ Jan 12, 2028 ▾ ]: you'd keep $x✓ after tax (as paid), repay nothing, and leave $x✓ of 401(k)
+               money behind.
+```
+
+**A-5 · What the benefits are worth**
+- **By year and over your stay:** the employer's 401(k) money (credited, and vested by your stay's end, with its vesting), the
+  employer's HSA money, perks (education, commuter), against health costs (premiums, expected out-of-pocket at your usage, and the
+  out-of-pocket maximum as the worst year), and your own 401(k) and HSA contributions.
+- **What they add up to:** total rewards − after-tax pay, a year and a month.
+- **Not entered, not counted:** a blank plan says so ("No 401(k) entered: not counted. Add it in detailed mode."), as the comparability
+  warning does across offers.
+- From the year figures as shown (`credited`, `employer`, `hsa`, `perks`, `oop`, `premiums`, `yours`) and the window's `benefits`.
+
+**A-6 · Tax, and warnings**
+- **Tax by calendar year:** the offer's tax and its rate, each rate with its year ("x% of its 2027 pay"), by kind (federal income tax, FICA, state, city), projected law marked. From
+  the fast lane's `taxYears`, with no slow job.
+- **Withholding against what you'll owe:** L-5's cash-timing estimate (`withholding`), with what to set aside for April.
+- **Every warning for this offer** over your stay, by kind (changes your numbers, not modeled, cash timing), each with "Show at the
+  field": L-5's lines (`warningWords`, `warningKinds`, `warningAt`), for this offer. L-5 then retires (B8). A warning about more than
+  one offer, the comparability warning, stays with the comparison, under the verdict (condition 3).
+
+**A-7 · The work** (collapsed until "Show the tables")
+- L-6's four tables for this offer, as they are: the employment years as numbered lines, your stay's totals, every payment with its
+  formula and tax, each calendar year's tax with and without the offer. L-6 moves here and retires as a reference (B8); its CSVs keep
+  their contents under the new names (`A-7-employment-years`, …). The payments come from the slow lane's `paymentsJob` while it's
+  open, as now.
+
+**Copy as document, for one offer**
+- With one offer, "Copy as document" copies its breakdown, about 2 pages, for someone who's never seen the tool: the bottom line in plain
+  English; where the money goes (the $100 and year 1's bridge); pay by year and when it arrives; the terms that can bite; the benefits;
+  tax by year; the offer as entered; the assumptions. As today's document: no tickmarks or references, every total adding up as
+  displayed, every calculation it states in `worked` (`copydoc.test.ts`), the samples flagged first and last.
+- With two or more (B10), the button offers a choice, as "Print…" does: the breakdown of the offer shown, the comparison (today's
+  document), or both. In "both", each breakdown comes in turn under its own heading, every after-rent figure naming its dollars, and the
+  comparison's tables that set offers side by side (year 1's bridges among them) stay in the common dollars, with the prices line
+  (condition 1).
+- **Print** follows: the summary prints each offer's A-1 to A-6 and A-7 without its list of every payment, then the comparison; the full
+  workpaper adds every payment, as now.
+
+### How it's reached
+
+**A section of the one page, one offer at a time** (B2). Inputs and results stay together (§2), and the methodology and the Data page
+keep their routes.
+
+```
+ ONE OFFER (desktop)                                         TWO OR MORE
+ ┌ About you ──────────────────────────────────────┐        ┌ About you ───────────────────────────────────────────┐
+ ├ Offers ────────────┬ A-1 · A on its own (pinned)┤        ├ Offers ──────────────────────────┬ L · Lead (pinned) ─┤
+ │            A       │ New York $ a month, stay:  │        │            A       B       C     │ C leaves you about │
+ │ Salary  110,000    │ 6,671 spend + 892 saved    │        │ Salary  110,000  80,000  105,000 │ $487 a month more  │
+ │ …                  │ = 7,563; year 1 as paid: … │        │ …                                │ than A …           │
+ │ + Add an offer     │ Tax 32.4% of pay over stay │        │ On its own (U.S.-avg $, a month) │                    │
+ │   to compare       │                            │        │          7,196   4,510   7,683   │                    │
+ ├────────────────────┴────────────────────────────┤        ├──────────────────────────────────┴────────────────────┤
+ │ A-2 Where the money goes  A-3 Pay by year       │        │ THE OFFERS, ONE AT A TIME          [ A | B | C ]      │
+ │ A-4 Terms  A-5 Benefits  A-6 Tax  A-7 The work  │        │ A-1 … A-7 for the offer chosen                        │
+ └─────────────────────────────────────────────────┘        │ L-1 By year · L-2 · L-3 · L-4: the comparison         │
+                                                            └───────────────────────────────────────────────────────┘
+```
+
+- **With one offer:** About you; the ledger with one column; beside it, pinned where the verdict goes, A-1, so the answer stays in view
+  as you edit; under the columns, A-2 to A-7, full width. No offer switch and no comparison.
+- **With two or more:** the pinned column is the verdict (L), as now. The ledger gains a foot row, "On its own", with each offer's
+  bottom line under its own column: a month over its own stay, in the common dollars (the prices picked, "U.S.-avg $" by default), never
+  its own city's, since the row sets offers side by side (condition 1). Each figure is ticked, its work steps from the offer's own-city
+  figure to the common one, and it links to its breakdown. Under the columns: the breakdown
+  section, one offer at a time behind an A | B | C switch, then the comparison's L-1 to L-4, loading as you scroll toward them, as now.
+- **The offer chosen** is one state for the phone's ledger tabs and the breakdown's switch (`ui.offerTab`, already saved), so on a phone
+  the offer you're editing is the breakdown under it. "Edit it" from a breakdown's figure opens its offer's tab and field, as now.
+- **Breakdown before comparison,** since it's the primary view. A breakdown is long, so A-2 to A-6 are compact, each part's detail behind
+  its own "Show …" (as L-6's tables are), and the section's head has "Skip to the comparison" when there is one.
+
+**Why not the alternatives:**
+- **A page per offer** (`#/offer/A`): inputs and results would split across pages (or the ledger would repeat on each), the breakdowns and
+  the comparison couldn't print or copy as one, and each switch would be a route change with focus to manage. A URL per offer isn't
+  something the design wants anyway (§10: no share links).
+- **Tabs that replace the comparison** (A | B | C | Compare): the verdict would be out of view while you edit an offer, and print would
+  open every tab anyway.
+
+**Relation to the comparison's schedules: each fact lives in one place.** An offer's own figures are worked out in its breakdown; the
+comparison adds only what lies between offers (gaps, winners, ties, what would flip the verdict) and cross-foots (`<`) its per-offer
+figures to the breakdowns.
+
+| Today | In this model | Why |
+|---|---|---|
+| L: verdict, rank list, if-you-stay row, pipeline winners, pay per extra hour, close call, rent note, comparability warning | Stays (comparison) | Between offers. The rank list's figures cross-foot to each breakdown's line at the prices picked (A-1) |
+| L-1: the chart and table of every offer by year | Stays (comparison) | Across offers, on the selected basis |
+| L-1: the bridge | Moves to A-2 (B7) | One offer and one year. With a comparison it keeps its prices line, which ties to L-1 |
+| L-2: who holds up best, the range chart, the winner in each scenario | Stays (comparison) | Between offers |
+| L-2: what goes wrong in the bear case, per offer | Moves to A-4; L-2's sentence keeps naming who has most to lose | One offer's inputs |
+| L-3: what it would take | Stays (comparison) | A tie is between offers. Item 3 adds each lever's value with one offer (A-9) |
+| L-4: the chart over every offer by date, one last day | Stays (comparison) | One date across offers. Its panel for one offer is A-4's "if you left on", the same job and state |
+| L-5: warnings | Each offer's warnings into its A-6; L-5 retires (B8) | They're about one offer. A warning about more than one (the comparability warning: a cost or benefit counted for one offer but not another) stays with the comparison, under the verdict (condition 3) |
+| L-6: the work | Into each breakdown as A-7; L-6 retires (B8) | Already one offer at a time |
+
+Retired references (L-5, L-6) aren't reused, as with any stable ID.
+
+**When starts differ.** A breakdown runs over its offer's own stay, from its own start (B3), so adding an offer never changes another's
+breakdown. The comparison runs, as decided, from the earliest start, so a later start counts as lost days. Where they differ, the
+comparison's figure for that offer shows the step in its work: "B on its own (A-1, Aug 3, 2026 – Aug 2, 2030), less what falls after the
+comparison's window ends (Jul 12, 2030), = B in the comparison `<`", like L-6's stay rows (the years, less what runs past your stay).
+Employment years are the same in both; only the stay's totals differ. The samples share a start date, so for them the two are one.
+
+**The view models it reuses** (each already per offer, so a figure in a breakdown and in the comparison is one figure):
+- `footing.ts` (`shownYears`, `shownStay`): every year figure, in A-1's year 1, A-2, A-3 and A-5.
+- `byYearModel.ts`: `bridge` (A-2, given an option to end at the offer's own prices) and `yearNotes` (A-1, A-3).
+- `cases.ts`: `windowValue`, `caseChanges`, `changeText`, `riskCarriers`, `hasRanges` (A-4's bad case).
+- `leaveModel.ts`: `leaveTerms`, `cliffText`, `segmentText`, `forfeits` and the panel's words (A-4).
+- `warningKinds.ts`, `warningWords.ts`, `warningAt.ts` (A-6).
+- `workpaper.ts`: `yearTable`, `stayRows`, `paymentYears`, `taxTables` (A-6's tax by year, A-7).
+- `summary.ts` and `copyDoc.ts`' `vestingText` (A-4's terms, the document's offer as entered).
+- `verdict.ts`' `shownFactor` and `monthOf` (A-1's months), and `derive.ts`, `metrics.ts` and `sections.ts`, extended with the
+  breakdown's figures.
+- **New:** `breakdownModel.ts`, A-1's and A-2's figures (the local split, the $100's shares, the rate, per hour), shared with `derive.ts`,
+  `csv.ts` and `copyDoc.ts`, as each schedule's view model is.
+
+**The worker:** a per-offer job in the fast lane, run for every complete offer whether or not there's a comparison: its own stay's
+projection (base, bear, bull), its withholding, its own window's annuity terms, and the pieces `stayDetail` builds today (`OfferDetail`).
+- The worker remembers each offer's job by its inputs, About you, the stay and today, so an edit to B re-projects B alone.
+- With two or more offers the comparison reuses each breakdown's projections where the windows match (every offer that starts on the
+  earliest start date), and projects again only for a later start, unless B11.
+- `horizonSweep` runs only with two or more offers.
+
+**The engine:** nothing new for A-1 to A-7. The window totals carry the local split; `cliffs`, `nextCliff`, `withholdingShortfall` and
+`annuityFactor` already take one offer and any window. One candidate (B11): `projectScenario` returning totals for several windows from
+one projection, so a later-starting offer's own stay and the comparison's window don't cost two projections.
+
+### Quick mode from one offer
+
+- **One offer is enough.** The ledger holds one to three offers; × removes any offer while two or more remain; "+ Add an offer to
+  compare (up to 3)" sits under the last column. "Start with my offer" makes one blank offer A, not two. A one-offer session is a valid
+  schema-3 session, so nothing migrates (an older build would show it as "Fill in at least two offers…", and save it unchanged). The Data
+  page's import already accepts one offer.
+- **A first-time visitor** (B5) sees sample A alone, as a breakdown: the ledger's one column, A-1 pinned beside it, A-2 to A-7 below. The
+  banner: "Sample offer: illustrative inputs, not market data. [Start with my offer] [See a sample comparison]", the two side by side
+  and both in view without scrolling on a phone and a desktop (condition 2); one click loads the three samples, compared.
+  - **Why A:** there's something in every part: a stub first bonus, a sign-on with a full clawback, a 401(k) cliff at three years, New
+    York City's tax, rent near 30% of pay, a promotion that the bear case drops, 80-hour weeks.
+  - **The alternative** keeps today's three samples. They show the comparison's point (the after-rent flip), but they open on three
+    offers that aren't the visitor's, which is finding 2's problem.
+- **Filling in your offer:** quick mode's fields as now (salary, bonus, city, start date, rent with its `E` estimate). Until the offer is
+  complete, the pinned column says what's missing ("Add a salary, a city and a start date to see A on its own"); the moment it's complete,
+  A-1 fills in. The first-use note for the after-rent figure comes with A-1 ("This is much less than the salary on purpose: it's what's
+  left to spend after tax and rent, plus what you save. [See where the money goes] [Got it]"), pointing to A-2.
+- **Adding a second offer brings in the comparison.** + adds column B, blank. A's breakdown doesn't change (B3). Once B is complete:
+  - the pinned column becomes the verdict, and the live region says the verdict's sentence once;
+  - A's bottom line moves to the ledger's "On its own" row, the breakdown section gets its A | B switch, and L-1 to L-4 appear under it;
+  - nothing else moves, and focus stays where it was.
+  Removing offers back to one reverses it: the comparison goes, and focus moves to the remaining offer's A-1 heading.
+- **The bars:** with one offer, the phone's bottom bar and the tablet's top bar show A-1's figure with its dollars ("A New York $7,563 a month · stay 4 yrs");
+  with two or more, the verdict, as now.
+- **Samples in this model:** a sample is an offer like any other, with its breakdown, stamped wherever it appears (§7's rules don't
+  change: `SAMPLE`, `EDITED SAMPLE`, the exports' first line and `-sample` names, chart captions). "See a sample comparison" loads all
+  three (the footer's "Reload the samples" does too). A sample is never offered as something to compare your own offer against: that's
+  what finding 2 had to do. Published wages (item 2) are the honest context for one offer.
+
+### v2's other items in this model
+
+- **Market benchmarks (item 2) move into the breakdown,** as `A-8 · Published wages`, after A-3. The occupation picker lives there, per
+  offer; the range, the placement words, the caveats, the data and the tests stand as written in item 2. It still never enters a figure,
+  a total or a tie (D1). With a comparison there's nothing more to add: each offer's range is in its own breakdown. L-7 isn't built, and
+  D6 falls away.
+- **Negotiation help (item 3) moves into the breakdown too, and works with one offer,** as `A-9 · What a change would be worth`, after
+  A-6:
+  - with one offer: what each lever adds to the bottom line, as facts ("Each $1,000 of starting salary is worth $x a month to you over
+    your stay, after tax and rent; it also raises your bonus and match"; "Each $1,000 of sign-on is worth $x after tax, paid Aug 12, and
+    is repaid if you leave before Jul 12, 2027"), each worked out from one projection with the lever moved, in the slow lane while A-9 is
+    on screen;
+  - with two or more: L-3's ties for this offer join it, and the published wages from A-8, as planned;
+  - the draft email, the wording rules and their test stand as written.
+- **Beyond the money (item 1) stays comparison-only** (B12). Its point is whether your values flip the money verdict, and with one offer
+  there's no verdict to flip; adding your values to one offer's figures would put them in the money figures, which D1 rules out. Its row
+  group shows with two or more offers; values entered stay saved if an offer is removed.
+- **Accuracy (item 4) feeds the breakdown with no new layout:** days off and commuting time into per hour (A-1); commuting's cost into
+  A-2 (a "getting to work" share of the $100); relocation into year 1 (A-2, A-3); startup options into A-3 and A-4's bad case; Public
+  Service Loan Forgiveness beside A-1. It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
+  for each) partly cancels out, but in one offer's bottom line nothing cancels. Hence 4a-4c move up.
+
+### Re-ranked priority (approved 2026-10-15)
+
+Item numbers are stable IDs; the order is separate.
+1. **Item 5, the offer breakdown** (this section), with quick mode from one offer and §1's new wording.
+2. **Item 2, market benchmarks,** as A-8: the context a one-offer evaluator lacks (finding 2), still context only.
+3. **Items 4a-4c, days off, commuting and relocation:** small, and a standalone bottom line has nothing to cancel their errors.
+4. **Item 3, negotiation help,** as A-9: lever values from one offer, ties from two.
+5. **Item 1, beyond the money:** comparison-only, so it waits for the comparison's users.
+6. **Items 4d-4f:** large, and each still set by the testers' answers (D10).
+
+**Before stop 5A:** the audit's remaining "fix before v2" items that this item leans on (`docs/audit-2026-10.md`): P1-P4 (the stylesheet
+and the worker reported, the first answer's time marked, CLS and TBT gated, one chunk enforced: the gates the bundle plan below relies
+on); T2 and T5 (so the new tests don't pin sample outputs a data refresh moves, and the defaults test sees what it checks); D7 and D8 (the
+two docs this changes); and H1 (the hooks linter) before the breakdown's stateful parts (its switch, A-4's last day).
+
+### The scope change: §1, evaluator-first
+
+`docs/ui-design.md` §1 today says the user holds two or three offers, and its jobs start with "Which offer leaves me better off,
+honestly?" D1 (approved) already revised its "not the job" lines for v2. The wording, approved with B1, replacing §1 whole at stop 5A (rev 4):
+
+> ## 1. Audience and job
+>
+> **Who.** A new grad or early-career analyst (0-3 years out) with a job offer, often on a deadline: exploding offers give one to three
+> weeks. Many hold a single offer; some hold two or three at once.
+> - **Finance-literate:** knows what a bonus, an RSU and a 401(k) match are. Not a tax expert.
+> - **Often moving:** the offer is in a city they don't live in yet (New York, Charlotte, Seattle).
+> - **Often unlike pay:** a bonus-heavy banking offer, salary plus RSUs in tech, steady corporate finance.
+>
+> **What the tool is: an evaluator first.** Every offer gets its own breakdown, and that's the primary view: what the offer pays out, year
+> by year, after tax and rent and per hour worked; what its terms can cost you; and the work behind every figure. Comparison is a layer
+> that appears when there are two or more offers. It adds the verdict and what lies between the offers: the gaps, the winner on each
+> basis, what would tie, what would flip it. It never replaces an offer's breakdown, and an offer's breakdown never depends on the others.
+>
+> **The principle: the tool informs the decision and shows its work; you make the call.**
+>
+> **Context.** Laptop first: one sitting of 10-20 minutes, then return visits as an offer changes (a negotiated sign-on, a recruiter's
+> new number) or another one arrives. Phone second: checking an offer's bottom line or the verdict, or showing someone.
+>
+> **Jobs, in order.** For any offer:
+> 1. **What would I actually have?** A month to spend after rent, plus what I'd save, in today's dollars (A-1).
+> 2. **Where does the money go?** Tax, rent, health costs, savings (A-2).
+> 3. **When does it arrive?** Pay by year and component, with the dates (A-3).
+> 4. **What can bite?** Bonus conditions, clawback windows, vesting cliffs, the bad case (A-4).
+> 5. **Can I trust this?** Every figure's tickmark opens its work.
+>
+> With two or more offers, the comparison adds:
+>
+> 6. **Which leaves me better off, honestly, and by how much?** The verdict, per month, not "$21,182 of present value".
+> 7. **Does it depend on how long I stay, or on things going badly? What would it take for another offer to win? What would leaving
+>    early cost under each?** The if-you-stay row, L-2, L-3, L-4.
+>
+> **Not the job:**
+> - Telling you which job to take, or whether an offer is good. Career fit is yours: values you set (beyond the money) are added up,
+>   never suggested.
+> - Market data as a verdict. Published wages are context, traced to their source, never an input to a figure, a total or a tie.
+> - Financial advice.
+>
+> The methodology page and the footer say this once, plainly.
+
+With it, at rev 4: the masthead's tagline ("Job offers worked out the way they'd pay out: after tax, after rent and prices, per hour, year
+by year, and compared side by side when you have more than one") and the first page's name in the navigation ("Offers", not "Compare").
+
+### Methodology
+
+- **M-1, the pipeline,** for one offer first: gross → after tax → total rewards → after rent, at the offer's own prices → per hour. Then
+  "Comparing offers": every offer restated at one place's prices (the U.S. average by default), the step only the comparison needs. Its
+  worked example is A's year-1 bridge, ending in New York dollars, then the prices line.
+- **New, M-1.1, where every $100 goes:** the shares, the money left to spend taking the rounding, and what's outside the $100.
+- **M-4:** the effective tax rate (the offer's tax ÷ its pay; with the offer minus without; why it isn't your top rate).
+- **M-6.3:** the identity at the offer's own prices (a factor of 1: total rewards − rent), and why the breakdown uses it.
+- **M-7:** the breakdown's stay (its own start) against the comparison's window (the earliest start), with the step between them; A-1's
+  months (M-7.2's annuity over its own stay).
+- **M-9:** the next cliff from your start, and the fuller terms list.
+- **M-12** lists each offer's assumptions, and the live numbers (M-1, M-6.3, M-7.2, M-8, M-9) follow the offer shown and work with one
+  offer (today `res()` throws under two).
+- **M-13:** the references `A-1` to `A-9` beside `L` and `M`.
+- At each stop, the methodology says what the code does (audit D3).
+
+### Bundle and LCP (within budget)
+
+**Where it stands** (2026-10-15, `main`): the main thread 365.8 / 111.8 kB raw / gzip for a quick-mode visit, one chunk, against 120 kB:
+8.2 kB of room. LCP about 1.9 s against 2.5 s; its element is About you's assumptions line, painted before the worker answers.
+
+- **Main thread: at most 0.5 kB gzip for the item,** v2's rule 1. What has to be there: the one-offer session rules (× and +, "Start
+  with my offer"), the breakdown section's slot, the ledger's "On its own" row, and the bars' one-offer text.
+- **A-1, the head, loads beside the worker, not in the main chunk.** Its chunk (an estimated 1-2 kB gzip) is requested at start, in
+  parallel with the worker, whose answer it can't render before anyway, so it should add no time to the first figures; 5A measures that
+  it doesn't delay the worker's first answer on Lighthouse's throttled profile. Like every lazy schedule it imports `figures.tsx`, never
+  `Tickmarks.tsx` (the one-chunk rule, and P4's check once it's built).
+- **A-2 to A-7:** one lazy chunk (an estimated 8-12 kB gzip), loaded as you scroll toward the section, as L-1 to L-6 are. A-7 is L-6's
+  chunk, moved. A-8 and A-9 come with items 2 and 3, in their own chunks.
+- **Copy as document for one offer:** in its chunk (an estimated 3-4 kB more gzip).
+- **The first visit gets lighter:** one sample and one ledger column on the page, no `horizonSweep` in the worker, and no L-1 to L-4 to
+  load until a second offer.
+- **LCP:** the LCP element doesn't change. A-1 holds its place at about its own height until its figures come, as L-1's place is held,
+  so nothing shifts when it fills (CLS at most 0.02, P3's gate). The time to the first answer (P2's mark) marks whichever paints first,
+  A-1 or the verdict, reported at each stop.
+- **The worker:** one-offer visits skip `horizonSweep`; remembering each offer's job means an edit projects only the offer edited. A
+  later-starting offer in a comparison costs a second set of projections (base, bear and bull: about 8 ms) unless B11. `npm run bench`
+  gains "one offer's breakdown" and "an edit to one of three offers", side by side with `main`. The worker grows by under 2 kB.
+- **Print:** the summary grows by each offer's A-1 to A-6, an estimated 2-3 pages an offer; the stop reports the samples' pages.
+
+### Accessibility
+
+- **The offer switch** is a tab list, as the phone's tabs are: arrow keys, Home and End choose; one Tab stop; each tab names its offer;
+  the section's heading names the offer shown ("A · NYC investment banking analyst, on its own").
+- **Headings:** the breakdown is an `h2` and each part an `h3`, so a screen reader's list of headings reads as its contents.
+- **The $100 bar:** each segment labeled in text, a table view, no color alone (graphite fills with labels: these parts aren't offers,
+  so offer colors don't apply), the drawing hidden from screen readers beside its text.
+- **The live region:** with one offer it says A-1's sentence ("A leaves you about New York $7,563 a month over your stay, after rent:
+  $6,671 to spend and $892 saved, in today's dollars at New York prices.") a second after the last result, only when it changes; when the comparison appears, its verdict
+  once. Not on the first load, as now.
+- **Focus:** removing offers down to one moves focus to A-1's heading; adding a second offer doesn't move it; "Edit it" from any
+  breakdown figure works as now.
+- **The bars** keep WCAG 2.4.11's guards with their one-offer text.
+- **Tickmarks:** every new figure has a kind, a methodology section and a derivation (`metrics.test.ts`) and foots as displayed
+  (`display.test.ts`, extended to the breakdown and to sessions of one offer).
+- **The scan's new states:** one offer (quick and detailed), each part open, each tab, the "On its own" row, the comparison appearing,
+  in every project (desktop, phone, tablet; light, dark). P5's decision about dimmed figures applies to the breakdown's too.
+- **The NVDA walkthrough** gains a part for one offer and one for the switch, before launch.
+
+### Review stops
+
+| Stop | What | Needs first |
+|---|---|---|
+| 5A | One offer works: one is the minimum, "Start with my offer", the worker's per-offer job (its own stay, remembered by its inputs), A-1 pinned with one offer and its derivations, the live region and bars with one offer, the ledger's "On its own" row, the comparison appearing and going, M-1 and M-7, §1's wording into `docs/ui-design.md` rev 4, the conditions' label rules (1 and 4) and their test. Live screenshots, light and dark, of one offer and of three | B1-B13 (approved 2026-10-15), the audit items above, the testers' first question |
+| 5B | A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved; the comparison's cross-foots and the step between windows; CSV names; print; M-1.1, M-4, M-6.3, M-9 | 5A |
+| 5C | Copy as document for one offer, and its choice with two or more; the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the NVDA walkthrough's new parts | 5B |
+
+Each stop: `npm run check-bundle` (the main thread at most 0.5 kB more over the three), `npm run lighthouse` (the LCP element
+unchanged, CLS at most 0.02), `npm run bench` side by side with `main`, and the grid unchanged (no engine change unless B11, which goes
+on its own branch under the engine's rules).
+
+### Questions for testers
+
+Ask before 5A, ideally while the tester has their own offers in front of them, and record the answers in `docs/user-testing.md`. Open
+questions first; show a sketch only after.
+1. **When you used it, how many offers did you actually have?** And how many did you expect, by when?
+2. Before a second offer came, what did you want to know about the first?
+3. What in your offer letter worried you, or didn't you understand (a clawback, vesting, the bonus's terms)?
+4. Shown the bottom line ("$6,671 a month to spend after rent, plus $892 saved, in today's dollars, over 4 years"), what do you take
+   "today's dollars" to mean? Would you plan around that, or around year 1's figure as paid?
+5. Would you want an offer's figures in its own city's dollars, or restated in a place you know?
+6. Would you share one offer's breakdown with anyone (family, a mentor, a friend at the firm)? As a document, a print, or something
+   else?
+7. Shown the sketch: which part would you read first, and which would you skip?
+- **Would change it:** most testers arrive with two or more offers (then the first visit keeps the three samples, B5); "today's dollars"
+  isn't understood (then year 1, as paid, leads A-1, and the stay's figure follows); testers think in a place they know (then the
+  breakdown follows "Prices in", B4).
+
+### Decisions (item 5): approved 2026-10-15
+
+B1-B12 as recommended, at the user's review of pull request #45, with conditions on B4, B5 and B8 (at the top of this section); B13
+was added at the same review.
+
+| # | Decision | Decided | The alternative (not taken) |
+|---|---|---|---|
+| B1 | The product's scope (`docs/ui-design.md` §1) | Evaluator-first, worded as above, keeping D1's principle | Comparison-first, with a breakdown as one more schedule |
+| B2 | How a breakdown is reached | A section of the one page, one offer at a time (A \| B \| C); A-1 pinned when there's one offer | A page per offer (`#/offer/A`); or tabs that replace the comparison |
+| B3 | A breakdown's stay | Its own start, for your stay; the comparison shows the step to its window when starts differ | The comparison's window once there is one (a breakdown would change when another offer is added) |
+| B4 | A breakdown's prices | **With a condition:** its own city's dollars within one breakdown, with one line at the prices picked (the conversion inline) once they're a city or there's a comparison; wherever two offers' figures sit together, the common dollars or the conversion inline; every figure names its dollars (condition 1) | Follow "Prices in" everywhere (the U.S. average by default) |
+| B5 | The first visit | **With a condition:** sample A alone, with "See a sample comparison" one click away, next to "Start with my offer" on the first screen (condition 2) | The three samples, as now |
+| B6 | Leaving early with one offer | A-4's "if you left on", L-4's panel for that offer (the same job and last day); L-4's chart stays in the comparison | L-4 shows with one offer too |
+| B7 | The bridge | Moves to A-2, ending at the offer's own prices, with the prices line when there's a comparison | Stays in L-1; A-2 shows the $100 alone |
+| B8 | L-5 and L-6 | **With a condition:** folded into each breakdown (A-6, A-7), the references retiring; a warning about more than one offer (the comparability warning) stays with the comparison (condition 3) | Stay as schedules of their own, shown with one offer too, with the breakdown pointing to them |
+| B9 | References | The offer's letter and a part: `A-1` … `A-9` | One prefix with the offer after it (`O-1.A`) |
+| B10 | Copy as document with two or more offers | A choice: the offer shown, the comparison, or both | The comparison only, as now |
+| B11 | Two windows for a later start | A second set of projections, unless `npm run bench` shows it matters; then `projectScenario` returns several windows' totals (an engine change, on its own branch) | The engine change from the start |
+| B12 | Beyond the money | Comparison-only | Per offer too (values beside A-1, never in it) |
+| B13 | Labels (added at review) | Every rate and share states its period, on screen, in accessible names, derivations, CSVs and the copied document (condition 4) | — |
+
+**With stop 5A:** `docs/ui-design.md` rev 4, with a status note at its top saying what's historical (audit D7): §0 (a row for
+evaluator-first), §1 (as above), §3.1's map and §3.2's layouts (the breakdown section, A-1 pinned, the "On its own" row), §3.3 (quick
+mode from one offer), §4 (the breakdown's parts; L-5 and L-6 into it; the bridge into A-2), §7 (the first visit), §8 (the methodology),
+§10 (copy and print), §12 (stops 5A-5C), and the conditions' rules where they belong (§2's principles, §9's labels); CLAUDE.md (Next
+steps, the design docs) with it. `docs/nvda-walkthrough.md` before launch.
 
 ## What v2 changes about the product's scope
 
@@ -35,7 +562,9 @@ too low. In practice:
 - **Still not advice.** Item 3 restates figures the tool already has: what would tie, and where that sits among published wages. It
   never says what to ask for, and the draft is text you edit and send yourself.
 
-`docs/ui-design.md` rev 4 records the new §1, with the principle, as item 1's first stop; each item's design follows as it's built.
+`docs/ui-design.md` rev 4 records the new §1, with the principle, at the first v2 stop, now 5A (item 5, approved 2026-10-15), which
+rewords §1 further (evaluator-first, keeping this principle: item 5, "The scope change"). Each item's design follows as
+it's built.
 
 ## Performance plan (every item)
 
@@ -86,6 +615,8 @@ under 0.3), against the 6-9 kB step 0 frees, so the main thread ends lighter tha
 15-20 kB gzip of new lazy chunks, plus OEWS's JSON) loads only when it's used.
 
 ## 1. Beyond the money
+
+**With item 5 (approved 2026-10-15):** comparison-only (B12). The row group shows with two or more offers, and the rest stands as written.
 
 **The job:** "A pays less, but I'd learn more there." Today the tool says career fit is yours and stops there. This lets you put your
 own dollar figure on what else each offer is worth to you, and shows whether that's enough to flip the money verdict, and at what
@@ -171,6 +702,9 @@ their chunk. The block renders when the worker answers, as the verdict does, so 
 - **1B:** the copied document's section, print, the scan's states, and L-3's switch if chosen.
 
 ## 2. Market benchmarks (BLS OEWS, May 2025)
+
+**With item 5 (approved 2026-10-15):** this becomes `A-8 · Published wages` in each offer's breakdown, after A-3, rather than L-7 after L-3, so it
+works with one offer, and D6 falls away. The picker, the range, the placement words, the caveats, the data and the tests stand as written.
 
 **The job:** "Is $110,000 a good offer for this?" Testers look it up elsewhere and come back. This puts each offer's base salary
 against published wages for its occupation where you'd live, with what those figures do and don't cover said beside them. Context
@@ -288,6 +822,10 @@ doesn't change. L-7 is far below the first screen, so LCP doesn't move.
 - **2B, L-7:** the picker, the ranges, the caveats, the table view and CSV, M-15, the copied document, print, the scan. Live screenshots.
 
 ## 3. Negotiation help
+
+**With item 5 (approved 2026-10-15):** this becomes `A-9 · What a change would be worth` in each offer's breakdown. With one offer it says what each
+lever (starting salary, sign-on) is worth to you after tax and rent; with two or more, L-3's ties for that offer join it, as below. The
+draft email, the wording rules and their test stand as written (item 5, "v2's other items in this model").
 
 **The job:** L-3 already says what would tie ("A: starting salary $110,000 → $118,626"). Someone about to negotiate wants that in a
 form they can use, beside where the figure sits among published wages, without the tool telling them what to do.
@@ -521,6 +1059,9 @@ Ask these before building each item, ideally while the tester has their own offe
 `docs/user-testing.md` (a finding per row, as now). Open questions first; show a sketch only after. Each group ends with what would
 change the plan.
 
+**Item 5, the offer breakdown:** its questions are in its section ("Questions for testers" there), and go first; its first, "When you
+used it, how many offers did you actually have?", before anything else.
+
 **Item 1, Beyond the money**
 1. Besides the money, what's pulling you toward one offer? (Listen for the factors' names before suggesting ours.)
 2. Could you put a dollar figure a year on that? How sure would you be of it?
@@ -558,7 +1099,8 @@ change the plan.
 ## Decisions for you
 
 Recorded 2026-10-13: **D1 and D14 approved.** D2-D13 and D15 stand as recommended unless the user comments on pull request #29;
-a comment there that disagrees replaces the row.
+a comment there that disagrees replaces the row. Item 5's decisions, B1-B13, are in its section: approved 2026-10-15, with conditions
+on B4, B5 and B8, and B13 added at review.
 
 | # | Decision | Recommended | The alternative |
 |---|---|---|---|
@@ -567,7 +1109,7 @@ a comment there that disagrees replaces the row.
 | D3 | Where your values show | Their own block under the verdict; the hero stays money | A step in the pipeline that the verdict can follow |
 | D4 | L-3 with your values | Decide at stop 1A, once the block is seen | Build the switch with 1A |
 | D5 | A value's units | A year, today's dollars, rising with inflation at anniversaries; not taxed or priced | The same nominal dollars every year |
-| D6 | L-7's place | After L-3 on the page, as L-7 | A second part of L-3 |
+| D6 | L-7's place | After L-3 on the page, as L-7 (superseded by item 5, approved 2026-10-15: A-8 in each offer's breakdown, B9) | A second part of L-3 |
 | D7 | What L-7's range compares | Base salary against May 2025 wages as published | Wages aged to the offer's start by the ECI |
 | D8 | Where OEWS data lives | One file per occupation under `app/public/oews/<vintage>/`, committed | One compact file, split at build |
 | D9 | Item 3 without item 2 | Only if testers want negotiation help before market data | Always after 2B |
@@ -580,15 +1122,21 @@ a comment there that disagrees replaces the row.
 
 ## Order and stops
 
+In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f).
+
 | Stop | What | Needs first |
 |---|---|---|
-| 0 | Make room: L-1 and the bridge on first use, quick mode's help on first open | D2 |
-| 1A | Beyond the money: engine, lead block, ledger rows, M-14, session and export | testers (item 1), D3, D5 |
-| 1B | Beyond the money: the copied document, print, the scan; L-3's switch if chosen | 1A, D4 |
+| 0 | Make room: L-1 and the bridge on first use, quick mode's help on first open. **Done** (pull request #31) | D2 |
+| 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
+| 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved | 5A |
+| 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan | 5B |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
-| 2B | L-7, Published wages: picker, ranges, caveats, M-15, the copied document | 2A, D6 |
-| 3A | Negotiation help: the summary, the draft email, the wording test | 2B (or 1A, D9), testers (item 3) |
-| 4a-4f | Accuracy, a stop per part (two for 4d and 4e; a spike for 4f) | testers (item 4), D10-D15 |
+| 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
+| 4a-4c | Accuracy, the small parts: days off, commuting, relocation, a stop each | testers (item 4), D10, D14, D15 |
+| 3A | Negotiation help, A-9 (with the levers' values): the summary, the draft email, the wording test | 2B (or 5B alone, D9), testers (item 3) |
+| 1A | Beyond the money: engine, lead block, ledger rows, M-14, session and export | testers (item 1), D3, D5, 5A |
+| 1B | Beyond the money: the copied document, print, the scan; L-3's switch if chosen | 1A, D4 |
+| 4d-4f | Accuracy, the large parts (two stops for 4d and 4e; a spike for 4f) | testers (item 4), D10-D13 |
 
 **On approval:** `docs/ui-design.md` rev 4 (§1, the ledger's new rows in §3.3, L-7 in §4, M-14 and M-15 in §8, the v2 stops in §12);
 CLAUDE.md (Next steps, the design docs); `docs/offer-model.md` for each engine change; `docs/nvda-walkthrough.md`, a part for each new
