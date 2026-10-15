@@ -104,9 +104,9 @@ describe("the comparison window", () => {
       bonus: { ...o.draft.bonus, amount: null }, cashAwards: [] } })),
   }));
 
-  // Audit C3: pay accrued in the window's last month is dated at the month's end, past the window, so an offer starting after
-  // the 1st of a month loses up to a month of pay while its hours for those days still count.
-  it.fails("each offer's salary in the window is its salary for its own days in the window", () => {
+  // Audit C3: pay accrued in the window's last month was dated at the month's end, past the window, so an offer starting after
+  // the 1st of a month lost up to a month of pay while its hours for those days still counted.
+  it("each offer's salary in the window is its salary for its own days in the window", () => {
     fc.assert(fc.property(flat, (c) => {
       const x = inputs(c);
       fc.pre(x !== null);
@@ -122,9 +122,9 @@ describe("the comparison window", () => {
     }), runs(40));
   });
 
-  // Audit C4: a payment dated before the offer's start date (relocation money paid before day one) counts in employment year 1, and
-  // so in L-1, the bridge and L-6, but falls before the window and out of the verdict.
-  it.fails("a payment in one of your stay's employment years is in the comparison, unless it comes after the stay ends", () => {
+  // Audit C4: a payment dated before the offer's start date (relocation money paid before day one) counted in employment year 1, and
+  // so in L-1, the bridge and L-6, but fell before the window and out of the verdict.
+  it("a payment in one of your stay's employment years is in the comparison, unless it comes after the stay ends", () => {
     fc.assert(fc.property(cases({ simple: true }), (c) => {
       const x = inputs(c);
       fc.pre(x !== null);
@@ -149,9 +149,9 @@ describe("bonuses", () => {
       bonus: { ...o.draft.bonus, basis: null, amount: { bear: 0, base: 0.1, bull: 0.15 }, firstPayoutGuaranteed: true } } })),
   }));
 
-  // Audit C5: when the cutoff skips the first bonus period, the guarantee is used up on the period that isn't paid, and the first bonus
-  // actually paid takes the scenario's amount (the bear case's $0).
-  it.fails("a guaranteed first payout is the target in every scenario", () => {
+  // Audit C5: when the cutoff skipped the first bonus period, the guarantee was used up on the period that isn't paid, and the first
+  // bonus actually paid took the scenario's amount (the bear case's $0).
+  it("a guaranteed first payout is the target in every scenario", () => {
     fc.assert(fc.property(guaranteed, (c) => {
       const x = inputs(c);
       fc.pre(x !== null);

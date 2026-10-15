@@ -54,6 +54,10 @@ export function projectScenario(offer: OfferInput, household: Household, options
   let trackedYears = years;
   while (addMonths(start, 12 * trackedYears) < windowEnd) trackedYears++;
   const anniversaries = Array.from({ length: trackedYears + 3 }, (_, n) => addMonths(start, 12 * n));
+  // Accrued pay, benefits and rent are cut into pieces at month starts, at anniversaries (each piece is in one employment year)
+  // and at the window's edges (each piece is wholly inside the window or outside it). Cut only at anniversaries, an offer starting
+  // after the 1st of a month had its last month in the window dated at the month's end, outside it (audit C3).
+  const cuts = [...new Set([...anniversaries, windowStart, windowEnd])].sort((a, b) => a - b);
   // Simulate to the end of the calendar year holding the last reported day, so it's taxed in full.
   const until = jan1(yearOfDay(Math.max(anniversaries[years], windowEnd) - 1) + 1);
   // Employment ends after the leave date (inclusive); nothing is earned, vested or granted after it.
@@ -92,7 +96,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const cash = cashEvents(offer.cashAwards ?? [], start);
   const paidCash = cash.filter((e) => e.day < workEnd);
   const raw: RawEvent[] = [
-    ...salaryEvents(path, start, workEnd, anniversaries),
+    ...salaryEvents(path, start, workEnd, cuts),
     ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, yearOfPayment, warnings, leave) : []),
     ...paidCash,
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
@@ -142,13 +146,13 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   if (offer.health) {
     const coverage = offer.health.coverage ?? "self";
-    const h = healthFlows(offer.health, household.healthUsage ?? "medium", start, workEnd, anniversaries,
+    const h = healthFlows(offer.health, household.healthUsage ?? "medium", start, workEnd, cuts,
       (y) => federal(jan1(y)).hsaLimit[coverage], warnings);
     benefitRaw.push(...h.flows);
     section125ByYear = h.section125ByYear;
   }
   if (offer.perks) {
-    benefitRaw.push(...perkFlows(offer.perks, start, workEnd, anniversaries, (y) => ({
+    benefitRaw.push(...perkFlows(offer.perks, start, workEnd, cuts, (y) => ({
       section127: federal(jan1(y)).section127Limit, commuterMonthly: federal(jan1(y)).commuterMonthlyLimit,
     }), warnings));
   }
@@ -244,7 +248,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
   });
   // Present value: each event's cash discounted from its date to the valuation date.
   const discount = (day: number) => (valuation === undefined ? undefined : (1 + discountRate) ** (-(day - valuation) / 365.25));
-  const inWindow = (day: number) => day >= windowStart && day < windowEnd;
+  // A payment before the start date (relocation money paid before day one) counts in the window from the start date, as it counts in
+  // employment year 1 (audit C4); its tax and present value stay on its own date.
+  const inWindow = (day: number) => Math.max(day, start) >= windowStart && Math.max(day, start) < windowEnd;
   const events: CompEvent[] = taxed.map((e) => ({
     date: fromDays(e.day),
     component: e.component,
@@ -377,7 +383,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     }
     // Rent is paid monthly while you work there. The lease starts on your start date, so rent
     // rises by rentGrowth at each anniversary: employment year n pays monthlyRent x (1 + g)^(n-1).
-    for (const { a, b, share } of monthlyPieces(start, workEnd, anniversaries)) {
+    for (const { a, b, share } of monthlyPieces(start, workEnd, cuts)) {
       const n = anniversaries.findIndex((d) => d > a);
       flow(b - 1, n, { rent: monthlyRent * (1 + rentGrowth) ** (n - 1) * share });
     }
