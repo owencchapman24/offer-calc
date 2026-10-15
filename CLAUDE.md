@@ -371,6 +371,10 @@ print scan off a desktop).
   the verdict's month is its work's and L-2's. `it.fails` marks a property a known bug breaks: the fix turns it into `it`.
 - Hand-checked values carry their arithmetic in comments.
 - `npm test` also runs `scripts/check-engine.ts`, the no-formatting-in-the-engine guard.
+- **Frozen law** (2026-10-15, audit T2): `vitest.config.ts` runs every test on a frozen copy of the amounts published for years
+  after 2026 (`test/frozen-enacted.ts`: 2027's HSA limits), except `test/law.test.ts`, which runs on `src/tax/params/enacted.ts`
+  and pins what it lists. So a data refresh fails `law.test.ts` alone; a simulated 2027 refresh (brackets, standard deduction,
+  402(g), 127, 132(f), the wage base) failed 46 tests in 11 files before, and 2 after, both in `law.test.ts`.
 
 **Other:**
 - `npm run offers` prints the sample tables (NYC IB analyst, Charlotte corporate finance,
@@ -456,7 +460,8 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 2027 inflation revenue procedure and 402(g) notice any day now ("Data refresh calendar", Next checks).
 
 ## Commands
-- `npm test`: unit tests (engine and app) plus the engine formatting guard.
+- `npm test`: unit tests (engine and app) plus the engine formatting guard. Two vitest projects (`vitest.config.ts`): "law"
+  (`test/law.test.ts`, on the law as published) and "frozen law" (every other test).
 - `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node
   types), `tsc -p app` (DOM, React) and `tsc -p e2e` (the Playwright tests).
 - `npm run oracle`: engine vs PolicyEngine-US for 2026, ~3-4 min. It needs a `.venv` installed from
@@ -497,8 +502,8 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 ## Code map
 - `src/tax/`
   - `index.ts`: `computeTaxes(input, params?)`.
-  - `params/`: 2026 data, `federal2027.ts` (amounts published for 2027 so far), `paramsForYear` (each federal amount projected
-    from its latest published value, `ENACTED`), the SALT schedule.
+  - `params/`: 2026 data, `federal2027.ts` (amounts published for 2027 so far), `enacted.ts` (`ENACTED`, the list of them by
+    year), `paramsForYear` (each federal amount projected from its latest published value), the SALT schedule.
   - `federal.ts`, `state.ts`, `local.ts`.
 - `src/offer/`
   - `types.ts`.
@@ -848,8 +853,11 @@ parentheses are the last ones seen. A refresh is a change like any other: its ow
 - **The Census's 2025 ACS 1-year estimates:** delayed with no date (the Census Bureau's advisory of Aug 4, 2026; still none in
   September). Check its release schedule monthly.
 
-**After any tax data change:** `npm test` (hand-checked values in `test/tax.test.ts`, `test/params.test.ts` and
-`test/offer.test.ts` may move: redo their arithmetic), `npm run typecheck`, `npm run grid` (2026 only: byte-identical unless 2026
+**After any tax data change:** `npm test`. An amount published for a later year (`src/tax/params/enacted.ts`) fails
+`test/law.test.ts` only, by design: update it with the amounts and their sources. Every other test runs on the frozen copy
+(`test/frozen-enacted.ts`, swapped in by `vitest.config.ts`), so none moves; one that does means the change reached beyond
+`enacted.ts`. A change to 2026 data can move hand-checked values in `test/tax.test.ts`, `test/params.test.ts` and
+`test/offer.test.ts`: redo their arithmetic. Then `npm run typecheck`, `npm run grid` (2026 only: byte-identical unless 2026
 law changed), and `npm run oracle` (2026 against PolicyEngine-US: byte-identical, or the diff explained, and M-4's match
 statistics updated with it; for a later year's amounts, compare with PolicyEngine-US's own parameters for that year where it has
 them). `npm run offers` shows what the samples do. Tax-engine changes go in separate commits, each passing the above.
@@ -857,7 +865,7 @@ them). `npm run offers` shows what the samples do. Tax-engine changes go in sepa
 and `npm run e2e` if a figure the scan or smoke tests read moved.
 
 **Federal tax** (`src/tax/params/federal2026.ts`; amounts published for later years in `federal2027.ts` and so on, listed in
-`ENACTED` in `params/index.ts`, with their sources):
+`ENACTED` in `params/enacted.ts`, with their sources):
 - **Brackets, standard deduction, 132(f) commuter limit, and the 127 educational assistance limit (indexed from 2027):** the IRS's
   annual inflation revenue procedure, October to mid-November for the next year (2026's: Rev. Proc. 2025-32, IR-2025-103,
   Oct 9, 2025). Listed on IRS.gov, "Inflation-adjusted tax items by tax year".
@@ -892,8 +900,9 @@ and `npm run e2e` if a figure the scan or smoke tests read moved.
   announced around June (2026's blend of the two halves is in `PHILLY_2026`).
 
 **Moving the base year** (from 2026 to 2027, once the Tax Foundation's 2027 table is out, about February 2027): new `federal2027`
-and `states2027` data, `BASE_YEAR`, the oracle's year and baseline, and the tests' hand-checked values. Until then, amounts
-published for 2027 go in `FEDERAL_2027` and the rest of 2027 is projected.
+and `states2027` data, `BASE_YEAR`, the oracle's year and baseline, the tests' hand-checked values, and the tests' frozen law
+(`test/frozen-enacted.ts`, which moves only then). Until then, amounts published for 2027 go in `FEDERAL_2027` and the rest of
+2027 is projected.
 
 **Prices and rent:**
 - **BEA Regional Price Parities** (`src/col/rpp.json`): annually, usually December, for the year two before (the 2024 RPPs came out
