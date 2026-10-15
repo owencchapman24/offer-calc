@@ -3,7 +3,7 @@ import { formatIssue } from "../../src/format/issues";
 import type { OfferIssue } from "../../src/offer/validate";
 import type { OfferWarning } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
-import { HELP, helpKey } from "./help";
+import { HELP } from "./help";
 import { lazyModule, useLazyModule } from "./lazy";
 import type { AppOffer, Letter } from "./model";
 import type { MetricId } from "./metrics";

@@ -7,7 +7,6 @@ import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
 import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
 import type { SectionId } from "./sections";
-import { dollars } from "./text";
 import type { TickKind } from "./ui";
 import type { VerdictView } from "./verdict";
 

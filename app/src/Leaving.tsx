@@ -74,6 +74,7 @@ export function Leaving(p: LeavingProps) {
     if (!onScreen || !ready || !cursorJob) return;
     const t = setTimeout(() => requestSlow(cursorJob, cursorKey!), 120);
     return () => clearTimeout(t);
+    // The job is compared by value (its key).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onScreen, ready, cursorKey, requestSlow]);
 

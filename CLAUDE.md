@@ -68,8 +68,8 @@ finding in `docs/user-testing.md` as it comes in.
   3. CI must pass (`gh pr checks --watch`, or the desktop app's PR monitor);
   4. `gh pr merge --merge --delete-branch`, then `git switch main` and `git pull --ff-only`.
 
-  Before opening it: tests and the typecheck pass locally; the grid is unchanged (`npm run grid`; `grid_ts.json` is ignored, so
-  compare with `main`'s output); `npm run build` for UI work.
+  Before opening it: tests, the typecheck and the hooks linter pass locally; the grid is unchanged (`npm run grid`; `grid_ts.json`
+  is ignored, so compare with `main`'s output); `npm run build` for UI work.
 - **Merging to `main` deploys to production** (Vercel). Keep `main` green.
 - **Tests:** hand-check at the edges: the day before and the day of a vest, payout or window end; thresholds; bracket crossings.
   Hand-checked values carry their arithmetic in comments.
@@ -87,8 +87,12 @@ finding in `docs/user-testing.md` as it comes in.
 - `npm test`: the unit tests in two vitest projects (`vitest.config.ts`): "law" (`test/law.test.ts`, on the tax law as published)
   and "frozen law" (every other test, on a frozen copy, so a data refresh moves none of them); then the engine's formatting guard
   (`scripts/check-engine.ts`).
-- `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node types; also `vitest.config.ts`), `tsc -p app`
-  (DOM, React), `tsc -p e2e`.
+- `npm run typecheck`: `tsc -p .` (src and test, no Node types), `tsc -p scripts` (Node types; also `vitest.config.ts` and
+  `app/vite.config.ts`), `tsc -p app` (DOM, React), `tsc -p e2e`. Beyond `strict`: no unused locals or parameters, no implicit
+  returns, no switch fallthrough, `override` required; the app also `isolatedModules` and `verbatimModuleSyntax`.
+- `npm run lint`: ESLint over `app/src` with the react-hooks rules only (`eslint.config.js`): the rules of hooks and every
+  dependency list. A disable comment that disables nothing is an error. Babel's parser, since TypeScript 7 has no JavaScript API for
+  typescript-eslint's. `scripts/lib/lint.test.ts` runs it in `npm test` too.
 - `npm run fuzz`: the property tests (`app/src/properties.test.ts`, `display.test.ts`) on a random seed at ten times `npm test`'s
   runs, shrinking each counterexample; it prints the seed (`FUZZ_SEED=<seed> npm run fuzz` replays it). CI runs it nightly.
 - `npm run dev` / `build` / `preview`: the app (Vite, `app/vite.config.ts`), built to `dist/`.
@@ -148,6 +152,9 @@ finding in `docs/user-testing.md` as it comes in.
   that adds up, CSV and the copied document included; don't change it without the user.
 - **Tickmarks:** every figure is a button with a tickmark kind, a methodology section and a derivation (`metrics.test.ts`); every
   default shows as a real value with a `D` tickmark, every estimate with an `E`.
+- **Hooks:** every dependency list is complete (`npm run lint`). One left out on purpose has `// eslint-disable-next-line
+  react-hooks/exhaustive-deps` with its reason above it: today a job or request compared by value (its key), and L-6's tables,
+  memoized over `words`, a key kept by hand (`TheWork.tsx`).
 - **Inputs:** every input has its hint, its ⓘ help and "How this is used →" (`help.ts`; `help.test.ts` fails on one without); a
   default with its `D` and its reason, or a blank where that was decided (`defaults.ts`; `defaults.test.ts` checks each against the
   engine); its problems at the field (`validateOffer`, in the worker). While any input has a problem, the results are the last valid
@@ -341,12 +348,13 @@ finding in `docs/user-testing.md` as it comes in.
 - each schedule and output: `l3`, `leave` (L-4), `l5`, `csv`, `copydoc` (each stated calculation), `ticks`, `names` (buttons' names),
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
-- the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock), `e2e/lib/exceptions.test.ts`.
+- the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
+  `e2e/lib/exceptions.test.ts`.
 
 **Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
 scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:
 `bundle.ts`, `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
-`vercel.json` (CSP and headers).
+`eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).
 
 ## 10. Known gaps
 The one list; the methodology's M-10 says the same in plain words. Rough priority within each group.
