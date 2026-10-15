@@ -1,7 +1,7 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
 import type { Bedrooms, RentEstimate } from "../col/rent";
 
-// Offer model types (docs/offer-model.md §12b). projectScenario runs one scenario;
+// Offer model types, authoritative over docs/offer-model.md (the design). projectScenario runs one scenario;
 // projectOffer runs bear/base/bull together; compareOffers puts offers on one window.
 
 // ---- shared -----------------------------------------------------------------
