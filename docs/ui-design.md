@@ -1,4 +1,17 @@
-# UI design (rev 3, approved)
+# UI design (rev 3, approved 2026-10-09; historical)
+
+**Status (2026-10-15): historical, the design as approved.** v1 is built from it: UI slices 1-8, Copy as document and v2's step
+0. Read it for why the UI is as it is, not as a spec: where the build differs, §12 says so slice by slice, and the code is what
+runs (`app/src`; CLAUDE.md's conventions and settled decisions are current). Differences §12 doesn't record:
+- **About you** as built: filing status, the stay, other wages, your spouse's wages (when filing jointly, since audit C1), health
+  use and "Prices in", with the assumptions as one line under them, not a panel. Not built: your current rent (decision 2's
+  estimate from it gave way to HUD's Fair Market Rents, §13.2), a savings rate (held at 0%) and a bedrooms setting (always 1).
+- **L-5's convenience rule** (§4.7) doesn't list Nebraska: it dropped its rule from tax year 2025 (pull request #30).
+  `src/offer/location.ts` has the states.
+- **The worked figures** (W4, W8, §9.1's 62,595) are the engine's, from before the year figures as shown. Under that rule
+  (CLAUDE.md, "The year figures as shown"), A's year 1 after rent reads 62,594 (§12, slice 6).
+- **§10:** the worker takes messages (no Comlink); the site is on Vercel, not GitHub Pages.
+- **Rev 4** comes with v2's stop 5A (`docs/v2-plan.md`, item 5): §1 rewritten for an evaluator-first tool, and the offer breakdown.
 
 Roadmap item 6. It covers:
 - who the app is for;
@@ -1622,10 +1635,10 @@ build order differs (below). The engine prerequisites came first and aren't numb
    cost or benefit is counted for some offers but not others, per-hour figures only when every
    offer has hours, a review checkpoint after the verdict-moving inputs, and JSON export/import
    (moved from slice 6).
-4. **L-3 and close calls:** breakeven (§4.6) with the winner's cushion and the rent lever
+4. **L-3 and close calls** (done, 2026-10-09): breakeven (§4.6) with the winner's cushion and the rent lever
    (engine item 11), and the close-call flip line (§4.1). Engine item 14 (the window) comes with
    it. (Rev 3: L-2 moved to slice 5.)
-5. **Leaving early and downside risk:** L-2 (§4.4), L-4 with the next-cliff panel (§4.5) and L-5
+5. **Leaving early and downside risk** (done, 2026-10-09, in three stops): L-2 (§4.4), L-4 with the next-cliff panel (§4.5) and L-5
    (§4.7). Engine item 13 (the leave sweep by day), the worker's slow lane (§3.4) and the CI
    bundle check come with it.
 6. **The reconciliation schedule:** L-6 (§4.8), CSV export of each table, print, and the
