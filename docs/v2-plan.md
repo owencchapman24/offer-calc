@@ -878,8 +878,9 @@ the clipboard in the smoke tests, the scan.
 
 ## 4. Accuracy
 
-Six parts, each its own pull request, in this order (D10): the two small ones that feed "per hour of your life" first, then
-relocation, then the large ones. The order is meant to be reset by the testers' answers.
+Seven parts, each its own pull request, in this order (D10): the two small ones that feed "per hour of your life" first, then
+relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for commuters,
+was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4) place it.
 
 | Part | Size | Engine | Main thread |
 |---|---|---|---|
@@ -889,6 +890,7 @@ relocation, then the large ones. The order is meant to be reset by the testers' 
 | 4d Remote work and working across a state line | Large | tax engine: nonresident tax, credits, sourcing | 0 (detailed mode) |
 | 4e Startup options | Medium-large | an option grant, exit scenarios, its tax | 0 (detailed mode) |
 | 4f Public Service Loan Forgiveness | Large, volatile | loans, payment plans, AGI by year | under 0.3 kB (a closed About-you row) |
+| 4g Philadelphia's wage tax for commuters | Small | none: the nonresident rate is in (`resident: false`) | 0 (detailed mode) |
 
 Every part's inputs live in detailed mode (a lazy chunk, 14 kB gzip today), or for 4f behind a closed row in About you that loads its
 inputs on first use, so none adds more than an entry point to the main thread. Each grows the worker and may grow the fast lane's
@@ -1050,6 +1052,35 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
   offers. Then you decide whether to build.
 - **Risks:** policy churn and litigation; a horizon the tool doesn't otherwise model; most of the audience may not need it.
 
+### 4g. Philadelphia's wage tax for commuters (added 2026-10-15)
+
+- **Today:** Philadelphia's resident wage tax is counted (audit C2, pull request #40): the "Inside Philadelphia" choice for an offer
+  in the Philadelphia metro in Pennsylvania, default inside. Someone who lives outside the city (the Pennsylvania suburbs, South
+  Jersey, Delaware) and works in it owes the nonresident rate on that pay, and the tool counts nothing: M-10 and CLAUDE.md list it
+  as a known gap. That understates tax by about $3,400 a year per $100,000 of pay.
+- **The engine has it:** `locality: { kind: "philadelphia", resident: false }` applies the nonresident rate (`src/tax/local.ts`), 3.43%
+  for pay dates to Jun 30, 2026 and 3.425% from Jul 1, 2026, blended for the year like the resident rate (`PHILLY_2026`, from the
+  Department of Revenue's rate table, checked 2026-10-14). No test covers it yet, and the app never sets it: a locality goes with
+  where you live, never where you work. Its warning, `phillyNonresident`, says the tax "applies only to days physically worked in the
+  city", which overstates the exclusion (below): its words change with this part.
+- **The rules, from the city** (its refund petition's instructions, phila.gov; re-read at the stop): the tax follows the
+  workplace. A nonresident whose base is the employer's Philadelphia office owes it on all pay, bonuses and paid leave included,
+  except for days the employer requires them to work outside the city; working from home for their own convenience doesn't count,
+  even with the employer's approval. The excluded days come back as a refund petition after the year, with the employer's
+  certification, not through withholding.
+- **Scope:** per offer, whether the job is in Philadelphia, asked when the employer state is Pennsylvania, and offered when you'd live
+  outside the city (in the metro or in New Jersey or Delaware). It's the city's tax on top of your state's. Required remote days
+  share 4b's and 4d's office days, if those are built first: with neither, every working day is in the city, and the help says so.
+- **Credits, to verify at the stop:** whether your state credits the city's tax. Secondary sources say New Jersey does, on Schedule
+  NJ-COJ, capped at New Jersey's tax on that pay, and that the New Jersey-Pennsylvania reciprocal agreement doesn't reach it.
+  Pennsylvania residents outside the city, and Delaware's credit, are unchecked. Until each is verified from the state's own
+  instructions, the tool counts the city's tax with no credit, and says so. A credit is 4d's machinery, so with 4d built first it
+  comes with it.
+- **Validation:** the oracle checks residents only, so hand-checked tests: a commuter at $60,000 and $100,000, the July rate change,
+  a bonus, a required remote day against a convenience one. The 2026 oracle report stays byte-identical.
+- **Bundle:** detailed mode; nothing in the worker beyond the input.
+- **Risk:** small. Philadelphia's rates change each July 1 (CLAUDE.md, the data refresh calendar, already covers it).
+
 **Review stops:** one per part, except 4d and 4e (two each: the engine with its hand-checked tests, then the UI); 4f starts with a spike
 (a short written finding, no code merged) and you decide from it.
 
@@ -1091,7 +1122,8 @@ used it, how many offers did you actually have?", before anything else.
 1. How many days off do you expect at each offer, holidays included? Is any "unlimited"?
 2. How would you get to work, how long would it take, and what would it cost?
 3. Do any offers pay for the move, and what will moving cost you?
-4. Would you live in one state and work for an employer in another, in the office or remotely? Which states?
+4. Would you live in one state and work for an employer in another, in the office or remotely? Which states? Would you live outside
+   a city that taxes commuters (Philadelphia) and work in it?
 5. Does any offer include stock options or private-company RSUs? Do you know the strike price and the number of shares?
 6. Do you have federal student loans? Is any offer from a government employer or a nonprofit?
 - **Would change it:** the answers set item 4's order (D10); a part no tester needs waits.
