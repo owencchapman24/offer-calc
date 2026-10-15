@@ -1,55 +1,112 @@
 import { describe, expect, it } from "vitest";
-import { projectScenario } from "../../src/offer/project";
+import { projectOffer } from "../../src/offer/compare";
+import { leaveDaySweep } from "../../src/offer/project";
 import { STATES_2026 } from "../../src/tax/index";
 import { asymmetries } from "./comparability";
 import { DEFAULTS } from "./defaults";
 import { US_STATES } from "./Detailed";
-import { type AppOffer, ASSUMPTIONS, getPath, type HealthDraft, type OfferDraft, type RetirementDraft, sampleOffers, setPath, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
+import { type AppOffer, all, ASSUMPTIONS, getPath, type HealthDraft, type OfferDraft, type RetirementDraft, sampleOffers, setPath, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
 
 // The defaults registry (what a D tickmark says) and the engine's defaults (what a null field gives the
 // engine, model.ts) can't disagree: for every default, an offer with the field at its default projects
-// exactly as one with the default's value entered.
+// exactly as one with the default's value entered. The probe has to be able to tell: for every default,
+// a value other than the default changes what it sees (audit T5), so each default is tried on an offer
+// where it matters.
 
 const TODAY = "2026-07-13";
 const [A, B, C] = sampleOffers(TODAY);
+const fresh = (o: AppOffer, d: (x: OfferDraft) => OfferDraft): AppOffer => ({ ...o, draft: d(structuredClone(o.draft)) });
+/** C's sign-on with a clawback at every default but its window. */
+const WITH_CLAWBACK = fresh(C, (d) => ({ ...d, cashAwards: [{ ...d.cashAwards[0], clawback: { months: 12, kind: "prorated", per: null, from: null, repay: null } }] }));
+/** C with its share price rising, so a grant's date moves its vests' values. */
+const GROWING = fresh(C, (d) => ({ ...d, equity: { ...d.equity, priceGrowth: all(0.05) } }));
+/** B with a 3-year cliff on the employer's 401(k) money, so how service is counted moves what vests in a 2-year stay. */
+const CLIFF = fresh(B, (d) => ({ ...d, retirement: { ...(d.retirement as RetirementDraft), vesting: { kind: "cliff", years: 3 } } }));
+/** B putting $5,000 a year in an HSA: over self-only coverage's limit, under family coverage's. */
+const BIG_HSA = fresh(B, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employeeHsa: 5_000 } }));
 
-/** The offer and the concrete path to try each default on, and the value that default stands for, when it depends on the offer. */
-function setup(key: string): { o: AppOffer; path: string; value: unknown } {
-  const fresh = (o: AppOffer, d: (x: OfferDraft) => OfferDraft = (x) => x): AppOffer => ({ ...o, draft: d(structuredClone(o.draft)) });
-  const withClawback = fresh(C, (d) => ({ ...d, cashAwards: [{ ...d.cashAwards[0], clawback: { months: 12, kind: "prorated", per: null, from: null, repay: null } }] }));
+/**
+ * The offer and the concrete path to try each default on, the value that default stands for (when it depends on the offer),
+ * and a value other than the default, which the probe must tell from it.
+ */
+function setup(key: string): { o: AppOffer; path: string; value: unknown; other: unknown } {
   const def = DEFAULTS[key];
+  const on = (o: AppOffer, path: string, other: unknown, value = def.value) => ({ o, path, value, other });
+  const shortSchedule = [{ month: 12, fraction: 1 }];
+  const otherDates = { months: [6, 12], day: 1 };
   switch (key) {
-    case "salary.promotions.scenarios": return { o: A, path: "salary.promotions.0.scenarios", value: def.value };
-    case "equity.grants.grantDate": case "equity.grants.vestStart": return { o: C, path: key.replace("grants.", "grants.0."), value: C.draft.startDate };
-    case "equity.grants.schedule": return { o: C, path: "equity.grants.0.schedule.tranches", value: PRESETS[DEFAULT_PRESET].tranches };
-    case "equity.grants.schedule.vestDates": return { o: C, path: "equity.grants.0.schedule.vestDates", value: null };
-    case "equity.refreshers": return { o: C, path: "equity.refreshers", value: null };
-    case "equity.refreshers.schedule": return { o: C, path: "equity.refreshers.schedule.tranches", value: PRESETS[DEFAULT_PRESET].tranches };
-    case "cashAwards.paidOn": return { o: C, path: "cashAwards.0.paidOn", value: { daysAfterStart: 30 } };
-    case "retirement.vesting": return { o: C, path: key, value: { kind: "immediate" } };
-    case "employerState": return { o: B, path: key, value: B.draft.residence.state };
-    case "bonus.cutoff": return { o: A, path: key, value: null };
+    case "salary.raise": return on(B, key, all(0.03));
+    case "salary.raiseOn": return on(B, key, "jan1");
+    case "salary.promotions.scenarios": return on(A, "salary.promotions.0.scenarios", ["base", "bull"]);
+    case "bonus.basis": return on(B, key, "fixed");
+    case "bonus.payOn": return on(B, key, { month: 1, day: 31 });
+    case "bonus.periodStart": return on(B, key, { month: 7, day: 1 });
+    case "bonus.cutoff": return on(B, key, { month: 7, day: 1 }); // B starts Jul 13: a Jul 1 cutoff skips its first bonus
+    case "bonus.firstPayoutGuaranteed": return on(B, key, true); // the bear case's first bonus at the target
+    case "bonus.mustBeEmployedOnPayDate": return on(B, key, false); // a bonus unpaid at the last day, prorated
+    case "equity.grants.grantDate": return on(GROWING, "equity.grants.0.grantDate", "2026-04-13", C.draft.startDate);
+    case "equity.grants.vestStart": return on(C, "equity.grants.0.vestStart", "2026-10-13", C.draft.startDate);
+    case "equity.grants.schedule": return on(C, "equity.grants.0.schedule.tranches", shortSchedule, PRESETS[DEFAULT_PRESET].tranches);
+    case "equity.grants.schedule.vestDates": return on(C, "equity.grants.0.schedule.vestDates", otherDates, null);
+    case "equity.priceGrowth": return on(C, key, all(0.1));
+    case "equity.refreshers": return on(C, key, C.draft.equity.refreshers, null);
+    case "equity.refreshers.firstAfterMonths": return on(C, key, 6);
+    case "equity.refreshers.everyMonths": return on(C, key, 6);
+    case "equity.refreshers.schedule": return on(C, "equity.refreshers.schedule.tranches", shortSchedule, PRESETS[DEFAULT_PRESET].tranches);
+    case "equity.refreshers.schedule.vestDates": return on(C, key, otherDates);
+    case "hours.weeksPerYear": return on(B, key, 48);
+    case "cashAwards.paidOn": return on(C, "cashAwards.0.paidOn", { daysAfterStart: 90 }, { daysAfterStart: 30 });
+    case "cashAwards.clawback.months": return on(WITH_CLAWBACK, "cashAwards.0.clawback.months", 24);
+    case "cashAwards.clawback.kind": return on(WITH_CLAWBACK, "cashAwards.0.clawback.kind", "full");
+    case "cashAwards.clawback.per": return on(WITH_CLAWBACK, "cashAwards.0.clawback.per", "day");
+    case "cashAwards.clawback.from": return on(WITH_CLAWBACK, "cashAwards.0.clawback.from", "payment");
+    case "cashAwards.clawback.repay": return on(WITH_CLAWBACK, "cashAwards.0.clawback.repay", "net");
+    case "retirement.contributionPct": return on(B, key, 0.06);
+    case "retirement.type": return on(B, key, "roth");
+    case "retirement.eligiblePay": return on(B, key, "salaryAndBonus");
+    case "retirement.nonElectivePct": return on(B, key, 0.03);
+    case "retirement.vesting": return on(C, key, { kind: "cliff", years: 3 }, { kind: "immediate" });
+    case "retirement.vestingService": return on(CLIFF, key, "planYearHours");
+    case "health.employeeHsa": return on(B, key, 1_000);
+    case "health.employerHsa": return on(B, key, 500);
+    case "health.coverage": return on(BIG_HSA, key, "family");
+    case "perks.section127": return on(B, key, 5_250);
+    case "perks.commuterMonthly": return on(B, key, 100);
+    case "employerState": return on(B, key, "NY", B.draft.residence.state); // NY's convenience rule: a warning
+    case "costOfLiving.rentGrowth": return on(B, key, 0.05);
   }
-  if (key.startsWith("cashAwards.clawback.")) return { o: withClawback, path: key.replace("cashAwards.", "cashAwards.0."), value: def.value };
-  if (key.startsWith("retirement.") || key.startsWith("health.")) return { o: B, path: key, value: def.value };
-  return { o: key.startsWith("equity.") ? C : B, path: key, value: def.value };
+  throw new Error(`No setup for the default ${key}: add one, on an offer where the default matters.`);
 }
 
-const project = (o: AppOffer) => {
+/**
+ * Last days to leave on: 6 months, mid-month after it (where counting by day and by month differ), 11 and 13 months. Each falls
+ * inside a 12-month clawback, across a bonus's pay date or a cliff, for offers starting Jul 13, 2026.
+ */
+const LAST_DAYS = ["2027-01-12", "2027-01-25", "2027-06-12", "2027-08-12"];
+
+/**
+ * What the probe sees: bear, base and bull with every event, assumption and warning, over a 4-year stay and a 2-year one, and
+ * leaving early. Not where a value came from (`rentGrowthSource` and the like): a default's value entered is "input", rightly.
+ */
+function probe(o: AppOffer) {
   const r = toOfferInput(o);
   if (!("offer" in r)) throw new Error("incomplete");
-  return projectScenario(r.offer, toHousehold(DEFAULT_HOUSEHOLD, 2026), { valuationDate: TODAY, inflation: ASSUMPTIONS.inflation }).window;
-};
+  const household = toHousehold(DEFAULT_HOUSEHOLD, 2026);
+  const options = { valuationDate: TODAY, inflation: ASSUMPTIONS.inflation };
+  const stay = (years: number) => projectOffer(r.offer, household, { ...options, window: { start: r.offer.startDate, years } });
+  const seen = { stays: [stay(4), stay(2)], leaving: leaveDaySweep(r.offer, household, LAST_DAYS, options) };
+  return JSON.parse(JSON.stringify(seen, (k, v) => (/source$/i.test(k) ? undefined : v))) as unknown;
+}
 
 describe("the defaults registry agrees with the engine", () => {
   for (const key of Object.keys(DEFAULTS)) {
     it(key, () => {
-      const { o, path, value } = setup(key);
-      const atDefault = { ...o, draft: setPath(o.draft, path, null) };
-      const entered = { ...o, draft: setPath(o.draft, path, value) };
-      expect(getPath(atDefault.draft, path), "the field is at its default").toBeNull();
-      expect(project(atDefault)).toEqual(project(entered));
+      const { o, path, value, other } = setup(key);
+      const atDefault = probe({ ...o, draft: setPath(o.draft, path, null) });
+      expect(getPath(setPath(o.draft, path, null), path), "the field is at its default").toBeNull();
+      expect(probe({ ...o, draft: setPath(o.draft, path, value) }), "the default's value entered").toEqual(atDefault);
+      expect(probe({ ...o, draft: setPath(o.draft, path, other) }), "another value: the probe must see the difference").not.toEqual(atDefault);
     });
   }
 });
