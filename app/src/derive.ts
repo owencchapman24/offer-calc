@@ -1021,16 +1021,26 @@ function repayWork(ctx: WorkContext, letter: L): Work {
   const owed = p.clawbacks.filter((c) => c.owed > 0);
   if (!owed.length) throw new Error(`Nothing to repay for ${letter} on that day.`);
   const relief = owed.reduce((s, c) => s + c.taxRelief, 0);
+  // The total is L-4's figure, rounded once; each clawback is rounded on its own, and the largest takes the rounding, as on a
+  // rounded schedule, so the lines add up to it as displayed. Two clawbacks that both round up would otherwise come to a dollar
+  // more than the total (FUZZ_SEED=1701905633: 929 + 34,286 under a total of 35,214).
+  const total = Math.round(p.clawbackOwed) + 0;
+  const shown = owed.map((c) => Math.round(c.owed) + 0);
+  const taker = owed.reduce((a, c, i) => (c.owed > owed[a].owed ? i : a), 0);
+  shown[taker] = total - shown.reduce((s, v, i) => (i === taker ? s : s + v), 0);
+  const tookRounding = shown[taker] !== Math.round(owed[taker].owed);
   return {
     title: `${letter} · clawbacks if you leave`, scope,
     lines: [
       ...owed.map((c, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `${c.award}: ${percent(c.fraction)} of it`,
-        note: c.basis === "net" ? "repaid net of tax" : "repaid gross, as paid", value: figure(c.owed) })),
-      ...(owed.length > 1 ? [{ op: "=" as const, label: "Repaid", value: figure(p.clawbackOwed), rule: "single" as const }] : []),
+        note: c.basis === "net" ? "repaid net of tax" : "repaid gross, as paid", value: figure(shown[i]) })),
+      ...(owed.length > 1 ? [{ op: "=" as const, label: "Repaid", value: figure(total), rule: "single" as const }] : []),
       { op: "−", label: "Tax relief", value: figure(relief) },
-      { op: "=", label: "What repaying costs you", value: figure(Math.round(p.clawbackOwed) - Math.round(relief)), rule: "double" },
+      { op: "=", label: "What repaying costs you", value: figure(total - Math.round(relief)), rule: "double" },
     ],
     notes: [
+      ...(tookRounding ? [`Each clawback is rounded once and the total is L-4's, so the largest, ${owed[taker].award}, takes the rounding, `
+        + `as on a rounded schedule (its own figure is ${cents(owed[taker].owed)}).`] : []),
       ...owed.map((c) => `${c.award}: ${RELIEF[c.treatment]}.`),
       "A prorated clawback falls as each month of its window is completed; a full one stays whole until the window ends.",
     ],
