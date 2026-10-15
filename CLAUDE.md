@@ -40,8 +40,8 @@ finding in `docs/user-testing.md` as it comes in.
 
 **The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
-- **T1** (a committed grid baseline in CI): the breakdown changes no tax code (unless B11, an engine change of its own); it guards each
-  tax change: the data refreshes below, the base-year move, v2's item 4d.
+- **T1** (a committed grid baseline in CI): the breakdown changes no tax code. It guards each tax change: the data refreshes below,
+  the base-year move, v2's item 4d.
 - **D1** (per hour is documented as total rewards; the code divides the after-rent total): M-1, M-5.4 and the README. This file and
   the plan say it as the code does, and 5A rewrites M-1.
 - **D3** (the methodology's lines the code doesn't bear out: M-4's withholding note and Alaska figure, M-10's convenience rule): 5A
@@ -355,7 +355,10 @@ section 2's and the plan's in step):
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
-  `e2e/lib/exceptions.test.ts`.
+  `e2e/lib/exceptions.test.ts`;
+- the docs: `scripts/lib/docs.test.ts` (every doc indexed in section 11, historical ones marked at their head, every
+  `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
+  here, and as v2's plan says).
 
 **Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
 scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:
