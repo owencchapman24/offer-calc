@@ -21,8 +21,9 @@ behind every figure.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
-  (T2), the performance gates (P1-P4), CI hygiene (S2, in part) and this file (D2, D5, D6); and the `main` ruleset is on (S1, in
-  part). What's left: section 3.
+  (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
+  part), this file (D2, D5, D6), the design docs marked historical (D7) and v2's plan brought up to date (D8); and the `main`
+  ruleset is on (S1, in part). What's left: section 3.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -34,13 +35,18 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: v2 item 5, the offer breakdown** (`docs/v2-plan.md`). Stop 5A starts after:
-- the testers' answer to item 5's first question ("how many offers did you actually have?");
-- the audit's remaining "fix before v2" items: T5 (the defaults test sees what it checks), H1 (the hooks linter), D7 (status notes on
-  `ui-design.md` and `offer-model.md`) and D8 (`v2-plan.md` brought up to date), which item 5 leans on, and also T1 (a committed
-  grid baseline in CI), D1 (per hour is documented as total rewards; the code divides the after-rent total), D3 (the methodology's
-  lines the code doesn't bear out: M-4's withholding note and Alaska figure, M-10's convenience rule) and D4 (data vintages typed
-  in: `docs/data-refresh.md` now lists where).
+**Next: v2 item 5, the offer breakdown** (`docs/v2-plan.md`). Stop 5A starts after the testers' answer to item 5's first question
+("how many offers did you actually have?"). The audit's items it leans on are done (`v2-plan.md`, "Before stop 5A").
+
+**The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
+section 2's and the plan's in step):
+- **T1** (a committed grid baseline in CI): the breakdown changes no tax code. It guards each tax change: the data refreshes below,
+  the base-year move, v2's item 4d.
+- **D1** (per hour is documented as total rewards; the code divides the after-rent total): M-1, M-5.4 and the README. This file and
+  the plan say it as the code does, and 5A rewrites M-1.
+- **D3** (the methodology's lines the code doesn't bear out: M-4's withholding note and Alaska figure, M-10's convenience rule): 5A
+  and 5B check the methodology against the code anyway.
+- **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
 - SSA's 2027 wage base (from 2026-10-14) and the IRS's 2027 inflation revenue procedure and 402(g) notice (any day; weekly from
@@ -349,7 +355,10 @@ finding in `docs/user-testing.md` as it comes in.
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
-  `e2e/lib/exceptions.test.ts`.
+  `e2e/lib/exceptions.test.ts`;
+- the docs: `scripts/lib/docs.test.ts` (every doc indexed in section 11, historical ones marked at their head, every
+  `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
+  here, and as v2's plan says).
 
 **Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
 scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:

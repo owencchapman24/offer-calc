@@ -1,4 +1,4 @@
-# v2 plan (proposed 2026-10-13; decisions recorded the same day; the offer breakdown approved 2026-10-15)
+# v2 plan (proposed 2026-10-13; decisions recorded the same day; the offer breakdown approved 2026-10-15; brought up to date 2026-10-15)
 
 **Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
 pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next section), is approved (2026-10-15): B1-B12 as
@@ -382,10 +382,19 @@ Item numbers are stable IDs; the order is separate.
 5. **Item 1, beyond the money:** comparison-only, so it waits for the comparison's users.
 6. **Items 4d-4f:** large, and each still set by the testers' answers (D10).
 
-**Before stop 5A:** the audit's remaining "fix before v2" items that this item leans on (`docs/audit-2026-10.md`): P1-P4 (the stylesheet
-and the worker reported, the first answer's time marked, CLS and TBT gated, one chunk enforced: the gates the bundle plan below relies
-on); T2 and T5 (so the new tests don't pin sample outputs a data refresh moves, and the defaults test sees what it checks); D7 and D8 (the
-two docs this changes); and H1 (the hooks linter) before the breakdown's stateful parts (its switch, A-4's last day).
+**Before stop 5A:** the audit's "fix before v2" items this item leans on (`docs/audit-2026-10.md`; IDs prefixed "audit" where they'd
+read as this plan's decisions). Each is done, so 5A waits only on the testers' first question. The audit's other open "fix before v2"
+items (T1, D1, D3, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
+agreeing.
+
+| Audit | What item 5 needs from it | Done |
+|---|---|---|
+| P1-P4 | The stylesheet and the worker reported, the worker budgeted, the first answer's time marked, CLS and TBT gated, one chunk enforced: the gates the bundle plan below relies on | #47 |
+| T2 | The tests on frozen tax law, so the new tests don't pin sample outputs a data refresh moves | #46 |
+| T5 | The defaults test sees what it checks, as the breakdown shows every default as a value with its `D` | #55 |
+| H1 | The hooks linter, before the breakdown's stateful parts (its switch, A-4's last day) | #56 |
+| D7 | The two design docs this item changes, marked historical | #57 |
+| D8 | This plan, brought up to date | #58 |
 
 ### The scope change: §1, evaluator-first
 
@@ -452,22 +461,25 @@ by year, and compared side by side when you have more than one") and the first p
 
 ### Bundle and LCP (within budget)
 
-**Where it stands** (2026-10-15, `main`): the main thread 365.8 / 111.8 kB raw / gzip for a quick-mode visit, one chunk, against 120 kB:
-8.2 kB of room. LCP about 1.9 s against 2.5 s; its element is About you's assumptions line, painted before the worker answers.
+**Where it stands** (2026-10-15, `main` at #54; `npm run check-bundle`, and CI's `npm run lighthouse`): the main thread 365.6 / 111.7 kB
+raw / gzip for a quick-mode visit, one chunk, against 120 kB: 8.3 kB of room. The worker 68.1 kB gzip against its 75 kB budget. LCP 1.87 s
+(the median of five; single runs 1.86-2.38 s) against 2.5 s; its element is About you's assumptions line, painted before the worker
+answers. The first answer, observed unthrottled, 1.29 s.
 
 - **Main thread: at most 0.5 kB gzip for the item,** v2's rule 1. What has to be there: the one-offer session rules (× and +, "Start
   with my offer"), the breakdown section's slot, the ledger's "On its own" row, and the bars' one-offer text.
 - **A-1, the head, loads beside the worker, not in the main chunk.** Its chunk (an estimated 1-2 kB gzip) is requested at start, in
   parallel with the worker, whose answer it can't render before anyway, so it should add no time to the first figures; 5A measures that
   it doesn't delay the worker's first answer on Lighthouse's throttled profile. Like every lazy schedule it imports `figures.tsx`, never
-  `Tickmarks.tsx` (the one-chunk rule, and P4's check once it's built).
+  `Tickmarks.tsx` (the one-chunk rule, which `check-bundle` and `scripts/lib/imports.test.ts` enforce: audit P4, #47).
 - **A-2 to A-7:** one lazy chunk (an estimated 8-12 kB gzip), loaded as you scroll toward the section, as L-1 to L-6 are. A-7 is L-6's
   chunk, moved. A-8 and A-9 come with items 2 and 3, in their own chunks.
 - **Copy as document for one offer:** in its chunk (an estimated 3-4 kB more gzip).
 - **The first visit gets lighter:** one sample and one ledger column on the page, no `horizonSweep` in the worker, and no L-1 to L-4 to
   load until a second offer.
 - **LCP:** the LCP element doesn't change. A-1 holds its place at about its own height until its figures come, as L-1's place is held,
-  so nothing shifts when it fills (CLS at most 0.02, P3's gate). The time to the first answer (P2's mark) marks whichever paints first,
+  so nothing shifts when it fills (CLS at most 0.02, gated since audit P3). The time to the first answer (audit P2's mark, "first-answer",
+  `Lead.tsx`) marks whichever paints first,
   A-1 or the verdict, reported at each stop.
 - **The worker:** one-offer visits skip `horizonSweep`; remembering each offer's job means an edit projects only the offer edited. A
   later-starting offer in a comparison costs a second set of projections (base, bear and bull: about 8 ms) unless B11. `npm run bench`
@@ -543,7 +555,7 @@ was added at the same review.
 | B12 | Beyond the money | Comparison-only | Per offer too (values beside A-1, never in it) |
 | B13 | Labels (added at review) | Every rate and share states its period, on screen, in accessible names, derivations, CSVs and the copied document (condition 4) | — |
 
-**With stop 5A:** `docs/ui-design.md` rev 4, with a status note at its top saying what's historical (audit D7): §0 (a row for
+**With stop 5A:** `docs/ui-design.md` rev 4, with its status note (audit D7, #57) saying what's still historical: §0 (a row for
 evaluator-first), §1 (as above), §3.1's map and §3.2's layouts (the breakdown section, A-1 pinned, the "On its own" row), §3.3 (quick
 mode from one offer), §4 (the breakdown's parts; L-5 and L-6 into it; the bridge into A-2), §7 (the first visit), §8 (the methodology),
 §10 (copy and print), §12 (stops 5A-5C), and the conditions' rules where they belong (§2's principles, §9's labels); CLAUDE.md (Now,
@@ -568,17 +580,20 @@ it's built.
 
 ## Performance plan (every item)
 
-**Where it stands** (2026-10-13, `main` after Copy as document):
-- **Main thread:** 381.6 / 117.35 kB raw / gzip for a quick-mode visit (`npm run check-bundle`), one chunk, against the 120 kB budget:
-  2.65 kB of room. The stylesheet, render-blocking too, is 46.4 / 10.2 kB and isn't budgeted.
-- **LCP:** 1.96 s locally today (`npm run lighthouse`: mobile, a discarded warm-up, the median of 3; performance 97), 1.91 s in CI at
-  slice 6's stop B, against 2.5 s. You've seen about 2.2 s, so this plan works to that: about 0.3 s of room. The LCP element is About
-  you's assumptions line, which renders before the worker answers, so LCP follows the main chunk's and the stylesheet's download and
-  parse, not the engine.
-- **What the main chunk holds** (attributed through a source map; each piece gzipped on its own, so the pieces add to more than the
-  whole): React, react-dom and the scheduler about 64 kB, over half; the city list (`cities.json`, 434 places) 6.5 kB; the app's own code
-  about 47 kB, led by `App.tsx` 5.3, `Lead.tsx` 3.8, `ByYear.tsx` 3.8, `model.ts` 3.7, `metrics.ts` 3.5 and `help.ts` 3.1.
-- **Worker:** 255.6 kB raw. Off the LCP path, but it sets when the first verdict appears.
+**Where it stands** (2026-10-15, `main` at #54). The commands print these; each stop reports them.
+- **Main thread:** 365.6 / 111.7 kB raw / gzip for a quick-mode visit (`npm run check-bundle`), one chunk, against the 120 kB budget:
+  8.3 kB of room. Step 0 took it from 117.35 to 109.69 kB (2026-10-13); changes since, mostly the audit's fixes, added 2.0 kB. The
+  stylesheet, render-blocking too, is 47.6 / 10.4 kB, reported and not budgeted.
+- **LCP:** 1.87 s in CI (`npm run lighthouse`: mobile, a discarded warm-up, the median of five; single runs 1.86-2.38 s; performance
+  98), against 2.5 s. You've seen about 2.2 s, so this plan works to that: about 0.3 s of room. The LCP element is About you's
+  assumptions line, which renders before the worker answers, so LCP follows the main chunk's and the stylesheet's download and parse,
+  not the engine. CLS 0 and TBT 42 ms, each gated (at most 0.02 and 200 ms), and the late-fonts pass holds the font swap's CLS at 0.
+- **What the main chunk held** (2026-10-13, before step 0; attributed through a source map; each piece gzipped on its own, so the pieces
+  add to more than the whole): React, react-dom and the scheduler about 64 kB, over half; the city list (`cities.json`, 434 places) 6.5
+  kB; the app's own code about 47 kB, led by `App.tsx` 5.3, `Lead.tsx` 3.8, `ByYear.tsx` 3.8, `model.ts` 3.7, `metrics.ts` 3.5 and
+  `help.ts` 3.1.
+- **Worker:** 255.8 / 68.1 kB raw / gzip, against a 75 kB gzip budget (`check-bundle`). Off the LCP path, but it sets when the first
+  answer appears: 1.29 s observed in CI.
 
 **The rules:**
 1. **Nothing new on the main thread but entry points.** Each item's code loads on first use, in a chunk of its own or an existing lazy
@@ -602,9 +617,10 @@ it's built.
      `react-dom/server` and every accessibility behavior would need proving again: a project of its own.
    - The budget stays 120 kB.
 3. **LCP is measured at every stop** (`npm run lighthouse` locally, and in CI), and `check-bundle` also prints the stylesheet's size
-   (reported, not budgeted). A feature's CSS is a few rules; anything bigger goes with its chunk.
+   (reported, not budgeted; built, #47). A feature's CSS is a few rules; anything bigger goes with its chunk.
 4. **Time to the first verdict** joins the Lighthouse report: a `performance.mark` when the first verdict paints, read from the trace.
-   Reported, not a gate, until there's a baseline. It's what item 4's engine work (a bigger worker, more per edit) would move.
+   Reported, not a gate, until there's a baseline. It's what item 4's engine work (a bigger worker, more per edit) would move. **Built
+   (#47):** the "first-answer" mark (`Lead.tsx`), 1.29 s observed in CI on 2026-10-15.
 5. **Data is never in a JavaScript chunk.** Item 2's OEWS files are static JSON fetched on demand, one per occupation, from a path that
    carries the vintage, cached as immutable (`vercel.json`). The CSP already allows it (`connect-src 'self'`).
 6. **The fast lane's per-edit time** (`npm run bench`, side by side with `main`) at every stop that adds to it. Item 1 adds a closed form
@@ -666,7 +682,8 @@ disagreement line, once any value isn't blank:
 The samples at their fixed dates (4 years, after rent at U.S. prices), with example values: C's money lead over A is $21,182 of present
 value, so a tie takes $21,182 ÷ 3.7592 = $5,635 a year; $7,000 a year is worth $26,314, so A leads by $5,132, or $118 a month.
 - Every figure is ticked, with its derivation (M-14); the values are `T`.
-- **Per hour:** a flip isn't defined per hour (nor is breakeven), so the block says so and uses the step-3 figures, as L-3 does.
+- **Per hour:** a flip isn't defined per hour (nor is breakeven), so the block says so and uses the figures per hour divides (the
+  after-rent total), as L-3 does.
 - **Unchanged:** the if-you-stay row, the sticky bars, L-1 to L-6. L-2 stays money only, and says so when values are entered.
 
 **L-3** stays money only at first. At stop 1A you choose (D4) whether to add a switch that counts your values in L-3's ties ("the salary
@@ -854,7 +871,7 @@ form they can use, beside where the figure sits among published wages, without t
   A starting salary of $118,626 would make the two about even." Never "deserve", "market rate", "below market", "underpaid", "you
   should", "ask for". A test fails on a list of such words in the summary, the template and L-7, as `check-engine.ts` guards the engine.
 - **Basis:** the summary follows the verdict's basis; the email speaks in starting salary and sign-on, the levers a recruiter knows, and
-  names the basis in words ("after taxes and rent"). Per hour: the step-3 figures, as L-3.
+  names the basis in words ("after taxes and rent"). Per hour: the figures per hour divides (the after-rent total), as L-3.
 - **Without an occupation:** no published-wages sentence; the summary is L-3's ties alone. Built before item 2 (D9), the summary is L-3's last
   part instead of L-7's, and moves to L-7 when L-7 arrives.
 
@@ -978,9 +995,9 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
     tax and no credit.
 - **v1's warning was out of date:** `CONVENIENCE_RULE_STATES` (`src/offer/location.ts`) listed Nebraska, so a Nebraska employer raised a
   warning that no longer applied. Fixed on its own, outside v2 (pull request #30, 2026-10-13): Nebraska employers raise none, and a
-  Nebraska resident is still warned for a New Jersey or Connecticut employer, since New Jersey's FAQ still names Nebraska. Still to fix,
-  from the same FAQ: New Jersey's rule doesn't reach Pennsylvania residents (the reciprocal agreement) or Connecticut residents, and the
-  tool warns them.
+  Nebraska resident is still warned for a New Jersey or Connecticut employer, since New Jersey's FAQ still names Nebraska. Fixed since,
+  from the same FAQ (pull requests #32 and #34, 2026-10-14): New Jersey's rule doesn't reach Pennsylvania residents (the reciprocal
+  agreement) or Connecticut residents, nor Pennsylvania's the residents of its reciprocal states, and the tool no longer warns them.
 - **Scope:** per offer, days a week in the employer's state (shared with 4b), and whether remote days are for the employer's necessity
   (default: your convenience, the usual case). The engine works out the wages sourced to the employer's state (the days worked there,
   plus remote days under a convenience rule), that state's nonresident tax on them by its own method, the residence state's credit by its
