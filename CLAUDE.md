@@ -15,7 +15,7 @@ behind every figure.
 
 ## 2. Current state (2026-10-15)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
-  years are projected from it, except amounts published for them (so far 2027's HSA limits).
+  years are projected from it, except amounts published for them (so far 2027's HSA limits and Social Security wage base).
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim). How each slice differs from the design:
   `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
@@ -49,8 +49,8 @@ section 2's and the plan's in step):
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
-- SSA's 2027 wage base (from 2026-10-14) and the IRS's 2027 inflation revenue procedure and 402(g) notice (any day; weekly from
-  2026-11-16). Each goes in `FEDERAL_2027`, and `test/law.test.ts` is the one test it should move.
+- The IRS's 2027 inflation revenue procedure and 402(g) notice (neither out on 2026-10-15; any day, weekly from 2026-11-16). Each
+  goes in `FEDERAL_2027`, and `test/law.test.ts` is the one test it should move. SSA's 2027 wage base ($192,300) is in.
 - December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027.
 
 **Pre-launch checklist** (before the public launch):
@@ -383,7 +383,8 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 - CA's 1% over $1 million is indexed in projected years, though R&TC 17043 isn't (audit C9).
 - Projected years: only CA's indexing is modeled; other states are held at 2026 (up to ~$15-20 too much at the median in 2027,
   ~$80-100 by 2031). Scheduled state rate cuts aren't applied. The SS wage base grows with inflation, not wages. Indexed amounts
-  aren't rounded as the IRS rounds them (at most ~$50), except published ones.
+  aren't rounded as the IRS rounds them (at most ~$50), except published ones. After 2027, the SS wage base is projected from
+  2027's published $192,300.
 - Section 125 amounts are excluded from every state's wages; CA and NJ tax HSA contributions.
 
 **Where you'd live and work**
