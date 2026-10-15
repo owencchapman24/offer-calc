@@ -284,6 +284,11 @@ user's call: see Next steps.
   - Settings: framework none, `npm ci`, `npm run build`, output `dist/`.
   - `vercel.json` sets the CSP, `Referrer-Policy`, `nosniff` and `Permissions-Policy`,
     plus a one-year immutable cache for `/assets/`. All were checked live.
+  - **Hygiene** (2026-10-15, audit S2): every action in the workflows is pinned to a commit, its release in a comment
+    (`actions/checkout@11d5960… # v4.4.0`); to update one, pin the new release's commit in every workflow. Dependabot alerts and
+    security-update pull requests are on (repository settings), for npm and the actions; a security update to `@playwright/test`
+    must move `package.json`'s `playwright-core` override with it. `.github/workflows/fuzz.yml` runs `npm run fuzz` each night
+    (07:17 UTC) on a random seed, written to the run's summary, and by hand from the Actions tab with a seed to replay.
 - **Bundles** (raw / gzip):
   - **Main thread:** 359.2 / 109.8 kB for a quick-mode visit by `npm run check-bundle` (Node's
     gzip; Vite 8's report reads ~1 kB higher, Rolldown's compressor). Copy as document's waiting reason (`copyBlock`) added
@@ -473,7 +478,7 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 - `npm run offers`: sample comparison tables.
 - `npm run fuzz`: the property tests (`app/src/properties.test.ts`, `display.test.ts`) on a random seed with ten times the runs,
   shrinking each counterexample; it prints the seed (`FUZZ_SEED=<seed> npm run fuzz` replays it). `npm test` runs them on a fixed
-  seed.
+  seed; CI runs this each night (`fuzz.yml`).
 - `npm run dev` / `npm run build` / `npm run preview`: the app (Vite, config in
   `app/vite.config.ts`), built to `dist/`.
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
