@@ -1,6 +1,6 @@
 // Sample offers for the table script, benchmarks and the UI's "Try the sample offers".
 // Illustrative inputs, not market data: every place that shows them must say so.
-import { VESTING_PRESETS } from "./offer/vesting";
+import { VESTING_PRESETS } from "./offer/presets";
 import type { ByScenario, Household, OfferInput } from "./offer/types";
 
 export const SAMPLE_HOUSEHOLD: Household = {
