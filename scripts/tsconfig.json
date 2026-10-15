@@ -1,6 +1,6 @@
 {
-  // Dev scripts run under Node; src/ must stay browser-safe, so only this config sees Node types.
+  // Dev scripts and the test config run under Node; src/ must stay browser-safe, so only this config sees Node types.
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["."]
+  "include": [".", "../vitest.config.ts"]
 }

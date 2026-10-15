@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear, saltForYear } from "../src/tax/index";
 import { saltCap } from "../src/tax/federal";
 import { ENACTED } from "../src/tax/params/index";
+import { ENACTED as FROZEN } from "./frozen-enacted";
 
 describe("SALT cap schedule, IRC 164(b)(7)", () => {
   it("2026: $40,400, phase-down above $505,000", () => {
@@ -27,6 +28,10 @@ describe("SALT cap schedule, IRC 164(b)(7)", () => {
 });
 
 describe("paramsForYear", () => {
+  it("runs on the tests' frozen law (test/frozen-enacted.ts), so a data refresh moves no figure a test pins", () => {
+    // vitest.config.ts swaps the frozen copy in for src/tax/params/enacted.ts everywhere but test/law.test.ts.
+    expect(ENACTED).toBe(FROZEN);
+  });
   it("2026 returns enacted 2026 law, not a projection", () => {
     const p = paramsForYear(2026);
     expect(p.year).toBe(2026);
@@ -110,25 +115,17 @@ describe("projected years (federal indexed, state held at 2026)", () => {
     const r = computeTaxes({ year: 2027, filingStatus: "single", wages: 300_000, state: "CA" }, at(2027, 0.025));
     expect(r.stateIncomeTax).toBe(23_540.77);
   });
-  it("2027's HSA limits are the IRS's (Rev. Proc. 2026-24) at any inflation, and later years project from them", () => {
+  it("an amount published for a later year is used as published in its year, at any inflation, and later years project from it", () => {
+    // The frozen law's one published amount: 2027's HSA limits, $4,500 and $9,000.
     for (const inflation of [0, 0.025, 0.1]) expect(at(2027, inflation).federal.hsaLimit).toEqual({ self: 4_500, family: 9_000 });
     // 2028 at 2.5%: 4,500 x 1.025 = 4,612.50 and 9,000 x 1.025 = 9,225 (from 2026 it would be 4,622.75 and 9,192.97).
     expect(at(2028, 0.025).federal.hsaLimit.self).toBeCloseTo(4_612.5, 9);
     expect(at(2028, 0.025).federal.hsaLimit.family).toBeCloseTo(9_225, 9);
     expect(at(2031, 0.025).federal.hsaLimit.self).toBeCloseTo(4_500 * 1.025 ** 4, 9);
-    // Everything else published for 2027 so far: nothing. It's projected from 2026, as before.
+    // An amount not published for 2027 is projected from 2026, as before.
     expect(at(2027, 0.025).federal.standardDeduction.single).toBeCloseTo(16_502.5, 9);
     expect(at(2027, 0.025).payroll.socialSecurityWageBase).toBeCloseTo(189_112.5, 9);
-    expect(ENACTED.map(([y, a]) => [y, Object.keys(a)])).toEqual([[2027, ["hsaLimit"]]]);
     expect(at(2027, 0.025).projected).toBe(true);
-  });
-  it("with 0% inflation, 2027 differs from 2026 only in the SALT schedule and the HSA limits published for it", () => {
-    const p26 = paramsForYear(2026);
-    const p27 = at(2027, 0);
-    expect({ ...p27.federal, salt: null, hsaLimit: null }).toEqual({ ...p26.federal, salt: null, hsaLimit: null });
-    expect(p27.federal.hsaLimit).toEqual({ self: 4_500, family: 9_000 });
-    expect(p27.payroll).toEqual(p26.payroll);
-    expect(p27.federal.salt.cap).toBeCloseTo(40_804, 6);
   });
   it("2027 at 2.5%: $100k single in TX owes $12,949.25 federal (hand-checked)", () => {
     // Taxable 100,000 - 16,502.50 = 83,497.50; brackets 12,710 / 51,660:
