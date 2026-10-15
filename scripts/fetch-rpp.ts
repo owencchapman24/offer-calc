@@ -5,7 +5,7 @@
 // state metro/nonmetro portion (PARPP) and by state (SARPP). Each zip holds CSVs with line
 // codes 1-5: all items, goods, housing (rents), utilities, other services. We keep the latest
 // year in the files.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";

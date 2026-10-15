@@ -42,13 +42,13 @@ export function downloadSaved(saved: string): string {
 }
 
 export class Recovery extends Component<{ children: ReactNode }, { error: Error | null; downloaded: string | null }> {
-  state: { error: Error | null; downloaded: string | null } = { error: null, downloaded: null };
+  override state: { error: Error | null; downloaded: string | null } = { error: null, downloaded: null };
 
   static getDerivedStateFromError(error: unknown) {
     return { error: error instanceof Error ? error : new Error(String(error)) };
   }
 
-  render() {
+  override render() {
     const { error, downloaded } = this.state;
     if (!error) return this.props.children;
     const saved = stored();
