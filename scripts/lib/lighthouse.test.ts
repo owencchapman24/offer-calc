@@ -25,6 +25,12 @@ describe("the Lighthouse budget", () => {
     expect(verdict([at(0.021, 50), at(0.03, 60), at(0, 70)]).problems).toEqual(["CLS 0.021 is over its 0.02 budget."]);
     expect(verdict([at(0, 201), at(0, 250), at(0, 70)]).problems).toEqual(["TBT 201 ms is over its 200 ms budget."]);
   });
+  it("with the fonts held back, gates only the layout shift: LCP and TBT wait for the swap", () => {
+    const late = { lcpMs: Infinity, cls: 0.02, tbtMs: Infinity };
+    const at = (cls: number) => run(4200, 70, { cls, tbtMs: 900 });
+    expect(verdict([at(0), at(0.001), at(0)], late).ok).toBe(true);
+    expect(verdict([at(0.047), at(0.047), at(0)], late).problems).toEqual(["CLS 0.047 is over its 0.02 budget."]);
+  });
   it("reports the first answer's median, and fails a run that never showed a verdict", () => {
     const v = verdict([run(1900, 98, { firstAnswerMs: 380 }), run(1900, 98, { firstAnswerMs: 420 }), run(1900, 98, { firstAnswerMs: 900 })]);
     expect(v).toMatchObject({ ok: true, firstAnswerMs: 420 });
@@ -48,6 +54,12 @@ describe("the Lighthouse budget", () => {
       firstAnswerMs: 431.5 });
     expect(toRun({ ...lhr, audits: { ...lhr.audits, "user-timings": { details: { type: "table", items: [] } } } }).firstAnswerMs)
       .toBeUndefined();
+    // The elements that shifted, named by their selectors' last two steps; a negligible shift isn't listed.
+    const shifts = { details: { type: "table", items: [
+      { node: { selector: "div#root > div.page > section.about > p.assumptions" }, score: 0.0466 },
+      { node: { selector: "div.page > nav.pages > a" }, score: 0.0001 },
+    ] } };
+    expect(toRun({ ...lhr, audits: { ...lhr.audits, "layout-shifts": shifts } }).shifted).toEqual(["section.about > p.assumptions 0.047"]);
     expect(() => toRun({ ...lhr, runtimeError: { code: "NO_FCP" } })).toThrow(/NO_FCP/);
     expect(() => toRun({ ...lhr, audits: { ...lhr.audits, "largest-contentful-paint": {} } })).toThrow(/largest-contentful-paint/);
   });

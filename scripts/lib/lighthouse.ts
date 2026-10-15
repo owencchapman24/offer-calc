@@ -18,6 +18,15 @@
 // CI its Total Blocking Time was 1-1.2 s, against ~70 ms after it), which swung the score by 20 points. The
 // performance score and each metric are the median of their own five values, so one slow run moves none of them. Five
 // runs, not three (2026-10-15, audit P2): one CI run's three LCPs spread 0.46 s.
+//
+// The late-fonts pass (`--fonts-late`): the web fonts load with font-display: swap, so when the page paints before they arrive,
+// text first shows in the fallback fonts and then swaps. On CI's Linux runner the fallback was a wider font, and the swap moved
+// About you's text: CLS 0.047 in 3 of 5 runs once (2026-10-15), and 0 whenever the fonts happened to arrive first. Holding the
+// fonts back makes that case happen every time, so the check that the swap moves nothing (styles.css' size-matched fallbacks)
+// doesn't depend on a runner's timing. Only CLS is gated there: LCP waits for the swap.
+
+export const FONTS_LATE_MS = 1500;
+export const FONTS_LATE_RUNS = 3;
 
 export const LCP_BUDGET_MS = 2500;
 export const CLS_BUDGET = 0.02;
@@ -37,6 +46,8 @@ export interface Run {
   cls: number;
   /** The LCP element's selector, as Lighthouse reports it. */
   lcpElement?: string;
+  /** The elements that shifted, with their scores, as Lighthouse's layout-shifts audit lists them; undefined when none did. */
+  shifted?: string[];
   /** From the trace, unthrottled: when LCP happened, and the app's first-answer mark (undefined when there was none). */
   observedLcpMs?: number;
   firstAnswerMs?: number;
@@ -104,7 +115,16 @@ export function toRun(lhr: {
     observedLcpMs: (lhr.audits.metrics?.details as { items?: { observedLargestContentfulPaint?: number }[] } | undefined)
       ?.items?.[0]?.observedLargestContentfulPaint,
     firstAnswerMs: userMark(lhr.audits["user-timings"]?.details, FIRST_ANSWER),
+    shifted: layoutShifts(lhr.audits["layout-shifts"]?.details),
   };
+}
+
+// The layout-shifts audit lists each shifted element with its score: the selector's last two steps are enough to name it.
+function layoutShifts(details: unknown): string[] | undefined {
+  const items = (details as { items?: { node?: { selector?: string }; score?: number }[] } | undefined)?.items ?? [];
+  const out = items.filter((i) => (i.score ?? 0) >= 0.0005)
+    .map((i) => `${(i.node?.selector ?? "?").split(" > ").slice(-2).join(" > ")} ${(i.score ?? 0).toFixed(3)}`);
+  return out.length ? out : undefined;
 }
 
 // The user-timings audit lists the trace's marks and measures, each with its start time from navigation.

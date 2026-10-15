@@ -40,7 +40,9 @@ jobs:
   # The bundle check catches regressions in what we ship; this measures what users feel: the Largest
   # Contentful Paint on Lighthouse's mobile profile (simulated slow 4G, 4x CPU slowdown), after a discarded warm-up, median of five
   # runs, at most 2.5 s; beside it the median layout shift (at most 0.02) and blocking time (at most 200 ms), and the time to the
-  # first answer, reported (scripts/lib/lighthouse.ts). The runner's preinstalled Chrome runs it.
+  # first answer, reported (scripts/lib/lighthouse.ts). The runner's preinstalled Chrome runs it. Then the late-fonts pass: the web
+  # fonts held back so the page paints in the fallback fonts first, three runs, the layout shift gated, so the font swap can't move
+  # text whatever the runner's timing.
   lighthouse:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -53,6 +55,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lighthouse
+      - if: ${{ !cancelled() }}
+        run: npm run lighthouse -- --fonts-late
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

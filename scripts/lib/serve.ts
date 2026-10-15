@@ -29,12 +29,17 @@ export function headersFor(path: string, rules: VercelHeaders[]): Record<string,
   return out;
 }
 
-/** Serves `dir` on 127.0.0.1, on `port` (0: a free one); resolves with the server and its URL. */
-export function serveDist(dir: string, vercelJson: string, port = 0): Promise<{ server: Server; url: string }> {
+/**
+ * Serves `dir` on 127.0.0.1, on `port` (0: a free one); resolves with the server and its URL. `holdBack` delays a response by the
+ * milliseconds it returns for its path: the Lighthouse check's late-fonts pass holds the web fonts back.
+ */
+export function serveDist(dir: string, vercelJson: string, port = 0, holdBack?: (path: string) => number): Promise<{ server: Server; url: string }> {
   const rules: VercelHeaders[] = JSON.parse(readFileSync(vercelJson, "utf8")).headers ?? [];
   const root = normalize(dir);
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     const path = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
+    const wait = holdBack?.(path) ?? 0;
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const file = normalize(join(root, path === "/" ? "index.html" : path));
     let body: Buffer;
     try {

@@ -97,6 +97,8 @@ finding in `docs/user-testing.md` as it comes in.
 - `npm run lighthouse [-- <url>]` (after a build): Lighthouse's mobile profile, a warm-up and five runs. Fails on a median LCP over
   2.5 s, CLS over 0.02 or TBT over 200 ms, or a run that shows no verdict; reports the time to the first answer (observed, not
   budgeted). Needs Chrome or `CHROME_PATH` (Edge on Windows). The median LCP's run's report goes to `.lighthouse/report.html`.
+  `npm run lighthouse -- --fonts-late [ms]`: the late-fonts pass, three runs with the web fonts held back (1.5 s), so the page paints
+  in the fallback fonts first; it gates only CLS (the swap mustn't move text). CI runs both.
 - `npm run e2e` (after a build): Playwright on the production build, served as Vercel serves it (`scripts/serve-dist.ts`, port
   4180): the accessibility scan, then the smoke, keyboard and phone/tablet tests. Locally it drives the installed Edge; CI runs
   Chromium in four shards. One project: `npm run e2e -- --project=phone-dark`. Don't pass `--reporter` (it drops the scan's).
@@ -153,7 +155,9 @@ finding in `docs/user-testing.md` as it comes in.
   entered, or none; a cost or benefit counted for some offers but not others is named under the verdict. Per hour shows only when
   every offer has hours.
 - **Type:** Atkinson Hyperlegible Next for text and figures, `font-variant-numeric: tabular-nums` wherever numbers align
-  (proportional on the hero number); Atkinson Hyperlegible Mono only for formulas and derivations.
+  (proportional on the hero number); Atkinson Hyperlegible Mono only for formulas and derivations. Each has a size-matched local
+  fallback (`styles.css`: Arial or its metric twins, Courier New or its twins, scaled to Atkinson's widths and given its ascent and
+  descent), so text doesn't move when the web fonts swap in; the late-fonts pass checks it. A change of font redoes the numbers.
 - **Colors:** offer colors (cobalt, berry, bronze) are for marks and rules only; text stays ink. Each offer keeps its letter and
   color for life. Tokens and their validation: `docs/ui-design.md` §9; re-run the dataviz validator if a color changes.
 - **Samples:** `src/samples.ts` keeps fixed dates (start 2026-07-13) for the table script and tests; the app moves them forward by
