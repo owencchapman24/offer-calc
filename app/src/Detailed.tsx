@@ -10,7 +10,7 @@ import {
 import { ChoiceField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, Warnings } from "./controls";
 import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
 import { type AppOffer, bonusBasis, type HealthDraft, type RetirementDraft } from "./model";
-import { BonusRow, CityRow, RentRow, SalaryRow, StartRow } from "./rows";
+import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
 import { bonusYearsText, cashAwardsText, grantsText, matchText, promotionsText, refreshersText } from "./summary";
 import { percent } from "./text";

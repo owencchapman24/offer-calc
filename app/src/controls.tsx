@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { formatWarning } from "../../src/format/warnings";
 import { WARNING_AT } from "./warningAt";
-import type { ByScenario, MonthDay, OfferWarning } from "../../src/offer/types";
+import type { ByScenario, MonthDay } from "../../src/offer/types";
 import { defaultFor, isDefault } from "./defaults";
 import { DefaultTick, fieldId, hintId, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";

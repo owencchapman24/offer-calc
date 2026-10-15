@@ -1,4 +1,4 @@
-# Tests, the engine's formatting guard, the type check, the build and its size budget, on every pull
+# Tests, the engine's formatting guard, the type check, the hooks linter, the build and its size budget, on every pull
 # request and every push to main; beside them, Lighthouse and Playwright (the accessibility scan, the smoke
 # and keyboard tests) on the production build. Pushes to other branches run only through their pull
 # request, so CI runs once per push.
@@ -34,6 +34,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm run build
       - run: npm run check-bundle
 
