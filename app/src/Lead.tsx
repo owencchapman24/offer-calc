@@ -50,6 +50,17 @@ function LiveVerdict({ text }: { text: string | null }) {
   return <p id="verdict-live" className="sr-only" role="status">{said}</p>;
 }
 
+/**
+ * The time to the first answer (audit P2): a performance mark, "first-answer", once a visit, after the frame that first shows
+ * a verdict. The Lighthouse check reports it from the trace (scripts/lib/lighthouse.ts).
+ */
+let answered = false;
+function markFirstAnswer() {
+  if (answered) return;
+  answered = true;
+  requestAnimationFrame(() => setTimeout(() => performance.mark("first-answer")));
+}
+
 /** Goes to the lead schedule: its heading takes focus, below a sticky bar's scroll padding. */
 export function toLead() {
   document.getElementById("lead")?.scrollIntoView({ block: "start" });
@@ -155,6 +166,7 @@ function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, chan
   const pv = basis !== "perHour";
   const extra = extraHoursView(view, letters);
   const marksHidden = useContext(TickSetting)?.hidden ?? false;
+  useEffect(markFirstAnswer, []);
   return (
     <>
       {basis === "colAdjustedTotal" && !dismissed?.afterRent && (

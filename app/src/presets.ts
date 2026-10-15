@@ -1,28 +1,8 @@
 import type { VestingSchedule } from "../../src/offer/types";
+import { VESTING_PRESETS } from "../../src/offer/presets";
 
-// The vesting presets the equity editor offers, built the way the engine's byYear() builds
-// VESTING_PRESETS. The main thread can't import engine values, so they're rebuilt here; a test
-// checks they equal the engine's, tranche for tranche.
-
-/** Percents per year, each year split into `perYear` equal vests; anything before the cliff vests at the cliff. */
-function byYear(pctPerYear: number[], perYear: number, cliffMonths = 0): VestingSchedule {
-  const byMonth = new Map<number, number>();
-  pctPerYear.forEach((p, year) => {
-    for (let k = 1; k <= perYear; k++) {
-      const month = Math.max(year * 12 + (k * 12) / perYear, cliffMonths);
-      byMonth.set(month, (byMonth.get(month) ?? 0) + p / 100 / perYear);
-    }
-  });
-  return { tranches: [...byMonth].filter(([, f]) => f > 0).sort((a, b) => a[0] - b[0]).map(([month, fraction]) => ({ month, fraction })) };
-}
-
-export const PRESETS = {
-  /** 25/25/25/25: 25% at a 1-year cliff, then quarterly. The default: the most common. */
-  evenQuarterlyAfterCliff: byYear([25, 25, 25, 25], 4, 12),
-  evenAnnual: byYear([25, 25, 25, 25], 1),
-  backLoadedSemiannualAfterCliff: byYear([5, 15, 40, 40], 2, 12),
-  frontLoadedMonthly: byYear([33, 33, 22, 12], 12),
-} as const;
+// The vesting presets the equity editor offers: the engine's own (src/offer/presets.ts, which the main thread may import).
+export const PRESETS = VESTING_PRESETS;
 
 export type PresetId = keyof typeof PRESETS;
 export const PRESET_IDS = Object.keys(PRESETS) as PresetId[];

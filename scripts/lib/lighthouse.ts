@@ -1,5 +1,14 @@
 // The load-time budget (docs/ui-design.md §10): on Lighthouse's mobile profile, the median Largest Contentful
-// Paint of three runs is at most 2.5 s, Google's "good" threshold for LCP.
+// Paint of five runs is at most 2.5 s, Google's "good" threshold for LCP. Beside it (audit P3), the median Cumulative
+// Layout Shift is at most 0.02 (0 on 2026-10-15; 0.020 once flagged a real shift, found by reading the numbers) and the
+// median Total Blocking Time at most 200 ms (45-99 ms on 2026-10-15; Google's "good" is 200 ms).
+//
+// The time to the first answer (audit P2): the app marks "first-answer" (performance.mark, app/src/Lead.tsx) after the
+// frame that first shows a verdict, once the worker has answered. LCP doesn't see it: the LCP element is About you's
+// assumptions line, painted before the worker answers. Lighthouse reads the mark from the trace, which simulated throttling
+// leaves unthrottled, so it's an observed time, reported beside the observed LCP, not a simulated one. Reported, not
+// budgeted, until there's a baseline (docs/v2-plan.md, the performance plan's rule 4); a run without the mark fails,
+// since then no verdict was shown.
 //
 // The bundle check (scripts/lib/bundle.ts) catches a regression in what we ship; this measures what a
 // phone user waits for. Lighthouse's mobile profile: a Moto G Power-sized screen, simulated slow 4G
@@ -7,10 +16,15 @@
 // load through a network and CPU model, so it's steadier than real throttling; the median of three runs
 // steadies it further. A warm-up run comes first and is discarded: a fresh browser's first load runs cold (on
 // CI its Total Blocking Time was 1-1.2 s, against ~70 ms after it), which swung the score by 20 points. The
-// performance score and LCP are each the median of their own three values, so one slow run moves neither.
+// performance score and each metric are the median of their own five values, so one slow run moves none of them. Five
+// runs, not three (2026-10-15, audit P2): one CI run's three LCPs spread 0.46 s.
 
 export const LCP_BUDGET_MS = 2500;
-export const RUNS = 3;
+export const CLS_BUDGET = 0.02;
+export const TBT_BUDGET_MS = 200;
+export const RUNS = 5;
+/** The app's mark when the first verdict has painted. */
+export const FIRST_ANSWER = "first-answer";
 /** Runs before the measured ones, discarded. */
 export const WARMUP_RUNS = 1;
 
@@ -23,6 +37,9 @@ export interface Run {
   cls: number;
   /** The LCP element's selector, as Lighthouse reports it. */
   lcpElement?: string;
+  /** From the trace, unthrottled: when LCP happened, and the app's first-answer mark (undefined when there was none). */
+  observedLcpMs?: number;
+  firstAnswerMs?: number;
 }
 
 /** The run with the median LCP (the middle one of an odd count; the slower middle one of an even count): its report is kept. */
@@ -41,13 +58,27 @@ function median(xs: number[], worse: (a: number, b: number) => number): number |
 
 /**
  * The measured runs' medians, each taken on its own (LCP's and the score's need not come from the same run), the run
- * whose report is kept (the median LCP's), and whether the median LCP is within the budget.
+ * whose report is kept (the median LCP's), and what's wrong: LCP, CLS or TBT over budget, or a run with no first answer.
  */
-export function verdict(runs: Run[], budgetMs = LCP_BUDGET_MS) {
+export function verdict(runs: Run[], budgets = { lcpMs: LCP_BUDGET_MS, cls: CLS_BUDGET, tbtMs: TBT_BUDGET_MS }) {
   const lcpMs = median(runs.map((r) => r.lcpMs), Math.max);
   const score = median(runs.map((r) => r.score), Math.min);
-  return { lcpMs, score, median: medianRun(runs), ok: lcpMs !== undefined && Number.isFinite(lcpMs) && lcpMs <= budgetMs };
+  const cls = median(runs.map((r) => r.cls), Math.max);
+  const tbtMs = median(runs.map((r) => r.tbtMs), Math.max);
+  const answers = runs.map((r) => r.firstAnswerMs).filter((t): t is number => t !== undefined);
+  const firstAnswerMs = median(answers, Math.max);
+  const observedLcpMs = median(runs.flatMap((r) => r.observedLcpMs ?? []), Math.max);
+  const problems: string[] = [];
+  if (!runs.length) problems.push("No runs.");
+  if (lcpMs !== undefined && !(lcpMs <= budgets.lcpMs)) problems.push(`LCP ${Math.round(lcpMs)} ms is over its ${budgets.lcpMs} ms budget.`);
+  if (cls !== undefined && !(cls <= budgets.cls)) problems.push(`CLS ${cls.toFixed(3)} is over its ${budgets.cls} budget.`);
+  if (tbtMs !== undefined && !(tbtMs <= budgets.tbtMs)) problems.push(`TBT ${Math.round(tbtMs)} ms is over its ${budgets.tbtMs} ms budget.`);
+  if (answers.length < runs.length) {
+    problems.push(`${runs.length - answers.length} of ${runs.length} runs had no "${FIRST_ANSWER}" mark: the page showed no verdict.`);
+  }
+  return { lcpMs, score, cls, tbtMs, firstAnswerMs, observedLcpMs, median: medianRun(runs), problems, ok: problems.length === 0 };
 }
+
 
 /** A Lighthouse result (its `lhr`) as a run. Throws if Lighthouse couldn't measure the page. */
 export function toRun(lhr: {
@@ -70,7 +101,16 @@ export function toRun(lhr: {
     tbtMs: num("total-blocking-time"),
     cls: num("cumulative-layout-shift"),
     lcpElement: lcpSelector(lhr.audits["lcp-breakdown-insight"]?.details),
+    observedLcpMs: (lhr.audits.metrics?.details as { items?: { observedLargestContentfulPaint?: number }[] } | undefined)
+      ?.items?.[0]?.observedLargestContentfulPaint,
+    firstAnswerMs: userMark(lhr.audits["user-timings"]?.details, FIRST_ANSWER),
   };
+}
+
+// The user-timings audit lists the trace's marks and measures, each with its start time from navigation.
+function userMark(details: unknown, name: string): number | undefined {
+  const items = (details as { items?: { name?: string; timingType?: string; startTime?: number }[] } | undefined)?.items ?? [];
+  return items.find((i) => i.name === name && i.timingType === "Mark")?.startTime;
 }
 
 // Lighthouse 13 names the element in the LCP breakdown insight: a list whose node item has a selector.

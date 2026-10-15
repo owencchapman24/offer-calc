@@ -1,5 +1,6 @@
-// Lighthouse on the production build, mobile profile: a warm-up run (discarded), then three. Fails if the median
-// Largest Contentful Paint is over 2.5 s (scripts/lib/lighthouse.ts). Run after `npm run build`:
+// Lighthouse on the production build, mobile profile: a warm-up run (discarded), then five. Fails if the median
+// Largest Contentful Paint is over 2.5 s, the median layout shift over 0.02 or the median blocking time over 200 ms, or if
+// a run shows no verdict; reports the time to the first answer (scripts/lib/lighthouse.ts). Run after `npm run build`:
 // `npm run lighthouse`. CI runs it.
 //   npm run lighthouse -- <url>   audits a deployed page instead (say, https://offer-calc.vercel.app/)
 // It needs Chrome, or CHROME_PATH set to a Chromium browser. On Windows without Chrome it uses Edge.
@@ -8,7 +9,7 @@ import { launch } from "chrome-launcher";
 import lighthouse from "lighthouse";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { LCP_BUDGET_MS, RUNS, toRun, verdict, WARMUP_RUNS, type Run } from "./lib/lighthouse";
+import { CLS_BUDGET, LCP_BUDGET_MS, RUNS, TBT_BUDGET_MS, toRun, verdict, WARMUP_RUNS, type Run } from "./lib/lighthouse";
 import { serveDist } from "./lib/serve";
 
 const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
@@ -39,7 +40,8 @@ try {
     });
     if (!result) throw new Error("Lighthouse returned nothing.");
     const run = toRun(result.lhr);
-    const numbers = `performance ${run.score}, FCP ${s(run.fcpMs)}, LCP ${s(run.lcpMs)}, TBT ${Math.round(run.tbtMs)} ms, CLS ${run.cls.toFixed(3)}`;
+    const numbers = `performance ${run.score}, FCP ${s(run.fcpMs)}, LCP ${s(run.lcpMs)}, TBT ${Math.round(run.tbtMs)} ms, CLS ${run.cls.toFixed(3)}; `
+      + `observed: LCP ${opt(run.observedLcpMs)}, first answer ${opt(run.firstAnswerMs)}`;
     // The warm-up warms the browser and the server: it's shown, not counted.
     if (i < 0) {
       console.log(`Warm-up (discarded): ${numbers}`);
@@ -60,10 +62,11 @@ const m = v.median!;
 mkdirSync(".lighthouse", { recursive: true });
 writeFileSync(".lighthouse/report.html", reports[runs.indexOf(m)]);
 const line = `${target ?? "Production build"}, mobile, after a warm-up, medians of ${RUNS} runs: LCP ${s(v.lcpMs!)} `
-  + `(budget ${s(LCP_BUDGET_MS)}), performance ${v.score}. LCP element: ${m.lcpElement ?? "unknown"}. `
-  + "Report (the median LCP's run): .lighthouse/report.html";
+  + `(budget ${s(LCP_BUDGET_MS)}), CLS ${v.cls!.toFixed(3)} (budget ${CLS_BUDGET}), TBT ${Math.round(v.tbtMs!)} ms (budget ${TBT_BUDGET_MS} ms), `
+  + `performance ${v.score}. LCP element: ${m.lcpElement ?? "unknown"}. Observed (unthrottled): LCP ${opt(v.observedLcpMs)}, `
+  + `the first answer ${opt(v.firstAnswerMs)} (reported, not budgeted). Report (the median LCP's run): .lighthouse/report.html`;
 if (!v.ok) {
-  console.error(`Lighthouse check failed. ${line}`);
+  console.error(`Lighthouse check failed. ${line}\n${v.problems.map((p) => `- ${p}`).join("\n")}`);
   process.exit(1);
 }
 console.log(`Lighthouse check: ${line}`);
@@ -94,3 +97,4 @@ function freePort(): Promise<number> {
 }
 
 function s(ms: number) { return `${(ms / 1000).toFixed(2)} s`; }
+function opt(ms: number | undefined) { return ms === undefined ? "none" : s(ms); }

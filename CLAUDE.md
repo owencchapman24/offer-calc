@@ -275,7 +275,7 @@ user's call: see Next steps.
   is deferred; see Decisions). CI (`.github/workflows/ci.yml`) runs on every pull request and every
   push to `main` (not on other branches' pushes, so a pull request runs it once), in three jobs:
   - `check`: `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, `npm run check-bundle`;
-  - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); a warm-up, then three runs; the median LCP's run's report is
+  - `lighthouse`: builds, then `npm run lighthouse` (the runner's Chrome); a warm-up, then five runs; the median LCP's run's report is
     uploaded as the `lighthouse-report` artifact;
   - `e2e (1/4)` to `e2e (4/4)`: four shards (`--shard`), each building, installing Playwright's Chromium (cached) and running
     its quarter of `npm run e2e` (one retry for a slow runner), writing a blob report; then `e2e` merges them
@@ -317,7 +317,10 @@ user's call: see Next steps.
     by L-1 and by L-2 and L-6, split React, `ui.tsx` and `text.ts` out (2026-10-12), so the button lives in `figures.tsx`.
     And `help.ts` stays free of React: the lazy chunks that fill it in (`quickHelp.ts`, `helpText.ts`) import it, and when it
     imported `lazy.ts` for `quickHelp`'s lazy module, React, `lazy.ts` and `text.ts` split out (2026-10-13), so that module is
-    in `fields.tsx`. `npm run build` then `grep -c modulepreload dist/index.html` is 0 when the main thread is one chunk.
+    in `fields.tsx`. Enforced since 2026-10-15 (audit P4): `npm run check-bundle` fails when `index.html` loads more than one
+    script, and `scripts/lib/imports.test.ts` (in `npm test`) walks `app/src`'s imports and checks the rules: no engine values on
+    the main thread, `help.ts` free of React, `figures.tsx` free of `react-dom` and of `metrics.ts` at run time, the lazy schedules
+    never importing `Tickmarks.tsx`.
   - **Loaded on first use** (raw / gzip, 2026-10-09): detailed mode 54 / 14 KB (sections, editors,
     controls, its help text), the derivations 69 / 22 KB (when a tickmark is hovered, focused or
     opened), the methodology 49 / 16 KB, the Data page 15 / 6 KB, the engine's warning words 4 / 2 KB,
@@ -476,10 +479,13 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 - `npm run bench`: engine timings on the sample offers (median of warm runs). Re-run after
   engine changes; the UI's live-update budget depends on them.
 - `npm run check-bundle`: after `npm run build`, the JS a quick-mode visit loads, gzipped, against
-  the 120 kB budget (`scripts/lib/bundle.ts`). CI runs it.
+  the 120 kB budget, in one chunk; the worker against its own 75 kB budget (68.1 kB on 2026-10-15); the stylesheet reported
+  (10.2 kB), not budgeted (`scripts/lib/bundle.ts`, audit P1 and P4). CI runs it.
 - `npm run lighthouse [-- <url>]`: after `npm run build`, Lighthouse's mobile profile on the
-  production build, a warm-up (discarded) and three runs; fails if the median LCP is over 2.5 s
-  (`scripts/lib/lighthouse.ts`). With a URL it audits that page instead (the live site). It needs
+  production build, a warm-up (discarded) and five runs; fails if the median LCP is over 2.5 s, the median CLS over 0.02, the
+  median TBT over 200 ms, or a run shows no verdict (`scripts/lib/lighthouse.ts`, audit P2 and P3). It reports the time to the
+  first answer: the app's `first-answer` mark (`Lead.tsx`), observed in the trace (unthrottled: 1.52 s against an observed LCP of
+  0.99 s locally on 2026-10-15), not budgeted until there's a baseline. With a URL it audits that page instead (the live site). It needs
   Chrome or `CHROME_PATH`; on Windows without Chrome it uses Edge and closes it over the DevTools
   protocol (Edge relaunches itself, so killing the launched process leaves the browser running).
   The median LCP's run's report goes to `.lighthouse/report.html`.
@@ -564,7 +570,8 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
     `horizonSweep`, your stay's full projection per offer (`StayDetail`), annuity terms, the rent
     note's rent flips (from those projections) and rent estimates. Only the worker and tests import it.
   - **Bundles:** only the worker holds the engine and the BEA/HUD tables. The main thread
-    imports engine types and `src/col/cities.ts` only. `src/protocol.ts` holds the
+    imports engine types, `src/col/cities.ts`, the samples and the vesting presets (`src/offer/presets.ts`, pure, which
+    `app/src/presets.ts` re-exports) only. `src/protocol.ts` holds the
     message types and `rentKey`: never import values from `engine.worker.ts` or
     `compute.ts`.
   - `src/verdict.ts`: the lead schedule's view model, including pay per extra hour and the verdict's sentence (`verdictSentence`).
@@ -705,7 +712,8 @@ gzip, LCP 1.95 s to 1.87 s). Data checks are due soon: SSA's 2027 wage base from
 
 ## UI conventions (keep these)
 - **Bundles:** the main thread never imports engine values (`src/offer`, `src/tax`,
-  `src/col/index.ts`, `src/col/rent.ts`); type imports are fine.
+  `src/col/index.ts`, `src/col/rent.ts`); type imports are fine. The exceptions are pure data: `src/col/cities.ts`, `src/samples.ts`
+  and `src/offer/presets.ts`. `scripts/lib/imports.test.ts` checks it.
   - It uses `src/col/cities.ts` (the slim city list) and gets everything else from the
     worker.
   - Message types and `rentKey` live in `app/src/protocol.ts`. Never import a value from
