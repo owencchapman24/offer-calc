@@ -2,6 +2,44 @@
    vertical column rulings, graphite tickmarks, ink stamps. Offer colors validated with the
    dataviz palette validator (all pairs, both modes). */
 
+/* Size-matched fallbacks for the web fonts, which load with font-display: swap: text first paints in a local font, and when
+   Atkinson arrives it mustn't move (a 0.047 layout shift in CI, 2026-10-15). Each face is a local font scaled to Atkinson's widths,
+   with Atkinson's vertical metrics: from the font files, 1000 units to the em, ascender 984, descender -316, line gap 0, for Next and
+   Mono alike (hhea and typo agree, USE_TYPO_METRICS set).
+   - Next on Arial, or the fonts with Arial's widths: Liberation Sans (Linux, CI's Chrome), Arimo, Helvetica. size-adjust is Next's
+     width over Arial's for the first screen's text, measured in Edge with canvas measureText: 98.86% for regular weights (20,097.6 ÷
+     20,328.7), 100.12% for bold (21,588.2 ÷ 21,561.9).
+   - Mono on Courier New, or Liberation Mono or Cousine: every glyph is 632 units against Courier New's 1229/2048, 105.32%.
+   - The browser scales ascent-override and descent-override by size-adjust, so each is Atkinson's 98.4% and 31.6% ÷ size-adjust.
+   Where none of these fonts is installed, the face fails and the stack moves on to system-ui. */
+@font-face {
+  font-family: "Atkinson Next fallback";
+  font-weight: 100 549;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Arimo"), local("Helvetica");
+  size-adjust: 98.86%;
+  ascent-override: 99.53%;
+  descent-override: 31.96%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Atkinson Next fallback";
+  font-weight: 550 900;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"),
+    local("Helvetica Bold");
+  size-adjust: 100.12%;
+  ascent-override: 98.28%;
+  descent-override: 31.56%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Atkinson Mono fallback";
+  src: local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"), local("LiberationMono"), local("Cousine");
+  size-adjust: 105.32%;
+  ascent-override: 93.43%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
 :root {
   color-scheme: light;
   --page: #eef1ef;
@@ -16,8 +54,8 @@
   --offer-b: #b5307a;
   --offer-c: #8a6a00;
   --warning: #8a5a00;
-  --sans: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", system-ui, sans-serif;
-  --mono: "Atkinson Hyperlegible Mono Variable", "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+  --sans: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", "Atkinson Next fallback", system-ui, sans-serif;
+  --mono: "Atkinson Hyperlegible Mono Variable", "Atkinson Hyperlegible Mono", "Atkinson Mono fallback", ui-monospace, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
