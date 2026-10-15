@@ -104,22 +104,64 @@ describe("the comparison window", () => {
       bonus: { ...o.draft.bonus, amount: null }, cashAwards: [] } })),
   }));
 
+  /** A generated draft as the counterexample had it: salary only, 35 hours a week, $800 rent. */
+  const salaryOnly = (residence: Case["offers"][number]["draft"]["residence"], startDate: string, annual: number,
+    rentGrowth: number | null): Case["offers"][number]["draft"] => ({
+    label: "Generated", residence, employerState: null, startDate,
+    salary: { annual, raise: null, raiseOn: null, promotions: [] },
+    bonus: { basis: "fixed", amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
+      mustBeEmployedOnPayDate: null },
+    cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: null, health: null,
+    perks: { section127: null, commuterMonthly: null }, hours: { weekly: { bear: 35, base: 35, bull: 35 }, weeksPerYear: null },
+    costOfLiving: { area: "35620", monthlyRent: 800, rentGrowth },
+  });
+
+  /**
+   * Each offer's salary in the window is its salary for its own days there, to within half a cent for each piece of pay posted:
+   * each piece (a month, or the part of one before or after an anniversary or the window's edge) is rounded to the cent once.
+   */
+  function salaryForOwnDays(c: Case) {
+    const x = inputs(c);
+    fc.pre(x !== null);
+    const window = comparisonWindow(x!.offers, c.household.stayYears);
+    x!.offers.forEach((offer, i) => {
+      const s = projectOffer(offer, x!.household, { valuationDate: c.today, window, inflation: INFLATION }).scenarios.base;
+      const pieces = s.events.filter((e) => e.inWindow && e.component === "salary");
+      const inWindow = pieces.reduce((sum, e) => sum + e.gross, 0);
+      const days = salaryFor(offer.salary.annual, toDays(offer.startDate), toDays(s.window.end));
+      expect(Math.abs(inWindow - days), `${"ABC"[i]} starts ${offer.startDate}; the window is ${window.start} to ${s.window.end}`)
+        .toBeLessThanOrEqual(0.005 * pieces.length + 1e-6);
+    });
+  }
+
   // Audit C3: pay accrued in the window's last month was dated at the month's end, past the window, so an offer starting after
   // the 1st of a month lost up to a month of pay while its hours for those days still counted.
   it("each offer's salary in the window is its salary for its own days in the window", () => {
-    fc.assert(fc.property(flat, (c) => {
-      const x = inputs(c);
-      fc.pre(x !== null);
-      const window = comparisonWindow(x!.offers, c.household.stayYears);
-      x!.offers.forEach((offer, i) => {
-        const s = projectOffer(offer, x!.household, { valuationDate: c.today, window, inflation: INFLATION }).scenarios.base;
-        const inWindow = s.events.filter((e) => e.inWindow && e.component === "salary").reduce((sum, e) => sum + e.gross, 0);
-        const days = salaryFor(offer.salary.annual, toDays(offer.startDate), toDays(s.window.end));
-        const months = Math.ceil((toDays(s.window.end) - toDays(offer.startDate)) / 28);
-        expect(Math.abs(inWindow - days), `${"ABC"[i]} starts ${offer.startDate}; the window is ${window.start} to ${s.window.end}`)
-          .toBeLessThanOrEqual(0.005 * months + 1e-6);
-      });
-    }), runs(40));
+    fc.assert(fc.property(flat, salaryForOwnDays), runs(40));
+  });
+
+  // FUZZ_SEED=1701905633 (2026-10-15), as shrunk: A starts on Jun 30, 2027 and the window ends on Jul 8, so A's 8 days in it are
+  // two pieces, each rounded to the cent: Jun 30, 395,500 / 12 x 1/30 = 1,098.6111 -> 1,098.61, and Jul 1-7, 395,500 / 12 x 7/31 =
+  // 7,442.2043 -> 7,442.20, together $0.0054 under the exact 8,540.8154. The engine was right; the property allowed half a cent per
+  // 28 days (one piece here) instead of half a cent per piece posted.
+  it("an offer starting on a month's last day, in a window ending a week into the next: two pieces, each to the cent", () => {
+    const c: Case = {
+      today: "2026-07-05",
+      household: { filingStatus: "single", spouseWages: 0, otherWagesThisYear: 1_000, stayYears: 1, pricesIn: "00000", healthUsage: "low" },
+      offers: [
+        { place: { area: "35620", state: "NY", city: null },
+          draft: salaryOnly({ state: "NY", nyc: false, philadelphia: false }, "2027-06-30", 395_500, null) },
+        { place: { area: "35620", state: "NY", city: "nyc" },
+          draft: salaryOnly({ state: "NY", nyc: true, philadelphia: false }, "2026-07-08", 30_000, 0) },
+      ],
+    };
+    salaryForOwnDays(c);
+    const x = inputs(c)!;
+    const window = comparisonWindow(x.offers, 1);
+    const s = projectOffer(x.offers[0], x.household, { valuationDate: c.today, window, inflation: INFLATION }).scenarios.base;
+    expect(s.events.filter((e) => e.component === "salary").slice(0, 3).map((e) => [e.date, e.gross, e.inWindow])).toEqual([
+      ["2027-06-30", 1_098.61, true], ["2027-07-07", 7_442.2, true], ["2027-07-31", 25_516.13, false],
+    ]);
   });
 
   // Audit C4: a payment dated before the offer's start date (relocation money paid before day one) counted in employment year 1, and
