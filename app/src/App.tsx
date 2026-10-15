@@ -375,6 +375,7 @@ export function App() {
           Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null && <span className="no-print">: {engine.ms.toFixed(0)} ms</span>} in a Web Worker.
           Not financial advice.
         </p>
+        <p className="rights">© 2026 Owen Chapman. All rights reserved.</p>
       </footer>
       {/* Last on the page, so it sticks to the bottom of the screen all the way down (W9). */}
       {route.page === "compare" && phone && view && (

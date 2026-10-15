@@ -22,6 +22,8 @@ test("a salary edit updates the verdict", async ({ page }) => {
   expect(after.hero).not.toEqual(before.hero);
   expect(after.ranks[0]).toMatch(/^B/);
   await expect(page.locator(".lead .verdict-lede").first()).toHaveText(/^B leaves you about/);
+  // The footer says whose it is (the README's license section says the same).
+  await expect(page.locator(".colophon .rights")).toHaveText("© 2026 Owen Chapman. All rights reserved.");
 });
 
 test("filing jointly, a spouse's wages raise every offer's tax, and are saved", async ({ page }) => {

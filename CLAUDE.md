@@ -407,7 +407,8 @@ Before the repo and the app go public (deferred, see Decisions):
 - **The repo stays private for now.** The goal is "user-ready" first; going public comes after.
   The public-repo settings and the visibility switch are deferred. Their checklist, with each
   setting, is `docs/slice-3-plan.md`, "Public-repo prep", item 7. The prep in the repo is done:
-  no LICENSE ("All rights reserved; source shown for review only" in the README), the README, the
+  no LICENSE ("© 2026 Owen Chapman. All rights reserved. Source shown for review only." in the README, and "© 2026 Owen
+  Chapman. All rights reserved." in the site's footer), the README, the
   neutral opening line here, `fetch-fmr`'s honest User-Agent and `--file` fallback, CI, `.claude/`
   ignored. The history scan (2026-10-08) found only noreply author addresses, no secret-shaped
   strings and no sensitive files; re-run it before switching the visibility.
