@@ -528,7 +528,15 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             arithmetic before rounding has 109,462.63). In a calendar year's tax with the offer, the total is the tax without it
             plus the offer's tax, and the federal income tax, the largest line, takes the rounding, as on a rounded schedule; its
             work shows the unrounded figure. Present values aren't sums of the years (each payment is discounted from its date),
-            so they're worked out before rounding, and L-6 ties each to the rank list.
+            so they're worked out before rounding, and L-6 ties each to the rank list; in a present value's own work, one line takes
+            the rounding (the tax, the largest benefit, or the money saved at face value), so its column adds up too.
+          </p>
+          <p>
+            Every Show the work works out exactly as displayed: each "=" is the arithmetic of the figures above it, as shown,
+            rounded as the result is shown. A gap between two totals is the totals as shown, subtracted; "a month" is that gap ÷ the
+            annuity factor as shown, rounded once, in the verdict, the stays row, L-2 and the copied document alike. The rent that
+            ties an offer (L-3) is worked from the figures shown in the same way. Where a division needs more decimals to work out
+            (hours, an index, a rate), they're shown.
           </p>
         </Section>
       </article>

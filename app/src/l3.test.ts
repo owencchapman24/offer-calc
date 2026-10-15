@@ -8,7 +8,7 @@ import type { WorkContext } from "./metrics";
 import type { AppOffer } from "./model";
 import { tieJob, type Ties } from "./protocol";
 import { breakevenJob } from "./slowJobs";
-import { compareOf, context, renderPage, runJob, withTies } from "./testing";
+import { compareOf, context, footsAsDisplayed, renderPage, runJob, withTies } from "./testing";
 
 // L-3 · What it would take, and the close-call line (docs/ui-design.md §4.6, §4.1). The samples start Jul 13, 2026 and
 // are valued then, as in W7a.
@@ -183,7 +183,10 @@ describe("the rent lever in L-3 is the engine's closed form", () => {
     const d = derive("tie.A.rent", withTies(ctx).ctx);
     const v = (label: string) => Number(d.lines.find((l) => l.label.startsWith(label))!.value!.replace(/[$,]/g, ""));
     expect(Math.round(v("The same in New York dollars") / v("Rent's present-value factor"))).toBe(v("Less rent a month"));
-    expect(d.lines[d.lines.length - 1]).toMatchObject({ label: "Rent that ties: $3,800 as entered − $497", value: "$3,303" });
+    // As displayed: 21,182 × 105.696 ÷ 99.880 = 22,415.1, shown 22,415; ÷ 45.1155 = 496.84, shown $497; $3,800 − $497 = $3,303.
+    expect(d.lines.slice(-3).map((l) => [l.op ?? "", l.label, l.value])).toEqual([
+      ["", "A's rent a month, as entered", "$3,800"], ["−", "Less rent", "$497"], ["=", "Rent that ties", "$3,303"]]);
+    footsAsDisplayed("tie.A.rent", d);
   });
 });
 

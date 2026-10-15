@@ -356,11 +356,12 @@ export function paymentFormula(p: WorkPayment): string {
 
 /** The fewest decimals (in percent, 2 to 8) at which a year's rate × each payment before rounding gives its tax to the cent. */
 export function rateDigits(rate: number, payments: WorkPayment[]): number {
-  for (let digits = 2; digits <= 8; digits++) {
+  // Up to 12: a payment whose tax is within a hair of a half cent needs them all to multiply out to its cent.
+  for (let digits = 2; digits <= 12; digits++) {
     const r = Number((rate * 100).toFixed(digits)) / 100;
     if (payments.every((p) => Math.round(exactPay(p) * r * 100) === Math.round(p.tax * 100))) return digits;
   }
-  return 8;
+  return 12;
 }
 /** A rate in percent at `digits` decimals: "27.2735%". */
 export const rateText = (rate: number, digits: number) => `${(rate * 100).toFixed(digits)}%`;

@@ -4,14 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Basis } from "../../src/offer/types";
 import { aboutYou, appOffers, type Case, cases, runs } from "./arbitrary";
-import { hasRanges, riskView } from "./cases";
+import { hasRanges, leadText, riskView } from "./cases";
 import { buildDoc, toHtml, toText } from "./copyDoc";
 import { build as csvBuild, type CsvTable } from "./csv";
 import { derive } from "./derive";
 import { firstLastDay, leaveAxis } from "./leaveModel";
 import type { Derivation, MetricId, WorkContext } from "./metrics";
 import { compareOf, contextOf, footsAsDisplayed, half, parseShown, renderPage, withLeave, withTies, withWork } from "./testing";
-import { dollars } from "./text";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { marginText, verdict } from "./verdict";
@@ -99,10 +98,10 @@ describe("the page, for any offers", () => {
     }), runs(6, false));
   }, 600_000);
 
-  // Audit C12, C14, C15: present-value derivations subtract unrounded gaps under rounded figures, the BEA products accept a dollar
-  // off, negative spending loses its sign, fractional 401(k) vesting is rounded on its own, L-6's rate is checked at one precision
-  // and shown at another.
-  it.fails("every figure's Show the work adds up as displayed", () => {
+  // Audit C12, C14, C15, C20: present-value derivations subtracted unrounded gaps under rounded figures, the BEA products accepted a
+  // dollar off, negative spending lost its sign, fractional 401(k) vesting was rounded on its own, L-6's rate was checked at one
+  // precision and shown at another, L-3's leads read with the wrong sign, a cliff's own part had no tax line.
+  it("every figure's Show the work adds up as displayed", () => {
     fc.assert(fc.property(pages, (x) => {
       const p = built(x);
       expect(p.derivations.size).toBeGreaterThan(100);
@@ -133,11 +132,11 @@ describe("the page, for any offers", () => {
     }), runs(6, false));
   }, 600_000);
 
-  // Audit C12, C13: the verdict's month is the present-value gap / the annuity factor, but the gap shown is the unrounded one, and
-  // the month is rounded twice (to the cent by the engine, then to the dollar), so it can read $488 where its own work and L-2's base
-  // case say $487 (about one lead in 200). Only the verdict's work and L-2 are worked out here, for every dollar basis and stay, so
+  // Audit C12, C13: the verdict's month is the present-value gap / the annuity factor, but the gap shown was the unrounded one, and
+  // the month was rounded twice (to the cent by the engine, then to the dollar), so it could read $488 where its own work and L-2's
+  // base case said $487 (about one lead in 200). Only the verdict's work and L-2 are worked out here, for every dollar basis and stay, so
   // many more cases run.
-  it.fails("the verdict's month, on every basis and stay, is its work's, and L-2's base case's", () => {
+  it("the verdict's month, on every basis and stay, is its work's, and L-2's base case's", () => {
     fc.assert(fc.property(cases(), (c) => {
       const first = contextOf(appOffers(c), aboutYou(c.household), c.today);
       fc.pre(!("issues" in first));
@@ -154,10 +153,10 @@ describe("the page, for any offers", () => {
           const month = marginText(basis, view.lead);
           expect(sameFigure(month, work.lines[work.lines.length - 1].value!), `${basis}, ${row.years} years: the verdict says ${month}`).toBe(true);
           if (row.years !== ctx.household.stayYears) continue;
-          const l2 = riskView(at).leads.base;
+          const v = riskView(at);
+          const l2 = v.leads.base;
           if (l2.winner === view.lead.winnerLetter) {
-            expect(sameFigure(month, dollars(l2.margin / row.annuityFactor)), `${basis}: the verdict says ${month}; L-2's base case `
-              + `${dollars(l2.margin / row.annuityFactor)}`).toBe(true);
+            expect(month, `${basis}: the verdict says ${month}; L-2's base case ${leadText(v, l2)}`).toBe(leadText(v, l2));
           }
         }
       }

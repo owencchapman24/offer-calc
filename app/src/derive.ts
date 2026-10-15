@@ -19,10 +19,11 @@ import {
   BASIS_LINE as L6_BASIS_LINE, exactPay, FOOTS, lineNo, paymentAt, paymentLabel, paymentYears, rateText, stayRows, type TaxCol, taxTable, toCent,
   yearCell, yearName, yearTable,
 } from "./workpaper";
-import { type CaseChange, caseChanges, caseValue, changeText, riskView } from "./cases";
-import { cashLever, inSentence, scalesText } from "./breakevenModel";
+import { monthOf, shownGap } from "./verdict";
+import { type CaseChange, caseChanges, caseValue, changeText, dropAmount, leadText, riskView } from "./cases";
+import { cashLever, inSentence, rentTie, scalesText } from "./breakevenModel";
 import type { Ties, TieRow } from "./protocol";
-import { cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
+import { bonusWorked, cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
 import { withholdingParts } from "./warningAt";
 import type { SectionId } from "./sections";
 import {
@@ -320,9 +321,10 @@ function marginWork(ctx: WorkContext, n: number, basis: Basis, self: MetricId): 
     };
   }
   const months = 12 * n;
-  const gap = values[lead.winner] - values[lead.runnerUp];
+  // The gap between the totals as shown, ÷ the factor as shown: the month every schedule states (verdict.ts, monthOf).
+  const gap = shownGap(values[lead.winner], values[lead.runnerUp]);
   const factor = row.annuityFactor;
-  const perMonth = lead.perMonth ?? gap / factor;
+  const perMonth = monthOf(gap, factor);
   const rate = percent(r.sweep.discountRate);
   const terms = r.detail?.annuity[n];
   const span = terms?.length ? ` (${longDate(terms[0].date)} to ${longDate(terms[terms.length - 1].date)})` : "";
@@ -378,6 +380,61 @@ function annuityWork(ctx: WorkContext, n: number): Work {
 // ---- an offer's totals ---------------------------------------------------------------------------
 
 /**
+ * An offer's present-value totals as shown, line by line (pvWork), and each part as its own work shows it (partWork). Each part
+ * is rounded once and each total is the engine's (the rank list's figure: a present value isn't worked from the years), so one
+ * line in each column takes the rounding, as on a rounded schedule: the tax, in after-tax pay; the largest benefit, in total
+ * rewards; the money saved at face value, after rent. Spending at the prices picked is spending as shown × the two BEA indexes as
+ * shown. So every column adds up as displayed (audit C12, C14).
+ */
+function shownPv(w: WindowTotals, d: OfferDetail) {
+  const R = (x: number) => Math.round(x) + 0;
+  const pv = w.presentValue!;
+  const ben = w.benefits.presentValue!;
+  const gross = R(pv.gross);
+  const premiums = R(pv.premiums);
+  const afterTax = R(pv.afterTaxComp);
+  const cash = { gross, tax: gross - premiums - afterTax, premiums, afterTax };
+  // Total rewards: what's added to after-tax pay, signed (health costs beyond the premiums come off).
+  const raw = { retirement: ben.retirement, perks: ben.perks, healthExtra: pv.premiums - ben.healthNet };
+  const keys = ["retirement", "perks", "healthExtra"] as const;
+  const taker = keys.reduce((a, k) => (Math.abs(raw[k]) > Math.abs(raw[a]) ? k : a), "retirement" as (typeof keys)[number]);
+  const totalRewards = R(w.totalRewards.presentValue!);
+  const adds = { retirement: R(raw.retirement), perks: R(raw.perks), healthExtra: R(raw.healthExtra) };
+  adds[taker] = totalRewards - afterTax - keys.filter((k) => k !== taker).reduce((t, k) => t + adds[k], 0);
+  const col = w.costOfLiving?.presentValue;
+  let after: { takeHome: number; savings: number; rent: number; spending: number; sameRef: number; oopLocal: number; oopRef: number; face: number;
+    total: number } | null = null;
+  if (col && d.costOfLiving) {
+    const x = shownIndexes(d);
+    const at = (v: number) => R((v * x.refValue) / x.areaValue);
+    const takeHome = R(pv.takeHome);
+    const savings = R(col.savings);
+    const rent = R(col.rent);
+    const spending = takeHome - savings - rent;
+    const oopLocal = R(col.outOfPocketReference / d.costOfLiving.nonHousingFactor);
+    const total = R(col.total);
+    const sameRef = at(spending);
+    const oopRef = at(oopLocal);
+    after = { takeHome, savings, rent, spending, sameRef, oopLocal, oopRef, face: total - sameRef + oopRef, total };
+  }
+  return { cash, rewards: { ...adds, taker, total: totalRewards }, after };
+}
+
+/** A part as it's shown in its total's column (shownPv), and the engine's figure, which it can differ from by the rounding it takes. */
+function shownPart(ctx: WorkContext, letter: L, part: PvPart): { shown: number; engine: number } {
+  const d = detailOf(ctx, letter);
+  const s = shownPv(d.window, d);
+  const engine = partValues(d.window, part)[1];
+  switch (part) {
+    case "gross": case "tax": case "premiums": return { shown: s.cash[part], engine };
+    case "retirement": case "perks": return { shown: s.rewards[part], engine };
+    case "healthExtra": return { shown: -s.rewards.healthExtra, engine };
+    case "takeHome": case "savings": case "rent": return { shown: s.after?.[part] ?? Math.round(engine), engine };
+    case "faceValue": return { shown: s.after?.face ?? Math.round(engine), engine };
+  }
+}
+
+/**
  * An offer's total over your stay, present value, line by line. In the base case each part opens its own
  * work; in the bear or bull case (L-2) the parts are that scenario's, and a note says which inputs differ.
  */
@@ -396,39 +453,48 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis, scenario: Scenar
   const link = (id: MetricId) => (base ? { ref: id } : {});
   const other = base ? null : caseNotes(ctx, letter, scenario);
   const inputs = (paths: string[]) => other?.inputs ?? fromInputs(ctx, letter, paths);
+  const shown = shownPv(w, d);
+  const rounding = "Each figure is rounded once and the total is the engine's, so one line takes the rounding, as on a rounded schedule: "
+    + "here, ";
   if (basis === "cash") {
+    const c = shown.cash;
     return {
       title, scope,
       lines: [
-        { label: PART.gross.label, value: figure(pv.gross), ...link(`part.${letter}.gross`) },
-        { op: "−", label: PART.tax.label, value: figure(pv.tax), ...link(`part.${letter}.tax`) },
-        ...(pv.premiums ? [{ op: "−" as const, label: PART.premiums.label, value: figure(pv.premiums), ...link(`part.${letter}.premiums`) }] : []),
-        { op: "=", label: "After-tax pay", value: figure(pv.afterTaxComp), rule: "double" },
+        { label: PART.gross.label, value: figure(c.gross), ...link(`part.${letter}.gross`) },
+        { op: "−", label: PART.tax.label, value: figure(c.tax), ...link(`part.${letter}.tax`) },
+        ...(c.premiums ? [{ op: "−" as const, label: PART.premiums.label, value: figure(c.premiums), ...link(`part.${letter}.premiums`) }] : []),
+        { op: "=", label: "After-tax pay", value: figure(c.afterTax), rule: "double" },
       ],
-      notes: [...(other?.notes ?? []), discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`],
+      notes: [...(other?.notes ?? []), discountNote, `As paid, without discounting: ${dollars(w.nominal.afterTaxComp)}.`,
+        ...(c.tax !== Math.round(pv.tax) ? [`${rounding}the tax (the engine's ${cents(pv.tax)}).`] : [])],
       ties: [], ...inputs(["salary.annual", bonusPath(ctx, letter), "startDate", "costOfLiving.area"]),
     };
   }
-  const healthExtra = ben.healthNet - pv.premiums;
   if (basis === "totalRewards") {
+    const t = shown.rewards;
     const adds: WorkLine[] = [
-      ...(ben.retirement ? [{ op: "+" as const, label: PART.retirement.label, value: figure(ben.retirement), ...link(`part.${letter}.retirement`) }] : []),
-      ...(ben.perks ? [{ op: "+" as const, label: PART.perks.label, value: figure(ben.perks), ...link(`part.${letter}.perks`) }] : []),
-      ...(Math.abs(healthExtra) >= 0.5 ? [{ op: healthExtra > 0 ? "−" as const : "+" as const, label: PART.healthExtra.label,
-        value: figure(Math.abs(healthExtra)), ...link(`part.${letter}.healthExtra`) }] : []),
+      ...(t.retirement ? [{ op: t.retirement > 0 ? "+" as const : "−" as const, label: PART.retirement.label, value: figure(Math.abs(t.retirement)),
+        ...link(`part.${letter}.retirement`) }] : []),
+      ...(t.perks ? [{ op: t.perks > 0 ? "+" as const : "−" as const, label: PART.perks.label, value: figure(Math.abs(t.perks)),
+        ...link(`part.${letter}.perks`) }] : []),
+      ...(t.healthExtra ? [{ op: t.healthExtra < 0 ? "−" as const : "+" as const, label: PART.healthExtra.label,
+        value: figure(Math.abs(t.healthExtra)), ...link(`part.${letter}.healthExtra`) }] : []),
     ];
+    const engine = { retirement: ben.retirement, perks: ben.perks, healthExtra: pv.premiums - ben.healthNet }[t.taker];
     return {
       title, scope,
       lines: [
-        { label: "After-tax pay", value: figure(pv.afterTaxComp), ...link(`pv.${letter}.cash`) },
+        { label: "After-tax pay", value: figure(shown.cash.afterTax), ...link(`pv.${letter}.cash`) },
         ...adds,
-        { op: "=", label: "Total rewards", value: figure(w.totalRewards.presentValue!), rule: "double" },
+        { op: "=", label: "Total rewards", value: figure(t.total), rule: "double" },
       ],
       notes: [
         ...(other?.notes ?? []),
         adds.length ? "Total rewards adds the benefits that are worth money to you and takes out health costs beyond the premiums."
           : `Nothing to add: offer ${letter} has no 401(k), perks or health costs entered.`,
         discountNote,
+        ...(t[t.taker] !== Math.round(engine) ? [`${rounding}${lowerFirst(PART[t.taker].label)} (the engine's ${cents(Math.abs(engine))}).`] : []),
       ],
       ties: [], ...inputs(["retirement", "health", "perks.section127", "perks.commuterMonthly"]),
     };
@@ -438,29 +504,30 @@ function pvWork(ctx: WorkContext, letter: L, basis: ValueBasis, scenario: Scenar
   if (!col || !info) throw new Error(`Offer ${letter} needs a city for this basis.`);
   const x = indexes(d);
   const f = info.nonHousingFactor;
-  const oopLocal = col.outOfPocketReference / f;
-  const check = w.totalRewards.presentValue! - col.rent + (f - 1) * (col.nonHousingLocal - oopLocal);
+  const a = shown.after!;
+  const check = w.totalRewards.presentValue! - col.rent + (f - 1) * (col.nonHousingLocal - col.outOfPocketReference / f);
   const p = pricesOf(ctx);
   return {
     title, scope: `${scope} · ${p.dollars}`,
     lines: [
-      { label: PART.takeHome.label, value: figure(pv.takeHome), ...link(`part.${letter}.takeHome`) },
-      ...(col.savings ? [{ op: "−" as const, label: PART.savings.label, value: figure(col.savings), ...link(`part.${letter}.savings`) }] : []),
-      { op: "−", label: PART.rent.label, value: figure(col.rent), ...link(`part.${letter}.rent`) },
-      { op: "=", label: `Spending money after rent, at ${x.city} prices`, value: figure(col.nonHousingLocal), rule: "single" },
+      { label: PART.takeHome.label, value: figure(a.takeHome), ...link(`part.${letter}.takeHome`) },
+      ...(a.savings ? [{ op: "−" as const, label: PART.savings.label, value: figure(a.savings), ...link(`part.${letter}.savings`) }] : []),
+      { op: "−", label: PART.rent.label, value: figure(a.rent), ...link(`part.${letter}.rent`) },
+      { op: "=", label: `Spending money after rent, at ${x.city} prices`, value: figure(a.spending), rule: "single" },
       ...priceLines(ctx, d, letter),
-      { op: "=", label: `The same spending, at ${p.place} prices`, value: figure(col.discretionaryReference), rule: "single" },
-      ...(col.outOfPocketReference ? [{ op: "−" as const, label: `Out-of-pocket health costs, at ${p.place} prices`, value: figure(col.outOfPocketReference),
-        note: `${figure(oopLocal)} × ${x.ref} ÷ ${x.area}` }] : []),
-      { op: "+", label: PART.faceValue.label, value: figure(col.faceValue), ...link(`part.${letter}.faceValue`) },
-      { op: "=", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: figure(col.total), rule: "double" },
+      { op: "=", label: `The same spending, at ${p.place} prices`, value: figure(a.sameRef), rule: "single" },
+      ...(a.oopRef ? [{ op: "−" as const, label: `Out-of-pocket health costs, at ${p.place} prices`, value: figure(a.oopRef),
+        note: `${figure(a.oopLocal)} × ${x.ref} ÷ ${x.area}` }] : []),
+      { op: "+", label: PART.faceValue.label, value: figure(a.face), ...link(`part.${letter}.faceValue`) },
+      { op: "=", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: figure(a.total), rule: "double" },
     ],
     notes: [
       ...(other?.notes ?? []),
       `Spending money is local; saved money isn't. What's left to spend after rent is priced as in ${p.city}; what you save counts at face value.`,
       `It ties to total rewards: ${figure(w.totalRewards.presentValue!)} − rent ${figure(col.rent)} + (${x.ref} ÷ ${x.area} − 1) × `
-        + `(spending ${figure(col.nonHousingLocal)} − out-of-pocket ${figure(oopLocal)}) = ${figure(check)}.`,
+        + `(spending ${figure(col.nonHousingLocal)} − out-of-pocket ${figure(col.outOfPocketReference / f)}) = ${figure(check)}.`,
       discountNote,
+      ...(a.face !== Math.round(col.faceValue) ? [`${rounding}the money saved at face value (the engine's ${cents(col.faceValue)}).`] : []),
     ],
     ties: [], ...(other
       ? { inputs: other.inputs.inputs, uses: [...other.inputs.uses, `in.${letter}.costOfLiving.monthlyRent`, `in.${letter}.costOfLiving.area`] }
@@ -482,12 +549,14 @@ function perHourWork(ctx: WorkContext, letter: L, scenario: Scenario = "base"): 
   const value = w ? w.perHour?.[of] ?? 0 : row.values.perHour[i];
   const weekly = hours?.weekly ? hours.weekly[scenario] : null;
   const other = w ? caseNotes(ctx, letter, scenario) : null;
+  // Total and hours at the decimals at which they divide out to the figure shown.
+  const q = quotient(total, worked, value, 100);
   return {
     title: `${letter} · per hour worked${w ? `, ${scenario} case` : ""}`,
     scope: `${CASE_NAME[scenario]} · stay ${years(row.years)} (${windowText(row)}) · nominal`,
     lines: [
-      { label: `${row.years}-year total ${phrase(ctx, of)}, as paid`, value: figure(total) },
-      { op: "÷", label: "Hours worked in the window", value: figure(worked), ...(weekly !== null ? {
+      { label: `${row.years}-year total ${phrase(ctx, of)}, as paid`, value: q.num },
+      { op: "÷", label: "Hours worked in the window", value: q.den, ...(weekly !== null ? {
         note: `${weekly} a week × ${hours!.weeksPerYear ?? 50} weeks a year` } : {}) },
       { op: "=", label: "Per hour worked", value: cents(value), rule: "double" },
     ],
@@ -562,10 +631,10 @@ function dropWork(ctx: WorkContext, letter: L): Work {
       ...(v.perHour
         ? [{ op: "=" as const, label: "Less per hour worked in the bear case", value: cents(x.drop), rule: "double" as const }]
         : [
-          { op: "=" as const, label: "Present-value drop", value: figure(Math.round(x.values.base) - Math.round(x.values.bear)), rule: "single" as const },
+          { op: "=" as const, label: "Present-value drop", value: figure(shownGap(x.values.base, x.values.bear)), rule: "single" as const },
           { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
             ref: `af.${n}` as MetricId },
-          { op: "=" as const, label: `A month, for ${months} months`, value: dollars(x.drop / v.factor), rule: "double" as const },
+          { op: "=" as const, label: `A month, for ${months} months`, value: dropAmount(v, x), rule: "double" as const },
         ]),
     ],
     notes: [`That's ${Math.round(x.share * 100)}% of ${letter}'s base case.`, ...caseNotes(ctx, letter, "bear").notes],
@@ -591,10 +660,10 @@ function caseLeadWork(ctx: WorkContext, scenario: Scenario): Work {
       ...(v.perHour
         ? [{ op: "=" as const, label: "More per hour worked", value: cents(margin), rule: "double" as const }]
         : [
-          { op: "=" as const, label: "Present-value gap", value: figure(Math.round(value(W)) - Math.round(value(R))), rule: "single" as const },
+          { op: "=" as const, label: "Present-value gap", value: figure(shownGap(value(W), value(R))), rule: "single" as const },
           { op: "÷" as const, label: `Annuity factor: ${months} month-ends at ${percent(r.sweep.discountRate)} a year`, value: v.factor.toFixed(4),
             ref: `af.${n}` as MetricId },
-          { op: "=" as const, label: `A month, for ${months} months`, value: dollars(margin / v.factor), rule: "double" as const },
+          { op: "=" as const, label: `A month, for ${months} months`, value: leadText(v, v.leads[scenario]), rule: "double" as const },
         ]),
     ],
     notes: scenario === "base"
@@ -635,13 +704,20 @@ function tieContext(ctx: WorkContext, t: Ties, row: TieRow) {
 }
 type TieContext = ReturnType<typeof tieContext>;
 
-/** The target, the offer's own total, and the gap between them, as displayed (the column foots). */
+/**
+ * The target, the offer's own total, and the gap between them, as displayed: the larger first, so the gap is what's left when the
+ * smaller is taken from it (the winner's cushion reads its own total less the target: its lead).
+ */
 function gapLines(x: TieContext, basis: ValueBasis, r: { targetPV: number; aheadBy: number }): WorkLine[] {
   const own = r.targetPV + r.aheadBy;
+  const gap = shownGap(r.targetPV, own);
+  const target: WorkLine = { label: `${x.other}: ${x.n}-year total ${x.words[basis]}, the target`, value: figure(r.targetPV), ...x.pv(x.other) };
+  const mine: WorkLine = { label: `${x.me}: the same, as entered`, value: figure(own), ...x.pv(x.me) };
+  const [first, second] = gap >= 0 ? [target, mine]
+    : [{ ...mine, label: `${x.me}: ${x.n}-year total ${x.words[basis]}, as entered` }, { ...target, label: `${x.other}: the same, the target` }];
   return [
-    { label: `${x.other}: ${x.n}-year total ${x.words[basis]}, the target`, value: figure(r.targetPV), ...x.pv(x.other) },
-    { op: "−", label: `${x.me}: the same, as entered`, value: figure(own), ...x.pv(x.me) },
-    { op: "=", label: x.cushion ? `${x.me}'s lead` : "The gap to close", value: figure(Math.abs(Math.round(r.targetPV) - Math.round(own))), rule: "single" },
+    first, { ...second, op: "−" },
+    { op: "=", label: x.cushion ? `${x.me}'s lead` : "The gap to close", value: figure(Math.abs(gap)), rule: "single" },
   ];
 }
 
@@ -670,8 +746,9 @@ function salaryWork(ctx: WorkContext, t: Ties, row: TieRow, extra: string[] = []
     lines: [
       ...lines,
       { label: `${x.me}'s starting salary, as entered`, value: dollars(r.from), ref: `in.${x.me}.salary.annual` },
+      // The change is the difference of the two figures as shown, so it's what's added to or taken off the one to reach the other.
       { op: r.increase >= 0 ? "+" : "−", label: x.cushion ? `What ${x.other} catching up takes off it` : "The increase that closes the gap",
-        value: dollars(Math.abs(r.increase)) },
+        value: dollars(Math.abs(Math.round(r.to) - Math.round(r.from))) },
       { op: "=", label: x.cushion ? `Starting salary at which ${x.other} ties` : "Starting salary that ties", value: dollars(r.to), rule: "double" },
     ],
     notes: [
@@ -746,7 +823,7 @@ function cashWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
       lever.added ? { label: `No cash award: ${lever.name}`, value: "$0" }
         : { label: `${lever.name}, as entered`, value: dollars(r.from), ref: `in.${x.me}.cashAwards.0.amount` as MetricId },
       { op: r.increase >= 0 ? "+" : "−", label: x.cushion ? `What ${x.other} catching up takes off it` : "The increase that closes the gap",
-        value: dollars(Math.abs(r.increase)) },
+        value: dollars(Math.abs(Math.round(r.to) - Math.round(r.from))) },
       { op: "=", label: x.cushion ? `${name} at which ${x.other} ties` : `${name} that ties`, value: dollars(r.to), rule: "double" },
     ],
     notes: [
@@ -768,20 +845,17 @@ function rentWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
   const d = detailOf(ctx, x.me);
   const ix = indexes(d);
   const info = ix.info;
-  const gap = Math.abs(Math.round(f.targetPV) - Math.round(f.targetPV + f.aheadBy));
-  const local = Math.abs(f.aheadBy) / f.nonHousingFactor;
-  const change = Math.abs(f.change);
+  const rt = rentTie(f, ix);
   const inputs = fromInputs(ctx, x.me, ["costOfLiving.monthlyRent"]);
   const estimated = info.rentSource !== "input";
   const lines: WorkLine[] = [
-    ...gapLines(x, "colAdjustedTotal", f).slice(0, 2),
-    { op: "=", label: x.cushion ? `${x.me}'s lead` : "The gap to close", value: figure(gap), rule: "single" },
+    ...gapLines(x, "colAdjustedTotal", f),
     { op: "×", label: `${ix.city} non-housing prices (BEA)`, value: ix.area, ref: `rpp.${x.me}.area` },
     { op: "÷", label: `${pricesOf(ctx).place} non-housing prices (BEA)`, value: ix.ref, ref: `rpp.${x.me}.ref` },
-    { op: "=", label: `The same in ${ix.city} dollars`, value: figure(local), rule: "single" },
-    { op: "÷", label: "Rent's present-value factor", value: f.rentFactor.toFixed(4),
+    { op: "=", label: `The same in ${ix.city} dollars`, value: figure(rt.local), rule: "single" },
+    { op: "÷", label: "Rent's present-value factor", value: rt.factor.toFixed(4),
       note: `$1 a month of first-year rent, each month you'd work there in your stay, rising ${percent(info.rentGrowth)} at each lease anniversary` },
-    { op: "=", label: x.cushion ? "More rent a month it can carry" : "Less rent a month, first lease year", value: dollars(change), rule: "single" },
+    { op: "=", label: x.cushion ? "More rent a month it can carry" : "Less rent a month, first lease year", value: dollars(rt.change), rule: "single" },
   ];
   const notes = [
     `Closed form, since the total is linear in rent: each $1 of ${ix.city} rent is $1 less to spend there, worth ${f.nonHousingFactor.toFixed(4)} at `
@@ -791,20 +865,22 @@ function rentWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
     ...(estimated ? [`${x.me}'s rent is an estimate (HUD Fair Market Rent): enter yours to see how far it is from this line.`] : []),
   ];
   const how = estimated ? "estimated" : "as entered";
-  if (f.outcome === "rentFree") {
+  const rentLines: WorkLine[] = [
+    { label: `${x.me}'s rent a month, ${how}`, value: dollars(rt.from) },
+    { op: rt.up ? "+" : "−", label: x.cushion ? "More rent it can carry" : "Less rent", value: dollars(rt.change) },
+  ];
+  if (f.outcome === "rentFree" || rt.to < 0) {
     return {
       title: x.title, scope: x.scope,
-      lines: [...lines, { op: "=", label: `Rent that ties: ${dollars(f.from)} ${how} − ${dollars(change)}`, value: "below $0", rule: "double" }],
+      lines: [...lines, ...rentLines, { op: "=", label: "Rent that ties", value: "below $0", rule: "double" }],
       notes: [`Even rent-free, ${x.me} trails ${x.other}: the rent that would tie is below zero.`, ...notes],
       ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
     };
   }
   return {
     title: x.title, scope: x.scope,
-    lines: [...lines, {
-      op: "=", label: `${x.cushion ? `Rent at which ${x.other} ties` : "Rent that ties"}: ${dollars(f.from)} ${how} ${x.cushion ? "+" : "−"} ${dollars(change)}`,
-      value: dollars(f.to), rule: "double",
-    }],
+    lines: [...lines, ...rentLines,
+      { op: "=", label: x.cushion ? `Rent at which ${x.other} ties` : "Rent that ties", value: dollars(rt.to), rule: "double" }],
     notes, ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
   };
 }
@@ -829,11 +905,10 @@ function rentNoteWork(ctx: WorkContext, letter: L): Work {
   const p = pricesOf(ctx);
   const winner = letter !== note.wins; // the winner's own rent: its lead goes above the rent that ties
   const own = f.targetPV + f.aheadBy;
-  const gap = Math.abs(Math.round(f.targetPV) - Math.round(own));
-  const local = Math.abs(f.aheadBy) / f.nonHousingFactor;
-  const change = Math.abs(f.change);
+  const t = rentTie(f, ix);
   const est = note.estimate;
-  const apart = Math.abs(est.monthlyRent - f.to);
+  const estimate = Math.round(est.monthlyRent);
+  const apart = Math.abs(estimate - t.to);
   // At the estimate, the other side leads by the rent's distance from the tie, through the same two factors.
   const leadPV = apart * f.nonHousingFactor * f.rentFactor;
   const name = estimateName(note);
@@ -841,24 +916,35 @@ function rentNoteWork(ctx: WorkContext, letter: L): Work {
     ? `HUD's Fair Market Rent for ${note.city}, ${est.bedrooms === 0 ? "a studio" : `${est.bedrooms} bedroom${est.bedrooms === 1 ? "" : "s"}`} (FY${est.fiscalYear})`
     : `The estimate for ${note.city}: BEA housing prices × the U.S. median rent`;
   const inputs = fromInputs(ctx, letter, ["costOfLiving.monthlyRent"]);
+  const totals: WorkLine[] = [
+    { label: `${note.against}: ${row.years}-year total ${p.phrase}`, value: figure(f.targetPV), ref: `pv.${note.against}.colAdjustedTotal` },
+    { label: `${letter}: the same, at your rent`, value: figure(own), ref: `pv.${letter}.colAdjustedTotal` },
+  ];
+  const tieRef = r.ties?.l3?.rows.some((x) => r.letters[x.offer] === letter && x.rent?.outcome === "tie") && r.ties.l3.basis === "colAdjustedTotal"
+    ? { ref: `tie.${letter}.rent` as MetricId } : {};
+  const tieLine: WorkLine = { label: `The rent that ties ${note.against}`, value: dollars(t.to), ...tieRef };
+  const estLine: WorkLine = { label: estLabel, value: dollars(estimate), tick: "estimate" };
   return {
     title: `${letter} at ${name} · ${p.phrase}`,
     scope: `Base case · stay ${years(row.years)} (${windowText(row)}) · today's dollars`,
     lines: [
-      { label: `${note.against}: ${row.years}-year total ${p.phrase}`, value: figure(f.targetPV), ref: `pv.${note.against}.colAdjustedTotal` },
-      { op: "−", label: `${letter}: the same, at your rent`, value: figure(own), ref: `pv.${letter}.colAdjustedTotal` },
-      { op: "=", label: winner ? `${letter}'s lead` : "The gap to close", value: figure(gap), rule: "single" },
+      // The larger first: the winner's own total, less the other's, is its lead.
+      ...(winner
+        ? [{ ...totals[1], label: `${letter}: ${row.years}-year total ${p.phrase}, at your rent` }, { ...totals[0], label: `${note.against}: the same`, op: "−" as const }]
+        : [totals[0], { ...totals[1], op: "−" as const }]),
+      { op: "=", label: winner ? `${letter}'s lead` : "The gap to close", value: figure(t.gap), rule: "single" },
       { op: "×", label: `${ix.city} non-housing prices (BEA)`, value: ix.area, ref: `rpp.${letter}.area` },
       { op: "÷", label: `${p.place} non-housing prices (BEA)`, value: ix.ref, ref: `rpp.${letter}.ref` },
-      { op: "=", label: `The same in ${ix.city} dollars`, value: figure(local), rule: "single" },
-      { op: "÷", label: "Rent's present-value factor", value: f.rentFactor.toFixed(4),
+      { op: "=", label: `The same in ${ix.city} dollars`, value: figure(t.local), rule: "single" },
+      { op: "÷", label: "Rent's present-value factor", value: t.factor.toFixed(4),
         note: `$1 a month of first-year rent, each month you'd work there in your stay, rising ${percent(d.costOfLiving!.rentGrowth)} at each lease anniversary` },
-      { op: "=", label: winner ? "More rent a month it can carry" : "Less rent a month, first lease year", value: dollars(change), rule: "single" },
-      { label: `Rent that ties ${note.against}: your ${dollars(f.from)} ${winner ? "+" : "−"} ${dollars(change)}`, value: dollars(f.to),
-        ...(r.ties?.l3?.rows.some((t) => r.letters[t.offer] === letter && t.rent?.outcome === "tie") && r.ties.l3.basis === "colAdjustedTotal"
-          ? { ref: `tie.${letter}.rent` as MetricId } : {}) },
-      { label: estLabel, value: dollars(est.monthlyRent), tick: "estimate" },
-      { op: "=", label: `${winner ? "Over" : "Under"} the rent that ties by`, value: dollars(apart), rule: "double" },
+      { op: "=", label: winner ? "More rent a month it can carry" : "Less rent a month, first lease year", value: dollars(t.change), rule: "single" },
+      { label: "Your rent a month", value: dollars(t.from) },
+      { op: t.up ? "+" : "−", label: winner ? "More rent it can carry" : "Less rent", value: dollars(t.change) },
+      { ...tieLine, op: "=", rule: "single" },
+      // The larger first again: the estimate is over the rent that ties, or under it.
+      ...(estimate >= t.to ? [estLine, { ...tieLine, op: "−" as const }] : [tieLine, { ...estLine, op: "−" as const }]),
+      { op: "=", label: `${estimate >= t.to ? "Over" : "Under"} the rent that ties by`, value: dollars(apart), rule: "double" },
     ],
     notes: [
       `${name[0].toUpperCase()}${name.slice(1)} is ${winner ? "over" : "under"} the rent that ties, and your ${dollars(f.from)} is ${winner ? "under" : "over"} `
@@ -978,13 +1064,19 @@ function forgoneWork(ctx: WorkContext, letter: L, index: number): Work {
   if (!w) throw new Error(`No forfeited bonus ${index + 1} for ${letter} on that day.`);
   const period = periodText(w.periodFrom, w.periodTo);
   const d = w.detail;
+  // The salary at the decimals at which it times the rate shown comes to the figure shown; the days as a fraction, exactly. The
+  // figure is what they work out to, rounded once (the panel shows the same).
+  const earned = bonusWorked(d);
+  const rateShown = Number((d.basis === "percentOfSalary" ? d.rate * 100 : 0).toFixed(2)) / 100;
   const lines: WorkLine[] = d.basis === "percentOfSalary"
-    ? [{ label: "Salary earned in the period by your last day", value: figure(d.salaryEarned) }, { op: "×", label: "Bonus rate", value: percent(d.rate) },
-      { op: "=", label: "Earned toward the bonus", value: figure(w.earned), rule: "double" }]
-    : [{ label: d.basis === "byEmploymentYear" ? `Bonus for employment year ${d.employmentYear}` : "Bonus for the year", value: figure(d.amount) },
-      { op: "×", label: `${figure(d.daysEmployed)} of the period's ${figure(d.periodDays)} days, worked by your last day`,
-        value: (d.daysEmployed / d.periodDays).toFixed(4) },
-      { op: "=", label: "Earned toward the bonus", value: figure(w.earned), rule: "double" }];
+    ? [{ label: "Salary earned in the period by your last day",
+      value: enough(d.salaryEarned, 0, (x) => Math.round(x * rateShown) === Math.round(earned)).text },
+      { op: "×", label: "Bonus rate", value: percent(d.rate) },
+      { op: "=", label: "Earned toward the bonus", value: figure(earned), rule: "double" }]
+    : [{ label: d.basis === "byEmploymentYear" ? `Bonus for employment year ${d.employmentYear}` : "Bonus for the year",
+      value: enough(d.amount, 0, (x) => Math.round((x * d.daysEmployed) / d.periodDays) === Math.round(earned)).text },
+      { op: "×", label: "Days worked by your last day, of the period's", value: `${d.daysEmployed}/${d.periodDays}` },
+      { op: "=", label: "Earned toward the bonus", value: figure(earned), rule: "double" }];
   const full = w.fullDetail.basis === "percentOfSalary"
     ? `${percent(w.fullDetail.rate)} of the ${dollars(w.fullDetail.salaryEarned)} salary for the period`
     : `${dollars(w.fullDetail.amount)} × ${figure(w.fullDetail.daysEmployed)} / ${figure(w.fullDetail.periodDays)} days`;
@@ -992,7 +1084,7 @@ function forgoneWork(ctx: WorkContext, letter: L, index: number): Work {
     title: `${letter} · the ${period} bonus, earned by ${longDate(p.leaveDate)}`, scope,
     lines,
     notes: [
-      `If you stayed through its payout on ${longDate(w.payDate)} it would pay ${dollars(w.full)}: ${full}`
+      `If you stayed through its payout on ${longDate(w.payDate)} it would pay ${dollars(bonusWorked(w.fullDetail))}: ${full}`
         + `${w.periodFrom < (compareStart(ctx, letter) ?? w.periodFrom) ? ", counting from your start" : ""}.`,
       "It's forfeited because the offer pays bonuses only to those employed on the payout date (Bonus › must be employed on the pay date). "
         + "An offer that pays it prorated to your last day would pay the earned part.",
@@ -1035,10 +1127,16 @@ function nextOwnWork(ctx: WorkContext, letter: L): Work {
   const { panel: p, scope } = panelOf(ctx, letter);
   const n = p.next;
   if (!n) throw new Error(`Nothing else pays, vests or steps down for ${letter} within the projection.`);
+  // Before tax, as each cliff is shown, less the tax: what the shown figures leave (audit C20: the tax line was missing).
+  const before = n.cliffs.reduce((t, c) => t + Math.round(c.amount), 0);
+  const tax = before - Math.round(n.cliffValue);
   return {
     title: `${letter} · the cliff on ${longDate(n.date)}`, scope,
     lines: [
       ...n.cliffs.map((c, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: cliffText(c), note: "before tax", value: figure(c.amount) })),
+      ...(n.cliffs.length > 1 ? [{ op: "=" as const, label: "Before tax", value: figure(before), rule: "single" as const }] : []),
+      ...(tax ? [{ op: tax > 0 ? "−" as const : "+" as const, label: tax > 0 ? "Tax, at that year's average rate on the offer" : "Tax relief",
+        value: figure(Math.abs(tax)) }] : []),
       { op: "=", label: "Its own part, after tax", value: figure(n.cliffValue), rule: "double" },
     ],
     notes: ["A payment counts after tax at that year's average rate on the offer, in the projection where you stay until the cliff, like every "
@@ -1134,11 +1232,15 @@ function averageWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
   if (!row.hours || !row.nominal[basis]) throw new Error("Needs hours for every offer.");
   return {
     title: `${letter} · per hour worked, ${phrase(ctx, basis)}`, scope: `Base case · stay ${years(row.years)} · nominal`,
-    lines: [
-      { label: `${row.years}-year total ${phrase(ctx, basis)}, as paid`, value: figure(row.nominal[basis]![i]) },
-      { op: "÷", label: "Hours worked in the window", value: figure(row.hours[i]) },
-      { op: "=", label: "Per hour worked, on average", value: cents(row.nominal[basis]![i] / row.hours[i]), rule: "double" },
-    ],
+    lines: (() => {
+      const avg = row.nominal[basis]![i] / row.hours![i];
+      const q = quotient(row.nominal[basis]![i], row.hours![i], avg, 100);
+      return [
+        { label: `${row.years}-year total ${phrase(ctx, basis)}, as paid`, value: q.num },
+        { op: "÷", label: "Hours worked in the window", value: q.den },
+        { op: "=", label: "Per hour worked, on average", value: cents(avg), rule: "double" },
+      ] as WorkLine[];
+    })(),
     notes: ["The average over every hour worked, to set against what the extra hours pay."],
     ties: [], ...fromInputs(ctx, letter, ["hours.weekly", "hours.weeksPerYear"]),
   };
@@ -1147,16 +1249,18 @@ function averageWork(ctx: WorkContext, letter: L, basis: ValueBasis): Work {
 function partWork(ctx: WorkContext, letter: L, part: PvPart): Work {
   const r = res(ctx);
   const w = detailOf(ctx, letter).window;
-  const [nominal, pv] = partValues(w, part);
+  const [nominal] = partValues(w, part);
+  const { shown, engine } = shownPart(ctx, letter, part);
   const p = PART[part];
   return {
     title: `${letter} · ${lowerFirst(p.label)} over your stay`, scope: `Base case · stay ${years(r.view.row.years)} (${windowText(r.view.row)})`,
     lines: [
       { label: "As paid (nominal)", value: figure(nominal) },
-      { label: `Present value today, at ${percent(r.sweep.discountRate)} a year`, value: figure(pv), rule: "single" },
+      { label: `Present value today, at ${percent(r.sweep.discountRate)} a year`, value: figure(shown), rule: "single" },
     ],
     notes: [
       `${p.label}: ${p.gloss}.`,
+      ...(shown !== Math.round(engine) ? [`Shown so its total adds up as displayed: it takes the rounding there (the engine's ${cents(engine)}).`] : []),
       nominal ? `Each amount is discounted from its date to today, ${longDate(r.sweep.valuationDate)}: `
         + `$1 paid a year from now is worth $${(1 / (1 + r.sweep.discountRate)).toFixed(4)} today.` : "None entered for this offer.",
     ],
@@ -1216,24 +1320,40 @@ function extraWork(ctx: WorkContext, more: L, fewer: L, focus: "hours" | ValueBa
   const pair = row.extraHours.find((x) => x.more === m && x.fewer === f);
   if (!pair || !row.hours) throw new Error("These offers' hours don't differ enough to compare.");
   const n = row.years;
+  // Hours and dollars at the decimals at which every line works out as shown: the extra hours a year, and what each pays.
+  const v = focus === "hours" ? null : row.nominal[focus]!;
+  const rate = focus === "hours" ? undefined : pair.perExtraHour[focus];
+  let hm = 0, hf = 0, j = 0, vm = 0, vf = 0, k = 0;
+  search: for (j = 0; j <= 4; j++) {
+    hm = Number(row.hours[m].toFixed(j));
+    hf = Number(row.hours[f].toFixed(j));
+    if (Math.round((hm - hf) / n) !== Math.round(pair.hoursPerYear)) continue;
+    if (!v) break;
+    for (k = 0; k <= 2; k++) {
+      vm = Number(v[m].toFixed(k));
+      vf = Number(v[f].toFixed(k));
+      if (rate !== undefined ? Math.round(((vm - vf) / (hm - hf)) * 100) === Math.round(rate * 100)
+        : Math.round((vm - vf) / n) === Math.round(pair.gapPerYear[focus as ValueBasis]!)) break search;
+    }
+  }
+  if (j > 4) { j = 4; hm = row.hours[m]; hf = row.hours[f]; }
+  if (v && k > 2) { k = 2; vm = v[m]; vf = v[f]; }
   const lines: WorkLine[] = [
-    { label: `${more}: hours worked in your stay`, value: figure(row.hours[m]) },
-    { op: "−", label: `${fewer}: hours worked`, value: figure(row.hours[f]) },
-    { op: "=", label: "Extra hours", value: figure(row.hours[m] - row.hours[f]), rule: "single" },
+    { label: `${more}: hours worked in your stay`, value: decimals(hm, j) },
+    { op: "−", label: `${fewer}: hours worked`, value: decimals(hf, j) },
+    { op: "=", label: "Extra hours", value: decimals(hm - hf, j), rule: "single" },
     { op: "÷", label: `${n} ${n === 1 ? "year" : "years"}`, value: String(n) },
     { op: "=", label: "Extra hours a year", value: figure(pair.hoursPerYear), rule: "double" },
   ];
   const notes = ["Nominal, like per hour: dollars as paid over your stay, not present values."];
-  if (focus !== "hours") {
-    const v = row.nominal[focus]!;
-    const gap = v[m] - v[f];
-    const rate = pair.perExtraHour[focus];
+  if (focus !== "hours" && v) {
+    const gap = vm - vf;
     lines.push(
-      { label: `${more}: ${n}-year total ${phrase(ctx, focus)}, as paid`, value: figure(v[m]), rule: "single" },
-      { op: "−", label: `${fewer}: the same`, value: figure(v[f]) },
-      { op: "=", label: gap >= 0 ? `${more} pays more` : `${more} pays less`, value: signed(gap), rule: "single" },
+      { label: `${more}: ${n}-year total ${phrase(ctx, focus)}, as paid`, value: decimals(vm, k), rule: "single" },
+      { op: "−", label: `${fewer}: the same`, value: decimals(vf, k) },
+      { op: "=", label: gap >= 0 ? `${more} pays more` : `${more} pays less`, value: decimals(gap, k), rule: "single" },
       ...(rate !== undefined
-        ? [{ op: "÷" as const, label: "Extra hours", value: figure(row.hours[m] - row.hours[f]) },
+        ? [{ op: "÷" as const, label: "Extra hours", value: decimals(hm - hf, j) },
           { op: "=" as const, label: "Each extra hour pays", value: cents(rate), rule: "double" as const }]
         : [{ op: "÷" as const, label: `${n} ${n === 1 ? "year" : "years"}`, value: String(n) },
           { op: "=" as const, label: "A year", value: signed(pair.gapPerYear[focus]!), rule: "double" as const }]),
@@ -1555,10 +1675,12 @@ function rentLines(ctx: WorkContext, letter: L, y: ShownYear): Omit<Work, "title
   const info = detailOf(ctx, letter).costOfLiving!;
   const monthly = info.monthlyRent * (1 + info.rentGrowth) ** (y.n - 1);
   const rent = y.col!.rent;
-  const full = Math.abs(12 * monthly - rent) < 1;
-  // A month's rent with the decimals it needs (whole dollars when it's whole), so twelve of them come to the year's rent as shown.
-  const month = Math.abs(monthly - Math.round(monthly)) < 1e-9 ? dollars(monthly)
-    : `$${enough(monthly, 2, (x) => Math.round(x * 12) === rent).text}`;
+  // A month's rent with the decimals it needs (whole dollars when it's whole), so twelve of them come to the year's rent as shown;
+  // a year whose rent isn't twelve such months (a partial year, or months posted to the cent that don't multiply out) is one line.
+  const whole = Math.abs(monthly - Math.round(monthly)) < 1e-9 && Math.round(monthly) * 12 === rent;
+  const exact = whole ? null : enoughOr(monthly, 2, (x) => Math.round(x * 12) === rent);
+  const full = Math.abs(12 * monthly - rent) < 1 && (whole || exact !== null);
+  const month = whole ? dollars(monthly) : `$${exact?.text ?? ""}`;
   return {
     lines: full
       ? [{ label: `Rent a month in year ${y.n}`, value: month, ref: `in.${letter}.costOfLiving.monthlyRent` },
@@ -1595,13 +1717,33 @@ function l6Name(ctx: WorkContext, letter: L, line: L6Line, col: string): string 
   return col === "sum" ? `L-6.${letter}, line ${no}, the years added` : `L-6.${letter}, year ${col}, line ${no}`;
 }
 
-/** A number at the fewest decimals (from `min` to 8) at which `ok` holds of the number as shown. */
+/** A number at the fewest decimals (from `min` to 12) at which `ok` holds of the number as shown. */
 function enough(x: number, min: number, ok: (shown: number) => boolean): { value: number; text: string } {
-  for (let k = min; k <= 8; k++) {
+  return enoughOr(x, min, ok) ?? { value: x, text: decimals(x, 12) };
+}
+/** The same, or null when no number of decimals up to 12 makes `ok` hold. */
+function enoughOr(x: number, min: number, ok: (shown: number) => boolean): { value: number; text: string } | null {
+  for (let k = min; k <= 12; k++) {
     const shown = Number(x.toFixed(k));
     if (ok(shown)) return { value: shown, text: decimals(shown, k) };
   }
-  return { value: x, text: decimals(x, 8) };
+  return null;
+}
+
+/**
+ * A quotient's two figures, each at the fewest decimals (the numerator 0 to 2, the denominator 0 to 6) at which their quotient,
+ * rounded as `result` is shown (`unit` 1 for dollars, 100 for cents), is `result`: so "total ÷ hours = per hour" works out as shown.
+ */
+function quotient(num: number, den: number, result: number, unit: number): { num: string; den: string; n: number; d: number } {
+  const target = Math.round(result * unit);
+  for (let j = 0; j <= 6; j++) {
+    for (let k = 0; k <= 2; k++) {
+      const n = Number(num.toFixed(k));
+      const d = Number(den.toFixed(j));
+      if (d !== 0 && Math.round((n / d) * unit) === target) return { num: decimals(n, k), den: decimals(d, j), n, d };
+    }
+  }
+  return { num: decimals(num, 2), den: decimals(den, 6), n: num, d: den };
 }
 const decimals = (x: number, k: number) =>
   `${x < 0 ? "−" : ""}${new Intl.NumberFormat("en-US", { minimumFractionDigits: k, maximumFractionDigits: k }).format(Math.abs(x))}`;
@@ -1808,7 +1950,8 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
           { label: line === "atRef" ? `Spending after rent, at ${x.city} prices` : "Expected out-of-pocket health costs", value: figure(from),
             ref: id(line === "atRef" ? "local" : "oop", n) },
           ...priceLines(ctx, d, letter),
-          { op: "=", label: name, value: figure(Math.abs(value)), rule: "double" },
+          // Spending after rent can be below zero (rent over take-home pay): its sign stays (audit C15); out-of-pocket costs are a deduction.
+          { op: "=", label: name, value: figure(line === "atRef" ? value : Math.abs(value)), rule: "double" },
         ],
         notes: [line === "atRef"
           ? `Restated at ${pricesOf(ctx).place} prices with BEA's non-housing price indexes: what the same spending buys there. Rent is already what you'd pay.`
@@ -1912,9 +2055,10 @@ function l6PaymentWork(ctx: WorkContext, letter: L, i: number, what: "gross" | "
     const t = taxTable(ctx, letter, p.calendarYear);
     const rate = Number((t.rate * 100).toFixed(t.digits)) / 100;
     const exact = exactPay(p);
+    // Pay before rounding shows at least three decimals, so it isn't read as the cent figure it rounds to.
     const pay = cent(exact) / 100 === exact
       ? { value: exact, text: toCent(exact) }
-      : enough(exact, 2, (x) => cent(x * rate) === cent(p.tax));
+      : enough(exact, 3, (x) => cent(x * rate) === cent(p.tax));
     return {
       title: `${letter} · tax on ${lowerFirst(label)}`, scope,
       lines: [
@@ -2038,19 +2182,20 @@ function l6TaxWork(ctx: WorkContext, letter: L, year: number, line: TaxLine, col
     const offerTax = t.t.with.total - t.t.without.total;
     const pay = offerTax / t.rate;
     const k = (() => {
-      for (let k = 2; k <= 8; k++) {
+      for (let k = 2; k <= 12; k++) {
         const a = Number(t.t.with.total.toFixed(k)) - Number(t.t.without.total.toFixed(k));
         if (rateText(Number(a.toFixed(k)) / Number(pay.toFixed(k)), t.digits) === rateText(t.rate, t.digits)) return k;
       }
-      return 8;
+      return 12;
     })();
     return {
       title: `${letter} · ${year} · the offer's tax rate`, scope,
       lines: [
-        { label: "Household tax with the offer, before rounding", value: decimals(t.t.with.total, k) },
-        { op: "−", label: "Without it", value: decimals(t.t.without.total, k) },
+        // Each formatted from the number checked (toFixed), not the unrounded one: Intl and toFixed can round a half apart (audit C15).
+        { label: "Household tax with the offer, before rounding", value: decimals(Number(t.t.with.total.toFixed(k)), k) },
+        { op: "−", label: "Without it", value: decimals(Number(t.t.without.total.toFixed(k)), k) },
         { op: "=", label: "The offer's tax", value: decimals(Number(t.t.with.total.toFixed(k)) - Number(t.t.without.total.toFixed(k)), k), rule: "single" },
-        { op: "÷", label: "The offer's pay, before rounding each payment", value: decimals(pay, k) },
+        { op: "÷", label: "The offer's pay, before rounding each payment", value: decimals(Number(pay.toFixed(k)), k) },
         { op: "=", label: "Its rate", value: rateText(t.rate, t.digits), rule: "double" },
       ],
       notes: [`Every payment in ${year} carries this rate: its tax is its pay before rounding × the rate, to the cent. `
@@ -2153,7 +2298,7 @@ function l6TaxWork(ctx: WorkContext, letter: L, year: number, line: TaxLine, col
       lines: grown !== 0
         ? [{ label: `Your spouse's wages in ${ctx.wagesYear}`, value: figure(entered), ref: "about.spouse" as MetricId },
           { op: "×", label: grown > 0 ? `Grown ${grown} ${grown === 1 ? "year" : "years"} at 2.5%` : `${-grown} ${grown === -1 ? "year" : "years"} earlier, at 2.5%`,
-            value: ((1 + ASSUMPTIONS.inflation) ** grown).toFixed(6) },
+            value: enough((1 + ASSUMPTIONS.inflation) ** grown, 6, (x) => Math.round(Math.round(entered) * x) === Math.round(v)).text },
           { op: "=", label: `In ${year}`, value: figure(v), rule: "double" }]
         : [{ label: `Your spouse's wages in ${year}`, value: figure(v), ref: "about.spouse" as MetricId }],
       notes: ["From About you: the same with and without the offer, so the offer's tax is what its pay adds on top of theirs."],

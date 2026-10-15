@@ -430,6 +430,14 @@ Before the repo and the app go public (deferred, see Decisions):
   engine's own rounding, and from W4/W4a in `docs/ui-design.md` (A's year 1 after rent is 62,594, not 62,595). Present values,
   the verdict and per hour stay the engine's: a present value isn't a sum of the years. Apply the same rule to anything new
   that adds up (CSV included); don't change it without the user.
+  - **Extended to every derivation** (2026-10-14, audit C12-C15, item 4 of the audit's fix list): every Show the work foots as
+    displayed, exactly (`footsAsDisplayed`, no tolerance; `display.test.ts` checks every figure on the page for generated offers).
+    A present value's total stays the engine's, and one line takes the rounding (`shownPv` in `derive.ts`: the tax; the largest
+    benefit; the money saved at face value), its own work showing the same figure. A gap is the totals as shown, subtracted, and
+    "a month" is that gap ÷ the annuity factor as shown, rounded once (`shownGap`, `monthOf` in `verdict.ts`): the verdict, the
+    stays row, the steps, L-2 and the copied document state it so, so it can differ by a dollar from the engine's `perMonth`. L-3's
+    rent that ties is worked from the figures shown (`rentTie` in `breakevenModel.ts`), a dollar from the engine's closed form at
+    most. Quotients (per hour, extra hours) show the decimals they need to work out to the engine's figure (`quotient`).
 
 ## Next steps
 The plan for slices 4-8 (`docs/ui-slices-4-8-plan.md`) is done: slice 6's stop B (2026-10-12) was its last review stop. At

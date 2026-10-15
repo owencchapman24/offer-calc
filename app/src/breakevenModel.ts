@@ -93,11 +93,31 @@ export function tieView(ties: Ties, letters: Letter[], offers: OfferInput[]): Ti
 export function changeText(r: BreakevenResult): string {
   if (r.outcome !== "tie") return "";
   const sign = r.increase >= 0 ? "+" : "−";
-  return `${sign}${dollars(Math.abs(r.increase))}${r.from > 0 ? `, ${sign}${(Math.abs(r.increase / r.from) * 100).toFixed(1)}%` : ""}`;
+  // The difference of the two figures as shown (to the dollar), so "from" and the change reach "to" as displayed.
+  const change = Math.abs(Math.round(r.to) - Math.round(r.from));
+  return `${sign}${dollars(change)}${r.from > 0 ? `, ${sign}${(Math.abs(r.increase / r.from) * 100).toFixed(1)}%` : ""}`;
 }
 
 /** The city a rent lever names: "New York" (the metro's first city). */
 export const rentCity = (areaName: string) => areaName.split(/[-,]/)[0].trim();
+
+/**
+ * A rent lever as shown (L-3, its work, the rent note's work, the copied document): the gap between the two totals as shown,
+ * restated in the offer's city's dollars with its two BEA indexes as shown, ÷ rent's present-value factor as shown (4 decimals),
+ * is the change in a month's first-year rent, in whole dollars; the rent that ties is the rent as used, less it (or, for an offer
+ * that's ahead, plus it). Worked from the figures shown, so every step adds up as displayed (audit C14): the engine's closed form
+ * can differ from it by a dollar.
+ */
+export function rentTie(f: Exclude<RentFlipResult, { outcome: "noRent" }>, idx: { areaValue: number; refValue: number }) {
+  const gap = Math.abs(Math.round(f.targetPV) - Math.round(f.targetPV + f.aheadBy));
+  const local = Math.round((gap * idx.areaValue) / idx.refValue);
+  const factor = Number(f.rentFactor.toFixed(4));
+  const change = Math.round(local / factor);
+  /** Ahead (the winner's cushion): its rent can rise before the other ties. */
+  const up = f.aheadBy > 0;
+  const from = Math.round(f.from);
+  return { gap, local, factor, change, up, from, to: from + (up ? change : -change) };
+}
 
 /** Whether a rent lever has a rent that ties. */
 export const rentTies = (r: RentFlipResult | undefined): r is Extract<RentFlipResult, { outcome: "tie" }> => r?.outcome === "tie";

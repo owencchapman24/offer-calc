@@ -145,7 +145,9 @@ function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof
   const afterTax = gross - tax - premiums;
   const yours = R(y.retirement.employee + y.health.employeeHsa);
   const takeHome = afterTax - yours;
-  const employer = R(y.retirement.employerVested);
+  // Vested: the credited money as shown × the vested share, so its work multiplies out (audit C15).
+  const credited = R(y.retirement.employerCredited);
+  const employer = y.retirement.employerCredited ? R(credited * (y.retirement.employerVested / y.retirement.employerCredited)) : 0;
   const oop = R(y.health.outOfPocket);
   const hsa = R(y.health.employerHsa);
   const perks = R(y.perks.face);
@@ -164,7 +166,7 @@ function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof
   const q = { salary: R(y.quoted.salary), bonus: R(y.quoted.bonus), cash: R(y.quoted.cash), rsu: R(y.quoted.rsu) };
   return {
     n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, gross, tax, premiums, afterTax, yours, takeHome,
-    credited: R(y.retirement.employerCredited), employer, oop, hsa, perks, totalRewards, hours: y.hours === undefined ? null : R(y.hours), col,
+    credited, employer, oop, hsa, perks, totalRewards, hours: y.hours === undefined ? null : R(y.hours), col,
     quoted: { ...q, letter: q.salary + q.bonus + q.cash + q.rsu }, posted: p,
   };
 }

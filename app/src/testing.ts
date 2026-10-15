@@ -238,21 +238,20 @@ export const half = (s: string) => {
  */
 export function footsAsDisplayed(id: MetricId, d: Derivation) {
   let acc: number | null = null;
-  let tol = 0;
   for (const l of d.lines) {
     if (!l.value || l.value === "below $0") { acc = null; continue; }
     const v = parseShown(l.value);
     if (Number.isNaN(v)) { acc = null; continue; }
-    if (!l.op || acc === null) { acc = v; tol = 0; continue; }
+    if (!l.op || acc === null) { acc = v; continue; }
     switch (l.op) {
       case "+": acc += v; break;
       case "−": acc -= v; break;
-      case "×": tol = Math.abs(acc * half(l.value)) + Math.abs(v) * tol; acc *= v; break;
-      case "÷": acc /= v; tol /= Math.abs(v); break;
+      case "×": acc *= v; break;
+      case "÷": acc /= v; break;
       case "=":
+        // The arithmetic of the figures shown, rounded as the result is shown: no slack for how its operands were rounded.
         expect(Math.abs(acc - v), `${id}: ${l.label} = ${l.value}, worked out ${acc}`).toBeLessThanOrEqual(half(l.value) + 1e-9);
         acc = v;
-        tol = 0;
     }
   }
 }

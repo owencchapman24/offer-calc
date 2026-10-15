@@ -3,8 +3,8 @@ import type { Scenario } from "../../src/offer/types";
 import { rangeTicks, useChartWidth } from "./axes";
 import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
-import { CASES, changeText, dropText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
-import { cents, dollars, figure } from "./text";
+import { CASES, changeText, dropAmount, dropText, leadText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
+import { cents, figure } from "./text";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
@@ -89,7 +89,6 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
 /** "C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month. A has the most to lose: …" */
 function Lede({ v }: { v: RiskView }) {
   const per = v.perHour ? "an hour" : "a month";
-  const amount = (x: number) => (v.perHour ? cents(x) : dollars(x / v.factor));
   const H = v.holdsUp;
   const own = CASES.filter((s) => v.leads[s].winner === H);
   const others = new Map<Letter, Scenario[]>();
@@ -103,11 +102,11 @@ function Lede({ v }: { v: RiskView }) {
       {others.size === 0 ? ", and wins in every scenario. " : <>: it wins the {cases(own)}, and {join([...others].map(([w, ss]) => `${w} the ${cases(ss)}`))}. </>}
       {bear.margin > (v.perHour ? 0.005 : 0.5) ? (
         <>In the bear case it leads <Who l={bear.runnerUp} /> by{" "}
-          <Fig id="win.bear" label={`${amount(bear.margin)} ${per} in the bear case`}>{amount(bear.margin)}</Fig> {per}.{" "}</>
+          <Fig id="win.bear" label={`${leadText(v, bear)} ${per} in the bear case`}>{leadText(v, bear)}</Fig> {per}.{" "}</>
       ) : <>In the bear case it ties with <Who l={bear.runnerUp} />.{" "}</>}
       {lose && (
         <><Who l={lose.letter} /> has the most to lose:{" "}
-          <Fig id={`drop.${lose.letter}`} label={`${amount(lose.drop)} ${per} below its base case`}>{amount(lose.drop)}</Fig> {per} below its base
+          <Fig id={`drop.${lose.letter}`} label={`${dropAmount(v, lose)} ${per} below its base case`}>{dropAmount(v, lose)}</Fig> {per} below its base
           case ({dropText(lose)}){lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.{" "}</>
       )}
       {v.onlyIfWell.map((l) => <span key={l}><Who l={l} /> comes out ahead only if things go well. </span>)}
@@ -203,7 +202,6 @@ function RowLabel({ row, v }: { row: RiskRow; v: RiskView }) {
 
 function Winners({ v }: { v: RiskView }) {
   const per = v.perHour ? "an hour" : "a month";
-  const amount = (x: number) => (v.perHour ? cents(x) : dollars(x / v.factor));
   return (
     <div className="stays risk-wins" role="table" aria-label="Who wins in each scenario">
       <div role="row" className="stays-row">
@@ -219,7 +217,7 @@ function Winners({ v }: { v: RiskView }) {
               {lead.margin > (v.perHour ? 0.005 : 0.5) ? (
                 <>
                   <span className={`who offer-${lead.winner}`}>{lead.winner}</span>
-                  <Fig id={`win.${s}`} label={`${lead.winner} +${amount(lead.margin)} ${per} in the ${s} case`} className="stays-margin">+{amount(lead.margin)}</Fig>
+                  <Fig id={`win.${s}`} label={`${lead.winner} +${leadText(v, lead)} ${per} in the ${s} case`} className="stays-margin">+{leadText(v, lead)}</Fig>
                   <span className="stays-per">{per}</span>
                 </>
               ) : <span className="stays-per">tie</span>}
