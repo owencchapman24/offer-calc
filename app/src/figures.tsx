@@ -11,7 +11,8 @@ import type { EditTarget, MetricId, WorkContext } from "./metrics";
 // No react-dom, and nothing from metrics.ts at run time: a figure's tickmark kind comes from the
 // provider (`kind`). Measured 2026-10-09: when a lazy chunk reached react-dom or metrics.ts through
 // this module, Rolldown split React, the model and the help text out of the main chunk, for 1-2 kB more
-// gzip on every visit. `npm run check-bundle` catches it.
+// gzip on every visit. `npm run check-bundle` fails on a split (index.html loading more than one script), and
+// scripts/lib/imports.test.ts checks this file's imports.
 //
 // The CSV button lives here too, for the same reason (2026-10-12): as a module of its own, imported by L-1 (main) and by L-2
 // and L-6 (lazy), it split React, ui.tsx and text.ts out of the main chunk. The CSV code itself (csv.ts) is a dynamic import.
