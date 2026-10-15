@@ -1231,7 +1231,7 @@ font requests.
 all formatting.
 
 **Roadmap:** HUD Small Area FMRs (ZIP-level) as an optional neighborhood rent estimate,
-loaded in the worker, never the main bundle (CLAUDE.md roadmap item 9).
+loaded in the worker, never the main bundle (v1's roadmap item 9; now `docs/v2-plan.md`, "Backlog beyond v2").
 
 ## 12. Build plan
 

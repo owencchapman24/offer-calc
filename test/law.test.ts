@@ -8,8 +8,8 @@ import { ENACTED as FROZEN } from "./frozen-enacted";
 
 // The law as published. This is the one test file that runs on src/tax/params/enacted.ts; every other test runs on the frozen
 // copy in test/frozen-enacted.ts (vitest.config.ts). It pins every federal amount published for a year after 2026, so it's the
-// test meant to fail at a data refresh: update it with the published amounts and their sources (CLAUDE.md, "Data refresh
-// calendar"). No other test should move with a refresh; if one does, the refresh changed more than the published amounts.
+// test meant to fail at a data refresh: update it with the published amounts and their sources (docs/data-refresh.md). No other
+// test should move with a refresh; if one does, the refresh changed more than the published amounts.
 
 const at = (year: number, inflation: number) => paramsForYear(year, { inflation });
 

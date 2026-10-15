@@ -7,7 +7,7 @@ import type { EnactedAmounts } from "../src/tax/params/index";
  * out under the same law whatever has been published since.
  *
  * Don't update it at a data refresh: a refresh changes enacted.ts and law.test.ts, and no other test. It moves only with the
- * base year (CLAUDE.md, "Moving the base year"), when the tests' hand-checked values are redone anyway.
+ * base year (docs/data-refresh.md, "Moving the base year"), when the tests' hand-checked values are redone anyway.
  */
 export const ENACTED: ReadonlyArray<readonly [year: number, amounts: EnactedAmounts]> = [
   [2027, { hsaLimit: { self: 4_500, family: 9_000 } }],
