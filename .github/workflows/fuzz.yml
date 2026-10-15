@@ -1,0 +1,41 @@
+# The property tests (app/src/properties.test.ts, display.test.ts) on a random seed each night, with ten times the runs
+# npm test gives them, shrinking each counterexample (npm run fuzz, audit T4). npm test runs them on a fixed seed; this one
+# looks further. The seed goes in the run's summary: FUZZ_SEED=<seed> npm run fuzz replays a failure locally. A failed
+# scheduled run emails whoever last changed this schedule. Run it by hand from the Actions tab (Run workflow), with a seed
+# to replay one.
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "17 7 * * *" # 07:17 UTC, the middle of the night in the U.S.
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "A seed to replay (blank: a random one)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: seed
+        env:
+          SEED: ${{ inputs.seed }}
+        run: |
+          seed="${SEED:-$(node -p "Math.floor(Math.random() * 2 ** 31)")}"
+          [[ "$seed" =~ ^[0-9]+$ ]] || { echo "::error::A seed is a whole number, not \"$seed\"."; exit 1; }
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "Property tests on seed $seed (commit ${GITHUB_SHA::7}). To replay: \`FUZZ_SEED=$seed npm run fuzz\`" >> "$GITHUB_STEP_SUMMARY"
+      - run: npm run fuzz
+        env:
+          FUZZ_SEED: ${{ steps.seed.outputs.seed }}
