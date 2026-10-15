@@ -58,10 +58,10 @@ list), but some dates are typed in. Update them with the data:
 
 ## Payroll
 - **Social Security wage base:** SSA's COLA fact sheet, mid-October for the next year (2026's $184,500 was announced Oct 24, 2025,
-  late for the shutdown; 2027's $192,300 on Oct 14, 2026). In `PAYROLL_2026`, or a later year's file (`socialSecurityWageBase`). State
-  payroll taxes capped at it (`wageCap: "ssWageBase"`) follow by themselves. SSA's pages block scripts (a 403), so read them in a
-  browser: the fact sheet is HTML now (https://www.ssa.gov/news/en/cola/factsheets/2027.html), and
-  https://www.ssa.gov/oact/cola/cbb.html lists every year's base.
+  late for the shutdown; 2027's $192,300 on Oct 14, 2026). In `PAYROLL_2026`, or a later year's file
+  (`socialSecurityWageBase`). State payroll taxes capped at it (`wageCap: "ssWageBase"`) follow by themselves. SSA's pages block
+  scripts (a 403), so read them in a browser: the fact sheet is HTML now (https://www.ssa.gov/news/en/cola/factsheets/2027.html),
+  and https://www.ssa.gov/oact/cola/cbb.html lists every year's base.
 - **State payroll taxes with their own caps and rates** (`payroll` in `states2026.ts`: NJ $171,100, NY Paid Family Leave $95,350,
   MN $185,000, RI $100,000, and every rate): each state sets the next year's, usually September to December; PolicyEngine-US
   carries them once it updates.
