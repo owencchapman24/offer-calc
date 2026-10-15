@@ -1,7 +1,7 @@
 # User testing
 
 What testers tell us, as it comes in. User testing started on 2026-10-12, with the live site (https://offer-calc.vercel.app) in
-front of a few people before deciding what to build next (CLAUDE.md, "Next steps").
+front of a few people before deciding what to build next (CLAUDE.md, "Now").
 
 **How to add a finding:** one row per finding, newest last. Give the date it was first raised, what testers said or did (in their
 words where possible, without names), how many testers raised it independently, and what it led to. When another tester raises a

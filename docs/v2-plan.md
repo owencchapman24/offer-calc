@@ -546,8 +546,8 @@ was added at the same review.
 **With stop 5A:** `docs/ui-design.md` rev 4, with a status note at its top saying what's historical (audit D7): §0 (a row for
 evaluator-first), §1 (as above), §3.1's map and §3.2's layouts (the breakdown section, A-1 pinned, the "On its own" row), §3.3 (quick
 mode from one offer), §4 (the breakdown's parts; L-5 and L-6 into it; the bridge into A-2), §7 (the first visit), §8 (the methodology),
-§10 (copy and print), §12 (stops 5A-5C), and the conditions' rules where they belong (§2's principles, §9's labels); CLAUDE.md (Next
-steps, the design docs) with it. `docs/nvda-walkthrough.md` before launch.
+§10 (copy and print), §12 (stops 5A-5C), and the conditions' rules where they belong (§2's principles, §9's labels); CLAUDE.md (Now,
+the docs index) with it. `docs/nvda-walkthrough.md` before launch.
 
 ## What v2 changes about the product's scope
 
@@ -792,7 +792,7 @@ only: it never enters the verdict, a total or a tie (D1).
   single occupations ("financial analyst" and the like); whether to include it in the picker's index is for stop 2A, by its size and
   the testers' answers. BLS classifies by duties, not titles, and the picker's help says so.
 - **Refresh:** yearly, when BLS publishes the next May's estimates (usually late March or early April; the May 2026 estimates have no
-  date yet). Added to CLAUDE.md's data refresh calendar.
+  date yet). Added to `docs/data-refresh.md`.
 
 **Tests:** the parser on a small fixture; the area match for every city in the list; the placement words at the edges (a salary equal to
 a percentile, under the 10th, over the 90th, a top-coded 90th, suppressed percentiles); L-7's figures in `metrics.test.ts`; the copied
@@ -1139,7 +1139,21 @@ In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f)
 | 4d-4f | Accuracy, the large parts (two stops for 4d and 4e; a spike for 4f) | testers (item 4), D10-D13 |
 
 **On approval:** `docs/ui-design.md` rev 4 (§1, the ledger's new rows in §3.3, L-7 in §4, M-14 and M-15 in §8, the v2 stops in §12);
-CLAUDE.md (Next steps, the design docs); `docs/offer-model.md` for each engine change; `docs/nvda-walkthrough.md`, a part for each new
-control, before launch. The data refresh calendar gains each dataset as its item is built: OEWS (yearly, spring), BLS's paid-leave
-figures (yearly, September, if D14's defaults use them), the IRS mileage rates (each December, and mid-year when the IRS changes them, as
-in 2026), each convenience rule and cross-state pair's sources (each January), and, if 4f is built, the repayment plans' rules.
+CLAUDE.md (Now, the docs index); `docs/offer-model.md` for each engine change; `docs/nvda-walkthrough.md`, a part for each new
+control, before launch. The data refresh calendar (`docs/data-refresh.md`) gains each dataset as its item is built: OEWS (yearly,
+spring), BLS's paid-leave figures (yearly, September, if D14's defaults use them), the IRS mileage rates (each December, and mid-year
+when the IRS changes them, as in 2026), each convenience rule and cross-state pair's sources (each January), and, if 4f is built, the
+repayment plans' rules.
+
+## Backlog beyond v2
+
+Open items from v1's roadmap (CLAUDE.md's until 2026-10-15; the whole roadmap is in `docs/history.md`) that v2 doesn't plan. Its
+other open items became v2's: the commute's cost (4b) and remote work (4d, and as a value you set, item 1), and even swaps for soft
+factors (item 1). Each needs the user's go-ahead.
+- **Neighborhood rents (v1's item 9):** HUD's Small Area FMRs by ZIP code, since a metro FMR averages the city center with its
+  suburbs (a Manhattan or downtown-Seattle 1-bedroom runs well above it). An optional ZIP field per offer, its SAFMR used when
+  given, else the metro FMR. HUD publishes them for every metro ZIP each fiscal year (`fy<year>_safmrs`, with a ZIP-to-FMR-area
+  crosswalk); tens of thousands of ZIPs, so the data loads in the worker or on demand, never in the main bundle. M-10 calls it
+  planned.
+- **Sensitivity, one input at a time (v1's item 4):** a tornado chart beside the joint bear and bull scenarios.
+- **The gap per paycheck (v1's item 4):** the verdict's monthly lead also restated per paycheck, against distinction bias.
