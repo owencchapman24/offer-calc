@@ -163,3 +163,51 @@ describe("the page, for any offers", () => {
     }), runs(40));
   }, 600_000);
 });
+
+// Counterexamples `npm run fuzz` found, as shrunk, kept so every `npm test` runs them whatever the seed.
+describe("the page, for the cases the nightly fuzz run found", () => {
+  // FUZZ_SEED=1701905633 (2026-10-15): on L-4's last day A owes two clawbacks that both round up, 13/14 of $1,000 = $928.57 and 6/7
+  // of $40,000 = $34,285.71, shown as 929 and 34,286 under L-4's total, $35,214.29, shown as 35,214. "Repaid" came to a dollar
+  // more than its lines' total. The largest now takes the rounding: 929 + 34,285 = 35,214.
+  const TWO_CLAWBACKS: Case = {
+    today: "2026-12-31",
+    household: { filingStatus: "single", spouseWages: 0, otherWagesThisYear: 0, stayYears: 1, pricesIn: "00000", healthUsage: "low" },
+    offers: [
+      { place: { area: "37980", state: "PA", city: null }, draft: {
+        label: "Generated", residence: { state: "PA", nyc: false, philadelphia: false }, employerState: null, startDate: "2027-08-22",
+        salary: { annual: 30_000, raise: null, raiseOn: null, promotions: [{ on: "2028-03-09", stepUp: 0, scenarios: null }] },
+        bonus: { basis: null, amount: { bear: 0, base: 0, bull: 0 }, amounts: [], payOn: { month: 1, day: 1 }, periodStart: null, cutoff: null,
+          firstPayoutGuaranteed: null, mustBeEmployedOnPayDate: null },
+        cashAwards: [
+          { label: "Award 1", amount: 1_000, paidOn: null, clawback: { months: 14, kind: null, per: null, from: null, repay: null } },
+          { label: "Award 2", amount: 40_000, paidOn: "2027-08-22", clawback: { months: 7, kind: null, per: null, from: null, repay: null } },
+        ],
+        equity: { grants: [{ label: "New-hire RSUs", value: 5_000, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }],
+          priceGrowth: null, refreshers: null },
+        retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },
+        costOfLiving: { area: "37980", monthlyRent: 800, rentGrowth: null },
+      } },
+      { place: { area: "35620", state: "NY", city: "nyc" }, draft: {
+        label: "Generated", residence: { state: "NY", nyc: true, philadelphia: false }, employerState: null, startDate: "2027-03-22",
+        salary: { annual: 30_000, raise: null, raiseOn: null, promotions: [] },
+        bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
+          mustBeEmployedOnPayDate: null },
+        cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: "none",
+        health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null },
+        perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },
+        costOfLiving: { area: "35620", monthlyRent: null, rentGrowth: null },
+      } },
+    ],
+  };
+
+  it("two clawbacks that both round up: the largest takes the rounding, and every derivation foots as displayed", () => {
+    const p = page(TWO_CLAWBACKS, "cash")!;
+    const repay = p.derivations.get("repay.A")!;
+    expect(repay.lines.map((l) => [l.label, l.value])).toEqual([
+      ["Award 1: 92.86% of it", "929"], ["Award 2: 85.71% of it", "34,285"], ["Repaid", "35,214"],
+      ["Tax relief", "6,680"], ["What repaying costs you", "28,534"],
+    ]);
+    expect(repay.notes[0]).toMatch(/the largest, Award 2, takes the rounding.*\$34,285\.71/);
+    for (const [id, d] of p.derivations) footsAsDisplayed(id, d);
+  }, 60_000);
+});
