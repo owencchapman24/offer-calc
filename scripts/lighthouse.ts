@@ -3,22 +3,32 @@
 // a run shows no verdict; reports the time to the first answer (scripts/lib/lighthouse.ts). Run after `npm run build`:
 // `npm run lighthouse`. CI runs it.
 //   npm run lighthouse -- <url>   audits a deployed page instead (say, https://offer-calc.vercel.app/)
+//   npm run lighthouse -- --fonts-late [ms]   holds the web fonts back (default 1.5 s), so the page paints in the fallback fonts
+//                                             first, and gates only the layout shift: the font swap mustn't move text. CI runs it too.
 // It needs Chrome, or CHROME_PATH set to a Chromium browser. On Windows without Chrome it uses Edge.
-// The median run's report is written to .lighthouse/report.html.
+// The median run's report is written to .lighthouse/report.html (.lighthouse/report-fonts-late.html with --fonts-late).
 import { launch } from "chrome-launcher";
 import lighthouse from "lighthouse";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { CLS_BUDGET, LCP_BUDGET_MS, RUNS, TBT_BUDGET_MS, toRun, verdict, WARMUP_RUNS, type Run } from "./lib/lighthouse";
+import {
+  CLS_BUDGET, FONTS_LATE_MS, FONTS_LATE_RUNS, LCP_BUDGET_MS, RUNS, TBT_BUDGET_MS, toRun, verdict, WARMUP_RUNS, type Run,
+} from "./lib/lighthouse";
 import { serveDist } from "./lib/serve";
 
 const EDGE = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const chromePath = process.env.CHROME_PATH
   ?? (process.platform === "win32" && !existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe") && existsSync(EDGE) ? EDGE : undefined);
 
-const target = process.argv[2];
-const local = target ? undefined : await serveDist("dist", "vercel.json");
+const args = process.argv.slice(2);
+const lateAt = args.indexOf("--fonts-late");
+const fontsLate = lateAt < 0 ? 0 : Number(/^\d+$/.test(args[lateAt + 1] ?? "") ? args[lateAt + 1] : FONTS_LATE_MS);
+const target = args.find((a, i) => !a.startsWith("--") && !(lateAt >= 0 && i === lateAt + 1));
+if (target && fontsLate) throw new Error("--fonts-late holds back the local build's fonts: it can't be used with a URL.");
+const local = target ? undefined : await serveDist("dist", "vercel.json", 0, (path) => (path.endsWith(".woff2") ? fontsLate : 0));
 const url = target ?? local!.url;
+const RUN_COUNT = fontsLate ? FONTS_LATE_RUNS : RUNS;
+const REPORT = fontsLate ? ".lighthouse/report-fonts-late.html" : ".lighthouse/report.html";
 // A fixed port: Edge doesn't report a dynamic one where chrome-launcher looks for it.
 const chrome = await launch({
   chromePath,
@@ -29,7 +39,7 @@ const chrome = await launch({
 const runs: Run[] = [];
 const reports: string[] = [];
 try {
-  for (let i = -WARMUP_RUNS; i < RUNS; i++) {
+  for (let i = -WARMUP_RUNS; i < RUN_COUNT; i++) {
     const result = await lighthouse(url, {
       port: chrome.port,
       output: "html",
@@ -41,7 +51,8 @@ try {
     if (!result) throw new Error("Lighthouse returned nothing.");
     const run = toRun(result.lhr);
     const numbers = `performance ${run.score}, FCP ${s(run.fcpMs)}, LCP ${s(run.lcpMs)}, TBT ${Math.round(run.tbtMs)} ms, CLS ${run.cls.toFixed(3)}; `
-      + `observed: LCP ${opt(run.observedLcpMs)}, first answer ${opt(run.firstAnswerMs)}`;
+      + `observed: LCP ${opt(run.observedLcpMs)}, first answer ${opt(run.firstAnswerMs)}`
+      + (run.shifted ? `; shifted: ${run.shifted.join(", ")}` : "");
     // The warm-up warms the browser and the server: it's shown, not counted.
     if (i < 0) {
       console.log(`Warm-up (discarded): ${numbers}`);
@@ -57,14 +68,19 @@ try {
   local?.server.close();
 }
 
-const v = verdict(runs);
+// With the fonts held back, LCP and TBT wait for the swap, so only the layout shift is gated.
+const v = verdict(runs, fontsLate ? { lcpMs: Infinity, cls: CLS_BUDGET, tbtMs: Infinity } : undefined);
 const m = v.median!;
 mkdirSync(".lighthouse", { recursive: true });
-writeFileSync(".lighthouse/report.html", reports[runs.indexOf(m)]);
-const line = `${target ?? "Production build"}, mobile, after a warm-up, medians of ${RUNS} runs: LCP ${s(v.lcpMs!)} `
-  + `(budget ${s(LCP_BUDGET_MS)}), CLS ${v.cls!.toFixed(3)} (budget ${CLS_BUDGET}), TBT ${Math.round(v.tbtMs!)} ms (budget ${TBT_BUDGET_MS} ms), `
-  + `performance ${v.score}. LCP element: ${m.lcpElement ?? "unknown"}. Observed (unthrottled): LCP ${opt(v.observedLcpMs)}, `
-  + `the first answer ${opt(v.firstAnswerMs)} (reported, not budgeted). Report (the median LCP's run): .lighthouse/report.html`;
+writeFileSync(REPORT, reports[runs.indexOf(m)]);
+const line = fontsLate
+  ? `Production build, mobile, the web fonts held back ${s(fontsLate)} (the page paints in the fallback fonts first), after a warm-up, `
+    + `medians of ${RUN_COUNT} runs: CLS ${v.cls!.toFixed(3)} (budget ${CLS_BUDGET}); LCP ${s(v.lcpMs!)}, not budgeted here (it waits for the `
+    + `swap). Report (the median LCP's run): ${REPORT}`
+  : `${target ?? "Production build"}, mobile, after a warm-up, medians of ${RUN_COUNT} runs: LCP ${s(v.lcpMs!)} `
+    + `(budget ${s(LCP_BUDGET_MS)}), CLS ${v.cls!.toFixed(3)} (budget ${CLS_BUDGET}), TBT ${Math.round(v.tbtMs!)} ms (budget ${TBT_BUDGET_MS} ms), `
+    + `performance ${v.score}. LCP element: ${m.lcpElement ?? "unknown"}. Observed (unthrottled): LCP ${opt(v.observedLcpMs)}, `
+    + `the first answer ${opt(v.firstAnswerMs)} (reported, not budgeted). Report (the median LCP's run): ${REPORT}`;
 if (!v.ok) {
   console.error(`Lighthouse check failed. ${line}\n${v.problems.map((p) => `- ${p}`).join("\n")}`);
   process.exit(1);
