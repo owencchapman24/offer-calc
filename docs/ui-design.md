@@ -1687,6 +1687,8 @@ line.
   machine: main LCP 1.95 s, TBT 49 ms, the first answer 0.58 s; 5A LCP 1.95 s, TBT 48 ms, the first answer 0.60 s; CLS 0 for both, and
   0 in the late-fonts pass. The LCP element is now the masthead's tagline (rev 4's longer wording), painted in the same frame as About
   you's assumptions line, which it was.
+- **Ctrl+P on a desktop before scrolling** prints without L-1 now, as it already did on a phone: the breakdowns sit between the columns
+  and L-1, which loads as you scroll toward it. Print… loads every schedule, as before.
 - **About you's other wages** stay in the earliest start's calendar year, the year About you names, for every breakdown: an added offer
   that starts in an earlier calendar year moves that year, as editing About you would.
 - **Started before the testers' first question was answered:** the user's call, 2026-10-15.

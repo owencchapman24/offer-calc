@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, stubPrint, verdictText } from "./lib/app";
+import { openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -120,6 +120,8 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   async ({ page }) => {
   await stubPrint(page);
   await openCompare(page);
+  // L-1 loads as you scroll toward it: since stop 5A the breakdowns sit above it, past a desktop's first screen too.
+  await showByYear(page);
   // The browser's own print: what's loaded is laid out for print at once (L-1's table view), before it prints.
   expect(await page.evaluate(() => { window.dispatchEvent(new Event("beforeprint")); return !!document.getElementById("l1-table"); })).toBe(true);
   await expect(page.locator("html")).toHaveClass(/printing/);
