@@ -22,8 +22,8 @@ behind every figure.
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
   (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
-  part), this file (D2, D5, D6), the design docs marked historical (D7) and v2's plan brought up to date (D8); and the `main`
-  ruleset is on (S1, in part). What's left: section 3.
+  part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8) and per hour documented
+  as the code works it out (D1); and the `main` ruleset is on (S1, in part). What's left: section 3.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -42,8 +42,6 @@ finding in `docs/user-testing.md` as it comes in.
 section 2's and the plan's in step):
 - **T1** (a committed grid baseline in CI): the breakdown changes no tax code. It guards each tax change: the data refreshes below,
   the base-year move, v2's item 4d.
-- **D1** (per hour is documented as total rewards; the code divides the after-rent total): M-1, M-5.4 and the README. This file and
-  the plan say it as the code does, and 5A rewrites M-1.
 - **D3** (the methodology's lines the code doesn't bear out: M-4's withholding note and Alaska figure, M-10's convenience rule): 5A
   and 5B check the methodology against the code anyway.
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.

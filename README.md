@@ -22,7 +22,7 @@ One pipeline, left to right, for two or three offers:
 4. **− Rent & prices (after rent, at U.S. prices):** spending money after rent, priced as in an
    average U.S. city (BEA Regional Price Parities), plus what you save at face value. This is the
    default verdict.
-5. **Per hour:** step 3 divided by the hours you'd work, and what each extra hour pays.
+5. **Per hour:** step 4, after rent, divided by the hours you'd work, and what each extra hour pays.
 
 The verdict is a present value restated as a level amount a month over the years you expect to stay,
 with the winner for stays of 2 to 5 years beside it. Every figure carries an audit tickmark: click it to
