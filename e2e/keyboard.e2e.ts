@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addOffer, fillOffer, loadSchedules, openCompare, openSection, ownSettled, settled } from "./lib/app";
+import { addOffer, fillOffer, loadSchedules, openCompare, openSection, ownSettled, settled, showByYear } from "./lib/app";
 
 // What the scan can't see (docs/ui-slices-4-8-plan.md, slice 7, "known before the scan"): what a screen reader hears, and
 // where focus goes. Each was a problem before slice 7; these keep them fixed.
@@ -23,6 +23,7 @@ test("the verdict is announced as one sentence once the inputs rest, not read wh
 
 test("L-1's chart reads a year at a time, as a slider; its tooltip stays silent", async ({ page }) => {
   await openCompare(page);
+  await showByYear(page);
   const chart = page.getByRole("slider", { name: /each employment year$/ });
   await chart.focus();
   await expect(chart).toHaveAttribute("aria-valuetext", /^Year 1: A [\d,]+, B [\d,]+, C [\d,]+$/);

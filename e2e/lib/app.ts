@@ -167,6 +167,20 @@ export async function showByYear(page: Page) {
 }
 
 /**
+ * L-1 alone: its slot scrolled to a screen and a half down, inside its load margin (useLoadNear's: a screen past the viewport), so
+ * L-2 to L-6, a pixel tall each until they load and just after its slot, stay outside it (for a screen shorter than twice its
+ * slot). Since stop 5A the breakdowns sit above L-1, past a desktop's first screen too.
+ */
+export async function loadByYearOnly(page: Page) {
+  await page.evaluate(() => {
+    const slot = document.querySelector(".l1-slot");
+    if (slot) window.scrollTo(0, Math.max(0, slot.getBoundingClientRect().top + window.scrollY - 1.5 * window.innerHeight));
+  });
+  await expect(page.locator("#l1-title")).toBeAttached();
+  await settled(page);
+}
+
+/**
  * L-1 to L-5 load as you scroll toward them, and L-3 and L-4 work out their numbers while they're on screen: scroll down to
  * each in turn, and wait for those two to be ready.
  */
