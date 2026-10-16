@@ -29,7 +29,7 @@ describe("the hooks linter", () => {
     expect(await problems(component("  const v = useMemo(() => amount * rate, [amount]);\n  void v;")))
       .toEqual(["react-hooks/exhaustive-deps"]);
     expect(await problems(component("  const v = useMemo(() => amount * rate, [amount, rate]);\n  void v;"))).toEqual([]);
-  });
+  }, 30_000); // the first lint loads ESLint's parser: seconds on a busy runner
 
   it("finds a hook called conditionally", async () => {
     expect(await problems(component("  if (show) useEffect(() => {}, []);"))).toEqual(["react-hooks/rules-of-hooks"]);
