@@ -10,15 +10,17 @@ import { build as csvBuild, type CsvTable } from "./csv";
 import { derive } from "./derive";
 import { firstLastDay, leaveAxis } from "./leaveModel";
 import type { Derivation, MetricId, WorkContext } from "./metrics";
-import { compareOf, contextOf, footsAsDisplayed, half, parseShown, renderPage, withLeave, withTies, withWork } from "./testing";
+import { compareOf, contextOf, footsAsDisplayed, half, parseShown, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork } from "./testing";
+import { ownView } from "./breakdownModel";
+import { toOfferInput } from "./model";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { marginText, verdict } from "./verdict";
 import { priceWords } from "./prices";
 
 // Properties of what the page shows, over generated offers and households (arbitrary.ts): the whole page as the app would
-// render it, with L-3, L-4 and L-6 worked out as the worker would, every figure's Show the work, the CSVs and the copied
-// document. These are the checks the samples already pass (l6.test.ts, metrics.test.ts, copydoc.test.ts), run where the samples
+// render it, with L-3, L-4 and L-6 worked out as the worker would, each offer's breakdown (A-1) and the ledger's "On its own"
+// row, every figure's Show the work, the CSVs and the copied document; and one offer on its own, as the app shows it then. These are the checks the samples already pass (l6.test.ts, metrics.test.ts, copydoc.test.ts), run where the samples
 // never go. A few seconds a case: `npm test` runs a handful on a fixed seed, `npm run fuzz` more on a random one.
 
 const BASES: Basis[] = ["cash", "totalRewards", "colAdjustedTotal", "perHour"];
@@ -41,7 +43,8 @@ function page(c: Case, basis: Basis): Page | null {
   const ctx = worked.ctx;
   const r = ctx.results!;
   const html = renderPage(ctx, { leave: { ...left.props, ctx }, ...(tied ? { ties: tied.props } : {}) })
-    + r.letters.map((l) => renderToStaticMarkup(createElement(WorkProvider, { ctx, children: [createElement(TheWork, { key: "w", ...worked.props, ctx, letter: l })] }))).join("");
+    + r.letters.map((l) => renderToStaticMarkup(createElement(WorkProvider, { ctx, children: [createElement(TheWork, { key: "w", ...worked.props, ctx, letter: l })] }))).join("")
+    + renderBreakdowns(ctx);
   const ids = [...new Set([...html.matchAll(/data-metric="([^"]+)"/g)].map((m) => m[1] as MetricId))];
   const derivations = new Map(ids.map((id) => [id, derive(id, ctx)]));
   // L-2's table (and its CSV) is there only when some offer has a range.
@@ -161,6 +164,57 @@ describe("the page, for any offers", () => {
         }
       }
     }), runs(40));
+  }, 600_000);
+});
+
+// One offer on its own (docs/v2-plan.md, item 5): the page as the app shows it with a single offer, its bottom line (A-1) pinned.
+describe("one offer on its own, for any offer", () => {
+  /** A single offer's page and every figure's work; null when the engine finds a problem with the generated inputs. */
+  function alonePage(c: Case) {
+    const ctx = contextOf(appOffers(c), aboutYou(c.household), c.today);
+    if ("issues" in ctx) return null;
+    const html = renderAlone(ctx);
+    const ids = [...new Set([...html.matchAll(/data-metric="([^"]+)"/g)].map((m) => m[1] as MetricId))];
+    return { ctx, html, derivations: new Map(ids.map((id) => [id, derive(id, ctx)])) };
+  }
+  const single = cases({ offers: [1, 1] });
+
+  it("is worked out without an error or a comparison, never shows NaN, Infinity or undefined, and every Show the work foots as displayed", () => {
+    fc.assert(fc.property(single, (c) => {
+      const p = alonePage(c);
+      fc.pre(p !== null);
+      expect(p!.ctx.results).toBeUndefined();
+      expect(p!.html).toContain('data-metric="own.A.total"');
+      const text = [p!.html, ...[...p!.derivations.values()].map((d) => JSON.stringify(d))].join("\n");
+      for (const bad of ["NaN", "Infinity", "undefined"]) expect(text.includes(bad), `"${bad}" on the page`).toBe(false);
+      for (const [id, d] of p!.derivations) footsAsDisplayed(id, d);
+    }), runs(8, false));
+  }, 600_000);
+
+  it("its bottom line adds up as shown: to spend + saved = the month; at the prices picked, the month − the price step", () => {
+    fc.assert(fc.property(single, (c) => {
+      const p = alonePage(c);
+      fc.pre(p !== null);
+      const ctx = p!.ctx;
+      const r = toOfferInput(ctx.offers[0]);
+      const v = ownView("A", ctx.own!.breakdowns.A!, (r as { offer: Parameters<typeof ownView>[2] }).offer, priceWords(ctx.household.pricesIn), true);
+      expect(v.month.spend + v.month.saved).toBe(v.month.total);
+      expect(v.pv.totalRewards - v.pv.rent).toBe(v.pv.total);
+      if (v.ref) expect(v.month.total - v.ref.step).toBe(v.ref.month);
+      if (v.year1) expect(v.year1.spend + v.year1.saved).toBe(v.year1.y.totalRewards - v.year1.y.col!.rent);
+    }), runs(20));
+  }, 600_000);
+
+  // B3: a breakdown runs over its own stay, so adding another offer changes nothing in it (when About you's year is the same).
+  it("adding a second offer leaves the first one's breakdown as it was", () => {
+    fc.assert(fc.property(cases({ offers: [2, 2] }), (c) => {
+      const both = contextOf(appOffers(c), aboutYou(c.household), c.today);
+      const first = contextOf(appOffers({ ...c, offers: c.offers.slice(0, 1) }), aboutYou(c.household), c.today);
+      fc.pre(!("issues" in both) && !("issues" in first));
+      const [x, y] = [both as WorkContext, first as WorkContext];
+      fc.pre(x.wagesYear === y.wagesYear);
+      expect(x.own!.breakdowns.A).toEqual(y.own!.breakdowns.A);
+    }), runs(10));
   }, 600_000);
 });
 

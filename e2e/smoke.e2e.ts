@@ -154,8 +154,9 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   await expect(page.locator(".l6-payments")).toHaveCount(3);
   await expect(page.locator(".l6-elsewhere")).toHaveCount(0);
   await page.emulateMedia({ media: "print" });
-  // On paper: every schedule's legend, no buttons but the figures, B's lines dashed and C's dotted, the footer's sample flag.
-  await expect(page.locator(".schedule .legend")).toHaveCount(7);
+  // On paper: every schedule's legend (the lead, the breakdowns and L-1 to L-6), no buttons but the figures, B's lines dashed and C's
+  // dotted, the footer's sample flag.
+  await expect(page.locator(".schedule .legend")).toHaveCount(8);
   await expect(page.getByRole("button", { name: "Print…" })).toBeHidden();
   await expect(page.locator(".segmented").first()).toBeHidden();
   const dash = (letter: string) => page.locator(`.by-year .series.offer-${letter} .series-line`).evaluate((el) => getComputedStyle(el).strokeDasharray);
@@ -190,7 +191,7 @@ test("Copy as document: one click puts the comparison on the clipboard, as HTML 
   const got = await clipboard(page);
   expect(Object.keys(got).sort()).toEqual(["text/html", "text/plain"]);
   for (const flavor of [got["text/html"], got["text/plain"]]) {
-    expect(flavor).toContain(`C leaves you about ${hero} more than A, after rent, at U.S. prices.`);
+    expect(flavor).toContain(`C leaves you about ${hero} more than A over your stay, after rent, at U.S. prices.`);
     expect(flavor).toContain(SAMPLE_LINE);
     expect(flavor).toContain("If your last day were");
     expect(flavor).toContain("To tie C's");
@@ -245,7 +246,7 @@ test("export, then import: the same results", async ({ page }) => {
   expect(JSON.parse(file)).toMatchObject({ format: "offer-calc", schemaVersion: 3 });
 
   // Change the inputs, so the import has something to restore.
-  await page.getByRole("link", { name: "Compare" }).click();
+  await page.getByRole("link", { name: "Offers" }).click();
   await settled(page);
   await page.locator("#in-C-salary-annual").fill("50000");
   await expect.poll(() => verdictText(page)).not.toEqual(before);

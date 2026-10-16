@@ -58,8 +58,8 @@ export interface YearTable {
   n: number;
   years: ShownYear[];
   rows: L6Row[];
-  /** After rent: the offer's city, the prices picked, and the two BEA indexes as shown. */
-  prices?: { city: string; place: string; ref: string; area: string };
+  /** After rent: the offer's city, the prices picked (and their dollars on a figure: "U.S.-avg"), and the two BEA indexes as shown. */
+  prices?: { city: string; place: string; unit: string; ref: string; area: string };
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -126,7 +126,7 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   if (col) {
     const x = { ...shownIndexes(d), city: shortCity(d.costOfLiving!.area.name) };
     const p = pricesOf(ctx);
-    prices = { city: x.city, place: p.place, ref: x.ref, area: x.area };
+    prices = { city: x.city, place: p.place, unit: p.unit.slice(0, -2), ref: x.ref, area: x.area };
     carry("takeHome", "rent", "Take-home pay", (y) => y.takeHome);
     if (any((y) => y.col!.savings)) line("savings", "rent", "Planned savings", (y) => -y.col!.savings, { lead: "less" });
     line("rent", "rent", "Rent", (y) => -y.col!.rent, { lead: "less", gloss: rentGloss(d) });
@@ -468,7 +468,7 @@ function taxTablesOf(w: WorkOffer, st: string, local: string, joint: boolean, n:
     rows.push({ line: "total", label: "Total tax", kind: "total", with: withTotal, without: withoutTotal, offer: offerTax });
     const rate = t.offerTaxRate;
     const digits = rateDigits(rate, inYear);
-    rows.push({ line: "rate", label: "The offer's tax ÷ its pay", gloss: "the rate on each of its payments this year", kind: "rate" });
+    rows.push({ line: "rate", label: `The offer's tax ÷ its ${t.year} pay`, gloss: "the rate on each of its payments this year", kind: "rate" });
     return { year: t.year, projectedLaw: t.projectedLaw, rows, rate, digits, pay, tax, parts, federal: t.with.federal, t };
   });
 }

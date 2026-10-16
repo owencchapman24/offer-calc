@@ -4,6 +4,7 @@ import {
   breakeven, cliffs, compareOffers, comparisonWindow, horizonSweep, leaveDateSweep, nextCliff, projectScenario, rentFlip, withholdingShortfall,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD as household, SAMPLE_OFFERS as offers } from "../src/samples";
+import { compute, type OwnCache } from "../app/src/compute";
 
 const valuationDate = "2026-07-13";
 const opts = { inflation: 0.025, valuationDate };
@@ -21,7 +22,19 @@ function time(label: string, runs: number, f: () => unknown): { label: string; m
   return { label, ms: ms[Math.floor(ms.length / 2)] };
 }
 
+// The worker's fast lane as the app runs it (app/src/compute.ts): each offer's breakdown, remembered by its inputs, and with two or more
+// the comparison (docs/v2-plan.md, item 5).
+const request = (os: typeof offers) => ({ offers: { offers: os, household, stays: [2, 3, 4, 5], stayYears: 4, ...opts, discountRate: 0.05 },
+  ids: os.map((_, i) => String(i)), rents: [] });
+const warm: OwnCache = new Map();
+compute(request(offers), warm);
+let edits = 0;
+
 const cases = [
+  time("fast lane: one offer's breakdown, nothing remembered", 20, () => compute(request([offers[0]]))),
+  time("fast lane: 3 offers, nothing remembered", 10, () => compute(request(offers))),
+  time("fast lane: an edit to one of 3 offers (B's salary)", 10, () =>
+    compute(request([offers[0], { ...offers[1], salary: { ...offers[1].salary, annual: 80_000 + ++edits } }, offers[2]]), warm)),
   time("projectScenario, offer A (bonus by year, 401(k) cliff)", 40, () =>
     projectScenario(offers[0], household, { ...opts, window })),
   time("projectScenario, offer C (RSUs + refreshers)", 40, () =>

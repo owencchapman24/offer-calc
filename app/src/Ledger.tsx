@@ -1,4 +1,4 @@
-import { type CSSProperties, type Dispatch, Fragment, type KeyboardEvent, useEffect, useRef } from "react";
+import { type CSSProperties, type Dispatch, Fragment, type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import type { OfferWarning } from "../../src/offer/types";
@@ -21,12 +21,14 @@ export const detailedModule = lazyModule(() => import("./Detailed"));
 // On a phone it shows one offer at a time, chosen by tabs A | B | C | + (W9): every cell says whose it is
 // (data-offer), and the stylesheet shows the chosen offer's.
 
-export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui, dispatch, tabbed = false }: {
+export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui, dispatch, tabbed = false, foot = null }: {
   offers: AppOffer[]; missing: Map<string, Missing[]>; rents: Record<string, RentEstimate>;
   /** The validator's problems for each offer. */ issues?: Partial<Record<Letter, OfferIssue[]>>;
   /** The engine's warnings for each offer, shown at their fields. */ warnings?: Partial<Record<Letter, OfferWarning[]>>;
   ui: Pick<UiState, "mode" | "section" | "editor" | "offerTab">; dispatch: Dispatch<Action>;
   /** A phone: one offer at a time, by tabs. */ tabbed?: boolean;
+  /** The foot row with two or more offers: "On its own", each offer's bottom line (Breakdown.tsx, loaded beside the worker). */
+  foot?: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
@@ -36,7 +38,7 @@ export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui,
   const pending = useRef<string | null>(null);
   useEffect(() => {
     if (!pending.current) return;
-    document.getElementById(pending.current === "tab" ? `offer-tab-${tab}` : pending.current)?.focus();
+    (document.getElementById(pending.current === "tab" ? `offer-tab-${tab}` : pending.current) ?? document.getElementById("offers-title"))?.focus();
     pending.current = null;
   });
   const select = (letter: Letter) =>
@@ -48,10 +50,11 @@ export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui,
     select(free);
     pending.current = "tab";
   };
-  // The × goes with its offer: focus goes to the tab shown next, or (with every offer showing) the ledger's heading.
+  // The × goes with its offer: focus goes to the tab shown next, or (with every offer showing) the ledger's heading; down to one
+  // offer, to its breakdown's heading, where its bottom line now is.
   const remove = (o: AppOffer) => {
     dispatch({ type: "removeOffer", id: o.id });
-    pending.current = tabbed ? "tab" : "offers-title";
+    pending.current = offers.length === 2 ? "own-title" : tabbed ? "tab" : "offers-title";
   };
   const needs = offers.filter((o) => (missing.get(o.id)?.length ?? 0) > 0 || (issues[o.letter]?.length ?? 0) > 0).map((o) => o.letter);
   const api: LedgerApi = {
@@ -90,6 +93,7 @@ export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui,
               <StartRow />
               <RentRow rents={rents} />
               <AlsoCounted offers={offers} show={() => setMode("detailed")} preload={preload} />
+              {foot}
             </>
           ) : LEDGER_SECTIONS.map((s) => (
             <Fragment key={s.id}>
@@ -98,10 +102,10 @@ export function Ledger({ offers, missing, rents, issues = {}, warnings = {}, ui,
               {ui.section === s.id && (detailed ? <detailed.DetailedSection id={s.id} rents={rents} />
                 : <div className="row loading-row"><p className="note">Loading this section…</p></div>)}
             </Fragment>
-          ))}
+          )).concat(<Fragment key="foot">{foot}</Fragment>)}
         </div>
         {offers.length < 3 && !tabbed && (
-          <button type="button" className="add" onClick={() => dispatch({ type: "addOffer" })}>+ Add an offer (up to 3)</button>
+          <button type="button" className="add" onClick={() => dispatch({ type: "addOffer" })}>+ Add an offer to compare (up to 3)</button>
         )}
       </section>
     </LedgerProvider>
@@ -120,7 +124,7 @@ function HeadRow({ offers, missing, remove, set }: {
             <span className="letter">{o.letter}</span>
             {o.sample === "sample" && <Stamp>Sample</Stamp>}
             {o.sample === "edited" && <Stamp>Edited sample</Stamp>}
-            {offers.length > 2 && (
+            {offers.length > 1 && (
               <button type="button" className="remove" onClick={() => remove(o)} aria-label={`Remove offer ${o.letter}`} title={`Remove offer ${o.letter}`}>
                 ×</button>
             )}
@@ -128,7 +132,7 @@ function HeadRow({ offers, missing, remove, set }: {
           <input className="offer-label" aria-label={`Offer ${o.letter} name`} placeholder={`Offer ${o.letter}`} data-help="label"
             aria-describedby="hint-label" value={o.draft.label} onChange={(e) => set(o, { label: e.target.value })} />
           {(missing.get(o.id)?.length ?? 0) > 0 && (
-            <p className="needs">Needs {missing.get(o.id)!.join(", ")} to be compared.</p>
+            <p className="needs">Needs {missing.get(o.id)!.join(", ")} to be worked out.</p>
           )}
         </div>
       ))}
@@ -167,7 +171,7 @@ function OfferTabs({ offers, tab, needs, select, add }: {
           );
         })}
       </div>
-      {offers.length < 3 && <button type="button" className="tab-add" aria-label="Add an offer" title="Add an offer" onClick={add}>+</button>}
+      {offers.length < 3 && <button type="button" className="tab-add" aria-label="Add an offer to compare" title="Add an offer to compare" onClick={add}>+</button>}
     </div>
   );
 }

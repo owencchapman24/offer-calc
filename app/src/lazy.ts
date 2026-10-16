@@ -61,6 +61,36 @@ export function useLoadNear<T>(m: LazyModule<T>, ref: RefObject<Element | null>,
   }, [m, ref, loaded]);
 }
 
+/**
+ * Starts loading a module once the page's first contentful paint is recorded (or after 3 s, where the browser doesn't record it):
+ * code the first answer needs, which can't show before the worker answers anyway. Requested sooner, during the first render or the
+ * frame after it, these chunks were still in the network Lighthouse simulates before the first paint, and moved its FCP by about
+ * 0.4 s (stop 5A, 2026-10-16).
+ */
+export function useLoadAfterPaint<T>(m: LazyModule<T>) {
+  useEffect(() => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      void m.load();
+    };
+    const fallback = setTimeout(go, 3_000);
+    let observer: PerformanceObserver | undefined;
+    try {
+      if (performance.getEntriesByName("first-contentful-paint").length) setTimeout(go);
+      else {
+        observer = new PerformanceObserver((list) => { if (list.getEntriesByName("first-contentful-paint").length) setTimeout(go); });
+        observer.observe({ type: "paint", buffered: true });
+      }
+    } catch { /* no paint timing: the fallback loads it */ }
+    return () => {
+      clearTimeout(fallback);
+      observer?.disconnect();
+    };
+  }, [m]);
+}
+
 /** Whether the element is on screen or near it: a schedule's slow jobs (L-3, L-4) run only then. */
 export function useOnScreen(ref: RefObject<Element | null>): boolean {
   const [on, setOn] = useState(typeof IntersectionObserver === "undefined");

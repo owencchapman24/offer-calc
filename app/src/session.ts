@@ -92,9 +92,11 @@ export function reducer(s: Session, a: Action): Session {
       const free = LETTERS.find((l) => !s.offers.some((o) => o.letter === l));
       return free ? { ...s, offers: [...s.offers, blankOffer(free)].sort(byLetter) } : s;
     }
-    case "removeOffer": return { ...s, offers: s.offers.filter((o) => o.id !== a.id) };
+    // One offer is enough (docs/v2-plan.md, item 5): the last one stays.
+    case "removeOffer": return s.offers.length > 1 ? { ...s, offers: s.offers.filter((o) => o.id !== a.id) } : s;
     case "loadSamples": return { ...s, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(a.today) };
-    case "startBlank": return { ...s, household: DEFAULT_HOUSEHOLD, offers: (["A", "B"] as Letter[]).map(blankOffer) };
+    // "Start with my offer": one blank offer, A; a second is a click away when there's one to compare.
+    case "startBlank": return { ...s, household: DEFAULT_HOUSEHOLD, offers: [blankOffer("A")], ui: { ...s.ui, offerTab: "A" } };
     case "basis": return { ...s, ui: { ...s.ui, basis: a.basis } };
     case "theme": return { ...s, ui: { ...s.ui, theme: a.theme } };
     case "dismiss": return { ...s, ui: { ...s.ui, dismissed: { ...s.ui.dismissed, [a.hint]: true } } };

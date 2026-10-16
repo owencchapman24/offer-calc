@@ -41,7 +41,7 @@ export async function settled(page: Page) {
  */
 export async function quiet(page: Page) {
   const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true'], "
-    + ".the-work[aria-busy='true']");
+    + ".the-work[aria-busy='true'], .own[aria-busy='true'], .breakdown[aria-busy='true']");
   const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
     .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
   for (let still = 0, tries = 0; still < 2; tries++) {
@@ -92,6 +92,42 @@ async function nearbyWorkedOut(page: Page) {
 export async function openCompare(page: Page) {
   await page.goto("/#/");
   await settled(page);
+}
+
+/** With one offer: its bottom line (A-1) shows, worked out, and the page is quiet. */
+export async function ownSettled(page: Page) {
+  await expect(page.locator("#own .own-body")).toBeVisible({ timeout: 30_000 });
+  await quiet(page);
+}
+
+/** Removes an offer with its ×; on a phone, its tab first. */
+export async function removeOffer(page: Page, letter: string) {
+  await selectOffer(page, letter);
+  await page.getByRole("button", { name: `Remove offer ${letter}` }).click();
+}
+
+/** One offer on its own: the first visit's sample A, with B and C removed, its bottom line pinned and worked out. */
+export async function openAlone(page: Page) {
+  await openCompare(page);
+  await removeOffer(page, "C");
+  await removeOffer(page, "B");
+  await ownSettled(page);
+}
+
+/** "+ Add an offer to compare": the button under the ledger, or on a phone the tabs' +. */
+export async function addOffer(page: Page) {
+  const tabAdd = page.locator(".tab-add");
+  if (await tabAdd.isVisible()) await tabAdd.click();
+  else await page.getByRole("button", { name: "+ Add an offer to compare (up to 3)" }).click();
+}
+
+/** A blank offer's quick fields: a salary, a city (from the list) and a start date a year out. */
+export async function fillOffer(page: Page, letter: string, salary: string, city: string) {
+  await selectOffer(page, letter);
+  await page.locator(`#in-${letter}-salary-annual`).fill(salary);
+  await page.getByRole("combobox", { name: `Offer ${letter} city` }).fill(city);
+  const next = new Date().getFullYear() + 1;
+  await page.locator(`#in-${letter}-startDate`).fill(`${next}-07-01`);
 }
 
 /**

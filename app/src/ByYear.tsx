@@ -6,6 +6,7 @@ import { type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, y
 import type { Action, UiState } from "./session";
 import { niceTicks, useChartWidth } from "./axes";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
+import { placeOf } from "./verdict";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
@@ -16,7 +17,11 @@ import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } fro
 
 /** A chart's units: after rent, in the dollars of the prices picked ("U.S.-avg $", "Charlotte $"). */
 const unit = (basis: Basis, ctx: WorkContext): string => (basis === "colAdjustedTotal" ? `${pricesOf(ctx).unit}, as paid`
-  : basis === "perHour" ? "$ an hour, as paid" : "$, as paid");
+  : basis === "perHour" ? `${placeOf(ctx.results!.view, basis) ? pricesOf(ctx).unit : "$"} an hour, as paid` : "$, as paid");
+
+/** A year's figure as its label says it, with its dollars (condition 1) and, per hour, its period: "U.S.-avg $62,594", "$21.85 an hour in year 2". */
+const said = (ctx: WorkContext, basis: Basis, v: number, n?: number) =>
+  `${placeOf(ctx.results!.view, basis)} ${basis === "perHour" ? `${cents(v)} an hour${n ? ` in year ${n}` : " over your stay"}` : dollars(v)}`.trim();
 
 const short = (x: number, perHour: boolean) =>
   perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
@@ -41,7 +46,7 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
   return (
     <section ref={ref} className={`schedule by-year${staleClass(status)}`} aria-labelledby="l1-title" aria-busy={status === "updating"}>
       <header className="schedule-head">
-        <h2 id="l1-title"><span className="ref">L-1</span> By year</h2>
+        <h2 id="l1-title" tabIndex={-1}><span className="ref">L-1</span> By year</h2>
         {sample && <Stamp>Illustrative samples</Stamp>}
         <StaleNote status={status} />
       </header>
@@ -55,7 +60,8 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
                 title={basis === "perHour" ? "Per hour doesn't add up across years" : undefined} onClick={() => setView({ mode: "running" })}>Running total</button>
             </div>
           </div>
-          <Chart offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} title={title} />
+          <Chart offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} title={title}
+            say={(v, n) => said(ctx, basis, v, n)} />
           <Notes ctx={ctx} />
           <p className="caption">
             Each year is in that year's dollars, as paid; the verdict discounts them to today.{sample ? " (Sample inputs.)" : ""}{" "}
@@ -66,7 +72,8 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
               {table && <>{" · "}<CsvButton table={{ kind: "l1", running: mode === "running" && basis !== "perHour" }} name="L-1, by year" /></>}
             </span>
           </p>
-          {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years} />}
+          {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years}
+            say={(v, n) => said(ctx, basis, v, n)} perHour={(l) => r.view.row.values.perHour?.[r.letters.indexOf(l)] ?? 0} />}
           {table && (
             <p className="caption">Each year ties to L-6, The work, below: every line of it, every payment behind it, and your stay's present value as
               in the rank list.</p>
@@ -84,7 +91,9 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
 const H = 240;
 const M = { top: 14, right: 132, bottom: 30, left: 52 };
 
-function Chart({ offers, basis, units, running, title }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean; title: string }) {
+function Chart({ offers, basis, units, running, title, say }: {
+  offers: ByYearData[]; basis: Basis; units: string; running: boolean; title: string; /** A figure as its label says it. */ say: (v: number, n?: number) => string;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const hintId = useId();
   const width = useChartWidth(box, 640);
@@ -175,7 +184,7 @@ function Chart({ offers, basis, units, running, title }: { offers: ByYearData[];
         {ends.map((e) => (
           <span key={e.letter} className={`end-label offer-${e.letter}`} style={{ left: x(e.n) + 16, top: e.ly - 11 }}>
             <span className="end-letter">{e.letter}</span>{" "}
-            <Fig id={id(e.letter, e.n)} label={`${e.letter}, year ${e.n}, ${fmt(e.value)}`}>{fmt(e.value)}</Fig>
+            <Fig id={id(e.letter, e.n)} label={`${e.letter}, year ${e.n}, ${say(e.value, e.n)}`}>{fmt(e.value)}</Fig>
           </span>
         ))}
         {hover !== null && (
@@ -206,7 +215,10 @@ function Notes({ ctx }: { ctx: WorkContext }) {
 
 // ---- the table view -----------------------------------------------------------------------------
 
-function YearTable({ offers, basis, units, running, years }: { offers: ByYearData[]; basis: Basis; units: string; running: boolean; years: number }) {
+function YearTable({ offers, basis, units, running, years, say, perHour: rate }: {
+  offers: ByYearData[]; basis: Basis; units: string; running: boolean; years: number;
+  /** A figure as its label says it (`said`); each offer's per hour over your stay. */ say: (v: number, n?: number) => string; perHour: (l: Letter) => number;
+}) {
   const perHour = basis === "perHour";
   const fmt = (v: number) => (perHour ? cents(v) : figure(v));
   return (
@@ -223,7 +235,7 @@ function YearTable({ offers, basis, units, running, years }: { offers: ByYearDat
               const k = o.years.findIndex((y) => y.n === n);
               if (k < 0) return <td key={o.letter}>—</td>;
               const v = running ? o.years.slice(0, k + 1).reduce((s, y) => s + y.value, 0) : o.years[k].value;
-              return <td key={o.letter}><Fig id={running ? `run.${o.letter}.${n}` : `ey.${o.letter}.${n}`} label={`${o.letter}, year ${n}, ${fmt(v)}`}>{fmt(v)}</Fig></td>;
+              return <td key={o.letter}><Fig id={running ? `run.${o.letter}.${n}` : `ey.${o.letter}.${n}`} label={`${o.letter}, year ${n}, ${say(v, n)}`}>{fmt(v)}</Fig></td>;
             })}
           </tr>
         ))}
@@ -232,12 +244,12 @@ function YearTable({ offers, basis, units, running, years }: { offers: ByYearDat
         {perHour ? (
           <tr className="rule-double">
             <th scope="row">Your stay</th>
-            {offers.map((o) => <td key={o.letter}><Fig id={`ph.${o.letter}`} label={`${o.letter}'s per hour over your stay`}>per hour</Fig></td>)}
+            {offers.map((o) => <td key={o.letter}><Fig id={`ph.${o.letter}`} label={`${o.letter}'s per hour, ${say(rate(o.letter))} worked`}>per hour</Fig></td>)}
           </tr>
         ) : (
           <tr className="rule-double">
             <th scope="row">Your stay, as paid</th>
-            {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${figure(o.window ?? 0)}`}>{figure(o.window ?? 0)}</Fig></td>)}
+            {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${say(o.window ?? 0)}`}>{figure(o.window ?? 0)}</Fig></td>)}
           </tr>
         )}
       </tfoot>
@@ -260,6 +272,9 @@ function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch
   const offer = ctx.offers.find((o) => o.letter === letter);
   const set = (patch: Partial<{ letter: Letter; year: number }>) => dispatch({ type: "ui", patch: { bridge: { letter, year: n, ...patch } } });
   const money = (v: number) => (v < 0 ? `(${figure(-v)})` : figure(v));
+  // A line's label says its dollars: after rent, the prices picked; the price line, the prices it steps across; the rest, "$".
+  const place = pricesOf(ctx).unit.slice(0, -2);
+  const say = (line: string, v: number) => (line === "total" ? `${place} ${dollars(v)}` : line === "prices" ? figure(Math.abs(v)) : dollars(Math.abs(v)));
   return (
     <div className="bridge" id="bridge">
       <div className="chart-bar">
@@ -289,7 +304,7 @@ function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch
                   {row.gloss && <span className="bridge-gloss">{row.gloss}</span>}
                 </th>
                 <td className="bridge-value">
-                  <Fig id={row.id} label={`${lead ? `${lead} ` : ""}${row.label}, ${money(row.value)}`}>{money(row.value)}</Fig>
+                  <Fig id={row.id} label={`${lead ? `${lead} ` : ""}${row.label}, ${say(row.line, row.value)}`}>{money(row.value)}</Fig>
                   {row.kind === "total" && <span className="tie" aria-hidden="true">&lt;</span>}
                 </td>
               </tr>
@@ -299,8 +314,9 @@ function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch
       </table>
       {b.spend !== undefined && b.saved !== undefined && (
         <p className="bridge-month">
-          = <Fig id={`br.${letter}.${n}.spend`} label={`${dollars(b.spend)} a month to spend after rent`}>{dollars(b.spend)}</Fig> a month to spend after
-          rent + <Fig id={`br.${letter}.${n}.saved`} label={`${dollars(b.saved)} a month saved`}>{dollars(b.saved)}</Fig> a month saved
+          = <Fig id={`br.${letter}.${n}.spend`} label={`${place} ${dollars(b.spend)} a month to spend after rent, in year ${n}`}>{place} {dollars(b.spend)}</Fig> a
+          month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${place} ${dollars(b.saved)} a month saved, in year ${n}`}>{place}{" "}
+            {dollars(b.saved)}</Fig> a month saved, in year {n}
         </p>
       )}
       <p className="caption">

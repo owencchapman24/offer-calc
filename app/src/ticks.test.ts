@@ -56,13 +56,13 @@ describe("with the marks hidden", () => {
     createElement(TheWork, { key: "w", ...w.props }),
   ].map((el) => render(hidden, el)).join("\n");
 
-  it("every figure is the same button, with the same name: \"How A, year 1, 62,594 was worked out (recomputed)\"", () => {
+  it("every figure is the same button, with the same name: \"How A, year 1, U.S.-avg $62,594 was worked out (recomputed)\"", () => {
     const buttons = (html: string) => [...html.matchAll(/<button type="button" class="fig tick-btn[^"]*" data-metric="([^"]+)"[^>]*aria-label="([^"]+)"/g)]
       .map((m) => `${m[1]} ${m[2]}`);
     const shown = buttons(page(false));
     expect(shown.length).toBeGreaterThan(300);
     expect(buttons(page(true))).toEqual(shown);
-    expect(shown).toContain("ey.A.1 How A, year 1, 62,594 was worked out (recomputed)");
+    expect(shown).toContain("ey.A.1 How A, year 1, U.S.-avg $62,594 was worked out (recomputed)");
   });
 
   it("the legends say the marks are hidden, and how to show them; the hint asks for an underlined figure", () => {

@@ -70,7 +70,8 @@ export function Breakeven(p: BreakevenProps) {
         <>
           <p className="tie-scope">
             To tie <Who l={v.winner} />: its {years}-year total {basisPhrase(pricesOf(p.ctx))[v.basis]},{" "}
-            <Fig id="tie.target" label={`${figure(v.target)}, ${v.winner}'s total`}>{figure(v.target)}</Fig> in today's dollars, base case, over your
+            <Fig id="tie.target" label={`${v.basis === "colAdjustedTotal" ? pricesOf(p.ctx).unit : "$"}${figure(v.target)}, ${v.winner}'s total over your stay`}>
+              {figure(v.target)}</Fig> in today's {v.basis === "colAdjustedTotal" ? pricesOf(p.ctx).dollars : "dollars"}, base case, over your
             stay ({longDate(row.window.start)} – {longDate(dayBefore(row.window.end))}). Each line changes one input and leaves the rest as entered.
           </p>
           {r.view.basis === "perHour" && (
@@ -145,7 +146,7 @@ function RentLine({ r, letter, winner, ctx }: { r: RentFlipResult | undefined; l
   return (
     <p className="tie-line tie-or">
       <Who l={winner} /> still wins unless your {city} rent for <Who l={letter} /> is under{" "}
-      <Fig id={`tie.${letter}.rent`} label={`${dollars(to)} a month, the rent that ties ${winner}`}>{dollars(to)}</Fig> a month (now {now}, first
+      <Fig id={`tie.${letter}.rent`} label={`${dollars(to)} a month in the first lease year, the rent that ties ${winner}`}>{dollars(to)}</Fig> a month (now {now}, first
       lease year).
     </p>
   );
@@ -187,7 +188,7 @@ function Cushion({ x, v, ctx }: { x: TieLine & { letter: Letter }; v: TieView; c
       {r && r.outcome === "tie" && (
         <p className="tie-line tie-or">
           <Who l={W} />'s lead goes if your {cityOf(ctx, W)} rent for <Who l={W} /> is over{" "}
-          <Fig id={`tie.${W}.rent`} label={`${dollars(rentTie(r, shownIndexes(detailOf(ctx, W))).to)} a month, the rent at which ${R} ties`}>
+          <Fig id={`tie.${W}.rent`} label={`${dollars(rentTie(r, shownIndexes(detailOf(ctx, W))).to)} a month in the first lease year, the rent at which ${R} ties`}>
             {dollars(rentTie(r, shownIndexes(detailOf(ctx, W))).to)}</Fig> a month (now{" "}
           <Fig id={`in.${W}.costOfLiving.monthlyRent`} label={`${dollars(r.from)}, ${W}'s rent`}>{dollars(r.from)}</Fig>, first lease year).
         </p>

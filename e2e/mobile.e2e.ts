@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { focusCovered, openCompare, settled, twoFrames } from "./lib/app";
+import { focusCovered, openAlone, openCompare, settled, twoFrames } from "./lib/app";
 
 // Phones and tablets (docs/ui-design.md §3.2, slice 7 stop B): the phone's offer tabs, and the sticky verdict bar, at the
 // bottom on a phone and at the top on a tablet, which never hides the focused element (WCAG 2.4.11). Run in the config's
@@ -31,11 +31,12 @@ test.describe("phone", () => {
 
   test("offer tabs: one offer at a time; arrow keys, Home and End choose; + adds an offer; × removes one", async ({ page }) => {
     await openCompare(page);
-    const tabs = page.getByRole("tablist", { name: "Offers" }).getByRole("tab");
+    // The ledger's tabs (the breakdowns' switch further down is "Offers, one at a time").
+    const tabs = page.getByRole("tablist", { name: "Offers", exact: true }).getByRole("tab");
     await expect(tabs).toHaveCount(3);
     const tab = (l: string) => page.locator(`#offer-tab-${l}`);
     await expect(tab("A")).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "offer-tab-A");
+    await expect(page.locator("#offer-panel")).toHaveAttribute("aria-labelledby", "offer-tab-A");
     await expect(page.locator("#in-A-salary-annual")).toBeVisible();
     await expect(page.locator("#in-B-salary-annual")).toBeHidden();
 
@@ -89,7 +90,7 @@ test.describe("phone", () => {
     const box = (await bar.boundingBox())!;
     expect(box.y + box.height).toBeCloseTo(page.viewportSize()!.height, 0);
     const go = bar.getByRole("button");
-    await expect(go).toHaveAccessibleName(/^[ABC] leads by \+\$[\d,]+ a month · stay 4 yrs ?\. Go to the lead schedule$/);
+    await expect(go).toHaveAccessibleName(/^[ABC] leads by U\.S\.-avg \+\$[\d,]+ a month · stay 4 yrs ?\. Go to the lead schedule$/);
 
     // Typing in a field raises the keyboard: the bar steps aside, and comes back after.
     await page.locator("#in-A-salary-annual").focus();
@@ -142,10 +143,10 @@ test.describe("tablet", () => {
 
   test("the verdict bar sits under About you, sticks to the top, and goes to the lead", async ({ page }) => {
     await openCompare(page);
-    await expect(page.getByRole("tablist")).toHaveCount(0); // every offer shows
+    await expect(page.getByRole("tablist", { name: "Offers", exact: true })).toHaveCount(0); // every offer shows
     const bar = page.locator(".verdict-bar.is-top");
     await expect(bar).toBeVisible();
-    await expect(bar).toContainText(/^[ABC] leaves you about \$[\d,]+ a month more than [ABC], after rent, at U\.S\. prices · stay 4 years/);
+    await expect(bar).toContainText(/^[ABC] leaves you about U\.S\.-avg \$[\d,]+ a month more than [ABC] over your stay, after rent, at U\.S\. prices · stay 4 years/);
     const about = (await page.locator(".about").boundingBox())!;
     expect((await bar.boundingBox())!.y).toBeGreaterThan(about.y + about.height - 1);
     await page.evaluate(() => window.scrollTo(0, 1200));
@@ -167,4 +168,19 @@ test.describe("tablet", () => {
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(400);
     expect(await tabThrough(page, 50, "Shift+Tab")).toBe(50);
   });
+});
+
+// One offer (docs/v2-plan.md, item 5): the bar shows its bottom line with its dollars, and goes to it.
+test("with one offer, the bar shows its bottom line with its dollars, and goes to A-1", async ({ page }) => {
+  await openAlone(page);
+  const place = isPhone(page) ? "bottom" : "top";
+  const bar = page.locator(`.verdict-bar.is-${place}`);
+  await expect(bar).toHaveCount(1);
+  await expect(page.locator(".verdict-bar")).toHaveCount(1); // the comparison's bar has gone
+  await expect(bar).toContainText(isPhone(page) ? /^A New York \$[\d,]+ a month · stay 4 yrs/ : /^A New York \$[\d,]+ a month over your stay, after rent · stay 4 years/);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await bar.getByRole("button").click();
+  await expect(page.locator("#own-title")).toBeFocused();
+  await twoFrames(page);
+  expect(await focusCovered(page)).toBeNull();
 });

@@ -121,11 +121,11 @@ describe("CSV: plain numbers, units in the headers", () => {
     const years = csvFigures(build(ctx, { kind: "l6", letter: "C", part: "years" }).rows);
     expect(years.filter((f) => !/Hour\./.test(f.id)).every((f) => /^-?\d+$/.test(f.num))).toBe(true);
     const tax = build(ctx, { kind: "l6", letter: "A", part: "tax" });
-    const rate = tax.rows.find((r) => String(r[2]).startsWith("The offer's tax ÷ its pay"))!;
-    expect(rate[2]).toBe("The offer's tax ÷ its pay (%)");
+    const rate = tax.rows.find((r) => /^The offer's tax ÷ its \d{4} pay/.test(String(r[2])))!;
+    expect(rate[2]).toBe("The offer's tax ÷ its 2026 pay (%)");
     expect((rate[8] as { num: string }).num).toMatch(/^\d+\.\d{2,8}$/);
     const l2 = build(ctx, { kind: "l2" });
-    expect(l2.header).toContain("Bear vs base (%)");
+    expect(l2.header).toContain("Bear vs base, over your stay (%)");
     expect(csvFigures(l2.rows).filter((f) => f.id.startsWith("drop.")).every((f) => /^-?\d+$/.test(f.num))).toBe(true);
   });
   it("reads back as a table: every row the header's width, labels with commas intact", () => {

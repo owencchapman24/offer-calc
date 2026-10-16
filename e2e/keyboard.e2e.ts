@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loadSchedules, openCompare, openSection, settled } from "./lib/app";
+import { addOffer, fillOffer, loadSchedules, openCompare, openSection, ownSettled, settled } from "./lib/app";
 
 // What the scan can't see (docs/ui-slices-4-8-plan.md, slice 7, "known before the scan"): what a screen reader hears, and
 // where focus goes. Each was a problem before slice 7; these keep them fixed.
@@ -12,7 +12,8 @@ test("the verdict is announced as one sentence once the inputs rest, not read wh
   // The first verdict is on the page as it loads: nothing is announced.
   await expect(live).toHaveText("");
   await page.locator("#in-B-salary-annual").fill("400000");
-  await expect(live).toHaveText(/^B leaves you about \$[\d,]+ a month more than [AC], after rent, at U\.S\. prices\.$/, { timeout: 10_000 });
+  await expect(live).toHaveText(/^B leaves you about U\.S\.-avg \$[\d,]+ a month more than [AC] over your stay, after rent, at U\.S\. prices\.$/,
+    { timeout: 10_000 });
   // A change that leaves the verdict as it is says nothing new.
   const said = await live.textContent();
   await page.getByLabel("Offer A name").fill("Bank");
@@ -57,7 +58,7 @@ test("hiding tickmarks: the marks go; each figure stays a button, with its name,
   await openCompare(page);
   const hero = page.locator('[data-metric="hero"]');
   const name = (await hero.getAttribute("aria-label"))!;
-  expect(name).toMatch(/^How \$[\d,]+ a month was worked out \(recomputed\)$/);
+  expect(name).toMatch(/^How U\.S\.-avg \$[\d,]+ a month over your stay was worked out \(recomputed\)$/);
   // The setting is a radio group in the footer, beside the theme's.
   const hide = page.getByRole("radio", { name: "Hide tickmarks" });
   await page.getByRole("radio", { name: "Show tickmarks" }).focus();
@@ -147,4 +148,54 @@ test("L-4's slider says the date and what each offer keeps, as its panel shows",
   await expect(page.locator(".leaving")).toHaveAttribute("data-ready", "1");
   await expect(slider).toHaveAttribute("aria-valuetext", /^[A-Z][a-z]{2} \d{1,2}, \d{4}\. A keeps \$[\d,]+, B \$[\d,]+, C \$[\d,]+\.$/);
   await expect(slider).toHaveAttribute("aria-valuetext", await panel());
+});
+
+// The offer breakdown (docs/v2-plan.md, item 5, "Accessibility"): the offer switch is a tab list; focus goes where it should as
+// offers come and go; the live region says one offer's bottom line, then the verdict once a comparison appears.
+
+test("the breakdowns' offer switch is a tab list: arrow keys, Home and End choose; one tab stop; the heading names the offer", async ({ page }) => {
+  await openCompare(page);
+  const tab = (l: string) => page.locator(`#own-tab-${l}`);
+  await tab("A").focus();
+  await expect(page.locator("#breakdown-title")).toHaveText("A · NYC bank, on its own");
+  await page.keyboard.press("ArrowRight");
+  await expect(tab("B")).toBeFocused();
+  await expect(tab("B")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#breakdown-title")).toHaveText("B · Charlotte corp, on its own");
+  await expect(page.locator("#own-panel")).toHaveAttribute("aria-labelledby", "own-tab-B");
+  await page.keyboard.press("End");
+  await expect(tab("C")).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(tab("A")).toBeFocused(); // it wraps
+  await page.keyboard.press("Home");
+  await expect(tab("A")).toHaveAttribute("aria-selected", "true");
+  await expect(tab("B")).toHaveAttribute("tabindex", "-1");
+  // "Its breakdown" in the ledger's On its own row opens that offer's tab.
+  await page.getByRole("button", { name: "C's breakdown" }).click();
+  await expect(tab("C")).toBeFocused();
+  await expect(tab("C")).toHaveAttribute("aria-selected", "true");
+  // And "Skip to the comparison" goes on to L-1's heading.
+  await page.getByRole("button", { name: "Skip to the comparison" }).click();
+  await expect(page.locator("#l1-title")).toBeFocused();
+  await settled(page);
+});
+
+test("down to one offer, focus goes to its bottom line and it's said once; a second offer leaves focus be, and the verdict is said once", async ({ page }) => {
+  await openCompare(page);
+  const live = page.locator("#verdict-live");
+  await page.getByRole("button", { name: "Remove offer C" }).click();
+  await expect(page.locator("#offers-title")).toBeFocused();
+  await page.getByRole("button", { name: "Remove offer B" }).click();
+  await expect(page.locator("#own-title")).toBeFocused();
+  await ownSettled(page);
+  await expect(live).toHaveText(/^A leaves you about New York \$[\d,]+ a month over your stay, after rent: New York \$[\d,]+ to spend and New York \$[\d,]+ saved, in today's dollars\.$/,
+    { timeout: 10_000 });
+  const add = page.getByRole("button", { name: "+ Add an offer to compare (up to 3)" });
+  await addOffer(page);
+  await expect(add).toBeFocused(); // adding an offer doesn't move focus
+  await expect(page.locator("#own-title")).toBeVisible(); // A's breakdown stays pinned while B is blank
+  await fillOffer(page, "B", "300000", "Charlotte-Concord-Gastonia, NC-SC");
+  await settled(page);
+  await expect(live).toHaveText(/^[AB] leaves you about U\.S\.-avg \$[\d,]+ a month more than [AB] over your stay, after rent, at U\.S\. prices\.$/,
+    { timeout: 10_000 });
 });

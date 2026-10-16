@@ -7,7 +7,7 @@ import { derive, highlightedSentence, metricSection } from "./derive";
 import { type MetricId, metricKind, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import { SECTIONS } from "./sections";
-import { context, footsAsDisplayed, renderAllInputs, renderPage, renderWork, withLeave, withTies, withWork } from "./testing";
+import { context, footsAsDisplayed, renderAllInputs, renderBreakdowns, renderPage, renderWork, withLeave, withTies, withWork } from "./testing";
 import { dayBefore, figure } from "./text";
 import { extraHoursView } from "./verdict";
 import type { OfferInput } from "../../src/offer/types";
@@ -205,8 +205,8 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
 
   it("the sentence: C holds up best and wins every scenario; A has the most to lose, $1,250 a month (−17%)", () => {
     // Bear: C 313,862 - A 258,793 = 55,070 / 43.5191 = $1,265 a month. A's drop: 313,175 - 258,793 = 54,382 / 43.5191 = $1,250 (17%).
-    expect(text(page(ctx))).toContain("C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month. "
-      + "A has the most to lose: $1,250 a month below its base case (−17%), because its bonuses and promotion carry the risk.");
+    expect(text(page(ctx))).toContain("C holds up best, and wins in every scenario. In the bear case it leads A by U.S.-avg $1,265 a month over your stay. "
+      + "A has the most to lose: U.S.-avg $1,250 a month below its base case over your stay (−17%), because its bonuses and promotion carry the risk.");
   });
 
   it("at 5 years A wins only the bull case, and the sentence says so", () => {
@@ -304,7 +304,7 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       const six = withLeave(tied.ctx);
       const end = withLeave(tied.ctx, dayBefore(plain.results!.view.row.window.end));
       checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx)
-        + renderPage(six.ctx, { leave: six.props, ties: tied.props }));
+        + renderPage(six.ctx, { leave: six.props, ties: tied.props }) + renderBreakdowns(six.ctx));
       checkAll(end.ctx, renderPage(end.ctx, { leave: end.props, ties: tied.props }));
       // L-6 open on each offer, with its payments and tax years: every line, payment and tax figure.
       const worked = withWork(six.ctx).ctx;
