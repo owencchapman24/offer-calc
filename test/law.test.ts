@@ -52,6 +52,12 @@ describe("the law as published", () => {
     // Washington at $200,000: WA Cares 0.58% of all wages, 1,160.00, plus paid leave 0.80716% of the base,
     // 192,300 × 0.0080716 = 1,552.16868; 2,712.16868, to the cent 2,712.17.
     expect(tax("WA", 200_000).statePayrollTax).toBe(2_712.17);
+    // Every state whose paid leave is capped at the base (test/params.test.ts has the seven), at $250,000: CO 0.44% × 192,300 =
+    // 846.12; CT and ME 0.5% = 961.50; DE 0.4% = 769.20; MA 0.46% = 884.58; OR 0.6% = 1,153.80, plus its transit tax 0.1% ×
+    // 250,000 = 250.00, 1,403.80; WA 0.80716% = 1,552.16868, plus WA Cares 0.58% × 250,000 = 1,450.00, 3,002.16868, to the cent
+    // 3,002.17.
+    const at250k = Object.fromEntries(["CO", "CT", "DE", "MA", "ME", "OR", "WA"].map((s) => [s, tax(s, 250_000).statePayrollTax]));
+    expect(at250k).toEqual({ CO: 846.12, CT: 961.5, DE: 769.2, MA: 884.58, ME: 961.5, OR: 1_403.8, WA: 3_002.17 });
   });
 
   it("works out the samples over 5 years (tax years 2026-2031), every total and every year's tax a finite figure", () => {

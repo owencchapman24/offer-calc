@@ -144,7 +144,7 @@ describe("projected years (federal indexed, state held at 2026)", () => {
       paramsForYear(year, { inflation: 0.025 })).stateIncomeTax;
     expect(ny(2027)).toBe(ny(2026));
   });
-  it("state payroll caps tied to the SS wage base follow it: WA at $300k", () => {
+  it("state payroll caps tied to the SS wage base follow it: WA at $300k (every such state: below)", () => {
     // WA Cares 0.58% (uncapped) + WA PFML 0.80716% up to the SS wage base.
     const wa = (year: number) => computeTaxes({ year, filingStatus: "single", wages: 300_000, state: "WA" },
       paramsForYear(year, { inflation: 0.025 })).statePayrollTax;
@@ -173,5 +173,55 @@ describe("projected years (federal indexed, state held at 2026)", () => {
   });
   it("rejects params for a different year than the input", () => {
     expect(() => computeTaxes({ year: 2026, filingStatus: "single", wages: 1, state: "TX" }, at(2027, 0))).toThrow();
+  });
+});
+
+describe("paid leave capped at the Social Security wage base", () => {
+  // The seven states whose paid-leave contribution stops at the year's SS wage base (wageCap: "ssWageBase", states2026.ts). In
+  // each it's the only capped payroll tax: OR's statewide transit tax (0.1%) and WA Cares (0.58%) are on every dollar.
+  const TIED: Record<string, number> = { CO: 0.0044, CT: 0.005, DE: 0.004, MA: 0.0046, ME: 0.005, OR: 0.006, WA: 0.0080716 };
+  const UNCAPPED: Record<string, number> = { OR: 0.001, WA: 0.0058 };
+  const payroll = (year: number, inflation: number, state: string, wages: number, spouseWages?: number) =>
+    computeTaxes({ year, filingStatus: spouseWages === undefined ? "single" : "joint", wages, state,
+      ...(spouseWages === undefined ? {} : { spouseWages }) }, paramsForYear(year, { inflation })).statePayrollTax;
+
+  it("are these seven, at these rates: a state newly tied to the base (or no longer) fails here", () => {
+    const tied = Object.entries(paramsForYear(2026).states)
+      .flatMap(([code, s]) => (s.payroll ?? []).filter((c) => c.wageCap === "ssWageBase").map((c) => [code, c.rate] as const));
+    expect(Object.fromEntries(tied)).toEqual(TIED);
+  });
+
+  it("2026: each stops at $184,500 (hand-checked at $250,000)", () => {
+    // CO 0.44% × 184,500 = 811.80; CT and ME 0.5% = 922.50; DE 0.4% = 738.00; MA 0.46% = 848.70; OR 0.6% = 1,107.00, plus transit
+    // 0.1% × 250,000 = 250.00, 1,357.00; WA 0.80716% = 1,489.2102, plus WA Cares 0.58% × 250,000 = 1,450.00, 2,939.2102, to the
+    // cent 2,939.21.
+    const at250k = Object.fromEntries(Object.keys(TIED).map((s) => [s, payroll(2026, 0.025, s, 250_000)]));
+    expect(at250k).toEqual({ CO: 811.8, CT: 922.5, DE: 738, MA: 848.7, ME: 922.5, OR: 1_357, WA: 2_939.21 });
+  });
+
+  it("every year 2026-2031, at 0%, 2.5% and 10% inflation, each stops at that year's base, for each worker", () => {
+    for (let year = 2026; year <= 2031; year++) {
+      for (const inflation of [0, 0.025, 0.1]) {
+        const base = paramsForYear(year, { inflation }).payroll.socialSecurityWageBase;
+        for (const [state, rate] of Object.entries(TIED)) {
+          const other = UNCAPPED[state] ?? 0;
+          // Each worker's wages pay the capped rate up to the base and the uncapped rate on all of them.
+          const owed = (...workers: number[]) => workers.reduce((t, w) => t + rate * Math.min(w, base) + other * w, 0);
+          const where = `${state} ${year} at ${inflation * 100}% (base ${base})`;
+          for (const wages of [base - 1_000, base, base + 1_000, 2 * base]) {
+            expect(Math.abs(payroll(year, inflation, state, wages) - owed(wages)), `${where}, $${wages}`).toBeLessThanOrEqual(0.005 + 1e-9);
+          }
+          // Joint, both over the base: each is capped on their own.
+          const [you, spouse] = [1.5 * base, 1.2 * base];
+          expect(Math.abs(payroll(year, inflation, state, you, spouse) - owed(you, spouse)), `${where}, joint`).toBeLessThanOrEqual(0.005 + 1e-9);
+        }
+      }
+    }
+  });
+
+  it("a projected year's base, hand-checked: 2028 at 2.5% is 184,500 × 1.025² = 193,840.3125 (the tests' frozen law)", () => {
+    // CO at $250,000: 0.44% × 193,840.3125 = 852.8973..., to the cent 852.90.
+    expect(paramsForYear(2028, { inflation: 0.025 }).payroll.socialSecurityWageBase).toBeCloseTo(193_840.3125, 6);
+    expect(payroll(2028, 0.025, "CO", 250_000)).toBe(852.9);
   });
 });
