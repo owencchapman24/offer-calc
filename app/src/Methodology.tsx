@@ -76,7 +76,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               minus the health costs you'd pay out of pocket (<Ref id="M-5" />).</li>
             <li><strong>− Rent &amp; prices ({p.phrase})</strong>: minus rent, with what's left to spend priced as in
               {" "}{p.city}, plus what you save at face value (<Ref id="M-6.3" />). This is the default verdict.</li>
-            <li><strong>Per hour</strong>: the step-3 total, as paid, divided by the hours you'd work (<Ref id="M-5.4" />).</li>
+            <li><strong>Per hour</strong>: the step-4 total, after rent, as paid, divided by the hours you'd work (<Ref id="M-5.4" />).</li>
           </ol>
           <p>
             Every payment and vest is a dated event. Tax is worked out per calendar year, the way the law works; the events are
@@ -219,8 +219,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-5.4">
           <p>
             Hours are weekly hours times weeks a year (50 unless entered), prorated for a partial year and counted only inside
-            your stay. Per hour is the step-3 total, as paid, divided by those hours. It isn't discounted, and it's a lens rather
-            than the verdict: hours are the softest input, and people trade hours for experience on purpose.
+            your stay. Per hour is the step-4 total ({p.phrase}: <Ref id="M-6.3" />), as paid, divided by those hours. It isn't
+            discounted, and it's a lens rather than the verdict: hours are the softest input, and people trade hours for experience
+            on purpose.
           </p>
         </Section>
         <Section id="M-5.5">

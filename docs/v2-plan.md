@@ -384,7 +384,7 @@ Item numbers are stable IDs; the order is separate.
 
 **Before stop 5A:** the audit's "fix before v2" items this item leans on (`docs/audit-2026-10.md`; IDs prefixed "audit" where they'd
 read as this plan's decisions). Each is done, so 5A waits only on the testers' first question. The audit's other open "fix before v2"
-items (T1, D1, D3, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
+items (T1, D3, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
 agreeing.
 
 | Audit | What item 5 needs from it | Done |
@@ -395,6 +395,7 @@ agreeing.
 | H1 | The hooks linter, before the breakdown's stateful parts (its switch, A-4's last day) | #56 |
 | D7 | The two design docs this item changes, marked historical | #57 |
 | D8 | This plan, brought up to date | #58 |
+| D1 | Per hour documented as the code works it out (the after-rent total), since A-1's per hour opens M-5.4 | #60 |
 
 ### The scope change: §1, evaluator-first
 
