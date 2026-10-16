@@ -9,15 +9,17 @@ behind every figure.
 - **The tool informs the decision and shows its work; you make the call** (v2's D1). It never recommends a job, calls an offer low,
   or gives financial advice.
 - **The direction: evaluator-first** (approved 2026-10-15, `docs/v2-plan.md` item 5, B1). Every offer gets its own standalone
-  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **What's built (v1) is
-  comparison-first:** the app needs two complete offers before it shows anything. Item 5 changes that, and it's next.
+  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **Built so far: stop 5A**
+  (2026-10-15): one offer is enough, and every offer has its bottom line (A-1) over its own stay; 5B and 5C build the rest of the
+  breakdown (A-2 to A-7, one offer's document, the first visit).
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
-## 2. Current state (2026-10-15)
+## 2. Current state (2026-10-16)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (so far 2027's HSA limits and Social Security wage base).
-- **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim). How each slice differs from the design:
-  `docs/ui-design.md` §12.
+- **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
+  A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test). How
+  each differs from the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
@@ -35,8 +37,10 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: v2 item 5, the offer breakdown** (`docs/v2-plan.md`). Stop 5A starts after the testers' answer to item 5's first question
-("how many offers did you actually have?"). The audit's items it leans on are done (`v2-plan.md`, "Before stop 5A").
+**Next: v2 item 5's stop 5B** (`docs/v2-plan.md`, "Review stops"): A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved
+into A-2, the comparison's cross-foots and the step between windows, CSV names, print, M-1.1, M-4, M-6.3, M-9. Stop 5A was built on
+2026-10-15 before the testers' answer to item 5's first question ("how many offers did you actually have?"), at the user's word; record
+the answer when it comes.
 
 **The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
@@ -149,6 +153,11 @@ section 2's and the plan's in step):
     main chunk would both import goes in an existing main-thread module (as `CsvButton` lives in `figures.tsx`).
   - New code loads on first use (`app/src/lazy.ts`, or a schedule's `useLoadNear`); new data loads where it's used (the worker, or a
     same-origin fetch), never in a JavaScript chunk. v2's rule: at most 0.5 kB gzip more on the main thread per item.
+  - What can't show before the worker's first answer loads beside it, once the first contentful paint is recorded
+    (`useLoadAfterPaint`, `lazy.ts`): the breakdowns (`Breakdown.tsx`, A-1, the "On its own" row, the one-offer bars; `ownSlots`
+    places them, so `App.tsx` stays light) and the lead's verdict (`LeadVerdict.tsx`).
+    Neither imports `Lead.tsx` (it imports `Tickmarks.tsx`: the main chunk split when one did), so the problems list reaches A-1 as a
+    node from `App.tsx`.
 - **The year figures as shown:** every figure is rounded once, where it's worked out, and a subtotal is the sum of the rounded items
   above it, so every column adds up as displayed and a figure shown in two places is one figure (`footing.ts`). Every Show the work
   foots as displayed exactly (`footsAsDisplayed`); a present value's total stays the engine's, with one line taking the rounding
@@ -174,8 +183,12 @@ section 2's and the plan's in step):
 - **Samples:** `src/samples.ts` keeps fixed dates (start 2026-07-13) for the table script and tests; the app moves them forward by
   whole years to start on or after today, so present values are from today. They're stamped illustrative wherever they appear.
 - **Today:** the app passes the user's local date as `valuationDate`.
-- **Words:** labels follow "Prices in" (`app/src/prices.ts`). Under v2's B13, every rate and share states its period, and under
-  condition 1 every after-rent figure names its dollars (`docs/v2-plan.md`, item 5's conditions).
+- **Words:** labels follow "Prices in" (`app/src/prices.ts`). Under v2's B13, every rate and share states its period ("a month over
+  your stay", "of its 2027 pay"), and under condition 1 every figure names its dollars: after rent the place's ("U.S.-avg $7,196",
+  "New York $6,671": on the figure or its column's head, in its accessible name, its Show the work, its CSV header and the copied
+  document), "$" before rent and prices; an offer's own city's dollars only inside its breakdown (`docs/v2-plan.md`, item 5's
+  conditions). `labels.test.ts` checks every figure the app renders, the CSVs and the document; a new figure needs its entry in its
+  `expectOf`.
 - **Accessibility:** WCAG 2.2 A and AA, checked by the scan in every state (`e2e/a11y.e2e.ts`); an exception needs a rule, a
   selector and a reason in `test/a11y-exceptions.json` (none today). Behaviors to keep:
   - the verdict is announced in one polite live region (`#verdict-live`), one sentence a second after the last result, only when
@@ -226,8 +239,9 @@ section 2's and the plan's in step):
   when it's paid. The engine defaults to 5 years; the UI's stay to 4.
 - **Stay length:** a stay of N years is the window, not a leave date: pay after it isn't counted, and its last calendar year is taxed
   as though you kept earning through December. Clawbacks from leaving belong to the leave-date sweep (L-4).
-- **A breakdown's stay** (v2 item 5, B3, not built): its own start, so adding an offer never changes another's breakdown; the
-  comparison shows the step to its window where starts differ.
+- **A breakdown's stay** (v2 item 5, B3, built at 5A): its own start, so adding an offer never changes another's breakdown (the
+  worker projects each offer over its own stay, remembered by its inputs; the comparison takes that projection where an offer starts
+  on its first day). The step from a breakdown to the comparison's window, where starts differ, is 5B's.
 - **Per month:** a present-value gap restated as the level month-end amount over the window with the same present value. A lead
   under 3% of the leader's value is a close call.
 - **Per hour:** the after-rent total, nominal, ÷ hours worked in the window, when every offer has a city (always, in the app); total
@@ -317,7 +331,8 @@ section 2's and the plan's in step):
 
 | Schedule | Component | View model | Unit tests |
 |---|---|---|---|
-| L, the verdict | `Lead.tsx` | `verdict.ts` | `metrics.test.ts` |
+| A-1, an offer's bottom line, and the "On its own" row | `Breakdown.tsx` | `breakdownModel.ts` | `breakdown.test.ts` |
+| L, the verdict | `Lead.tsx`, `LeadVerdict.tsx` | `verdict.ts` | `metrics.test.ts` |
 | L-1, by year, and the bridge | `ByYear.tsx` | `byYearModel.ts`, `footing.ts` | `metrics.test.ts`, `l6.test.ts` |
 | L-2, if things go badly | `Risk.tsx` | `cases.ts` | `metrics.test.ts` |
 | L-3, what it would take | `Breakeven.tsx` | `breakevenModel.ts` | `l3.test.ts` |
@@ -326,14 +341,16 @@ section 2's and the plan's in step):
 | L-6, the work | `TheWork.tsx` | `workpaper.ts` | `l6.test.ts` |
 
 - **Page:** `main.tsx`, `App.tsx` (routes `#/`, `#/method`, `#/data`; print; Copy as document's button), `Recovery.tsx` (the error
-  boundary), `About.tsx` (About you), `Ledger.tsx` (the offers' inputs, the phone's tabs), `Later.tsx` (L-1 to L-6, each loaded as
-  you scroll toward it), `Methodology.tsx` (`#/method`, M-1 to M-13), `Data.tsx` (`#/data`: export, import, delete).
+  boundary), `About.tsx` (About you), `Ledger.tsx` (the offers' inputs, the phone's tabs, the foot row's slot), `Later.tsx` (the
+  breakdowns and the verdict, loaded once the page has first painted; L-1 to L-6, each loaded as you scroll toward it), `Methodology.tsx` (`#/method`, M-1
+  to M-13), `Data.tsx` (`#/data`: export, import, delete).
 - **Inputs:** `fields.tsx`, `rows.tsx` (quick mode), `Detailed.tsx`, `editors.tsx`, `controls.tsx` (detailed mode); `help.ts`,
   `quickHelp.ts`, `helpText.ts` (each field's name and help); `defaults.ts` (the defaults registry); `summary.ts`; `presets.ts`;
   `comparability.ts` (a cost counted for some offers but not others).
 - **State:** `model.ts` (the offer draft ↔ `OfferInput`, the samples), `session.ts` (the session, schema 3, in localStorage under
   `offer-calc:v1`), `exchange.ts` (JSON export and import).
-- **The worker:** `engine.worker.ts`, `compute.ts` (the fast lane: per edit), `slowJobs.ts` (L-3's and L-4's jobs, L-6's payments),
+- **The worker:** `engine.worker.ts`, `compute.ts` (the fast lane: per edit; each offer's breakdown, remembered by its inputs, and with
+  two or more the comparison), `slowJobs.ts` (L-3's and L-4's jobs, L-6's payments),
   `jobs.ts` (the two lanes), `protocol.ts` (messages), `useEngine.ts` (debounced 200 ms, stale results dropped).
 - **Show the work:** `figures.tsx` (`Fig`, `TickButton`, `CsvButton`), `Tickmarks.tsx` (`WorkProvider`, the popover), `metrics.ts`
   (metric ids, tickmark kinds, the rent note), `derive.ts` (the derivations, loaded on first use), `sections.ts` (methodology ids).
@@ -348,7 +365,9 @@ section 2's and the plan's in step):
 - every figure on the page: `metrics.test.ts` (each tickmark's kind, section and derivation; the hero and the bridge against the
   design's worked examples), `l6.test.ts` (L-6, L-1 and the bridge footing and tying), `display.test.ts` and `properties.test.ts`
   (property tests over generated offers: every derivation foots as displayed, no NaN, one figure reads the same everywhere; an
-  `it.fails` marks a property a known bug breaks), `prices.test.ts` (every label follows "Prices in");
+  `it.fails` marks a property a known bug breaks; one offer on its own too), `prices.test.ts` (every label follows "Prices in"),
+  `labels.test.ts` (every figure names its dollars, every rate its period, no two offers' own-city figures side by side),
+  `breakdown.test.ts` (A-1 against the plan's worked example, the worker's per-offer job, one-offer sessions);
 - each schedule and output: `l3`, `leave` (L-4), `l5`, `csv`, `copydoc` (each stated calculation), `ticks`, `names` (buttons' names),
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
@@ -415,11 +434,11 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Planned, not built (step 0 built) |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5's stop 5A built; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |
-| `docs/ui-design.md` | The UI design (rev 3) and §12, how each slice was built | Historical, with §12 as built; rev 4 comes with v2's stop 5A |
+| `docs/ui-design.md` | The UI design (rev 4: §1 evaluator-first) and §12, how each slice and stop was built | Historical, except §1 (current); §12 as built |
 | `docs/offer-model.md` | The offer model's design (rev 3) | Historical; `src/offer/types.ts` is authoritative |
 | `docs/ui-slices-4-8-plan.md`, `docs/slice-3-plan.md`, `docs/copy-as-document-plan.md` | Plans, each built (the last with `copy-as-document-sample.html`) | Done; `slice-3-plan.md`'s public-repo settings (item 7) still apply |
 | `docs/nvda-walkthrough.md` | The screen-reader script | Needs D11's updates before it's run |
