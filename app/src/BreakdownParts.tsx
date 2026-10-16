@@ -230,7 +230,8 @@ function BridgeView({ ctx, letter, n, prices }: { ctx: WorkContext; letter: Lett
       </table>
       {b.spend !== undefined && b.saved !== undefined && (
         <p className="bridge-month">
-          = <Fig id={`br.${letter}.${n}.spend`} label={`${inDollars(b.city!, b.spend)} a month to spend after rent, in year ${n}`}>{dollars(b.spend)}</Fig> a
+          {/* Where the bridge steps on to the prices picked, the month restates the line at its own prices, not the last line. */}
+          {b.rows.some((r) => r.line === "total") ? `After rent at ${letter}'s own prices ` : ""}= <Fig id={`br.${letter}.${n}.spend`} label={`${inDollars(b.city!, b.spend)} a month to spend after rent, in year ${n}`}>{dollars(b.spend)}</Fig> a
           month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${inDollars(b.city!, b.saved)} a month saved, in year ${n}`}>
             {dollars(b.saved)}</Fig> a month saved, in year {n}, in {b.city} dollars
         </p>

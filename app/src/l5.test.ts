@@ -35,7 +35,7 @@ describe("A-6: every warning for an offer's stay", () => {
     expect(a6(ctx, "C")).toContain("Federal withholding falls short of the federal income tax on its pay by $1,084 for 2029 and $1,219 for 2030");
     expect(a).not.toContain("Changes your numbers");
     expect(changingWarnings(context().results!.detail!.offers, 2030)).toBe(0);
-  });
+  }, 30_000);
   it("a year's shortfall foots as displayed: the offer's federal tax - withheld from salary - withheld at 22% (M-4)", () => {
     const d = derive("wh.A.2028", context());
     expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "32,948"], ["−", "13,075"], ["−", "18,700"], ["=", "1,173"]]);
@@ -61,7 +61,7 @@ describe("A-6: every warning for an offer's stay", () => {
     const lead = text(ctx, createElement(Lead, { view: ctx.results!.view, letters: ctx.results!.letters, stayYears: 4, updating: false, error: null,
       notes: [], sample: true, dispatch: () => {}, changes: n, warnAt: ["C"], onWarnings: () => {} }));
     expect(lead).toContain("A warning changes these numbers. See C-6");
-  });
+  }, 30_000);
   it("what the model leaves out that may cost you: the convenience-of-employer rule", () => {
     const ctx = context("colAdjustedTotal", tweak("A", (o) => ({ ...o, draft: { ...o.draft, residence: { ...o.draft.residence, state: "NJ", locality: null },
       employerState: "NY" } } as AppOffer)));

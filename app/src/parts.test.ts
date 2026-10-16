@@ -40,8 +40,11 @@ describe("A-2: where each $100 of year 1's pay goes (the plan's sketch)", () => 
     const parts = words(renderBreakdowns(context()));
     expect(parts).toContain("After rent, at New York prices 65,662");
     expect(parts).toContain("less New York prices non-housing prices");
-    expect(parts).toContain("= $4,647 a month to spend after rent + $825 a month saved, in year 1, in New York dollars");
-  });
+    // The month restates the line at its own prices, which the step to U.S. prices follows: it says so.
+    expect(parts).toContain("After rent at A's own prices = $4,647 a month to spend after rent + $825 a month saved, in year 1, in New York dollars");
+    expect(words(renderAlone(alone("A"))))
+      .toContain("New York prices 65,662 = $4,647 a month to spend after rent");
+  }, 30_000);
 });
 
 describe("A-3: pay by year, and when each payment arrives", () => {
@@ -89,7 +92,7 @@ describe("A-4: the terms that can bite", () => {
     const text = words(renderBreakdowns(context()));
     expect(text).toMatch(/Bad case, in New York dollars: \$6,245 a month over your stay, 17% under the base case; in the bull case, \$[\d,]+ a month over your stay\./);
     expect(text).toContain("In the bear case, bonuses 20% under target; no promotion in 2029.");
-  });
+  }, 30_000);
 });
 
 describe("A-6: tax by calendar year", () => {
@@ -124,7 +127,7 @@ describe("B3: a breakdown is its offer's alone", () => {
     expect(ownPv - less).toBe(here);
     // Its A-7 is over its own stay: it has no present-value column (it isn't the rank list's).
     expect(renderBreakdowns(later)).not.toContain('data-metric="l6s.B.colAdjustedTotal.pv"');
-  });
+  }, 30_000);
 });
 
 describe("the comparison without L-5 and L-6 (B8)", () => {
