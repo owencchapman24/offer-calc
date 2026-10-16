@@ -144,10 +144,11 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             <strong>Later years.</strong> Tax law after 2026 isn't known yet, so it's projected: federal brackets, deductions and
             limits rise with the inflation assumption ({percent(ASSUMPTIONS.inflation)} a year), and the SALT cap follows its
-            statutory schedule (101% a year through 2029, $10,000 from 2030). Where the IRS has already published a later year's
-            amount, it's used as published and projected on from there: so far, the 2027 HSA limits ($4,500 self-only, $9,000
-            family; Rev. Proc. 2026-24). State law is held at 2026 rules, except California, which indexes by statute, and amounts
-            tied to federal ones.
+            statutory schedule (101% a year through 2029, $10,000 from 2030). Where a later year's amount has already been
+            published, it's used as published and projected on from there: so far, the 2027 HSA limits ($4,500 self-only, $9,000
+            family; the IRS's Rev. Proc. 2026-24) and the 2027 Social Security wage base ($192,300; the Social Security
+            Administration, October 14, 2026). State law is held at 2026 rules, except California, which indexes by statute, and
+            amounts tied to federal ones.
           </p>
           <p>
             <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses and RSU vests
@@ -424,7 +425,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <li>Small state gaps: Vermont's brackets (up to about $150), Oregon and North Dakota indexing, low-income credits in
               Connecticut, Arkansas, Maine, New Mexico, Hawaii and Minnesota, Colorado's sales-tax refund, Alaska's dividend.</li>
             <li>California and New Jersey tax HSA contributions; we don't.</li>
-            <li>The Social Security wage base grows with inflation here, though it really tracks wages.</li>
+            <li>After 2027, the last year published, the Social Security wage base grows with inflation here, though it really tracks
+              wages.</li>
           </ul>
           <h3 className="method-sub">Where you'd live and work</h3>
           <ul>
@@ -456,8 +458,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">IRC 164(b)(7), as added by Pub. L. 119-21 §70120</th><td>The SALT cap: $40,400 in 2026, phased down above
                 $505,000, $10,000 from 2030</td><td>Statute</td></tr>
               <tr><th scope="row">IRS Notice 2025-67; Rev. Proc. 2025-19</th><td>401(k) deferral limit ($24,500); HSA limits</td><td>2026</td></tr>
-              <tr><th scope="row">SSA 2026 COLA fact sheet; IRC 3101(b)(2)</th><td>Social Security wage base ($184,500) and rates; Additional
-                Medicare Tax</td><td>2026</td></tr>
+              <tr><th scope="row">IRS Rev. Proc. 2026-24</th><td>HSA limits ($4,500 self-only, $9,000 family)</td><td>2027</td></tr>
+              <tr><th scope="row">SSA 2026 and 2027 COLA fact sheets; IRC 3101(b)(2)</th><td>Social Security wage base ($184,500; $192,300
+                in 2027) and rates; Additional Medicare Tax</td><td>2026, 2027</td></tr>
               <tr><th scope="row">Tax Foundation, State Individual Income Tax Rates and Brackets, 2026</th><td>State brackets, deductions and
                 exemptions; state payroll taxes</td><td>Data as of Feb 11, 2026</td></tr>
               <tr><th scope="row">State laws enacted after that table</th><td>

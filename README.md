@@ -94,8 +94,9 @@ npm run oracle
   browser, and the script says how.
 - **Census Bureau, American Community Survey 2024 1-year, table B25064:** the U.S. median gross rent,
   used only where HUD has no figure.
-- **IRS** Rev. Proc. 2025-32, Notice 2025-67, Rev. Proc. 2025-19, and Publications 15 and 15-T; the
-  **Social Security Administration**'s 2026 fact sheet.
+- **IRS** Rev. Proc. 2025-32, Notice 2025-67, Rev. Proc. 2025-19, Rev. Proc. 2026-24 (2027's HSA
+  limits), and Publications 15 and 15-T; the **Social Security Administration**'s 2026 and 2027 fact
+  sheets (the wage base).
 - **Tax Foundation**, "State Individual Income Tax Rates and Brackets, 2026", and each state law enacted
   after it, listed in the methodology (M-11).
 - **PolicyEngine-US**, used only to validate the tax engine; it isn't part of the app.

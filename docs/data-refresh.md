@@ -4,10 +4,11 @@ Every dataset the tool depends on: when it's usually published, how to refresh i
 parentheses are the last ones seen. A refresh is a change like any other: its own branch and pull request. (Moved here from
 CLAUDE.md on 2026-10-15; CLAUDE.md keeps the next checks.)
 
-## Next checks (set 2026-10-12, unchanged on 2026-10-15)
-- **2026-10-14 and after: SSA's 2027 wage base** (with the COLA). Add `socialSecurityWageBase` to `FEDERAL_2027`.
+## Next checks (set 2026-10-12; checked 2026-10-15)
+- **Done 2026-10-15: SSA's 2027 wage base**, $192,300 (announced Oct 14, 2026, with the 3.6% COLA), in `FEDERAL_2027`.
 - **Now to mid-November 2026: the IRS's 2027 inflation revenue procedure** (brackets, standard deduction, 132(f), and 127, indexed
-  from 2027) **and the 402(g) notice.** Add them to `FEDERAL_2027`. If neither is out by **2026-11-16**, check weekly.
+  from 2027) **and the 402(g) notice.** Neither was out on 2026-10-15 (the IRS's newsroom and irs-drop listing). Add them to
+  `FEDERAL_2027`. If neither is out by **2026-11-16**, check weekly.
 - **December 2026 to February 2027: BEA's 2025 RPPs, Pub. 15 and 15-T for 2027, the states' 2027 payroll caps, then the Tax
   Foundation's 2027 state table** (the start of moving the base year to 2027, below).
 - **The Census's 2025 ACS 1-year estimates:** delayed with no date (the Census Bureau's advisory of Aug 4, 2026; still none in
@@ -57,8 +58,10 @@ list), but some dates are typed in. Update them with the data:
 
 ## Payroll
 - **Social Security wage base:** SSA's COLA fact sheet, mid-October for the next year (2026's $184,500 was announced Oct 24, 2025,
-  late for the shutdown; usually around Oct 10-15). In `PAYROLL_2026`, or a later year's file (`socialSecurityWageBase`). State
-  payroll taxes capped at it (`wageCap: "ssWageBase"`) follow by themselves.
+  late for the shutdown; 2027's $192,300 on Oct 14, 2026). In `PAYROLL_2026`, or a later year's file
+  (`socialSecurityWageBase`). State payroll taxes capped at it (`wageCap: "ssWageBase"`) follow by themselves. SSA's pages block
+  scripts (a 403), so read them in a browser: the fact sheet is HTML now (https://www.ssa.gov/news/en/cola/factsheets/2027.html),
+  and https://www.ssa.gov/oact/cola/cbb.html lists every year's base.
 - **State payroll taxes with their own caps and rates** (`payroll` in `states2026.ts`: NJ $171,100, NY Paid Family Leave $95,350,
   MN $185,000, RI $100,000, and every rate): each state sets the next year's, usually September to December; PolicyEngine-US
   carries them once it updates.
