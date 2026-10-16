@@ -1699,6 +1699,49 @@ line.
   that starts in an earlier calendar year moves that year, as editing About you would.
 - **Started before the testers' first question was answered:** the user's call, 2026-10-15.
 
+**v2's item 5, stop 5B** (2026-10-16; `docs/v2-plan.md`, item 5, "Review stops"): every offer's breakdown, A-1 to A-7, each over its
+own stay (B3), with L-5 and L-6 folded in (B8) and the bridge moved (B7). Each part is compact, its detail behind its own "Show …".
+- **A-2, where the money goes:** a year's pay (year 1 unless you pick another) as each $100: tax, rent, health costs (premiums and
+  expected out-of-pocket), saved (your 401(k) and HSA, planned savings) and left to spend, each the year's figure as shown ÷ its pay as
+  shown, to the cent, left to spend taking the rounding (M-1.1). A bar in graphite patterns, keyed in its table, beside the table; the
+  employer's 401(k) money (and how much has vested by the stay's end), HSA money and perks outside the $100. "Show the bridge from the
+  offer letter": L-1's bridge, moved, ending after rent at the offer's own prices, then, with a comparison or Prices in a city, the
+  price line and after rent at the prices picked, which ties to L-1. Its month is in the offer's own city's dollars (A-1's year 1).
+- **A-3, pay by year, and when it arrives:** stacked columns and the table of A-7's pay lines (one figure, one id); salary a month at
+  its starting salary; L-1's notes for the offer; "Show when each payment arrives": every bonus, cash award and RSU vest by date.
+- **A-4, terms that can bite:** its terms in words (M-9's, with a bonus cutoff and a guaranteed first payout); the next cliff from its
+  start (from today, once it has started) and what staying until it is worth after tax, as what you'd keep on its day less on the
+  first; "If you left on" a day you pick: L-4's panel for this offer, the same job and last day as L-4's (B6); the bad case, bear and
+  bull a month at its own prices, with what goes wrong in the bear case (L-2's per-offer list, moved); "Show every cliff in its
+  stay", each dated with what leaving the day before gives up. The cliffs come from a new slow lane, `terms`.
+- **A-5, what the benefits are worth:** total rewards less after-tax pay over the stay, and a month; the employer 401(k) money
+  credited; a 401(k) or health plan not entered, said so; the out-of-pocket maximum; "Show the benefits by year".
+- **A-6, tax, and warnings:** its tax as a share of its pay over its stay; every warning for the offer over its stay, by kind, with
+  "Show at the field" (L-5's, for one offer); "Show tax by calendar year": each year's pay, its tax by kind and its rate.
+- **A-7, the work:** L-6's four tables for the offer, over its own stay (the payments job now projects each offer over its own stay);
+  their CSVs are named `A-7-employment-years`, `A-7-its-stay`, `A-7-every-payment` and `A-7-tax-by-year` (with the offer's letter). The
+  stay table's present value, the rank list's, shows where the comparison projects the offer over the same stay.
+- **The comparison:** L-1 without the bridge (its chart full width); L-2's sentence keeps who has most to lose and points to A-4 for
+  what goes wrong; L-5 and L-6 retired; the lead's warnings pointer names each offer's A-6 ("See C-6"); "See how we get there" opens
+  the leader's A-2 on its bridge. A later start's rank-list figure says, in its work, how it steps from the offer's own stay ("B on its
+  own (A-1, …): x, less y that falls after the comparison's window ends, = z").
+- **Print:** every offer's A-1 to A-6 and its A-7 (a summary without the list of every payment), then the comparison.
+- **Methodology:** M-1 names the parts; M-1.1, where every $100 goes (new); M-4, the effective tax rate, and withholding now flagged
+  in A-6; M-6.3, the identity at an offer's own prices; M-8 and M-9 with A-4's bad case, terms and next cliff, M-9's numbers with one
+  offer too; M-13, the references.
+
+**Stop 5B versus the plan:**
+- **Each part's detail is behind its own "Show …",** one setting for every offer (`ui.parts`): the bridge (A-2), the dated payments
+  (A-3), every cliff (A-4), the benefits by year (A-5), tax by calendar year (A-6). A-7 keeps L-6's "Show the tables".
+- **A-2's bar has its numbers beside it** in its table, always shown, rather than a table view to open.
+- **A-4's "If you left on" is a date field,** not L-4's chart, which stays in the comparison; its bad case is a line, not L-2's chart.
+- **Staying until the next cliff is what you'd keep on its day less on the first,** each after tax: the engine's "cliff value" (its
+  payment after tax) can exceed it, as for a sign-on repaid in full if you leave right after it, so the split isn't shown.
+- **A-6's kinds add to its tax as shown:** federal income tax takes the rounding, and the rate is the tax as shown ÷ the pay as shown.
+- **CSVs:** A-7's four tables keep theirs, renamed; A-3's and A-6's tables have none yet.
+- **With one offer, A-2 to A-7 are a section under the columns,** headed "A · NYC bank, in full", A-1 being pinned beside the ledger.
+- **L-1's and the parts' placeholders** are measured again (L-1 is 521 px tall without the bridge, 652 on a phone).
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

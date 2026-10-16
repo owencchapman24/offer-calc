@@ -40,8 +40,8 @@ export async function settled(page: Page) {
  * - and it all holds for a moment.
  */
 export async function quiet(page: Page) {
-  const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true'], "
-    + ".the-work[aria-busy='true'], .own[aria-busy='true'], .breakdown[aria-busy='true']");
+  const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], "
+    + ".the-work[aria-busy='true'], .part[aria-busy='true'], .own[aria-busy='true'], .breakdown[aria-busy='true']");
   const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
     .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
   for (let still = 0, tries = 0; still < 2; tries++) {
@@ -150,7 +150,7 @@ export async function openWithSaved(page: Page, saved: string) {
   await page.goto("/#/");
 }
 
-/** Scrolls down until a schedule that loads as you near it (L-1 to L-6) is on the page, and shows it. */
+/** Scrolls down until a schedule that loads as you near it (L-1 to L-4) is on the page, and shows it. */
 async function scrollTo(page: Page, id: string) {
   const title = page.locator(`#${id}-title`);
   for (let i = 0; i < 60 && !(await title.count()); i++) {
@@ -167,25 +167,25 @@ export async function showByYear(page: Page) {
 }
 
 /**
- * L-1 alone: its slot scrolled to a screen and a half down, inside its load margin (useLoadNear's: a screen past the viewport), so
- * L-2 to L-6, a pixel tall each until they load and just after its slot, stay outside it (for a screen shorter than twice its
+ * L-1 alone: its slot scrolled to just inside its load margin (useLoadNear's: a screen past the viewport, so 1.9 screens down), so
+ * L-2 to L-4, a pixel tall each until they load and just after its slot, stay outside it (for a screen less than ten times its
  * slot). Since stop 5A the breakdowns sit above L-1, past a desktop's first screen too.
  */
 export async function loadByYearOnly(page: Page) {
   await page.evaluate(() => {
     const slot = document.querySelector(".l1-slot");
-    if (slot) window.scrollTo(0, Math.max(0, slot.getBoundingClientRect().top + window.scrollY - 1.5 * window.innerHeight));
+    if (slot) window.scrollTo(0, Math.max(0, slot.getBoundingClientRect().top + window.scrollY - 1.9 * window.innerHeight));
   });
   await expect(page.locator("#l1-title")).toBeAttached();
   await settled(page);
 }
 
 /**
- * L-1 to L-5 load as you scroll toward them, and L-3 and L-4 work out their numbers while they're on screen: scroll down to
+ * L-1 to L-4 load as you scroll toward them, and L-3 and L-4 work out their numbers while they're on screen: scroll down to
  * each in turn, and wait for those two to be ready.
  */
 export async function loadSchedules(page: Page) {
-  for (const id of ["l1", "l2", "l3", "l4", "l5"]) await scrollTo(page, id);
+  for (const id of ["l1", "l2", "l3", "l4"]) await scrollTo(page, id);
   for (const schedule of [".ties", ".leaving"]) {
     await page.locator(schedule).scrollIntoViewIfNeeded();
     await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
@@ -194,28 +194,51 @@ export async function loadSchedules(page: Page) {
 }
 
 /**
- * L-6, The work: scrolled to (it loads as you near it), its tables opened, on an offer's tables, with its payments and tax
- * years worked out.
+ * An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5): its tab chosen with two or more offers, and scrolled to, since they
+ * load as you near them; A-4's cliffs and last day worked out. With one offer, its parts under the columns.
  */
-export async function openWork(page: Page, letter = "A") {
-  // The schedules above first, worked out: L-4's panel filling in moves L-6 down, and a click mid-move lands elsewhere.
-  await loadSchedules(page);
-  const title = page.locator("#l6-title");
+export async function openParts(page: Page, letter = "A") {
+  const tab = page.locator(`#own-tab-${letter}`);
+  if (await tab.count()) {
+    await tab.scrollIntoViewIfNeeded();
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+  }
+  const title = page.locator(`#${letter}-2-title`);
+  await page.locator("#breakdown").scrollIntoViewIfNeeded();
   for (let i = 0; i < 80 && !(await title.count()); i++) {
-    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.5));
     await page.waitForTimeout(100);
   }
-  await title.scrollIntoViewIfNeeded();
-  const toggle = page.locator(".l6-toggle");
+  await expect(title).toBeAttached();
+  await expect(page.locator(`section[aria-labelledby="${letter}-4-title"]`)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await quiet(page);
+}
+
+/** Every part's "Show …" in an offer's breakdown, A-2 to A-6, open (one setting for every offer). */
+export async function showParts(page: Page, letter = "A") {
+  await openParts(page, letter);
+  for (const n of [2, 3, 4, 5, 6]) {
+    const show = page.locator(`section[aria-labelledby="${letter}-${n}-title"] .part-show`);
+    if ((await show.getAttribute("aria-expanded")) !== "true") await show.click();
+    await expect(show).toHaveAttribute("aria-expanded", "true");
+  }
+  await quiet(page);
+}
+
+/**
+ * An offer's A-7, The work, in its breakdown (L-6 until stop 5B): scrolled to, its tables opened, with its payments and tax years
+ * worked out.
+ */
+export async function openWork(page: Page, letter = "A") {
+  await openParts(page, letter);
+  const part = page.locator(`section[aria-labelledby="${letter}-7-title"]`);
+  await part.scrollIntoViewIfNeeded();
+  const toggle = part.locator(".l6-toggle");
   if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-  const pick = page.locator("#l6-body .segmented button", { hasText: letter });
-  await expect(async () => {
-    if ((await pick.getAttribute("aria-pressed")) !== "true") await pick.click();
-    await expect(pick).toHaveAttribute("aria-pressed", "true", { timeout: 2_000 });
-  }).toPass({ timeout: 30_000 });
-  await expect(page.locator(".the-work")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-  await expect(page.locator(".l6-payments")).toBeVisible();
-  await settled(page);
+  await expect(part).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(part.locator(".l6-payments")).toBeVisible();
+  await quiet(page);
 }
 
 /** Detailed mode with one section open. */

@@ -6,7 +6,7 @@ import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
 import { Lead, LiveVerdict, Problems, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
-import { BreakevenSlot, breakdownModule, ByYearSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, breakdownModule, ByYearSlot, LeavingSlot, loadLater, loadParts, RiskSlot, showBridge } from "./Later";
 import { useLazyModule, useLoadAfterPaint } from "./lazy";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
@@ -16,7 +16,7 @@ import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
 import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
 import { NewerSave } from "./Recovery";
-import { clearSession, type KeyValueStore, loadSession, reducer, type SaveStatus, saveSession, type Theme, type Ticks } from "./session";
+import { clearSession, type KeyValueStore, loadSession, reducer, type SaveStatus, saveSession, type Theme, type Ticks, type UiState } from "./session";
 import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
 import { dayBefore, localToday, longDate } from "./text";
@@ -26,6 +26,7 @@ import { type Engine, useEngine } from "./useEngine";
 import type { Live } from "./copyDoc";
 import { SECTIONS, type SectionId } from "./sections";
 import { verdict, verdictSentence } from "./verdict";
+import { changingWarnings } from "./warningKinds";
 
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
@@ -206,17 +207,24 @@ export function App() {
   // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
   const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
   if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
-  // Warnings that change your numbers: the lead points to L-5, which lists every warning.
+  // Warnings that change your numbers: the lead points to each such offer's A-6, where its warnings are (L-5 until stop 5B).
   const changes = view ? engine.detail?.changes ?? 0 : 0;
-  const toWarnings = () => {
-    document.getElementById("l5")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // L-5 loads as it nears the screen: its heading takes focus once it's there.
-    const focus = (tries: number) => {
-      const h = document.getElementById("l5-title");
-      if (h) h.focus({ preventScroll: true });
-      else if (tries) setTimeout(() => focus(tries - 1), 100);
-    };
-    focus(20);
+  const lastYear = view ? Number(dayBefore(view.row.window.end).slice(0, 4)) : 0;
+  const warnAt = view && engine.detail ? letters.filter((_, i) => engine.detail!.offers[i] && changingWarnings([engine.detail!.offers[i]], lastYear) > 0) : [];
+  // Shows an offer's breakdown, then a part of it once its code is here: scrolled to, its heading focused.
+  const toPart = async (letter: Letter, id: string, patch: Partial<UiState> = {}) => {
+    dispatch({ type: "ui", patch: { offerTab: letter, ...patch } });
+    await loadParts();
+    for (let i = 0; i < 120 && !document.getElementById(`${id}-title`); i++) await new Promise((r) => requestAnimationFrame(r));
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(`${id}-title`)?.focus({ preventScroll: true });
+  };
+  const toWarnings = (letter: Letter) => void toPart(letter, `${letter}-6`);
+  // "See how we get there": the leader's bridge, in its A-2, open on year 1.
+  const toBridge = () => {
+    const w = view?.lead?.winnerLetter ?? letters[0];
+    return w ? showBridge(w, () => dispatch({ type: "ui", patch: { offerTab: w, parts: { ...session.ui.parts, a2: true }, bridge: { letter: w, year: 1 } } }))
+      : Promise.resolve();
   };
   // A cost or benefit counted for some offers but not others: the lead schedule says so.
   const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
@@ -256,19 +264,31 @@ export function App() {
     ...(flip?.row && engine.flip.result ? { flip: engine.flip.result } : {}),
     ...(engine.breakeven.result ? { l3: engine.breakeven.result } : {}),
   };
-  // L-6, the work (docs/ui-design.md §4.8): closed by default; its payments and tax years come only while it's open.
+  // A-7, the work (docs/ui-design.md §4.8, L-6 until stop 5B): closed by default; its payments and tax years come only while it's open.
   const workOpen = session.ui.work?.open ?? false;
-  const workLetter = session.ui.work?.letter ?? null;
-  const payments = (workOpen || printing) && engine.work.result?.length === letters.length ? { work: engine.work.result } : {};
+  // The slow lane's results for every complete offer, in the request's order, by letter.
+  const byLetter = <T,>(xs: T[] | null | undefined): Partial<Record<Letter, T>> | undefined =>
+    (xs && xs.length === letters.length ? Object.fromEntries(letters.map((l, i) => [l, xs[i]])) : undefined);
+  const ownWork = (workOpen || printing) ? byLetter(engine.work.result) : undefined;
+  const ownTerms = byLetter(engine.terms.result);
+  const ownPanels = byLetter(engine.cursor.result);
+  // The breakdowns' slow jobs start once every complete offer's breakdown is current and valid (one offer is enough).
+  const ownReady = !engine.updating && !engine.invalid && complete.length > 0 && complete.every((x) => engine.breakdowns[x.o.id]);
   // The breakdowns' parts, where the page places them (Breakdown.tsx): pinned with one offer, a section and the ledger's foot row
   // with two or more.
   const own = breakdown?.ownSlots({ offers: session.offers, breakdowns: engine.breakdowns, prices, tab: session.ui.offerTab, stayYears,
     updating: engine.updating, sample, notes, firstUse: !session.ui.dismissed?.afterRent, dispatch,
-    problems: <Problems issues={engine.invalid ? issues : {}} results={Object.keys(engine.breakdowns).length > 0} onFix={edit} /> });
+    problems: <Problems issues={engine.invalid ? issues : {}} results={Object.keys(engine.breakdowns).length > 0} onFix={edit} />,
+    parts: {
+      ui: session.ui, dispatch, request, ready: ownReady, requestSlow, slow: { work: engine.work, terms: engine.terms, cursor: engine.cursor },
+      leave: { at: leaveAt, basis: leaveBasis, onAt: setLeaveAt }, status: stale,
+    } });
   const slot = <div className="later own-slot" />;
   const work: WorkContext = {
-    today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents, ...(own ? { own: own.own } : {}),
-    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties, ...payments } } : {}),
+    today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
+    ...(own ? { own: { ...own.own, ...(ownWork ? { work: ownWork } : {}), ...(ownTerms ? { terms: ownTerms } : {}),
+      ...(ownPanels ? { leave: { at: leaveAt ?? engine.cursor.result?.find(Boolean)?.leaveDate ?? today, basis: leaveBasis, panels: ownPanels } } : {}) } } : {}),
+    ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties } } : {}),
   };
   // "Copy as document" (docs/copy-as-document-plan.md): waits while the inputs have a problem, and says why. It reads the page as it
   // is when its figures come back (`live`), not as it was when the button was pressed.
@@ -337,11 +357,11 @@ export function App() {
               {comparing ? (
                 <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
                   sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
-                  cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} />
+                  cautions={cautions} changes={changes} warnAt={warnAt} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} showBridge={toBridge} />
               ) : own?.pinned ?? slot}
             </div>
           </main>
-          {comparing && (own?.section ?? slot)}
+          {own ? own.section(work) : comparing ? slot : null}
           {work.results && <ByYearSlot ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
           {work.results && <RiskSlot ctx={work} sample={sample} status={stale} />}
           {work.results && (
@@ -351,12 +371,6 @@ export function App() {
             <LeavingSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale}
               leave={engine.leave} cursor={engine.cursor} requestSlow={engine.requestSlow} at={leaveAt} basis={leaveBasis} onAt={setLeaveAt}
               onBasis={setLeaveBasis} />
-          )}
-          {work.results && <WarningsSlot ctx={work} sample={sample} status={stale} />}
-          {work.results && (
-            <TheWorkSlot ctx={work} sample={sample} compare={compare} ready={ready} status={stale} work={engine.work} requestSlow={requestSlow}
-              open={workOpen} letter={workLetter} onOpen={(open) => dispatch({ type: "ui", patch: { work: { ...session.ui.work, open } } })}
-              onLetter={(letter) => dispatch({ type: "ui", patch: { work: { open: true, letter } } })} />
           )}
         </>
       )}
@@ -494,7 +508,7 @@ function CopyDocument({ blocked, quietly = false, live, requestSlow, results }: 
 }
 
 const SCOPES: Array<{ scope: PrintScope; name: string; hint: string }> = [
-  { scope: "summary", name: "Summary", hint: "every schedule, with L-6's tables but not its list of every payment" },
+  { scope: "summary", name: "Summary", hint: "every offer's breakdown, with its A-7 tables but not its list of every payment, then the comparison" },
   { scope: "full", name: "Full workpaper", hint: "adds every payment, to the cent: many more pages" },
 ];
 

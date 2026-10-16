@@ -42,9 +42,10 @@ describe("prices in a city you know", () => {
     expect(b.nonHousingFactor).toBe(1);
     const y = clt.results!.detail!.offers[1].employmentYears[0].costOfLiving!;
     expect(y.discretionaryReference).toBe(y.nonHousingLocal);
+    // Its own prices are the prices picked: A-2's bridge ends there, with no price line to step across (stop 5B).
     const rows = bridge(clt, "B", 1).rows;
-    expect(rows.find((r) => r.line === "prices")).toMatchObject({ label: "Charlotte prices", value: 0, gloss: "the prices you picked under Prices in: a factor of 1" });
-    expect(rows.at(-1)).toMatchObject({ label: "After rent, at Charlotte prices", kind: "total" });
+    expect(rows.find((r) => r.line === "prices")).toBeUndefined();
+    expect(rows.at(-1)).toMatchObject({ line: "own", label: "After rent, at Charlotte prices", kind: "total" });
   });
 
   it("switching the reference scales every offer's converted spending by Charlotte ÷ U.S. (0.974100) and leaves savings at face value", () => {

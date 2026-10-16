@@ -127,13 +127,15 @@ test.describe("phone", () => {
     expect(await tabThrough(page, 30, "Shift+Tab")).toBeGreaterThan(5);
   });
 
-  test("See how we get there brings the bridge, though L-1 loads only as you scroll toward it", async ({ page }) => {
+  test("See how we get there brings the leader's bridge, in its A-2, though the breakdown loads only as you scroll toward it", async ({ page }) => {
     await openCompare(page);
-    // On a phone, L-1 and the bridge are screens below the first-use note: their code isn't loaded yet.
-    await expect(page.locator("#l1-title")).toHaveCount(0);
+    // On a phone, the breakdowns are screens below the first-use note: A-2's code isn't loaded yet.
+    await expect(page.locator("#C-2-title")).toHaveCount(0);
     await page.getByRole("button", { name: "See how we get there" }).click();
-    await expect(page.locator("#bridge-title")).toBeFocused();
-    await expect(page.locator("#bridge-title")).toBeInViewport();
+    // C leads, so it's C's breakdown, open on its bridge for year 1; the ledger's tab is C's too.
+    await expect(page.locator("#bridge-C-title")).toBeFocused();
+    await expect(page.locator("#bridge-C-title")).toBeInViewport();
+    await expect(page.locator("#own-tab-C")).toHaveAttribute("aria-selected", "true");
     await settled(page);
   });
 });

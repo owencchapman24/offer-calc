@@ -1,11 +1,11 @@
 import type { RentEstimate } from "../../src/col/rent";
-import type { Basis, Component, EmploymentYearResult, HorizonRow, HorizonSweep, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
+import type { Basis, Component, EmploymentYearResult, HorizonRow, HorizonSweep, ISODate, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, type Letter } from "./model";
 import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
-import { type Breakdown, type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
+import { type Breakdown, type LeavePanel, type OfferDetail, type OfferTerms, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
 import type { SectionId } from "./sections";
 import type { TickKind } from "./ui";
 import type { VerdictView } from "./verdict";
@@ -23,7 +23,7 @@ export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | 
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
 export type BridgeLine =
   | "letter" | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
-  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "prices" | "total" | "spend" | "saved";
+  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved";
 /** L-6's employment-year lines (docs/ui-design.md §4.8): cash; total rewards and hours; after rent. workpaper.ts numbers them. */
 export type L6Line =
   | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "takeHome"
@@ -41,8 +41,13 @@ const L6_KIND: Record<L6Line, TickKind> = {
   totalHour: "recomputed",
 };
 
-/** An offer's breakdown, A-1 (docs/v2-plan.md, item 5): its bottom line over its own stay, and what it's built from. */
-export type OwnLine = "total" | "spend" | "saved" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "rate" | "hour" | "bear" | "drop";
+/** An offer's breakdown, A-1 (docs/v2-plan.md, item 5): its bottom line over its own stay, and what it's built from. `bull`: A-4's. */
+export type OwnLine = "total" | "spend" | "saved" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "rate" | "hour" | "bear" | "drop" | "bull";
+/** A-2, where the money goes: each part of a year's pay in dollars and as a share of each $100, the $100, and the employer's money on top. */
+export type A2Part = "tax" | "rent" | "health" | "saved" | "spend";
+export type A2Line = A2Part | `${A2Part}Share` | "hundred" | "credited";
+/** A-6, tax by calendar year: the offer's pay and tax that year, its rate, and the tax by kind. */
+export type A6Line = "gross" | "tax" | "rate" | "federal" | "fica" | "state" | "local";
 
 export type MetricId =
   | "hero" // the verdict: the lead a month (or an hour) on the selected basis, for your stay
@@ -83,7 +88,15 @@ export type MetricId =
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
   | `about.${AboutField}` // an input in About you
   | `own.${L}.${OwnLine}` // an offer's breakdown, A-1: its bottom line over its own stay, at its own prices
-  | `alone.${L}`; // the ledger's "On its own" row: an offer's bottom line in the common dollars (the prices picked)
+  | `alone.${L}` // the ledger's "On its own" row: an offer's bottom line in the common dollars (the prices picked)
+  | `a2.${L}.${number}.${A2Line}` // A-2: where an employment year's pay goes, of each $100
+  | `when.${L}.${number | "salary"}` // A-3: a payment that isn't salary, by its place in the list (or salary a month, at the start)
+  | `cliff.${L}.${number}` // A-4: a cliff inside the stay, by its place in the list: what leaving the day before gives up
+  | `nextup.${L}` // A-4: what staying until the next cliff from the start (or today) is worth after tax
+  | `a5.${L}.${"credited" | "added" | "month"}.${number | "sum"}` // A-5: employer 401(k) money credited; total rewards less after-tax pay
+  | `a6.${L}.${number}.${A6Line}`; // A-6: a calendar year's pay, tax, rate and tax by kind
+// L-5 and L-6 retired at stop 5B (docs/v2-plan.md, item 5, B8): each offer's warnings are in its A-6, and the `l6*` ids are A-7's
+// figures, each offer's tables over its own stay. The ids kept their names; the page calls the tables A-7.
 
 export interface WorkLine {
   op?: "+" | "−" | "×" | "÷" | "=";
@@ -138,7 +151,16 @@ export interface WorkContext {
    * Each complete offer's breakdown, by letter, once the worker has sent it (docs/v2-plan.md, item 5); `withRef`: A-1 restates
    * its total at the prices picked (they're a city's, or there's a comparison).
    */
-  own?: { breakdowns: Partial<Record<Letter, Breakdown>>; withRef: boolean };
+  own?: {
+    breakdowns: Partial<Record<Letter, Breakdown>>;
+    withRef: boolean;
+    /** A-7's payments and tax years, each offer over its own stay, once the worker has sent them (only while A-7 is open). */
+    work?: Partial<Record<Letter, WorkOffer>>;
+    /** A-4's cliffs inside each offer's stay and its next cliff, once the worker has sent them. */
+    terms?: Partial<Record<Letter, OfferTerms>>;
+    /** A-4's "if you left on": the last day picked (L-4's, with a comparison) and each offer's panel (null before its start). */
+    leave?: { at: ISODate; basis: LeaveBasis; panels: Partial<Record<Letter, LeavePanel | null>> };
+  };
   results?: {
     sweep: HorizonSweep;
     /** Your stay's projections; null until the worker has sent them. */
@@ -150,8 +172,6 @@ export interface WorkContext {
     leave?: LeaveContext;
     /** Breakevens, once the worker has sent them: the close-call line's and L-3's, as displayed. */
     ties?: { flip?: Ties; l3?: Ties };
-    /** L-6's payments and tax years, once the worker has sent them (only while L-6 is open): the offers compared, in order. */
-    work?: WorkOffer[];
   };
 }
 
@@ -190,6 +210,10 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "tie": return a === "target" ? "crossFooted" : "recomputed";
     case "rentnote": return "estimate";
     case "alone": return "crossFooted";
+    case "a2": return c === "tax" || c === "rent" || c === "credited" ? "crossFooted" : c === "hundred" || c === "health" || c === "saved" || c === "spend" ? "footed"
+      : "recomputed";
+    case "a5": return b === "month" || (b === "credited" && c !== "sum") ? "recomputed" : "footed";
+    case "a6": return c === "tax" || c === "federal" || c === "rate" ? "footed" : "recomputed";
     case "l6y":
       if (c === "sum") return "footed";
       if (b === "rent") return offerByLetter(ctx, a as L)?.draft.costOfLiving.monthlyRent === null ? "estimate" : "traced";
@@ -207,7 +231,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
       switch (c as BridgeLine) {
         case "letter": case "premiums": case "perks": case "hsa": case "oop": return "traced";
         case "rent": return offerByLetter(ctx, a as L)?.draft.costOfLiving.monthlyRent === null ? "estimate" : "traced";
-        case "paid": case "afterTax": case "totalRewards": case "total": return "footed";
+        case "paid": case "afterTax": case "totalRewards": case "own": case "total": return "footed";
         default: return "recomputed";
       }
   }
@@ -215,6 +239,20 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
 }
 
 // ---- lookups ----------------------------------------------------------------------------------
+
+/** An offer's breakdown, over its own stay (docs/v2-plan.md, item 5, B3): what A-1 to A-7 are worked out from. */
+export function ownOf(ctx: WorkContext, letter: L): Breakdown {
+  const b = ctx.own?.breakdowns[letter];
+  if (!b) throw new Error("Still working this out…");
+  return b;
+}
+/** One employment year of an offer's own stay. */
+export function ownYearOf(ctx: WorkContext, letter: L, n: number): EmploymentYearResult {
+  const b = ownOf(ctx, letter);
+  const y = b.detail.employmentYears[n - 1];
+  if (!y || n > b.years) throw new Error(`Year ${n} isn't in its stay.`);
+  return y;
+}
 
 export function res(ctx: WorkContext) {
   if (!ctx.results) throw new Error("Fill in at least two offers to see the comparison's work.");

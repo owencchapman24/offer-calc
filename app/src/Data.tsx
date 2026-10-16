@@ -141,8 +141,8 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
           <p><button type="button" className="got-it data-button" onClick={save}>Download {download.fileName}</button></p>
           {sample && <p className="method-note">The file says it includes sample offers, and its name ends -sample.</p>}
           <p>
-            For a spreadsheet, each table downloads as a CSV from its schedule: L-1's and L-2's table views, and L-6's four tables for each
-            offer. Each figure is the one shown, as a plain number, with its tickmark beside it. To print the comparison, use Print at the top
+            For a spreadsheet, each table downloads as a CSV from its schedule: L-1's and L-2's table views, and the four tables in each
+            offer's A-7. Each figure is the one shown, as a plain number, with its tickmark beside it. To print the comparison, use Print at the top
             of the comparison: it works out every schedule first.
           </p>
           {done?.at === "export" && <p className="note" role="status">{done.text}</p>}

@@ -140,6 +140,7 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
     rsus: r.events.flatMap((e) => (e.detail.kind === "rsu"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, refresher: e.detail.grant.kind === "refresher", tranche: e.detail.tranche,
         tranches: e.detail.tranches, priceFactor: e.detail.priceFactor, ...(e.detail.nominalDate ? { nominalDate: e.detail.nominalDate } : {}) }] : [])),
+    cash: r.events.flatMap((e) => (e.detail.kind === "cash" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, award: e.detail.award }] : [])),
   };
   return { detail, base: r };
 }

@@ -3,6 +3,7 @@ import { DATA_YEARS } from "../../src/col/cities";
 import { formatAssumption } from "../../src/format/index";
 import type { Assumption, ValueBasis } from "../../src/offer/types";
 import { ownView } from "./breakdownModel";
+import { bonusTerms, centsText, hundredOf, A2_LABEL } from "./partsModel";
 import type { Breakdown } from "./protocol";
 import { CASES, changeText, riskView } from "./cases";
 import { cashLever, changeText as tieChangeText } from "./breakevenModel";
@@ -68,8 +69,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-1">
           <p>
             Every offer runs one pipeline, left to right, and gets a breakdown of its own: what it would leave you with, worked out
-            over your stay from its own start date, whatever other offers you add. Its references are its letter and a part: A-1
-            is offer A's bottom line, B-1 offer B's.
+            over your stay from its own start date, whatever other offers you add. Its references are its letter and a part: A-1 is
+            offer A's bottom line, A-2 where its money goes, A-3 its pay by year and when it arrives, A-4 the terms that can bite, A-5
+            what its benefits are worth, A-6 its tax and warnings, and A-7 the work behind every figure; B-1 is offer B's bottom line.
           </p>
           <ol className="pipeline-list">
             <li><strong>Gross pay</strong>: salary, bonuses, cash awards such as a sign-on, and RSUs as they vest.</li>
@@ -96,12 +98,30 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           </p>
           <p>
             Every payment and vest is a dated event. Tax is worked out per calendar year, the way the law works; the events are
-            then grouped into employment years (year 1 is your first 12 months) for the breakdown's year 1, L-1 and the bridge,
+            then grouped into employment years (year 1 is your first 12 months) for the breakdown's years (A-2's bridge, A-3) and L-1,
             and summed over a stay for the bottom line and the verdict. All of these come from the same events, so they reconcile:
-            the bridge's year-1 total is the chart's year 1, and the years add up to your stay. L-6, The work, lists them all:
-            each year line by line, every payment with its formula and tax, and each calendar year's tax with and without the offer.
+            the bridge's year-1 total is the chart's year 1, and the years add up to your stay. Each offer's A-7, The work, lists them
+            all: each year line by line, every payment with its formula and tax, and each calendar year's tax with and without the
+            offer.
           </p>
           <PipelineExample ctx={ctx} sample={sample} />
+        </Section>
+
+        <Section id="M-1.1">
+          <p>
+            A-2 takes a year's pay, as paid, and says where each $100 of it goes: tax (<Ref id="M-4" />), rent (<Ref id="M-6.2" />),
+            health costs (your premiums and the out-of-pocket costs you expect, <Ref id="M-5.2" />), saved (your 401(k) and HSA, and
+            your planned savings) and what's left to spend. Each part is the year's figure as shown ÷ the year's pay as shown, to the
+            cent, and what's left to spend takes the rounding, so the five add to $100.00. Each share names its year: "$27.27 of each
+            $100 of year-1 pay". A year where rent and the rest take more than it pays shows what's left to spend below zero, in
+            parentheses.
+          </p>
+          <p>
+            The employer's money isn't paid to you, so it's outside the $100: its 401(k) money (and how much of it has vested by the
+            end of your stay, <Ref id="M-5.1" />), its HSA money and perks. Under the $100, the bridge goes from the offer letter to
+            after rent at the offer's own prices, line by line, and with a comparison on to the prices picked (<Ref id="M-6.3" />).
+          </p>
+          <Hundred ctx={ctx} sample={sample} />
         </Section>
 
         <Section id="M-2">
@@ -122,7 +142,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             early, a clawback may take some back (<Ref id="M-9" />).
           </p>
           <p>
-            The bridge in L-1 starts from what an <strong>offer letter</strong> quotes for a year: the salary at the year's start,
+            The bridge, in each offer's A-2, starts from what an <strong>offer letter</strong> quotes for a year: the salary at the year's start,
             the target bonus on it, cash awards paid in the year and new-hire RSUs due in it at grant value. Each line under it
             is a reason what's paid differs: a stub first bonus, RSUs that vest on the company's dates, a raise during the year.
           </p>
@@ -167,8 +187,17 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             amounts tied to federal ones.
           </p>
           <p>
-            <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses and RSU vests
-            at a flat 22%, often less than you owe, so a balance can come due in April; a later update will flag it.
+            <strong>The effective tax rate.</strong> A-1 and A-6 state an offer's tax as a share of its pay: the offer's tax over your
+            stay (A-1) or a calendar year (A-6), worked out as above, with the offer less without it, ÷ its pay, both as paid. It's an
+            average over all its pay, so it's lower than your top rate, the rate on your last dollar: the first dollars are taxed in
+            the low brackets, or not at all under the standard deduction. A-6 splits each year's tax by kind (federal income tax,
+            Social Security and Medicare, state, local), each the household's with the offer less without it; federal income tax, the
+            largest, takes the rounding, so the kinds add to the tax as shown.
+          </p>
+          <p>
+            <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses and RSU vests at
+            a flat 22%, often less than you owe, so a balance can come due in April: each offer's A-6 says when federal withholding falls
+            short by $1,000 or more in a year, and by how much. State, other jobs' and a spouse's withholding aren't estimated.
           </p>
           <h3 className="method-sub">Validated against PolicyEngine-US</h3>
           <p>
@@ -182,7 +211,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">Social Security and Medicare</th><td>Exact at every grid point</td></tr>
               <tr><th scope="row">State payroll taxes</th><td>Exact (within $0.01)</td></tr>
               <tr><th scope="row">New York City</th><td>Within $0.48</td></tr>
-              <tr><th scope="row">Federal income tax, single, $60k–$200k</th><td>50 of 51 within $5. Alaska is $120–$350 lower: PolicyEngine
+              <tr><th scope="row">Federal income tax, single, $60k–$200k</th><td>50 of 51 within $5. Alaska is $120–$240 lower: PolicyEngine
                 counts the Permanent Fund Dividend as income; we don't.</td></tr>
               <tr><th scope="row">State income tax, single, $60k–$200k</th><td>42 of 51 within $5 and 44 within $6 (Nebraska −$5.67,
                 Wisconsin −$5.59). The other seven differ by more than $10: Arkansas and Connecticut (low-income credits and tables
@@ -298,6 +327,12 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             factor of 1 (an offer {p.us ? "in a city priced at the U.S. average" : `in ${p.place}`}) with no rent, it equals total rewards. It's
             much lower than a salary on purpose: it's what's left after tax and rent. The place is yours to pick (<Ref id="M-6.1" />).
           </p>
+          <p>
+            <strong>At an offer's own prices.</strong> An offer's own breakdown is priced in its own city: a price factor of 1, so the
+            identity above is simply total rewards − rent, in that city's dollars. That's what A-1's bottom line and A-2's bridge end
+            at: what you'd actually have where you'd live, with nothing converted. Restating it at {p.place} prices is the comparison's
+            step, and it's shown beside it, never in its place: A-1's line "in the comparison", and the bridge's price line.
+          </p>
           <YearOne ctx={ctx} sample={sample} />
         </Section>
         <Section id="M-6.4">
@@ -320,8 +355,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             Each payment's after-tax cash is discounted from its date to today at {percent(ASSUMPTIONS.discountRate)} a year
             (about 2.4% after {percent(ASSUMPTIONS.inflation)} inflation): $1 paid in a year is worth ${(1 / (1 + ASSUMPTIONS.discountRate)).toFixed(4)} today,
             and $1 in four years about ${(1.05 ** -4).toFixed(2)}. So a bonus paid in your fourth year counts for less than the same
-            sign-on paid in your first month. Tax is discounted with the payment it comes from. L-1 and the bridge show dollars as
-            paid each year; the verdict and the rank list are present values.
+            sign-on paid in your first month. Tax is discounted with the payment it comes from. L-1, A-2's bridge and A-3 show dollars
+            as paid each year; the verdict, the rank list and A-1's months are present values.
           </p>
         </Section>
         <Section id="M-7.2">
@@ -400,9 +435,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             Uncertain inputs (bonus, raises, share price, refreshers, promotions) can have a bear, base and bull value. The three
             are joint scenarios: the bear case sets every uncertain input to its bear value at once, a coherent bad story rather
-            than the worst case. The verdict uses the base case. L-2, If things go badly, shows all three for your stay: which offer
-            holds up best, who wins each, and which of your inputs differ in the bear case. An offer without a range shows one value
-            and says so, rather than looking safe.
+            than the worst case. The verdict uses the base case. Each offer's A-4 states its bear and bull cases a month over your stay,
+            and which of its inputs differ in the bear case; L-2, If things go badly, sets the offers side by side: which holds up best,
+            and who wins each case. An offer without a range shows one value and says so, rather than looking safe.
           </p>
           <Scenarios ctx={ctx} sample={sample} />
         </Section>
@@ -426,6 +461,15 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit.
           </p>
           <p>
+            <strong>An offer's terms (A-4).</strong> Each offer's A-4 lists, in words, what leaving early or starting late can cost under
+            its terms: when its first bonus is paid and whether you must be employed on the payout date, a start on or after a bonus
+            cutoff, a guaranteed first payout, each cash award's clawback window, the first RSU vest and the employer 401(k) money's
+            vesting. Then every cliff inside its stay, dated by the first last day that keeps it, with what leaving the day before
+            gives up, before tax; and the next cliff from its start (from today, once it has started), with what staying until it is
+            worth after tax, as paid: what you'd keep leaving on the cliff's day, less what you'd keep leaving on its start. "If you
+            left on" is L-4's panel for that offer, the same last day as L-4's.
+          </p>
+          <p>
             L-4, Leaving early, shows what you keep for any last day, as paid: each offer's curve by calendar date, so offers that
             start on different days line up, with a step on the day of each payment, vest or clawback step. A prorated clawback's
             monthly steps are drawn as one segment. For the last day you pick it shows what you keep, repay and leave behind, and the
@@ -440,8 +484,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>Where the numbers are simplified or incomplete, in rough order of how much they matter:</p>
           <h3 className="method-sub">Taxes</h3>
           <ul>
-            <li>Where you'd live is where you're taxed, for the whole year. Moving mid-year, working in a different state, and
-              New York's rule that can tax remote workers for a New York employer aren't computed (the last one gets a warning).</li>
+            <li>Where you'd live is where you're taxed, for the whole year. Moving mid-year and working in a different state aren't
+              computed, nor the rules that can tax you for working from home for an employer in another state: New York's, Delaware's
+              and Pennsylvania's, and Connecticut's and New Jersey's for residents of states with such a rule. Where one could apply,
+              the offer gets a warning.</li>
             <li>Maryland county, Ohio city and Pennsylvania local wage taxes aren't included unless entered.</li>
             <li>No dependents or credits such as the child tax credit or EITC, and no alternative minimum tax. Head of household
               uses single filers' state rules.</li>
@@ -530,7 +576,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           </p>
           <p>
             Each schedule has a reference, as on a workpaper: an offer's breakdown is its letter and a part (A-1, offer A's bottom
-            line); the comparison's are L (the lead schedule) and L-1 to L-6; the methodology's are M-1 to M-13. A printed page cites
+            line, to A-7, its work); the comparison's are L (the lead schedule) and L-1 to L-4; the methodology's are M-1 to M-13. L-5
+            and L-6 aren't used any more: since stop 5B each offer's warnings and tables are in its A-6 and A-7. A printed page cites
             them the same way.
           </p>
           <p>
@@ -543,7 +590,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               {([
                 ["recomputed", "Recomputed from other figures; opens the arithmetic."],
                 ["footed", "The total of the lines above it."],
-                ["crossFooted", "Ties to the same figure on another schedule: L-6's stay to L-1's, its present value to the rank list."],
+                ["crossFooted", "Ties to the same figure on another schedule: A-7's stay to L-1's, its present value to the rank list."],
                 ["traced", "Something you entered, a sample input, or published data (IRS, BEA, HUD, Census)."],
                 ["default", "A default you haven't changed, with the reason for it."],
                 ["estimate", "Estimated, not entered: a rent you can replace with yours."],
@@ -561,7 +608,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             arithmetic before rounding has 109,462.63). In a calendar year's tax with the offer, the total is the tax without it
             plus the offer's tax, and the federal income tax, the largest line, takes the rounding, as on a rounded schedule; its
             work shows the unrounded figure. Present values aren't sums of the years (each payment is discounted from its date),
-            so they're worked out before rounding, and L-6 ties each to the rank list; in a present value's own work, one line takes
+            so they're worked out before rounding, and A-7 ties each to the rank list; in a present value's own work, one line takes
             the rounding (the tax, the largest benefit, or the money saved at face value), so its column adds up too.
           </p>
           <p>
@@ -638,11 +685,28 @@ function PipelineExample({ ctx, sample }: { ctx: WorkContext; sample: boolean })
     <Live>
       <p className="live-head">Your numbers: {letter}, year 1, as paid <Illustrative sample={sample} /></p>
       <p>
-        {steps.map(([k, v]) => `${k} ${dollars(v)}`).join(" → ")} → after rent, at {place} prices, {place} {dollars(own)}.
+        {steps.map(([k, v]) => `${k} ${dollars(v)}`).join(" → ")} → after rent, at {place} prices, {dollars(own)} in {place} dollars.
         {info.area.code !== info.reference.code && (
-          <> Restated at {p.place} prices for a comparison: {place} {dollars(own)} {step >= 0 ? "−" : "+"} {place} prices {dollars(Math.abs(step))} ={" "}
-            {p.unit}{figure(y.col.total)}.</>
+          <> Restated at {p.place} prices for a comparison: {dollars(own)} in {place} dollars {step >= 0 ? "−" : "+"} {dollars(Math.abs(step))} for{" "}
+            {place}'s {step >= 0 ? "higher" : "lower"} prices = {dollars(y.col.total)} in {p.dollars}.</>
         )}
+      </p>
+    </Live>
+  );
+}
+
+/** M-1.1: the first offer's year 1, each $100 of its pay, as its A-2 shows it. */
+function Hundred({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
+  const letter = (Object.keys(ctx.own?.breakdowns ?? {}) as Letter[]).sort()[0];
+  const b = letter ? ctx.own!.breakdowns[letter] : undefined;
+  const h = b ? hundredOf(b.detail, 1) : null;
+  if (!h) return null;
+  return (
+    <Live>
+      <p className="live-head">Your numbers: {letter}-2, year 1 <Illustrative sample={sample} /></p>
+      <p>
+        Paid in year 1, {dollars(h.paid)}: {h.parts.map((q) => `${A2_LABEL[q.part]} ${figure(q.dollars)} (${centsText(q.cents)})`).join(", ")}, of each $100 of
+        year-1 pay; {h.parts.map((q) => centsText(q.cents)).join(" + ")} = $100.00.
       </p>
     </Live>
   );
@@ -789,39 +853,43 @@ function Scenarios({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   );
 }
 
-/** M-9: what leaving early would cost under your offers' terms, and L-4's panel when it has worked one out. */
+/** M-9: what leaving early would cost under each offer's terms (its A-4), and L-4's panel when it has worked one out. */
 function LeavingEarly({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const r = ctx.results;
-  if (!r?.detail || r.detail.years !== r.view.row.years) return <p className="method-note">Fill in two offers to see this with your numbers.</p>;
-  const leave = r.leave;
+  const letters = (Object.keys(ctx.own?.breakdowns ?? {}) as Letter[]).sort();
+  if (!letters.length) return <p className="method-note">Fill in an offer to see this with your numbers.</p>;
+  const leave = r?.leave;
   return (
     <Live>
-      <p className="live-head">Your offers, if you left early <Illustrative sample={sample} /></p>
+      <p className="live-head">Your {letters.length === 1 ? "offer" : "offers"}, if you left early <Illustrative sample={sample} /></p>
       <ul className="method-list">
-        {r.letters.map((letter, i) => {
+        {letters.map((letter) => {
           const app = ctx.offers.find((o) => o.letter === letter);
           const input = app ? toOfferInput(app) : null;
           const o = input && "offer" in input ? input.offer : null;
-          const d = r.detail!.offers[i];
+          const d = ctx.own!.breakdowns[letter]!.detail;
           if (!o) return null;
-          const facts = leaveTerms(o, d);
-          const p = leave?.panels[i];
+          const facts = [...leaveTerms(o, d), ...bonusTerms(o)];
+          const p = leave && r?.letters.includes(letter) ? leave.panels[r.letters.indexOf(letter)] : ctx.own?.leave?.panels[letter];
           const lost = p ? forfeits(p.warnings, o.startDate).reduce((sum, f) => sum + f.earned, 0) : 0;
           return (
             <li key={letter}>
               <strong>{letter}</strong>: {facts.length ? `${facts.join("; ")}.` : "nothing is lost by leaving early beyond the pay itself."}
               {p && (
-                <> At the last day picked in L-4, {longDate(p.leaveDate)}, it keeps {dollars(p.afterTaxCompKept)} after tax
+                <> At the last day picked {r ? "in L-4" : "in A-4"}, {longDate(p.leaveDate)}, it keeps {dollars(p.afterTaxCompKept)} after tax
                   {p.clawbackOwed >= 0.5 ? `, repays ${dollars(p.clawbackOwed)}` : ""}{lost >= 0.5 ? ` and forfeits ${dollars(lost)} earned toward bonuses` : ""}.</>
               )}
             </li>
           );
         })}
       </ul>
-      <p>{leave ? "" : "L-4 works out what you'd keep for any last day. "}<a href="#/">See L-4 on the comparison</a></p>
+      <p>{panelsWorked(leave, ctx) ? "" : `${r ? "L-4" : "Each offer's A-4"} works out what you'd keep for any last day. `}<a href="#/">See {r ? "L-4 on the comparison" : "A-4"}</a></p>
     </Live>
   );
 }
+
+/** Whether a last day's panel is worked out: L-4's, or with one offer A-4's. */
+const panelsWorked = (leave: unknown, ctx: WorkContext) => !!leave || !!ctx.own?.leave;
 
 /** M-7.4: L-3's numbers, once it has worked them out. */
 function WhatItWouldTake({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {

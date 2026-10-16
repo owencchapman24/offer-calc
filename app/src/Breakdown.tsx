@@ -1,5 +1,8 @@
 import { type Dispatch, type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import type { OfferInput } from "../../src/offer/types";
+import type { PartsProps } from "./BreakdownParts";
+import { lazyModule, useLazyModule, useLoadNear } from "./lazy";
+import type { WorkContext } from "./metrics";
 import { inDollars, ownSentence, ownView, type OwnView, prefixOf, shareText, stayText, taxRateText } from "./breakdownModel";
 import { Fig, useRovingTicks } from "./figures";
 import { type AppOffer, type Letter, type Missing, toOfferInput } from "./model";
@@ -9,10 +12,11 @@ import type { Action } from "./session";
 import { cents, dollars } from "./text";
 import { markFirstAnswer, Stamp, TickLegend, usePrinting } from "./ui";
 
-// An offer's breakdown (docs/v2-plan.md, item 5, stop 5A): A-1, its bottom line, over its own stay at its own prices. With one
-// offer it's pinned where the verdict goes; with two or more it's a section under the columns, one offer at a time, and the
-// ledger's "On its own" row gives each offer's bottom line in the common dollars. Loaded once the page has painted, beside the worker, not in
-// the main chunk (App.tsx); like the schedules it imports figures.tsx, never Tickmarks.tsx.
+// An offer's breakdown (docs/v2-plan.md, item 5, stops 5A and 5B): A-1, its bottom line, over its own stay at its own prices, then
+// A-2 to A-7 (BreakdownParts.tsx, a chunk of their own, loaded as you scroll toward them). With one offer A-1 is pinned where the
+// verdict goes and A-2 to A-7 are a section under the columns; with two or more the breakdown is a section under the columns, one
+// offer at a time, and the ledger's "On its own" row gives each offer's bottom line in the common dollars. Loaded once the page has
+// painted, beside the worker, not in the main chunk (App.tsx); like the schedules it imports figures.tsx, never Tickmarks.tsx.
 
 /** One offer, as the breakdown needs it: the ledger's offer, its engine input (complete), and its breakdown once worked out. */
 export interface OwnOffer { offer: AppOffer; input: OfferInput | null; breakdown: Breakdown | null; missing: Missing[] }
@@ -27,6 +31,8 @@ export function ownSlots(a: {
   stayYears: number; updating: boolean; sample: boolean; notes: string[]; firstUse: boolean; dispatch: Dispatch<Action>;
   /** Problems with the latest inputs, each with "Fix it" (Lead.tsx's, which this chunk mustn't import: it would split the main chunk). */
   problems: ReactNode;
+  /** What A-2 to A-7 need beyond the offer and the page's context: the page's state and its slow jobs (BreakdownParts.tsx). */
+  parts: Omit<PartsProps, "ctx" | "x" | "prices">;
 }) {
   const owned: OwnOffer[] = a.offers.map((o) => {
     const r = toOfferInput(o);
@@ -43,7 +49,10 @@ export function ownSlots(a: {
     said: alone ? sentenceOf(alone, a.prices) : null,
     pinned: alone ? <OwnPinned x={alone} prices={a.prices} withRef={!a.prices.us} updating={a.updating} sample={alone.offer.sample !== null}
       problems={a.problems} notes={a.notes} firstUse={a.firstUse} dispatch={a.dispatch} /> : null,
-    section: comparing ? <BreakdownSection offers={owned} tab={tab} prices={a.prices} updating={a.updating} sample={a.sample} dispatch={a.dispatch} /> : null,
+    /** Under the columns, given the page's context: with two or more offers the breakdowns, one at a time; with one, its A-2 to A-7. */
+    section: (ctx: WorkContext) => (comparing
+      ? <BreakdownSection offers={owned} tab={tab} prices={a.prices} updating={a.updating} sample={a.sample} dispatch={a.dispatch} ctx={ctx} parts={a.parts} />
+      : alone?.input && alone.breakdown ? <PartsSection x={alone} prices={a.prices} sample={a.sample} ctx={ctx} parts={a.parts} /> : null),
     foot: comparing ? <OwnRow offers={owned} prices={a.prices} dispatch={a.dispatch} /> : null,
     bar: (place: "top" | "bottom", hidden = false) => (alone
       ? <OwnBar x={alone} prices={a.prices} place={place} stayYears={a.stayYears} updating={a.updating} hidden={hidden} /> : null),
@@ -202,11 +211,42 @@ export function OwnPinned({ x, prices, withRef, updating, sample, problems, note
 }
 
 /**
- * Two or more offers: the breakdowns, one offer at a time behind a tab list (the offer chosen is the phone's ledger tab too,
- * `ui.offerTab`), before the comparison, with a way past them to it.
+ * An offer's breakdown, A-2 to A-7 (BreakdownParts.tsx): loaded as you scroll toward it. Here, not in Later.tsx: this chunk importing
+ * Later.tsx split modules off the main chunk. The page loads it through this chunk (Later.tsx's loadParts).
  */
-export function BreakdownSection({ offers, tab, prices, updating, sample, dispatch }: {
-  offers: OwnOffer[]; tab: Letter; prices: PriceWords; updating: boolean; sample: boolean; dispatch: Dispatch<Action>;
+export const partsModule = lazyModule(() => import("./BreakdownParts"));
+
+/** A-2 to A-7 for an offer, once their code is here: it loads as you scroll toward them. */
+function PartsSlot(props: PartsProps) {
+  const m = useLazyModule(partsModule);
+  const ref = useRef<HTMLDivElement>(null);
+  useLoadNear(partsModule, ref, m !== null);
+  return m ? <m.OwnParts {...props} /> : <div ref={ref} className="later parts-slot" />;
+}
+
+/** One offer: A-2 to A-7 under the columns, full width, A-1 being pinned beside them (docs/v2-plan.md, item 5, "How it's reached"). */
+function PartsSection({ x, prices, sample, ctx, parts }: {
+  x: OwnOffer; prices: PriceWords; sample: boolean; ctx: WorkContext; parts: Omit<PartsProps, "ctx" | "x" | "prices">;
+}) {
+  return (
+    <section id="breakdown" className="schedule breakdown parts-only" aria-labelledby="breakdown-title">
+      <header className="schedule-head">
+        <h2 id="breakdown-title" tabIndex={-1}>{x.offer.letter} · {x.offer.draft.label || `Offer ${x.offer.letter}`}, in full</h2>
+        {sample && <Stamp>{x.offer.sample === "edited" ? "Edited sample" : "Sample"}</Stamp>}
+      </header>
+      <PartsSlot {...parts} ctx={ctx} x={x} prices={prices} />
+      <TickLegend />
+    </section>
+  );
+}
+
+/**
+ * Two or more offers: the breakdowns, one offer at a time behind a tab list (the offer chosen is the phone's ledger tab too,
+ * `ui.offerTab`), before the comparison, with a way past them to it: A-1, then A-2 to A-7.
+ */
+export function BreakdownSection({ offers, tab, prices, updating, sample, dispatch, ctx, parts }: {
+  offers: OwnOffer[]; tab: Letter; prices: PriceWords; updating: boolean; sample: boolean; dispatch: Dispatch<Action>; ctx: WorkContext;
+  parts: Omit<PartsProps, "ctx" | "x" | "prices">;
 }) {
   const ref = useRef<HTMLElement>(null);
   useRovingTicks(ref);
@@ -247,14 +287,16 @@ export function BreakdownSection({ offers, tab, prices, updating, sample, dispat
       <div id="own-panel" role="tabpanel" aria-labelledby={`own-tab-${shown.offer.letter}`}>
         <h3 id="own-title" className="part-title" tabIndex={-1}><span className="ref">{shown.offer.letter}-1</span> The bottom line</h3>
         {v ? <OwnBody v={v} prices={prices} compared /> : <OwnWaiting x={shown} />}
+        {shown.input && shown.breakdown && <PartsSlot {...parts} ctx={ctx} x={shown} prices={prices} />}
       </div>
-      {/* In print, every offer's bottom line, each under its own heading. */}
+      {/* In print, every offer's breakdown, each under its own heading. */}
       {printing && offers.filter((x) => x !== shown).map((x) => {
         const w = viewOf(x, prices, true);
         return (
           <div key={x.offer.id} className="own-print">
             <h3 className="part-title"><span className="ref">{x.offer.letter}-1</span> {nameOf(x.offer)}: the bottom line</h3>
             {w ? <OwnBody v={w} prices={prices} compared /> : <OwnWaiting x={x} />}
+            {x.input && x.breakdown && <PartsSlot {...parts} ctx={ctx} x={x} prices={prices} />}
           </div>
         );
       })}

@@ -63,6 +63,8 @@ export interface OfferDetail {
   /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
   rsus: Array<{ ey: number; date: ISODate; gross: number; refresher: boolean; tranche: number; tranches: number;
     priceFactor: number; nominalDate?: ISODate }>;
+  /** Cash awards (a sign-on, a relocation payment): when, how much, which award (A-3's dates). */
+  cash: Array<{ ey: number; date: ISODate; gross: number; award: string }>;
 }
 
 export interface AnnuityTerm { date: ISODate; days: number; factor: number }
@@ -200,9 +202,13 @@ export const tieJob = (lane: BreakevenRequest["lane"], c: CompareRequest, basis:
   stayYears: c.stayYears, basis, winner: lead.winner, runnerUp: lead.runnerUp,
 });
 
-// ---- L-6, the work: every payment and each calendar year's tax (docs/ui-design.md §4.8), sent only once L-6 is open ------
+// ---- A-7, the work: every payment and each calendar year's tax (docs/ui-design.md §4.8, L-6 until stop 5B), sent only once it's
+// open ------
 
-/** Your stay's projection, base case, over the comparison window: as the fast lane projects it, so the figures tie. */
+/**
+ * Each offer's stay, base case, over its own stay (its breakdown's, docs/v2-plan.md item 5, B3): as the fast lane projects its
+ * breakdown, so the figures tie.
+ */
 export interface WorkRequest extends SlowBase { lane: "work"; valuationDate: ISODate; discountRate: number; stayYears: number }
 /** A payment: dated and rounded to the cent as the engine has it, with its share of its calendar year's tax. */
 export interface WorkPayment { date: ISODate; component: Component; detail: EventDetail; gross: number; tax: number; calendarYear: number; ey: number }
@@ -224,18 +230,37 @@ export interface WorkTaxYear {
  */
 export interface WorkOffer { payments: WorkPayment[]; taxYears: WorkTaxYear[] }
 
-/** L-6's request for a comparison: the lead schedule's and L-6's are built alike, so a result can be matched to its inputs. */
+/** A-7's request for the complete offers: built alike wherever it's asked for, so a result can be matched to its inputs. */
 export const workJob = (c: CompareRequest): Omit<WorkRequest, "gen"> => ({
   lane: "work", offers: c.offers, household: c.household, inflation: c.inflation, valuationDate: c.valuationDate, discountRate: c.discountRate,
   stayYears: c.stayYears,
 });
 
-export type SlowRequest = LeaveRequest | CursorRequest | BreakevenRequest | WorkRequest;
+// ---- A-4, terms that can bite: each offer's cliffs inside its own stay, and its next cliff --------------------------------------
+
+/** Each offer's cliffs inside its own stay, and the next one from its start (from `today`, once it has started). */
+export interface TermsRequest extends SlowBase { lane: "terms"; stayYears: number; today: ISODate }
+export interface OfferTerms {
+  /** Every cliff from the offer's start to its stay's end (exclusive), in date order: the first last day that keeps each. */
+  cliffs: Cliff[];
+  /** The day the next cliff is counted from: the start, or today once the offer has started. */
+  from: ISODate;
+  /** The next cliff after `from`, past a prorated clawback's monthly steps, while it's inside the stay; null if none is. */
+  next: NextCliffResult["next"];
+  /** After-tax pay kept, as paid, if your last day were `from`, and if it were the next cliff's day: their difference is staying until it. */
+  kept: { from: number; at: number } | null;
+}
+export const termsJob = (c: CompareRequest, today: ISODate): Omit<TermsRequest, "gen"> => ({
+  lane: "terms", offers: c.offers, household: c.household, inflation: c.inflation, stayYears: c.stayYears, today,
+});
+
+export type SlowRequest = LeaveRequest | CursorRequest | BreakevenRequest | WorkRequest | TermsRequest;
 export type SlowLane = SlowRequest["lane"];
 export type SlowResponse = { gen: number; /** From the request's arrival to the result: the wait included. */ ms: number } & (
   | { lane: "leave"; ok: true; curves: LeaveCurve[] }
   | { lane: "cursor"; ok: true; panels: Array<LeavePanel | null> }
   | { lane: "flip" | "breakeven"; ok: true; ties: Ties }
   | { lane: "work"; ok: true; work: WorkOffer[] }
+  | { lane: "terms"; ok: true; terms: OfferTerms[] }
   | { lane: SlowLane; ok: false; error: string }
 );

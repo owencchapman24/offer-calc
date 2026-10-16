@@ -5,7 +5,8 @@ import { keptIfLeaving, leaveDaySweep, projectScenario } from "../../src/offer/p
 import type { BreakevenResult, Cliff, Household, ISODate, LeaveDayRow, OfferInput, ValuedOptions, ValueBasis } from "../../src/offer/types";
 import type { TaxInput, TaxResult } from "../../src/tax/types";
 import type {
-  BreakevenRequest, CursorRequest, LeaveCurve, LeavePanel, LeaveRequest, SlowResponse, TaxRun, TieRow, WorkOffer, WorkRequest,
+  BreakevenRequest, CursorRequest, LeaveCurve, LeavePanel, LeaveRequest, OfferTerms, SlowResponse, TaxRun, TermsRequest, TieRow, WorkOffer,
+  WorkRequest,
 } from "./protocol";
 
 // The slow lane's jobs (docs/ui-design.md §3.4, §4.5, §4.6, §4.8): generators that the worker's runner
@@ -121,7 +122,40 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
   };
 }
 
-// ---- L-6: every payment, and each calendar year's tax ---------------------------------------------------------
+// ---- A-4: the cliffs inside each offer's own stay, and its next cliff ------------------------------------------------
+
+/**
+ * Each offer's cliffs from its start to its own stay's end, and the next one from its start (from today, once it has started), with
+ * what staying until it is worth: a chunk per offer and its next cliff, about 4-8 ms each.
+ */
+export function* termsJob(req: TermsRequest, post: (r: SlowResponse) => void, now = () => performance.now()): Generator<void> {
+  const t0 = now();
+  try {
+    const options = { inflation: req.inflation, years: req.stayYears + 1 };
+    const terms: OfferTerms[] = [];
+    for (const o of req.offers) {
+      const end = addMonths(toDays(o.startDate), 12 * req.stayYears);
+      const list = cliffs(o, req.household, options).filter((c) => toDays(c.date) < end);
+      yield;
+      const from = req.today > o.startDate ? req.today : o.startDate;
+      const found = toDays(from) < end ? nextCliff(o, req.household, from, options, { skip: proratedStep }).next : null;
+      const next = found && toDays(found.date) < end ? found : null;
+      yield;
+      // What leaving on each of the two days keeps, so the value of staying is shown as their difference.
+      const kept = next ? {
+        from: keptIfLeaving(o, req.household, toDays(from), options).afterTaxCompKept,
+        at: keptIfLeaving(o, req.household, toDays(next.date), options).afterTaxCompKept,
+      } : null;
+      terms.push({ cliffs: list, from, next, kept });
+      yield;
+    }
+    post({ lane: "terms", gen: req.gen, ok: true, terms, ms: now() - t0 });
+  } catch (e) {
+    post({ lane: "terms", gen: req.gen, ok: false, error: message(e), ms: now() - t0 });
+  }
+}
+
+// ---- A-7: every payment, and each calendar year's tax ---------------------------------------------------------
 
 /** A tax engine run's figures, unrounded: what went in and what came out. */
 function taxRun(input: TaxInput, r: TaxResult): TaxRun {
@@ -133,18 +167,17 @@ function taxRun(input: TaxInput, r: TaxResult): TaxRun {
 }
 
 /**
- * L-6's payments and tax years: each offer's stay projected as the fast lane projects it (base case, the comparison window),
- * a chunk per offer. The payments are those in the calendar years its stay's employment years touch, so each year's tax
- * table has all of its payments, those after the stay's last employment year included.
+ * A-7's payments and tax years: each offer's stay projected as the fast lane projects its breakdown (base case, over its own stay:
+ * docs/v2-plan.md, item 5, B3), a chunk per offer. The payments are those in the calendar years its stay's employment years touch,
+ * so each year's tax table has all of its payments, those after the stay's last employment year included.
  */
 export function* paymentsJob(req: WorkRequest, post: (r: SlowResponse) => void, now = () => performance.now()): Generator<void> {
   const t0 = now();
   try {
-    const window = comparisonWindow(req.offers, req.stayYears);
-    const options = { valuationDate: req.valuationDate, inflation: req.inflation, discountRate: req.discountRate, scenario: "base" as const, window };
+    const options = { valuationDate: req.valuationDate, inflation: req.inflation, discountRate: req.discountRate, scenario: "base" as const };
     const work: WorkOffer[] = [];
     for (const o of req.offers) {
-      const r = projectScenario(o, req.household, options);
+      const r = projectScenario(o, req.household, { ...options, window: comparisonWindow([o], req.stayYears) });
       const ys = r.employmentYears.slice(0, req.stayYears);
       const lastDay = ys.length ? fromDays(toDays(ys[ys.length - 1].end) - 1) : o.startDate;
       const lastYear = Math.max(Number(lastDay.slice(0, 4)), ...r.events.filter((e) => e.employmentYear <= req.stayYears).map((e) => e.calendarYear));

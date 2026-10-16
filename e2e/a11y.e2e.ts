@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
 import {
   addOffer, EDITORS, fillOffer, loadSchedules, openAlone, openCompare, openEditor, openSection, openWithSaved, openWork, ownSettled, printWithButton,
-  quiet, SAVED, SECTIONS, selectOffer, settled, showByYear, showTheWork, stubPrint,
+  quiet, SAVED, SECTIONS, selectOffer, settled, showByYear, showParts, showTheWork, stubPrint,
 } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
@@ -21,10 +21,10 @@ test.describe("compare", () => {
     await scan(page, "About you, filing jointly");
   });
 
-  test("the schedules, L-1 to L-5", async ({ page }) => {
+  test("the schedules, L-1 to L-4", async ({ page }) => {
     await openCompare(page);
     await loadSchedules(page);
-    await scan(page, "L-1 to L-5");
+    await scan(page, "L-1 to L-4");
     // L-4 on your stay's last day: the panel reconciles leaving then with the stay.
     await page.getByRole("button", { name: /^Your stay's last day/ }).click();
     await expect(page.locator(".leave-recon").first()).toBeVisible();
@@ -32,25 +32,38 @@ test.describe("compare", () => {
     await scan(page, "L-4 on your stay's last day");
   });
 
-  // L-6 open is the longest page there is (every schedule loaded, and some 500 figures in its tables): each state its own test,
-  // with room for a slow runner.
-  test("L-6, A's tables", async ({ page }) => {
+  // An offer's A-7 open is the longest part there is (some 500 figures in its tables): each state its own test, with room for a
+  // slow runner.
+  test("A-7, A's tables", async ({ page }) => {
     test.setTimeout(180_000);
     await openCompare(page);
     await openWork(page, "A");
-    await scan(page, "L-6: A's tables");
+    await scan(page, "A-7: A's tables");
   });
 
-  test("L-6, C's tables, and a payment's tax worked out", async ({ page }) => {
+  test("C-7, C's tables, and a payment's tax worked out", async ({ page }) => {
     test.setTimeout(180_000);
     await openCompare(page);
     // C has RSUs and refreshers: the most lines and payments.
     await openWork(page, "C");
-    await scan(page, "L-6: C's tables");
+    await scan(page, "C-7: C's tables");
     // Show the work from a payment's tax: its rate, from the year's tax table.
-    await page.locator('.l6-payments [data-metric$=".tax"]').first().click();
+    await page.locator('section[aria-labelledby="C-7-title"] .l6-payments [data-metric$=".tax"]').first().click();
     await expect(page.locator(".work .work-lines")).toBeVisible();
-    await scan(page, "L-6: a payment's tax, its work");
+    await scan(page, "C-7: a payment's tax, its work");
+  });
+
+  test("each offer's breakdown, A-2 to A-6, every part's detail open", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openCompare(page);
+    for (const letter of ["A", "B", "C"]) {
+      await showParts(page, letter);
+      await scan(page, `the breakdowns: ${letter}-2 to ${letter}-6, open`);
+    }
+    // Show the work for a share of the $100, and for A-4's next cliff.
+    await page.locator('[data-metric="a2.C.1.taxShare"]').first().click();
+    await expect(page.locator(".work .work-lines")).toBeVisible();
+    await scan(page, "C-2: a share of the $100, its work");
   });
 
   test("L-1's table view", async ({ page }) => {
@@ -93,7 +106,7 @@ test.describe("compare", () => {
 
   test("tickmarks hidden", async ({ page }) => {
     await openCompare(page);
-    // The setting is at the foot of the page: going there brings L-2 to L-5 on screen. Load and work them out first, so the scan
+    // The setting is at the foot of the page: going there brings L-2 to L-4 on screen. Load and work them out first, so the scan
     // never catches L-3 or L-4 dimmed while they're worked out (on a phone or tablet, the scan's unstuck bar moves them).
     await loadSchedules(page);
     await page.locator("label", { hasText: "Hide tickmarks" }).click();
@@ -142,6 +155,15 @@ test.describe("compare: one offer, and the breakdowns", () => {
     await page.locator('[data-metric="own.A.total"]').first().click();
     await expect(page.locator(".work .work-lines")).toBeVisible();
     await scan(page, "one offer: A-1's month, its work");
+  });
+
+  test("one offer: A-2 to A-7 under the columns, every part's detail open", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openAlone(page);
+    await showParts(page, "A");
+    await scan(page, "one offer: A-2 to A-6, open");
+    await openWork(page, "A");
+    await scan(page, "one offer: A-7's tables");
   });
 
   test("one blank offer: what's missing, then the comparison appearing", async ({ page }) => {

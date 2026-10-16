@@ -36,8 +36,10 @@ export interface UiState {
   editor?: { row: string; letter: Letter } | null;
   /** On a phone, the offer the ledger shows (its tab). Missing, or an offer that's gone: the first. */
   offerTab?: Letter;
-  /** L-6, the work: whether its tables are open (closed by default), and the offer shown (missing, or gone: the first). */
+  /** A-7, the work (L-6 until stop 5B): whether its tables are open (closed by default). `letter`: L-6's offer, no longer read. */
   work?: { open: boolean; letter?: Letter };
+  /** The breakdown's parts, A-2 to A-6: each one's detail ("Show …"), shown or not, for every offer. */
+  parts?: Partial<Record<"a2" | "a3" | "a4" | "a5" | "a6", boolean>>;
   /** Tickmarks shown beside the figures (the default), or hidden for a cleaner read (docs/ui-design.md §9.1). */
   ticks?: Ticks;
 }
@@ -75,7 +77,7 @@ export type Action =
   | { type: "basis"; basis: Basis }
   | { type: "theme"; theme: Theme }
   | { type: "dismiss"; hint: Hint }
-  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab" | "work" | "ticks">> }
+  | { type: "ui"; patch: Partial<Pick<UiState, "byYear" | "bridge" | "mode" | "section" | "editor" | "offerTab" | "work" | "ticks" | "parts">> }
   /** An import: replaces every offer and About you, and takes the file's view choices, if any. */
   | { type: "replace"; household: AppHousehold; offers: AppOffer[]; ui?: Partial<UiState> }
   /** "Delete all data": back to the first visit, with the samples. */

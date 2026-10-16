@@ -2,16 +2,17 @@ import { type Dispatch, type KeyboardEvent, type PointerEvent, useId, useRef, us
 import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import { basisPhrase, type MetricId, pricesOf, type WorkContext } from "./metrics";
-import { type Bridge as BridgeData, bridge, byYear, type ByYear as ByYearData, yearNotes } from "./byYearModel";
+import { byYear, type ByYear as ByYearData, yearNotes } from "./byYearModel";
 import type { Action, UiState } from "./session";
 import { niceTicks, useChartWidth } from "./axes";
-import { cents, dayBefore, dollars, figure, longDate } from "./text";
+import { cents, dollars, figure } from "./text";
 import { placeOf } from "./verdict";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
-// L-1 · By year (docs/ui-design.md §4.3) and, beside it, the bridge from the offer letter (§5, W4). It loads as you scroll
-// toward it (Later.tsx), so it imports figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
+// L-1 · By year (docs/ui-design.md §4.3). The bridge from the offer letter (§5, W4) was beside it until stop 5B; it's in each offer's
+// breakdown now, A-2 (docs/v2-plan.md, item 5, B7). It loads as you scroll toward it (Later.tsx), so it imports figures.tsx, not
+// Tickmarks.tsx: see figures.tsx for why.
 // The chart is hand-built SVG: one axis, 2px lines, 8px markers with a 2px sheet ring, a solid
 // hairline grid, a legend plus direct end labels, and a crosshair readout of every offer at a year.
 
@@ -75,11 +76,10 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
           {table && <YearTable offers={offers} basis={basis} units={unit(basis, ctx)} running={mode === "running" && basis !== "perHour"} years={r.view.row.years}
             say={(v, n) => said(ctx, basis, v, n)} perHour={(l) => r.view.row.values.perHour?.[r.letters.indexOf(l)] ?? 0} />}
           {table && (
-            <p className="caption">Each year ties to L-6, The work, below: every line of it, every payment behind it, and your stay's present value as
-              in the rank list.</p>
+            <p className="caption">Each year ties to the offer's breakdown above: A-2's bridge for every line of it, and A-7 for every payment behind
+              it.</p>
           )}
         </div>
-        <Bridge ctx={ctx} ui={ui} dispatch={dispatch} />
       </div>
       <TickLegend />
     </section>
@@ -254,76 +254,5 @@ function YearTable({ offers, basis, units, running, years, say, perHour: rate }:
         )}
       </tfoot>
     </table>
-  );
-}
-
-// ---- the bridge ---------------------------------------------------------------------------------
-
-function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch: Dispatch<Action> }) {
-  const r = ctx.results!;
-  const letter = ui.bridge && r.letters.includes(ui.bridge.letter) ? ui.bridge.letter : r.letters[0];
-  const n = Math.min(ui.bridge?.year ?? 1, r.view.row.years);
-  let b: BridgeData;
-  try {
-    b = bridge(ctx, letter, n);
-  } catch {
-    return null;
-  }
-  const offer = ctx.offers.find((o) => o.letter === letter);
-  const set = (patch: Partial<{ letter: Letter; year: number }>) => dispatch({ type: "ui", patch: { bridge: { letter, year: n, ...patch } } });
-  const money = (v: number) => (v < 0 ? `(${figure(-v)})` : figure(v));
-  // A line's label says its dollars: after rent, the prices picked; the price line, the prices it steps across; the rest, "$".
-  const place = pricesOf(ctx).unit.slice(0, -2);
-  const say = (line: string, v: number) => (line === "total" ? `${place} ${dollars(v)}` : line === "prices" ? figure(Math.abs(v)) : dollars(Math.abs(v)));
-  return (
-    <div className="bridge" id="bridge">
-      <div className="chart-bar">
-        <h3 className="chart-title" id="bridge-title" tabIndex={-1}>From the offer letter</h3>
-        <div className="bridge-pick">
-          <div className="segmented" role="group" aria-label="Offer">
-            {r.letters.map((l) => (
-              <button key={l} type="button" className={l === letter ? "is-on" : ""} aria-pressed={l === letter} onClick={() => set({ letter: l })}>{l}</button>
-            ))}
-          </div>
-          <select aria-label="Employment year" value={n} onChange={(e) => set({ year: Number(e.target.value) })}>
-            {Array.from({ length: r.view.row.years }, (_, i) => i + 1).map((y) => <option key={y} value={y}>Year {y}</option>)}
-          </select>
-        </div>
-      </div>
-      <p className="bridge-scope">
-        <strong className={`who offer-${letter}`}>{letter}</strong>{offer?.draft.label ? ` · ${offer.draft.label}` : ""} · year {n} ({longDate(b.start)} – {longDate(dayBefore(b.end))})
-      </p>
-      <table className="bridge-table">
-        <tbody>
-          {b.rows.map((row) => {
-            const lead = row.kind === "less" || row.kind === "plus" || row.kind === "change" ? (row.value < 0 ? "less" : "plus") : "";
-            return (
-              <tr key={row.id} className={`bridge-${row.kind}${row.kind === "subtotal" ? " rule-single" : row.kind === "total" ? " rule-double" : ""}`}>
-                <th scope="row">
-                  {lead && <span className="bridge-lead">{lead}</span>}{row.label}
-                  {row.gloss && <span className="bridge-gloss">{row.gloss}</span>}
-                </th>
-                <td className="bridge-value">
-                  <Fig id={row.id} label={`${lead ? `${lead} ` : ""}${row.label}, ${say(row.line, row.value)}`}>{money(row.value)}</Fig>
-                  {row.kind === "total" && <span className="tie" aria-hidden="true">&lt;</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {b.spend !== undefined && b.saved !== undefined && (
-        <p className="bridge-month">
-          = <Fig id={`br.${letter}.${n}.spend`} label={`${place} ${dollars(b.spend)} a month to spend after rent, in year ${n}`}>{dollars(b.spend)}</Fig> a
-          month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${place} ${dollars(b.saved)} a month saved, in year ${n}`}>
-            {dollars(b.saved)}</Fig> a month saved, in year {n}, in {pricesOf(ctx).dollars}
-        </p>
-      )}
-      <p className="caption">
-        {b.rows.some((x) => x.line === "total")
-          ? `Each subtotal is footed (^), and the total ties (<) to ${letter}'s year ${n} in the chart on the after-rent basis.`
-          : "Each subtotal is footed (^). Add a city to carry the bridge through rent and prices."}
-      </p>
-    </div>
   );
 }

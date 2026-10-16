@@ -385,7 +385,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* ---- L-1 by year and the bridge ------------------------------------------------------------------ */
 
 .by-year { margin-top: 24px; }
-.by-year-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+/* L-1's chart, full width: the bridge beside it moved to each offer's A-2 at stop 5B. */
+.by-year-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
 .chart-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .chart-title { margin: 0; font-size: 15px; font-weight: 700; outline: none; }
 .chart { position: relative; }
@@ -709,14 +710,13 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .risk-wins { margin-top: 14px; max-width: 560px; }
 .risk-wins .stays-margin { white-space: nowrap; }
 .risk-table { max-width: 760px; }
-.risk-wrong ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 .later { min-height: 1px; }
 /* L-1's place before its code arrives, about as tall as L-1 itself (the samples, 2026-10-13: 705, 1,135 and 1,406 px), so the page
    lays out as it will: the schedules below stay where they'd be, so they don't load early, and nothing shifts when L-1 comes.
    Not in print: Ctrl+P prints what's loaded. */
-.later.l1-slot { min-height: 705px; }
-@media (max-width: 1179px) { .later.l1-slot { min-height: 1135px; } }
-@media (max-width: 759px) { .later.l1-slot { min-height: 1406px; } }
+/* L-1's place, about as tall as L-1 (its chart and caption; the bridge moved to A-2 at stop 5B), measured at 1440, 820 and 390 px. */
+.later.l1-slot { min-height: 521px; }
+@media (max-width: 759px) { .later.l1-slot { min-height: 652px; } }
 @media print { .later.l1-slot { min-height: 0; } }
 .printing .later.l1-slot { min-height: 0; }
 
@@ -744,6 +744,55 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .breakdown .schedule-head .skip { margin-left: auto; font-size: 13px; }
 .breakdown .schedule-head .skip + .updating { margin-left: 12px; }
 .own-tabs { margin: 0 0 14px; border-bottom: 1px solid var(--rule); max-width: 560px; }
+/* ---- an offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B): compact parts, each one's detail behind its "Show …" ---- */
+
+.own-parts { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.own-parts > .part { border-top: 1px solid var(--rule); padding-top: 14px; }
+.own-parts > .part > :not(.part-head) { transition: opacity 120ms; }
+.own-parts.is-updating > .part > :not(.part-head) { opacity: 0.6; }
+.part-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 8px; }
+.part-head .part-title { margin: 0; }
+.part-head select { min-height: 30px; padding: 2px 6px; }
+.part-lede { margin: 0 0 8px; font-size: 15px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
+.part-note { margin: 6px 0 0; font-size: 14px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
+.part-more { margin: 8px 0 0; font-size: 13.5px; }
+.parts-only .own-parts { margin-top: 4px; }
+.parts-only .own-parts > .part:first-child { border-top: 0; padding-top: 0; }
+/* The $100 and the pay columns: graphite fills told apart by pattern, each keyed in words in its table (no color alone, and these
+   parts aren't offers, so offer colors don't apply). */
+.seg-tax, .seg-salary { background: var(--ink); }
+.seg-rent, .seg-bonus { background: repeating-linear-gradient(90deg, var(--graphite) 0 2px, transparent 2px 4px); }
+.seg-health, .seg-cash { background: repeating-linear-gradient(45deg, var(--graphite) 0 1.5px, transparent 1.5px 5px); }
+.seg-saved, .seg-rsu { background: radial-gradient(var(--graphite) 1.1px, transparent 1.3px) 0 0 / 5px 5px; }
+.seg-spend { background: var(--band); }
+.hundred { max-width: 640px; }
+.hundred-bar { display: flex; height: 18px; border: 1px solid var(--ink); background: var(--sheet); }
+.hundred-seg { min-width: 2px; border-right: 1px solid var(--ink); }
+.hundred-seg:last-child { border-right: 0; }
+.hundred-key, .pay-key { display: inline-block; width: 14px; height: 12px; margin-right: 8px; border: 1px solid var(--ink); vertical-align: -1px; }
+.hundred-table td, .hundred-table th { text-align: right; }
+.hundred-table th[scope="row"], .hundred-table thead th:first-child { text-align: left; }
+.hundred-table th[scope="row"] { white-space: nowrap; }
+.pay-chart { max-width: 520px; margin: 4px 0 4px; }
+.pay-legend { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--graphite); }
+.pay-columns { display: flex; align-items: flex-end; gap: 14px; height: 120px; padding-bottom: 18px; border-bottom: 1px solid var(--ink); position: relative; }
+.pay-column { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; max-width: 64px; }
+.pay-stack { display: flex; flex-direction: column-reverse; border: 1px solid var(--ink); border-bottom: 0; min-height: 2px; }
+.pay-seg { min-height: 1px; }
+.pay-year { position: absolute; bottom: -18px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--muted); }
+.arrivals, .cliffs { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.arrival-date { font-weight: 600; }
+.arrival-year { color: var(--muted); }
+.terms-list { margin: 0 0 4px; padding-left: 18px; font-size: 14px; line-height: 1.55; max-width: 96ch; }
+.left-on input[type="date"] { min-height: 30px; padding: 2px 6px; font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--graphite); }
+/* A-2 to A-7's place, about as tall as they are with every part's detail closed (measured at 1440, 820 and 390 px). */
+.later.parts-slot { min-height: 1810px; }
+@media (max-width: 1179px) { .later.parts-slot { min-height: 1880px; } }
+@media (max-width: 759px) { .later.parts-slot { min-height: 2700px; } }
+@media print { .later.parts-slot { min-height: 0; } }
+.printing .later.parts-slot { min-height: 0; }
+.risk-wrong { color: var(--graphite); }
+
 .row-own > * { border-top: 2px solid var(--ink); }
 .own-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-variant-numeric: tabular-nums; }
 .own-cell .fig { font-weight: 700; }

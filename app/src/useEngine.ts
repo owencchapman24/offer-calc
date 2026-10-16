@@ -3,7 +3,8 @@ import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 import type {
-  Breakdown, EngineRequest, EngineResponse, LeaveCurve, LeavePanel, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties, WorkOffer,
+  Breakdown, EngineRequest, EngineResponse, LeaveCurve, LeavePanel, OfferTerms, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties,
+  WorkOffer,
 } from "./protocol";
 
 /** A slow-lane result (L-3, L-4, L-6, the close-call line): the latest one back, the request it answers, and whether a newer one is on its way. */
@@ -39,8 +40,10 @@ export interface EngineState {
   /** The close-call line's breakeven (§4.1) and L-3's (§4.6). */
   flip: SlowState<Ties>;
   breakeven: SlowState<Ties>;
-  /** L-6's payments and tax years (§4.8): asked for only while it's open. */
+  /** A-7's payments and tax years (§4.8), each offer over its own stay: asked for only while it's open. */
   work: SlowState<WorkOffer[]>;
+  /** A-4's cliffs inside each offer's own stay, and its next cliff: asked for while A-4 is on screen. */
+  terms: SlowState<OfferTerms[]>;
 }
 
 type Body<T> = T extends unknown ? Omit<T, "gen"> : never;
@@ -53,8 +56,9 @@ export interface Engine extends EngineState {
 
 const DEBOUNCE_MS = 200;
 const noSlow = { result: null, key: null, updating: false, error: null, ms: null };
-const LANES: SlowLane[] = ["leave", "cursor", "flip", "breakeven", "work"];
-const slowResult = (r: Extract<SlowResponse, { ok: true }>) => ("curves" in r ? r.curves : "panels" in r ? r.panels : "work" in r ? r.work : r.ties);
+const LANES: SlowLane[] = ["leave", "cursor", "flip", "breakeven", "work", "terms"];
+const slowResult = (r: Extract<SlowResponse, { ok: true }>) =>
+  ("curves" in r ? r.curves : "panels" in r ? r.panels : "work" in r ? r.work : "terms" in r ? r.terms : r.ties);
 
 /**
  * Runs the engine in a Web Worker. Inputs are debounced; each request gets a generation number and
@@ -73,7 +77,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
   const queued = useRef<SlowRequest[]>([]);
   const [state, setState] = useState<EngineState>({
     sweep: null, detail: null, breakdowns: {}, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null,
-    leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow,
+    leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow, terms: noSlow,
   });
   // An import or "Delete all data" replaces every offer: the last valid results were for offers that are gone.
   const seen = useRef(revision);
@@ -81,7 +85,8 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
     if (seen.current === revision) return;
     seen.current = revision;
     for (const l of LANES) slow.current[l].key = null;
-    setState((s) => ({ ...s, sweep: null, detail: null, breakdowns: {}, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow }));
+    setState((s) => ({ ...s, sweep: null, detail: null, breakdowns: {}, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow,
+      terms: noSlow }));
   }, [revision]);
 
   useEffect(() => {

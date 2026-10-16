@@ -3,7 +3,7 @@ import type { Scenario } from "../../src/offer/types";
 import { rangeTicks, useChartWidth } from "./axes";
 import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
-import { CASES, changeText, dropAmount, dropText, leadText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
+import { CASES, dropAmount, dropText, leadText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
 import { cents, figure } from "./text";
 import { placeOf } from "./verdict";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
@@ -61,17 +61,8 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
           <p className="chart-title risk-title">{title}</p>
           <RangeChart v={v} at={at} />
           <Winners v={v} at={at} place={placeOf(r.view, basis) ? pricesOf(ctx).unit : ""} />
-          <div className="risk-wrong">
-            <p className="extra-title">What goes wrong in the bear case</p>
-            <ul>
-              {[...v.rows].sort((a, b) => a.letter.localeCompare(b.letter)).map((x) => (
-                <li key={x.letter}>
-                  <Who l={x.letter} />{" "}
-                  {x.changes.length ? x.changes.map(changeText).join("; ") : x.ranged ? "nothing within your stay" : "no ranges entered"}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* What goes wrong in each offer's bear case is about that offer alone: its breakdown's A-4 says it (docs/v2-plan.md, item 5). */}
+          <p className="part-note risk-wrong">What goes wrong in each offer's bear case is in its breakdown, under A-4, Terms that can bite.</p>
           <p className="caption">
             The bear case is one coherent bad story: every uncertain input at its bear value at once. It isn't the worst case.{" "}
             <a href="#/method/M-8">Methodology M-8</a>.{sample ? " (Sample inputs.)" : ""}{" "}

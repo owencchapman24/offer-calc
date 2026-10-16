@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { loadByYearOnly, openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
+import { loadByYearOnly, openCompare, openParts, openWithSaved, openWork, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -60,7 +60,7 @@ test("living inside Philadelphia adds its wage tax; the suburbs don't", async ({
   await expect(inside).toHaveCount(0);
 });
 
-test("L-6 asks the worker for its payments only once it's opened, and its totals tie to the rank list", async ({ page }) => {
+test("A-7 asks the worker for its payments only once it's opened, and its totals tie to the rank list", async ({ page }) => {
   // What the page asks the engine worker for: each message's lane.
   await page.addInitScript(() => {
     const post = Worker.prototype.postMessage;
@@ -72,11 +72,10 @@ test("L-6 asks the worker for its payments only once it's opened, and its totals
   });
   const lanes = () => page.evaluate(() => (window as unknown as { lanes?: string[] }).lanes ?? []);
   await openCompare(page);
-  // L-6 loads as you scroll toward it, closed: nothing asked for yet.
-  const title = page.locator("#l6-title");
-  for (let i = 0; i < 80 && !(await title.count()); i++) await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.75));
-  await expect(page.locator(".l6-toggle")).toHaveAttribute("aria-expanded", "false");
-  await settled(page);
+  // A's breakdown, A-2 to A-7, loads as you scroll toward it, A-7 closed: its payments aren't asked for yet (A-4's cliffs are).
+  await openParts(page, "A");
+  await expect(page.locator('section[aria-labelledby="A-7-title"] .l6-toggle')).toHaveAttribute("aria-expanded", "false");
+  expect(await lanes()).toContain("terms");
   expect(await lanes()).not.toContain("work");
   await openWork(page, "A");
   expect(await lanes()).toContain("work");
@@ -109,11 +108,11 @@ test("CSV: a table downloads with the figures shown, as plain numbers, flagged a
   await expect(page.getByRole("status").filter({ hasText: l1.name })).toHaveCount(1);
 
   await openWork(page, "C");
-  const pay = await csvOf(page, "Download CSV: L-6.C, every payment");
-  expect(pay.name).toMatch(/-L-6-C-every-payment-sample\.csv$/);
+  const pay = await csvOf(page, "Download CSV: C-7, every payment");
+  expect(pay.name).toMatch(/-C-7-every-payment-sample\.csv$/);
   expect(pay.lines[3]).toBe("Employment year,Kind,Payment,Paid on,How it was worked out,Pay ($),Pay tickmark,Tax ($),Tax tickmark");
   // The first payment, to the cent, as listed.
-  const gross = await shownText(page, '.l6-payments [data-metric="l6p.C.0.gross"]');
+  const gross = await shownText(page, 'section[aria-labelledby="C-7-title"] .l6-payments [data-metric="l6p.C.0.gross"]');
   expect(pay.lines[4]).toContain(`,${gross.replace(/,/g, "")},✓,`);
 });
 
@@ -121,7 +120,7 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   async ({ page }) => {
   await stubPrint(page);
   await openCompare(page);
-  // L-1 loads as you scroll toward it, and only L-1 here: L-2 to L-6 are for the button to load.
+  // L-1 loads as you scroll toward it, and only L-1 here: L-2 to L-4 are for the button to load.
   await loadByYearOnly(page);
   // The browser's own print: what's loaded is laid out for print at once (L-1's table view), before it prints.
   expect(await page.evaluate(() => { window.dispatchEvent(new Event("beforeprint")); return !!document.getElementById("l1-table"); })).toBe(true);
@@ -139,12 +138,16 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   await expect(page.locator("#print-choice")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Print…" })).toBeFocused();
 
-  // The summary: L-2 to L-6 loaded and worked out first (none of them was), every offer's L-6 open but its list of every payment.
-  await expect(page.locator("#l6-title")).toHaveCount(0);
+  // The summary: L-2 to L-4 loaded and worked out first (none of them was), and every offer's breakdown, A-1 to A-7, its A-7 open but
+  // its list of every payment.
+  await expect(page.locator("#l4-title")).toHaveCount(0);
   await printWithButton(page);
-  for (const id of ["l1", "l2", "l3", "l4", "l5", "l6"]) await expect(page.locator(`#${id}-title`)).toBeAttached();
-  for (const s of [".ties", ".leaving", ".the-work"]) await expect(page.locator(s)).toHaveAttribute("data-ready", "1");
-  await expect(page.locator(".l6-offer")).toHaveCount(3);
+  for (const id of ["l1", "l2", "l3", "l4"]) await expect(page.locator(`#${id}-title`)).toBeAttached();
+  for (const s of [".ties", ".leaving"]) await expect(page.locator(s)).toHaveAttribute("data-ready", "1");
+  for (const l of ["A", "B", "C"]) {
+    for (const n of [2, 3, 4, 5, 6, 7]) await expect(page.locator(`#${l}-${n}-title`)).toBeAttached();
+    await expect(page.locator(`section[aria-labelledby="${l}-7-title"]`)).toHaveAttribute("data-ready", "1");
+  }
   await expect(page.locator("table.l6-tax")).toHaveCount(3);
   await expect(page.locator(".l6-payments")).toHaveCount(0);
   await expect(page.locator(".l6-elsewhere")).toHaveCount(3);
@@ -157,9 +160,9 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   await expect(page.locator(".l6-payments")).toHaveCount(3);
   await expect(page.locator(".l6-elsewhere")).toHaveCount(0);
   await page.emulateMedia({ media: "print" });
-  // On paper: every schedule's legend (the lead, the breakdowns and L-1 to L-6), no buttons but the figures, B's lines dashed and C's
+  // On paper: every schedule's legend (the lead, the breakdowns and L-1 to L-4), no buttons but the figures, B's lines dashed and C's
   // dotted, the footer's sample flag.
-  await expect(page.locator(".schedule .legend")).toHaveCount(8);
+  await expect(page.locator(".schedule .legend")).toHaveCount(6);
   await expect(page.getByRole("button", { name: "Print…" })).toBeHidden();
   await expect(page.locator(".segmented").first()).toBeHidden();
   const dash = (letter: string) => page.locator(`.by-year .series.offer-${letter} .series-line`).evaluate((el) => getComputedStyle(el).strokeDasharray);
@@ -169,7 +172,7 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   // Done printing: back to the screen.
   await page.emulateMedia({ media: "screen" });
   await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
-  await expect(page.locator(".l6-offer")).toHaveCount(0);
+  await expect(page.locator(".own-print")).toHaveCount(0);
 });
 
 /** What the clipboard holds: each flavor's text. */

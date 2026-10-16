@@ -12,11 +12,15 @@ import { Lead } from "./Lead";
 import { Leaving, type LeavingProps } from "./Leaving";
 import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
-import { Warnings } from "./Warnings";
-import { breakevenJob, cursorJob, leaveJob, paymentsJob } from "./slowJobs";
+import { breakevenJob, cursorJob, leaveJob, paymentsJob, termsJob as runTerms } from "./slowJobs";
 import { TheWork, type TheWorkProps } from "./TheWork";
-import { type Breakdown, type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties, workJob } from "./protocol";
-import { BreakdownSection, OwnPinned, type OwnOffer, OwnRow } from "./Breakdown";
+import {
+  type Breakdown, type CompareRequest, cursorJobFor, type LeaveCurve, type LeavePanel, type OfferTerms, type SlowResponse, termsJob, tieJob, type Ties,
+  workJob, type WorkOffer,
+} from "./protocol";
+import { BreakdownSection, OwnPinned, type OwnOffer, OwnRow, partsModule } from "./Breakdown";
+import * as Parts from "./BreakdownParts";
+import type { PartsProps } from "./BreakdownParts";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
 import * as VerdictCode from "./LeadVerdict";
@@ -39,6 +43,7 @@ import { verdict } from "./verdict";
 detailedModule.provide(Detailed);
 derivations.provide(Derive);
 verdictModule.provide(VerdictCode);
+partsModule.provide(Parts);
 
 /** The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's. */
 export const VALUATION = "2026-07-13";
@@ -74,10 +79,12 @@ export function contextOf(offers: AppOffer[], household: AppHousehold, today: st
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
   if (!out.breakdowns || out.issues.some((x) => x.length)) return { issues: out.issues };
-  // Each offer's breakdown, as the app keeps it: restated at the prices picked once they're a city's or there's a comparison.
+  // Each offer's breakdown, as the app keeps it: restated at the prices picked once they're a city's or there's a comparison; with the
+  // slow jobs its parts ask for run, as the worker would (A-4's cliffs and last day, A-7's payments).
   const prices = priceWords(household.pricesIn);
-  const own = { breakdowns: out.breakdowns as Partial<Record<Letter, Breakdown>>, withRef: offers.length >= 2 || !prices.us };
-  const base = { today, household, wagesYear, offers, rents: out.rents, own };
+  const breakdowns = out.breakdowns as Partial<Record<Letter, Breakdown>>;
+  const base0 = { today, household, wagesYear, offers, rents: out.rents, own: { breakdowns, withRef: offers.length >= 2 || !prices.us } };
+  const base = { ...base0, own: { ...base0.own, ...ownJobs(base0).own } };
   if (!out.sweep) return base;
   const noHours = offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter);
   const view = verdict(out.sweep, letters, basis, household.stayYears, noHours, prices)!;
@@ -100,8 +107,13 @@ export function ownOffers(ctx: WorkContext): OwnOffer[] {
   });
 }
 
-/** One offer's page: About you, the ledger, and its bottom line (A-1) pinned beside it. */
-export function renderAlone(ctx: WorkContext, opts: { firstUse?: boolean } = {}): string {
+/**
+ * One offer's page: About you, the ledger, its bottom line (A-1) pinned beside it, and A-2 to A-7 under them with every part's detail
+ * open (its slow jobs run, as the worker would).
+ */
+export function renderAlone(ctx0: WorkContext, opts: { firstUse?: boolean; parts?: (p: PartsOf) => PartsOf } = {}): string {
+  const { ctx, parts: given } = withParts(ctx0);
+  const parts = opts.parts ? opts.parts(given) : given;
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
   const x = ownOffers(ctx)[0];
   const prices = priceWords(ctx.household.pricesIn);
@@ -110,19 +122,77 @@ export function renderAlone(ctx: WorkContext, opts: { firstUse?: boolean } = {})
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: { mode: "quick" }, dispatch: noop }),
     createElement(OwnPinned, { key: "o", x, prices, withRef: ctx.own!.withRef, updating: false, sample: x.offer.sample !== null, problems: null, notes: [],
       firstUse: opts.firstUse ?? false, dispatch: noop }),
+    createElement(Parts.OwnParts, { key: "p", ...parts, ctx, x, prices }),
   ]));
 }
 
-/** The breakdown section with two or more offers, on each offer's tab in turn, and the ledger's "On its own" row. */
-export function renderBreakdowns(ctx: WorkContext): string {
+/** The breakdown section with two or more offers, on each offer's tab in turn (A-1 to A-7, every part open), and the ledger's "On its own" row. */
+export function renderBreakdowns(ctx0: WorkContext): string {
+  const { ctx, parts } = withParts(ctx0);
   const offers = ownOffers(ctx);
   const prices = priceWords(ctx.household.pricesIn);
   return [
     renderToStaticMarkup(tree(ctx, [createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: { mode: "quick" },
       dispatch: noop, foot: createElement(OwnRow, { offers, prices, dispatch: noop }) })])),
     ...offers.map((x) => renderToStaticMarkup(tree(ctx, [createElement(BreakdownSection, { key: "b", offers, tab: x.offer.letter, prices, updating: false,
-      sample: true, dispatch: noop })]))),
+      sample: true, dispatch: noop, ctx, parts })]))),
   ].join("\n");
+}
+
+/** Every complete offer, as the breakdowns' slow jobs project them (App.tsx's request). */
+export function requestOf(ctx: Pick<WorkContext, "offers" | "household" | "wagesYear" | "today">): CompareRequest {
+  return {
+    offers: ctx.offers.map((o) => (toOfferInput(o) as { offer: CompareRequest["offers"][number] }).offer),
+    household: toHousehold(ctx.household, ctx.wagesYear), stays: staysFor(ctx.household.stayYears), stayYears: ctx.household.stayYears,
+    valuationDate: ctx.today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
+  };
+}
+
+/** A-4's first last day, as the app picks it: six months' work from the earliest start (L-4's, W6). */
+const firstDayOf = (ctx: Pick<WorkContext, "offers" | "household">) =>
+  firstLastDay(leaveAxis(ctx.offers.map((o) => o.draft.startDate!).sort()[0], ctx.household.stayYears));
+
+/**
+ * The breakdowns' slow jobs run, as the worker would: A-7's payments and tax years, A-4's cliffs, and A-4's last day (L-4's panel,
+ * six months in from the earliest start), by letter, and the jobs' results as the worker posts them.
+ */
+function ownJobs(ctx: Pick<WorkContext, "offers" | "household" | "wagesYear" | "today">) {
+  const request = requestOf(ctx);
+  const letters = ctx.offers.map((o) => o.letter);
+  const byLetter = <T,>(xs: T[]) => Object.fromEntries(letters.map((l, i) => [l, xs[i]])) as Partial<Record<Letter, T>>;
+  const work = runJob((post) => paymentsJob({ ...workJob(request), gen: 1 }, post));
+  const terms = runJob((post) => runTerms({ ...termsJob(request, ctx.today), gen: 1 }, post));
+  const at = firstDayOf(ctx);
+  const cursor = runJob((post) => cursorJob({ ...cursorJobFor(request, at), gen: 1 }, post));
+  if (!work.ok || !("work" in work) || !terms.ok || !("terms" in terms) || !cursor.ok || !("panels" in cursor)) throw new Error("The breakdowns' jobs failed");
+  return {
+    request, at, work: work.work, terms: terms.terms, panels: cursor.panels,
+    own: { work: byLetter<WorkOffer>(work.work), terms: byLetter<OfferTerms>(terms.terms),
+      leave: { at, basis: "cash" as const, panels: byLetter<LeavePanel | null>(cursor.panels) } },
+  };
+}
+
+/** The breakdown's parts' props, as the app passes them, every part's detail open: their slow jobs keyed as they key their requests. */
+type PartsOf = Omit<PartsProps, "ctx" | "x" | "prices">;
+
+export function withParts(ctx: WorkContext): { ctx: WorkContext; parts: PartsOf } {
+  const request = requestOf(ctx);
+  const letters = ctx.offers.map((o) => o.letter);
+  const own = ctx.own!;
+  const at = own.leave?.at ?? firstDayOf(ctx);
+  const list = <T,>(m: Partial<Record<Letter, T>> | undefined) => letters.map((l) => m?.[l] ?? null);
+  const slow = <T,>(result: T, key: string) => ({ result, key, updating: false, error: null, ms: 0 });
+  const ui = { ...initialSession(VALUATION).ui, parts: { a2: true, a3: true, a4: true, a5: true, a6: true }, work: { open: true } };
+  return {
+    ctx,
+    parts: {
+      ui, dispatch: noop, request, ready: true, requestSlow: noop, status: null,
+      slow: { work: slow(list(own.work) as WorkOffer[], JSON.stringify(workJob(request))),
+        terms: slow(list(own.terms) as OfferTerms[], JSON.stringify(termsJob(request, ctx.today))),
+        cursor: slow(list(own.leave?.panels), JSON.stringify(cursorJobFor(request, at))) },
+      leave: { at: null, basis: own.leave?.basis ?? "cash", onAt: noop },
+    },
+  };
 }
 
 const noop = () => {};
@@ -226,29 +296,26 @@ export function withTies(ctx: WorkContext): { ctx: WorkContext; props: Omit<Brea
 }
 
 /**
- * L-6 with its slow job run, as the worker would: the context with every offer's payments and tax years, and the schedule's
- * props, open on `letter`'s tables.
+ * A-7 with its slow job run, as the worker would: the context with every offer's payments and tax years, each over its own stay,
+ * and A-7's props, open on `letter`'s tables.
  */
-export function withWork(ctx: WorkContext, letter: Letter = ctx.results!.letters[0]): { ctx: WorkContext; props: TheWorkProps } {
-  const compare = compareOf(ctx);
-  const job = workJob(compare);
-  const out = runJob((post) => paymentsJob({ ...job, gen: 1 }, post));
-  if (!out.ok || !("work" in out)) throw new Error(`L-6's job failed: ${out.ok ? "" : out.error}`);
-  const next = { ...ctx, results: { ...ctx.results!, work: out.work } };
-  return {
-    ctx: next,
-    props: { ctx: next, sample: true, compare, ready: true, work: { result: out.work, key: JSON.stringify(job), updating: false, error: null, ms: 0 },
-      requestSlow: noop, open: true, letter, onOpen: noop, onLetter: noop },
-  };
+export function withWork(ctx: WorkContext, letter: Letter = ctx.offers[0].letter): { ctx: WorkContext; props: TheWorkProps } {
+  if (ctx.own?.work) return { ctx, props: { ctx, letter, open: true, onOpen: noop, fresh: true, error: null } };
+  const request = requestOf(ctx);
+  const out = runJob((post) => paymentsJob({ ...workJob(request), gen: 1 }, post));
+  if (!out.ok || !("work" in out)) throw new Error(`A-7's job failed: ${out.ok ? "" : out.error}`);
+  const work = Object.fromEntries(ctx.offers.map((o, i) => [o.letter, out.work[i]])) as Partial<Record<Letter, WorkOffer>>;
+  const next = { ...ctx, own: { ...ctx.own!, work } };
+  return { ctx: next, props: { ctx: next, letter, open: true, onOpen: noop, fresh: true, error: null } };
 }
 
-/** L-6 open on each offer's tables, in turn. */
+/** Every offer's A-7, open on its tables. */
 export function renderWork(ctx: WorkContext): string {
   const w = withWork(ctx);
-  return ctx.results!.letters.map((l) => renderToStaticMarkup(tree(w.ctx, [createElement(TheWork, { key: "w", ...w.props, letter: l })]))).join("\n");
+  return ctx.offers.map((o) => renderToStaticMarkup(tree(w.ctx, [createElement(TheWork, { key: "w", ...w.props, letter: o.letter })]))).join("\n");
 }
 
-/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), the bridge for one offer, L-2 (table view open), L-3 and L-4 when given, and L-5. */
+/** The comparison's page: About you, the ledger, the lead schedule, L-1 (table view open), L-2 (table view open), and L-3 and L-4 when given. */
 export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf?: Letter; ui?: Pick<UiState, "mode" | "section" | "editor">;
   leave?: LeavingProps; ties?: Omit<BreakevenProps, "ctx"> } = {}): string {
   const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
@@ -265,7 +332,6 @@ export function renderPage(ctx: WorkContext, opts: { running?: boolean; bridgeOf
     createElement(Risk, { key: "r", ctx, sample: true, tableOpen: true }),
     ...(opts.ties ? [createElement(Breakeven, { key: "b", ctx, ...opts.ties })] : []),
     ...(opts.leave ? [createElement(Leaving, { key: "v", ...opts.leave })] : []),
-    createElement(Warnings, { key: "w", ctx, sample: true }),
   ]));
 }
 
