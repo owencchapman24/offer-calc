@@ -3,8 +3,8 @@
 **Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
 pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next section), is approved (2026-10-15): B1-B12 as
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
-built (pull request #31), and item 5's stop 5A (pull request #62, 2026-10-15, started before the testers' first answer at the user's
-word); nothing else is. What to build after v1
+built (pull request #31), and item 5's stops 5A (pull request #62, 2026-10-15, started before the testers' first answer at the user's
+word) and 5B (pull request #65, 2026-10-16); nothing else is. What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
@@ -31,10 +31,10 @@ stop.
 
 ## 5. Offer breakdown (approved 2026-10-15, with conditions; first in priority)
 
-**Status: approved; stop 5A built (2026-10-15, pull request #62), 5B and 5C to come.** Proposed and approved on 2026-10-15 (pull
-request #45): B1-B12 as recommended, with the conditions below on B4, B5 and B8 and a rule for labels (B13), which the rest of this
-section follows. 5A started before the testers' first question was answered, at the user's word; how 5A differs from this section is in
-`docs/ui-design.md` §12.
+**Status: approved; stops 5A (2026-10-15, pull request #62) and 5B (2026-10-16, pull request #65) built, 5C to come.** Proposed and
+approved on 2026-10-15 (pull request #45): B1-B12 as recommended, with the conditions below on B4, B5 and B8 and a rule for labels (B13),
+which the rest of this section follows. 5A started before the testers' first question was answered, at the user's word; how 5A and 5B
+differ from this section is in `docs/ui-design.md` §12.
 
 **The conditions** (the user's review of pull request #45, 2026-10-15):
 1. **Own-city dollars stay inside one breakdown (B4).** An offer's own city's dollars are for its breakdown alone. Two offers' figures
@@ -390,7 +390,7 @@ Item numbers are stable IDs; the order is separate.
 
 **Before stop 5A:** the audit's "fix before v2" items this item leans on (`docs/audit-2026-10.md`; IDs prefixed "audit" where they'd
 read as this plan's decisions). Each is done, so 5A waits only on the testers' first question. The audit's other open "fix before v2"
-items (T1, D3, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
+items (T1, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
 agreeing.
 
 | Audit | What item 5 needs from it | Done |
@@ -472,6 +472,11 @@ by year, and compared side by side when you have more than one") and the first p
 and the verdict's body load beside the worker); the worker 68.4 kB gzip; LCP 1.95 s side by side with main's 1.95 s, on a local server
 that now keeps each file compressed (it compressed each response anew, which Lighthouse read as server latency).
 
+**At stop 5B** (2026-10-16, #65): the main thread 360.3 / 110.9 kB raw / gzip, 0.8 kB under where item 5 started; A-2 to A-7 one lazy
+chunk, 37.4 / 10.6 kB raw / gzip (estimated 8-12 kB); the worker 68.6 kB gzip; LCP 1.95 s, as at 5A, CLS 0 with the fonts on time and
+late. A-4's cliffs are a slow job per offer (`terms`: its cliffs, its next cliff and what you'd keep either side of it, a few
+milliseconds each).
+
 **Where it stood** (2026-10-15, `main` at #54; `npm run check-bundle`, and CI's `npm run lighthouse`): the main thread 365.6 / 111.7 kB
 raw / gzip for a quick-mode visit, one chunk, against 120 kB: 8.3 kB of room. The worker 68.1 kB gzip against its 75 kB budget. LCP 1.87 s
 (the median of five; single runs 1.86-2.38 s) against 2.5 s; its element is About you's assumptions line, painted before the worker
@@ -521,7 +526,7 @@ answers. The first answer, observed unthrottled, 1.29 s.
 | Stop | What | Needs first |
 |---|---|---|
 | 5A (built, #62) | One offer works: one is the minimum, "Start with my offer", the worker's per-offer job (its own stay, remembered by its inputs), A-1 pinned with one offer and its derivations, the live region and bars with one offer, the ledger's "On its own" row, the comparison appearing and going, M-1 and M-7, §1's wording into `docs/ui-design.md` rev 4, the conditions' label rules (1 and 4) and their test. Live screenshots, light and dark, of one offer and of three | B1-B13 (approved 2026-10-15), the audit items above, the testers' first question |
-| 5B | A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved; the comparison's cross-foots and the step between windows; CSV names; print; M-1.1, M-4, M-6.3, M-9 | 5A |
+| 5B (built, #65) | A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved; the comparison's cross-foots and the step between windows; CSV names; print; M-1.1, M-4, M-6.3, M-9 | 5A |
 | 5C | Copy as document for one offer, and its choice with two or more; the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the NVDA walkthrough's new parts | 5B |
 
 Each stop: `npm run check-bundle` (the main thread at most 0.5 kB more over the three), `npm run lighthouse` (the LCP element
@@ -1187,8 +1192,8 @@ In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f)
 | Stop | What | Needs first |
 |---|---|---|
 | 0 | Make room: L-1 and the bridge on first use, quick mode's help on first open. **Done** (pull request #31) | D2 |
-| 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
-| 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved | 5A |
+| 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules. **Done** (pull request #62) | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
+| 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan | 5B |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |

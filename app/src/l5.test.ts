@@ -6,27 +6,34 @@ import { Lead } from "./Lead";
 import Methodology from "./Methodology";
 import type { WorkContext } from "./metrics";
 import type { AppOffer } from "./model";
-import { context, withLeave } from "./testing";
+import { context, renderBreakdowns, withLeave } from "./testing";
 import { WorkProvider } from "./Tickmarks";
 import { changingWarnings } from "./warningKinds";
-import { Warnings } from "./Warnings";
 
-// L-5 · Warnings (docs/ui-design.md §4.7), the lead's pointer to it, and M-8 and M-9's live numbers.
-// The samples start Jul 13, 2026 and are valued then.
+// Each offer's warnings, in its breakdown's A-6 (L-5 until stop 5B: docs/ui-design.md §4.7, docs/v2-plan.md item 5, B8), the lead's
+// pointer to them, and M-8 and M-9's live numbers. The samples start Jul 13, 2026 and are valued then.
 
 const text = (ctx: WorkContext, el: ReactElement) => renderToStaticMarkup(createElement(WorkProvider, { ctx, children: el }))
   .replace(/<(li|p|tr)[^>]*>/g, "\n").replace(/<[^>]+>/g, "").replace(/[✓^]/g, "").replace(/&#x27;/g, "'").replace(/&lt;/g, "<");
-const l5 = (ctx: WorkContext) => text(ctx, createElement(Warnings, { ctx, sample: true }));
+const clean = (html: string) => html.replace(/<(li|p|tr)[^>]*>/g, "\n").replace(/<[^>]+>/g, "").replace(/[✓^]/g, "").replace(/&#x27;/g, "'")
+  .replace(/&lt;/g, "<");
+/** An offer's A-6, as its breakdown shows it. */
+const a6 = (ctx: WorkContext, letter: string) => {
+  const m = renderBreakdowns(ctx).match(new RegExp(`<section class="part tax-warnings" id="${letter}-6"[\\s\\S]*?</section>`));
+  if (!m) throw new Error(`No ${letter}-6`);
+  return clean(m[0]);
+};
 const tweak = (letter: string, f: (o: AppOffer) => AppOffer) => (os: AppOffer[]) => os.map((o) => (o.letter === letter ? f(o) : o));
 
-describe("L-5: every warning for your stay", () => {
-  it("the samples: withholding falls short in the later years, one line per offer, each year a figure", () => {
-    const t = l5(context());
-    expect(t).toContain("Cash timing");
-    expect(t).toContain("A Federal withholding falls short of the federal income tax on its pay by $1,173 for 2028, $1,075 for 2029 and $3,284 for "
+describe("A-6: every warning for an offer's stay", () => {
+  it("the samples: withholding falls short in the later years, each offer in its own A-6, each year a figure", () => {
+    const ctx = context();
+    const a = a6(ctx, "A");
+    expect(a).toContain("Cash timing");
+    expect(a).toContain("Federal withholding falls short of the federal income tax on its pay by $1,173 for 2028, $1,075 for 2029 and $3,284 for "
       + "2030, owed each following April: bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real rate on them.");
-    expect(t).toContain("C Federal withholding falls short of the federal income tax on its pay by $1,084 for 2029 and $1,219 for 2030");
-    expect(t).not.toContain("Changes your numbers");
+    expect(a6(ctx, "C")).toContain("Federal withholding falls short of the federal income tax on its pay by $1,084 for 2029 and $1,219 for 2030");
+    expect(a).not.toContain("Changes your numbers");
     expect(changingWarnings(context().results!.detail!.offers, 2030)).toBe(0);
   });
   it("a year's shortfall foots as displayed: the offer's federal tax - withheld from salary - withheld at 22% (M-4)", () => {
@@ -38,11 +45,13 @@ describe("L-5: every warning for your stay", () => {
     // C deferring 30% of pay reaches the 402(g) limit every year of the stay.
     const ctx = context("colAdjustedTotal", tweak("C", (o) => ({ ...o, draft: { ...o.draft,
       retirement: { ...(o.draft.retirement as object), contributionPct: 0.3 } as AppOffer["draft"]["retirement"] } })));
-    const t = l5(ctx);
-    expect(t.indexOf("Changes your numbers")).toBeLessThan(t.indexOf("Cash timing"));
+    const t = a6(ctx, "C");
+    // Listed first: before any other kind of warning.
+    expect(t.indexOf("Changes your numbers")).toBeGreaterThan(-1);
+    for (const other of ["Cash timing", "Not modeled"]) if (t.includes(other)) expect(t.indexOf("Changes your numbers")).toBeLessThan(t.indexOf(other));
     // One line for the limit in every year of the stay it's reached (2027 to 2030: half of 2026 stays under it; 2031 is after the
     // stay), counted once.
-    expect(t).toMatch(/C Its 401\(k\) deferrals reach the 402\(g\) limit before the end of 2027 to 2030 \(\$[\d,]+ in 2027, rising to \$[\d,]+ in 2030\): deferrals and the match stop for the rest of each of those years/);
+    expect(t).toMatch(/Its 401\(k\) deferrals reach the 402\(g\) limit before the end of 2027 to 2030 \(\$[\d,]+ in 2027, rising to \$[\d,]+ in 2030\): deferrals and the match stop for the rest of each of those years/);
     expect(t).toContain("Show at the field");
     expect(t).not.toContain("2031 (");
     const n = changingWarnings(ctx.results!.detail!.offers, 2030);
@@ -50,15 +59,15 @@ describe("L-5: every warning for your stay", () => {
     expect(ctx.results!.detail!.changes).toBe(1); // the worker's count, which the lead reads
     expect(context().results!.detail!.changes).toBe(0);
     const lead = text(ctx, createElement(Lead, { view: ctx.results!.view, letters: ctx.results!.letters, stayYears: 4, updating: false, error: null,
-      notes: [], sample: true, dispatch: () => {}, changes: n, onWarnings: () => {} }));
-    expect(lead).toContain("A warning changes these numbers. See L-5");
+      notes: [], sample: true, dispatch: () => {}, changes: n, warnAt: ["C"], onWarnings: () => {} }));
+    expect(lead).toContain("A warning changes these numbers. See C-6");
   });
   it("what the model leaves out that may cost you: the convenience-of-employer rule", () => {
     const ctx = context("colAdjustedTotal", tweak("A", (o) => ({ ...o, draft: { ...o.draft, residence: { ...o.draft.residence, state: "NJ", locality: null },
       employerState: "NY" } } as AppOffer)));
-    const t = l5(ctx);
+    const t = a6(ctx, "A");
     expect(t).toContain("Not modeled: may cost you");
-    expect(t).toContain("A You'd live in NJ and work for an employer in NY. NY's convenience-of-employer rule may tax your remote days there too");
+    expect(t).toContain("You'd live in NJ and work for an employer in NY. NY's convenience-of-employer rule may tax your remote days there too");
   });
 });
 

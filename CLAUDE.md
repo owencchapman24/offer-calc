@@ -9,23 +9,25 @@ behind every figure.
 - **The tool informs the decision and shows its work; you make the call** (v2's D1). It never recommends a job, calls an offer low,
   or gives financial advice.
 - **The direction: evaluator-first** (approved 2026-10-15, `docs/v2-plan.md` item 5, B1). Every offer gets its own standalone
-  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **Built so far: stop 5A**
-  (2026-10-15): one offer is enough, and every offer has its bottom line (A-1) over its own stay; 5B and 5C build the rest of the
-  breakdown (A-2 to A-7, one offer's document, the first visit).
+  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **Built so far: stops 5A and 5B**
+  (2026-10-15 and 16): one offer is enough, and every offer has its breakdown over its own stay, A-1 (its bottom line) to A-7 (the
+  work); 5C builds the rest (one offer's document, the first visit).
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
 ## 2. Current state (2026-10-16)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (so far 2027's HSA limits and Social Security wage base).
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
-  A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test). How
-  each differs from the design: `docs/ui-design.md` §12.
+  A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test) and
+  stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2). How each differs from the design:
+  `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
   (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
-  part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8) and per hour documented
-  as the code works it out (D1); and the `main` ruleset is on (S1, in part). What's left: section 3.
+  part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8), per hour documented
+  as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and the `main` ruleset is on (S1, in
+  part). What's left: section 3.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -37,17 +39,15 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: v2 item 5's stop 5B** (`docs/v2-plan.md`, "Review stops"): A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved
-into A-2, the comparison's cross-foots and the step between windows, CSV names, print, M-1.1, M-4, M-6.3, M-9. Stop 5A was built on
-2026-10-15 before the testers' answer to item 5's first question ("how many offers did you actually have?"), at the user's word; record
-the answer when it comes.
+**Next: v2 item 5's stop 5C** (`docs/v2-plan.md`, "Review stops"): Copy as document for one offer, and its choice with two or more;
+the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the
+NVDA walkthrough's new parts. Stops 5A and 5B were built (2026-10-15 and 16) before the testers' answer to item 5's first question
+("how many offers did you actually have?"), at the user's word; record the answer when it comes.
 
 **The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
 - **T1** (a committed grid baseline in CI): the breakdown changes no tax code. It guards each tax change: the data refreshes below,
   the base-year move, v2's item 4d.
-- **D3** (the methodology's lines the code doesn't bear out: M-4's withholding note and Alaska figure, M-10's convenience rule): 5A
-  and 5B check the methodology against the code anyway.
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
@@ -158,6 +158,9 @@ section 2's and the plan's in step):
     places them, so `App.tsx` stays light) and the lead's verdict (`LeadVerdict.tsx`).
     Neither imports `Lead.tsx` (it imports `Tickmarks.tsx`: the main chunk split when one did), so the problems list reaches A-1 as a
     node from `App.tsx`.
+  - The breakdowns' parts, A-2 to A-7 (`BreakdownParts.tsx`), are one chunk, loaded as you scroll toward them through
+    `partsModule`, which lives in `Breakdown.tsx`: from `Later.tsx`, which `Breakdown.tsx` can't import, it split `text.ts` and
+    `ui.tsx` off the main chunk.
   - Which lazy chunks import a main-thread module moves Rolldown's chunking, not only what's new: `LeadVerdict.tsx` imports
     `metrics.ts` at run time (`basisPhrase`) and `verdict.ts` doesn't. Without the first, `prices.ts` and the city list split off the
     main chunk; with the second, `model.ts`, `protocol.ts` and `text.ts` did (2026-10-16). `npm run check-bundle` catches either.
@@ -169,7 +172,7 @@ section 2's and the plan's in step):
 - **Tickmarks:** every figure is a button with a tickmark kind, a methodology section and a derivation (`metrics.test.ts`); every
   default shows as a real value with a `D` tickmark, every estimate with an `E`.
 - **Hooks:** every dependency list is complete (`npm run lint`). One left out on purpose has `// eslint-disable-next-line
-  react-hooks/exhaustive-deps` with its reason above it: today a job or request compared by value (its key), and L-6's tables,
+  react-hooks/exhaustive-deps` with its reason above it: today a job or request compared by value (its key), and A-7's tables,
   memoized over `words`, a key kept by hand (`TheWork.tsx`).
 - **Inputs:** every input has its hint, its ⓘ help and "How this is used →" (`help.ts`; `help.test.ts` fails on one without); a
   default with its `D` and its reason, or a blank where that was decided (`defaults.ts`; `defaults.test.ts` checks each against the
@@ -340,17 +343,19 @@ section 2's and the plan's in step):
 | Schedule | Component | View model | Unit tests |
 |---|---|---|---|
 | A-1, an offer's bottom line, and the "On its own" row | `Breakdown.tsx` | `breakdownModel.ts` | `breakdown.test.ts` |
+| A-2 to A-6: where the money goes (and the bridge), pay by year, terms, benefits, tax and warnings | `BreakdownParts.tsx` | `partsModel.ts`, `byYearModel.ts` (the bridge), `leaveModel.ts`, `warningKinds.ts`, `warningAt.ts`, `warningWords.ts` | `parts.test.ts`, `l5.test.ts`, `l6.test.ts` |
+| A-7, the work | `TheWork.tsx` | `workpaper.ts` | `l6.test.ts` |
 | L, the verdict | `Lead.tsx`, `LeadVerdict.tsx` | `verdict.ts` | `metrics.test.ts` |
-| L-1, by year, and the bridge | `ByYear.tsx` | `byYearModel.ts`, `footing.ts` | `metrics.test.ts`, `l6.test.ts` |
+| L-1, by year | `ByYear.tsx` | `byYearModel.ts`, `footing.ts` | `metrics.test.ts`, `l6.test.ts` |
 | L-2, if things go badly | `Risk.tsx` | `cases.ts` | `metrics.test.ts` |
 | L-3, what it would take | `Breakeven.tsx` | `breakevenModel.ts` | `l3.test.ts` |
 | L-4, leaving early | `Leaving.tsx` | `leaveModel.ts` | `leave.test.ts` |
-| L-5, warnings | `Warnings.tsx` | `warningKinds.ts`, `warningAt.ts`, `warningWords.ts` | `l5.test.ts` |
-| L-6, the work | `TheWork.tsx` | `workpaper.ts` | `l6.test.ts` |
+
+L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its tables in its A-7; their tests keep their names.
 
 - **Page:** `main.tsx`, `App.tsx` (routes `#/`, `#/method`, `#/data`; print; Copy as document's button), `Recovery.tsx` (the error
   boundary), `About.tsx` (About you), `Ledger.tsx` (the offers' inputs, the phone's tabs, the foot row's slot), `Later.tsx` (the
-  breakdowns and the verdict, loaded once the page has first painted; L-1 to L-6, each loaded as you scroll toward it), `Methodology.tsx` (`#/method`, M-1
+  breakdowns and the verdict, loaded once the page has first painted; L-1 to L-4, each loaded as you scroll toward it), `Methodology.tsx` (`#/method`, M-1
   to M-13), `Data.tsx` (`#/data`: export, import, delete).
 - **Inputs:** `fields.tsx`, `rows.tsx` (quick mode), `Detailed.tsx`, `editors.tsx`, `controls.tsx` (detailed mode); `help.ts`,
   `quickHelp.ts`, `helpText.ts` (each field's name and help); `defaults.ts` (the defaults registry); `summary.ts`; `presets.ts`;
@@ -358,7 +363,7 @@ section 2's and the plan's in step):
 - **State:** `model.ts` (the offer draft ↔ `OfferInput`, the samples), `session.ts` (the session, schema 3, in localStorage under
   `offer-calc:v1`), `exchange.ts` (JSON export and import).
 - **The worker:** `engine.worker.ts`, `compute.ts` (the fast lane: per edit; each offer's breakdown, remembered by its inputs, and with
-  two or more the comparison), `slowJobs.ts` (L-3's and L-4's jobs, L-6's payments),
+  two or more the comparison), `slowJobs.ts` (L-3's and L-4's jobs, A-4's cliffs, A-7's payments),
   `jobs.ts` (the two lanes), `protocol.ts` (messages), `useEngine.ts` (debounced 200 ms, stale results dropped).
 - **Show the work:** `figures.tsx` (`Fig`, `TickButton`, `CsvButton`), `Tickmarks.tsx` (`WorkProvider`, the popover), `metrics.ts`
   (metric ids, tickmark kinds, the rent note), `derive.ts` (the derivations, loaded on first use), `sections.ts` (methodology ids).
@@ -371,12 +376,13 @@ section 2's and the plan's in step):
 - the engine: `test/offer.test.ts` (hand-worked projections), `test/tax.test.ts`, `test/params.test.ts` (projection mechanics),
   `test/validate.test.ts` (each problem at its path), `test/law.test.ts` (the law as published);
 - every figure on the page: `metrics.test.ts` (each tickmark's kind, section and derivation; the hero and the bridge against the
-  design's worked examples), `l6.test.ts` (L-6, L-1 and the bridge footing and tying), `display.test.ts` and `properties.test.ts`
+  design's worked examples), `l6.test.ts` (A-7, L-1 and the bridge footing and tying), `display.test.ts` and `properties.test.ts`
   (property tests over generated offers: every derivation foots as displayed, no NaN, one figure reads the same everywhere; an
   `it.fails` marks a property a known bug breaks; one offer on its own too), `prices.test.ts` (every label follows "Prices in"),
   `labels.test.ts` (every figure names its dollars, every rate its period, no two offers' own-city figures side by side),
-  `breakdown.test.ts` (A-1 against the plan's worked example, the worker's per-offer job, one-offer sessions);
-- each schedule and output: `l3`, `leave` (L-4), `l5`, `csv`, `copydoc` (each stated calculation), `ticks`, `names` (buttons' names),
+  `breakdown.test.ts` (A-1 against the plan's worked example, the worker's per-offer job, one-offer sessions), `parts.test.ts` (A-2
+  to A-7 against it, a breakdown that adding offers doesn't change, the step to the comparison's window);
+- each schedule and output: `l3`, `leave` (L-4), `l5` (A-6's warnings), `csv`, `copydoc` (each stated calculation), `ticks`, `names` (buttons' names),
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
@@ -442,7 +448,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5's stop 5A built; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5's stops 5A and 5B built; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |

@@ -1,16 +1,16 @@
 import type { Basis } from "../../src/offer/types";
 import { CASES, dropText, riskView } from "./cases";
-import { basisPhrase, type MetricId, metricKind, pricesOf, res, type WorkContext } from "./metrics";
+import { basisPhrase, type MetricId, metricKind, ownOf, pricesOf, res, type WorkContext } from "./metrics";
 import { byYear } from "./byYearModel";
 import type { Letter } from "./model";
 import { cents, dayBefore, figure, longDate } from "./text";
 import { TICKS, type TickKind } from "./ui";
 import {
-  KIND_NAME, moneyText, paymentFormula, paymentLabel, paymentYears, rateText, rowText, sectionName, stayRows, type TaxCol, taxTables, toCent,
+  KIND_NAME, moneyText, paymentFormula, paymentLabel, paymentYears, rateText, rowText, sameStay, sectionName, stayRows, type TaxCol, taxTables, toCent,
   yearTable,
 } from "./workpaper";
 
-// CSV export of each table (docs/ui-design.md §4.8, §10): L-1's and L-2's table views, and L-6's four tables for an offer.
+// CSV export of each table (docs/ui-design.md §4.8, §10): L-1's and L-2's table views, and an offer's A-7 (L-6 until stop 5B), its four tables.
 // Each is built from the same view model as the table on screen, and each figure is the figure shown, written as a plain number:
 // its display text with the thousands separators, currency signs and parentheses taken out ("(41,724)" is -41724, "$21.85"
 // is 21.85, "27.2735%" is 27.2735), units in the column headers. Beside each figure, a column with its tickmark (metricKind).
@@ -18,8 +18,8 @@ import {
 // against a spreadsheet running them as formulas: offer labels and award names are free text. Loaded on the first download.
 
 export type L6Part = "years" | "stay" | "payments" | "tax";
-/** A table to export: L-1's table view (each year or the running total), L-2's, or one of L-6's for an offer. */
-export type CsvTable = { kind: "l1"; running: boolean } | { kind: "l2" } | { kind: "l6"; letter: Letter; part: L6Part };
+/** A table to export: L-1's table view (each year or the running total), L-2's, or one of an offer's A-7 tables. */
+export type CsvTable = { kind: "l1"; running: boolean } | { kind: "l2" } | { kind: "a7"; letter: Letter; part: L6Part };
 
 /** A cell: text, a number (as written; a figure carries its id, for the tests), or empty. */
 export type Cell = string | { num: string; id?: MetricId } | null;
@@ -52,7 +52,7 @@ export function csvFile(ctx: WorkContext, table: CsvTable): { fileName: string; 
   const lines: Cell[][] = [
     ...(sample ? [[SAMPLE_LINE]] : []),
     [b.title],
-    [scope(ctx)],
+    [scope(ctx, table)],
     b.header,
     ...b.rows,
     [],
@@ -80,14 +80,17 @@ export function build(ctx: WorkContext, t: CsvTable): Built {
   switch (t.kind) {
     case "l1": return l1(ctx, t.running);
     case "l2": return l2(ctx);
-    case "l6": return L6[t.part](ctx, t.letter);
+    case "a7": return L6[t.part](ctx, t.letter);
   }
 }
 
-/** "Base case · stay 4 years (Jul 13, 2026 – Jul 12, 2030) · Offer Calc, exported Oct 12, 2026" */
-function scope(ctx: WorkContext): string {
-  const row = res(ctx).view.row;
-  return `Base case · stay ${row.years} ${row.years === 1 ? "year" : "years"} (${longDate(row.window.start)} – ${longDate(dayBefore(row.window.end))})`
+/**
+ * "Base case · stay 4 years (Jul 13, 2026 – Jul 12, 2030) · Offer Calc, exported Oct 12, 2026": the comparison's window, or for an
+ * offer's A-7 its own stay.
+ */
+function scope(ctx: WorkContext, t: CsvTable): string {
+  const w = t.kind === "a7" ? { ...ownOf(ctx, t.letter).window, years: ownOf(ctx, t.letter).years } : { ...res(ctx).view.row.window, years: res(ctx).view.row.years };
+  return `Base case · ${t.kind === "a7" ? "its stay" : "stay"} ${w.years} ${w.years === 1 ? "year" : "years"} (${longDate(w.start)} – ${longDate(dayBefore(w.end))})`
     + ` · Offer Calc, exported ${longDate(ctx.today)}`;
 }
 
@@ -160,11 +163,11 @@ function l2(ctx: WorkContext): Built {
   };
 }
 
-// ---- L-6, the work: an offer's four tables ---------------------------------------------------------------
+// ---- A-7, the work: an offer's four tables, over its own stay -----------------------------------------------------
 
-const ref = (ctx: WorkContext, letter: Letter, what: string) => `L-6.${letter}${label(ctx, letter) ? ` · ${label(ctx, letter)}` : ""} · ${what}`;
-const PART_SLUG: Record<L6Part, string> = { years: "employment-years", stay: "your-stay", payments: "every-payment", tax: "tax-by-year" };
-const slug = (letter: Letter, part: L6Part) => `L-6-${letter}-${PART_SLUG[part]}`;
+const ref = (ctx: WorkContext, letter: Letter, what: string) => `${letter}-7${label(ctx, letter) ? ` · ${label(ctx, letter)}` : ""} · ${what}`;
+const PART_SLUG: Record<L6Part, string> = { years: "employment-years", stay: "its-stay", payments: "every-payment", tax: "tax-by-year" };
+const slug = (letter: Letter, part: L6Part) => `${letter}-7-${PART_SLUG[part]}`;
 
 const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
   years(ctx, letter) {
@@ -189,20 +192,22 @@ const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
 
   stay(ctx, letter) {
     const rows = stayRows(ctx, letter);
-    const n = res(ctx).view.row.years;
+    const n = ownOf(ctx, letter).years;
     const after = rows.some((x) => x.after);
+    // Its present value is the rank list's where the comparison projects it over the same stay.
+    const pv = sameStay(ctx, letter);
     return {
       slug: slug(letter, "stay"),
-      title: ref(ctx, letter, "Your stay on each basis, as paid and in present value; tied to the lead schedule and L-1"),
+      title: ref(ctx, letter, pv ? "Its stay on each basis, as paid and in present value; tied to the lead schedule and L-1" : "Its stay on each basis, as paid"),
       header: ["Basis", `Years 1–${n} ($, as paid)`, `Years 1–${n} tickmark`,
-        ...(after ? ["Past your stay's last day ($)", "Past your stay's last day tickmark"] : []),
-        "Your stay, as paid ($)", "Your stay tickmark", "Present value today ($)", "Present value tickmark"],
+        ...(after ? ["Past its stay's last day ($)", "Past its stay's last day tickmark"] : []),
+        "Its stay, as paid ($)", "Its stay tickmark", ...(pv ? ["Present value today ($)", "Present value tickmark"] : [])],
       rows: rows.map((x) => [
         x.label,
         ...fig(ctx, `l6y.${letter}.${x.line}.sum`, figure(x.years)),
         ...(after ? (x.after ? fig(ctx, `l6s.${letter}.${x.basis}.after`, moneyText(-x.after)) : [null, null]) : []),
         ...fig(ctx, `l6s.${letter}.${x.basis}.stay`, figure(x.stay)),
-        ...fig(ctx, `l6s.${letter}.${x.basis}.pv`, figure(x.pv)),
+        ...(pv ? fig(ctx, `l6s.${letter}.${x.basis}.pv`, figure(x.pv)) : []),
       ]),
     };
   },
@@ -210,14 +215,14 @@ const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
   payments(ctx, letter) {
     const rows: Cell[][] = [];
     for (const y of paymentYears(ctx, letter)) {
-      const year = y.ey === "after" ? "After your stay" : `Year ${y.ey}`;
+      const year = y.ey === "after" ? "After its stay" : `Year ${y.ey}`;
       for (const g of y.groups) {
         for (const { i, p } of g.rows) {
           rows.push([year, KIND_NAME[g.component], paymentLabel(p), p.date, paymentFormula(p),
             ...fig(ctx, `l6p.${letter}.${i}.gross`, toCent(p.gross)), ...fig(ctx, `l6p.${letter}.${i}.tax`, toCent(p.tax))]);
         }
         if (g.rows.length > 1) {
-          rows.push([year, KIND_NAME[g.component], `${KIND_NAME[g.component]}, ${y.ey === "after" ? "after your stay" : `year ${y.ey}`}: the payments added`, "", "",
+          rows.push([year, KIND_NAME[g.component], `${KIND_NAME[g.component]}, ${y.ey === "after" ? "after its stay" : `year ${y.ey}`}: the payments added`, "", "",
             ...fig(ctx, `l6g.${letter}.${y.ey}.${g.component}.gross` as MetricId, toCent(g.gross)),
             ...fig(ctx, `l6g.${letter}.${y.ey}.${g.component}.tax` as MetricId, toCent(g.tax))]);
         }

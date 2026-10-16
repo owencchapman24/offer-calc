@@ -111,14 +111,15 @@ describe("pay per extra hour (docs/ui-design.md §4.2)", () => {
   });
 });
 
-describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
+describe("the bridge from the offer letter (docs/ui-design.md §5, W4), in A-2 since stop 5B", () => {
   const ctx = context();
   it("A, year 1: the letter's 190,000 to 62,594 after rent, W4's lines footed as shown at every subtotal", () => {
     const b = bridge(ctx, "A", 1);
     // W4 has 109,463, 111,263 and 62,595: the engine's figures, each rounded once. Shown, every subtotal is the lines above it as shown,
     // added (footing.ts): 152,986 - 41,724 - 1,800 = 109,462; + 3,300 - 1,500 = 111,262; take-home 109,462 - 6,600 = 102,862, less rent
     // 45,600 = 57,262 to spend, x 99.880 / 105.696 = 54,111 at U.S. prices, less out-of-pocket 1,500 x 99.880 / 105.696 = 1,417, plus 9,900
-    // saved = 62,594; the price line is 62,594 - 111,262 + 45,600 = -3,068.
+    // saved = 62,594. Since stop 5B it stops at A's own prices first: 111,262 - 45,600 = 65,662 after rent at New York prices (v2-plan.md,
+    // item 5, A-2), then the price line, 62,594 - 65,662 = -3,068.
     expect(b.rows.map((r) => [r.kind, r.label, r.value])).toEqual([
       ["letter", "Offer letter: salary + target bonus + sign-on", 190_000],
       ["change", "first bonus is a stub", -37_014],
@@ -127,7 +128,9 @@ describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
       ["subtotal", "After-tax pay", 109_462],
       ["plus", "employer 401(k)", 3_300], ["less", "expected out-of-pocket health costs", -1_500],
       ["subtotal", "Total rewards", 111_262],
-      ["less", "rent", -45_600], ["less", "New York prices", -3_068],
+      ["less", "rent", -45_600],
+      ["subtotal", "After rent, at New York prices", 65_662],
+      ["less", "New York prices", -3_068],
       ["total", "After rent, at U.S. prices", 62_594],
     ]);
     expect(b.rows[1].gloss).toBe("paid Jan 31 for Jul–Dec only"); // the bonus year runs Jan-Dec; A worked from Jul 13
@@ -140,8 +143,9 @@ describe("the bridge from the offer letter (docs/ui-design.md §5, W4)", () => {
         running = r.value;
       } else running += r.value;
     }
-    // 62,594 = spending at U.S. prices 54,111 - 1,417 = 52,694 + saved 9,900: $4,391 a month to spend and $825 saved (W4).
-    expect([Math.round(b.spend!), Math.round(b.saved!)]).toEqual([4_391, 825]);
+    // A month, at its own prices: 57,262 to spend - 1,500 out-of-pocket = 55,762, / 12 = $4,647, and 9,900 saved / 12 = $825: A-1's
+    // year 1 (v2-plan.md's A-2 sketch).
+    expect([Math.round(b.spend!), Math.round(b.saved!), b.city]).toEqual([4_647, 825, "New York"]);
     // It ties to A's year 1 in L-1 on the after-rent basis.
     expect(byYear(ctx, "A").years[0].value).toBe(b.rows[b.rows.length - 1].value);
     expect(derive("br.A.1.total", ctx).ties).toEqual(["ey.A.1", "l6y.A.total.1"]);
@@ -216,9 +220,12 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
     expect(text(page(context("colAdjustedTotal", (o) => o, 5)))).toContain("A comes out ahead only if things go well.");
   });
 
-  it("what goes wrong lists exactly the inputs whose bear value differs from base", () => {
-    expect(text(page(ctx))).toContain("What goes wrong in the bear caseA bonuses 20% under target; no promotion in 2029"
-      + "B bonus 5% of salary instead of 10%C bonus 10% of salary instead of 15%; refreshers $10,000 instead of $25,000");
+  it("what goes wrong lists exactly the inputs whose bear value differs from base, in each offer's A-4 (since stop 5B)", () => {
+    expect(text(page(ctx))).toContain("What goes wrong in each offer's bear case is in its breakdown, under A-4");
+    const parts = text(renderBreakdowns(ctx));
+    expect(parts).toContain("In the bear case, bonuses 20% under target; no promotion in 2029.");
+    expect(parts).toContain("In the bear case, bonus 5% of salary instead of 10%.");
+    expect(parts).toContain("In the bear case, bonus 10% of salary instead of 15%; refreshers $10,000 instead of $25,000.");
   });
 
   it("only what can move the figure: a promotion after your stay, price growth without equity, hours off the per-hour basis", () => {
@@ -240,7 +247,7 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
     const html = page(flat);
     expect(html).toContain('data-metric="risk.B.base"');
     expect(html).not.toContain('data-metric="risk.B.bear"');
-    expect(text(html)).toContain("B no ranges entered");
+    expect(text(renderBreakdowns(flat))).toContain("Bad case: no ranges entered, so the bear and bull cases are the base case.");
   });
 
   it("with no ranges anywhere, L-2 is one line pointing to + range", () => {
@@ -304,17 +311,19 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
       const tied = withTies(plain);
       const six = withLeave(tied.ctx);
       const end = withLeave(tied.ctx, dayBefore(plain.results!.view.row.window.end));
+      const parts = renderBreakdowns(six.ctx);
+      // The bridge is in each offer's A-2 (its detail open here), since stop 5B.
+      expect(parts).toContain('id="bridge-A"');
       checkAll(six.ctx, render(six.ctx) + render(six.ctx, true, "C") + renderAllInputs(six.ctx)
-        + renderPage(six.ctx, { leave: six.props, ties: tied.props }) + renderBreakdowns(six.ctx));
+        + renderPage(six.ctx, { leave: six.props, ties: tied.props }) + parts);
       checkAll(end.ctx, renderPage(end.ctx, { leave: end.props, ties: tied.props }));
-      // L-6 open on each offer, with its payments and tax years: every line, payment and tax figure.
+      // A-7 open on each offer, with its payments and tax years: every line, payment and tax figure.
       const worked = withWork(six.ctx).ctx;
       checkAll(worked, renderWork(worked) + render(worked));
     }, 30_000); // every figure on the page and its drill-downs: a few seconds, longer on a busy runner
   }
   function checkAll(ctx: WorkContext, html: string) {
     {
-      expect(html).toContain('id="bridge"');
       const ids = [...new Set([...html.matchAll(/data-(?:tick|metric|trace)="([^"]+)"/g)].map((m) => m[1] as MetricId))];
       const ticks = [...html.matchAll(/<button[^>]*class="[^"]*\btick-btn\b[^"]*"[^>]*>/g)];
       expect(ticks.length).toBeGreaterThan(10);

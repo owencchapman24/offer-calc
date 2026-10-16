@@ -8,7 +8,7 @@ import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { Stamp, TickLegend } from "./ui";
 import type { RentNote } from "./metrics";
-import { showBridge, verdictModule } from "./Later";
+import { verdictModule } from "./Later";
 import { useLazyModule, useLoadAfterPaint } from "./lazy";
 import { useRovingTicks } from "./Tickmarks";
 import { marginText as margin, perText as per, placeOf, verdictSentence, type VerdictView } from "./verdict";
@@ -84,7 +84,7 @@ export function VerdictBar({ view, stayYears, place, updating, hidden = false }:
 }
 
 export function Lead({ view, letters, stayYears, updating, error, notes, sample, dismissed = {}, dispatch, issues = {}, onFix, cautions = [], changes = 0,
-  onWarnings, flip = null, rentNotes = [] }: {
+  warnAt = [], onWarnings, flip = null, rentNotes = [], showBridge }: {
   /** A close call's flip line: present while the lead is a close call on a dollar basis. */
   flip?: FlipLine | null;
   /** Rents the verdict turns on: an entered rent and its estimate on either side of the rent that flips it (after rent only). */
@@ -93,8 +93,10 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
   sample: boolean; dismissed?: UiState["dismissed"]; dispatch: Dispatch<Action>;
   /** A cost or benefit counted for some offers but not others, in words: it stays while it applies. */
   cautions?: string[];
-  /** How many warnings change these numbers (L-5 lists them), and how to get there. */
-  changes?: number; onWarnings?: () => void;
+  /** How many warnings change these numbers, the offers whose they are (each offer's A-6 lists them), and how to get there. */
+  changes?: number; warnAt?: Letter[]; onWarnings?: (letter: Letter) => void;
+  /** "See how we get there": the leader's bridge, in its A-2. */
+  showBridge?: () => Promise<void>;
   /** Problems with the latest inputs: the results are the last valid ones until they're fixed. */
   issues?: Partial<Record<Letter, OfferIssue[]>>; onFix?: (t: EditTarget) => void;
 }) {
@@ -122,7 +124,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       <Problems issues={issues} results={!!view} onFix={onFix} />
       {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
       {view && m ? <m.Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions}
-        changes={changes} onWarnings={onWarnings} flip={flip} rentNotes={rentNotes} showBridge={showBridge} />
+        changes={changes} warnAt={warnAt} onWarnings={onWarnings} flip={flip} rentNotes={rentNotes} showBridge={showBridge ?? (() => Promise.resolve())} />
         : !error && notes.length === 0 && problems.length === 0 && (
         <p className="note">Working out the comparison…</p>
       )}

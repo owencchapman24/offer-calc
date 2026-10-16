@@ -1,6 +1,8 @@
 import type { Basis, EmploymentYearResult, ValueBasis } from "../../src/offer/types";
 import { type ShownYear, shownStay, shownYears } from "./footing";
-import { type BridgeLine, detailOf, join, type MetricId, offerByLetter, pricesOf, res, shortCity, type WorkContext, yearOf } from "./metrics";
+import {
+  type BridgeLine, detailOf, join, type MetricId, offerByLetter, ownOf, ownYearOf, pricesOf, res, shortCity, type WorkContext, yearOf,
+} from "./metrics";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { OfferDetail } from "./protocol";
 import { dollars, longDate, monthName, percent, shortDate } from "./text";
@@ -26,10 +28,16 @@ export function yearValue(y: ShownYear, basis: Basis, perHourOf: ValueBasis): nu
   }
 }
 
-/** One employment year of an offer's stay, as shown. */
+/** One employment year of an offer's stay in the comparison, as shown. */
 export function shownYearOf(ctx: WorkContext, letter: L, n: number): ShownYear {
   yearOf(ctx, letter, n);
   return shownYears(detailOf(ctx, letter))[n - 1];
+}
+
+/** One employment year of an offer's own stay (its breakdown), as shown. Employment years are the same in the comparison. */
+export function ownShownYear(ctx: WorkContext, letter: L, n: number): ShownYear {
+  ownYearOf(ctx, letter, n);
+  return shownYears(ownOf(ctx, letter).detail)[n - 1];
 }
 
 export interface ByYear {
@@ -100,9 +108,14 @@ export interface Bridge {
   start: string;
   end: string;
   rows: BridgeRow[];
-  /** A month: spending money after rent at the prices picked, and what's saved. Present with a city. */
+  /**
+   * A month: spending money after rent, and what's saved, present with a city: at the offer's own prices in its breakdown (A-2),
+   * at the prices picked in the comparison's document.
+   */
   spend?: number;
   saved?: number;
+  /** The offer's city, its bridge's own-price line names ("New York"); present with a city. */
+  city?: string;
 }
 
 /** In which employment year a date falls: a date on an anniversary counts toward the year just ended (decision 1). */
@@ -119,10 +132,15 @@ export function cashName(o: AppOffer | undefined): string {
   return o?.draft.cashAwards.length && o.draft.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards";
 }
 
-/** The bridge for one offer and employment year (docs/ui-design.md §5, W4): every line foots, as shown (footing.ts). */
-export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
-  const d = detailOf(ctx, letter);
-  const y = shownYearOf(ctx, letter, n);
+/**
+ * The bridge for one offer and employment year (docs/ui-design.md §5, W4): every line foots, as shown (footing.ts). In its breakdown
+ * (A-2, `of` "own"), over its own stay, it ends after rent at the offer's own prices, then, with a comparison or Prices in a city,
+ * steps to the prices picked (docs/v2-plan.md, item 5, B7). The comparison's document (`of` "comparison") sets offers side by side,
+ * so it goes from rent straight to the prices picked, never through an offer's own city's dollars (condition 1).
+ */
+export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comparison" = "own"): Bridge {
+  const d = of === "own" ? ownOf(ctx, letter).detail : detailOf(ctx, letter);
+  const y = of === "own" ? ownShownYear(ctx, letter, n) : shownYearOf(ctx, letter, n);
   const o = offerByLetter(ctx, letter);
   const id = (line: BridgeLine) => `br.${letter}.${n}.${line}` as MetricId;
   const rows: BridgeRow[] = [];
@@ -185,16 +203,40 @@ export function bridge(ctx: WorkContext, letter: L, n: number): Bridge {
   const col = y.col;
   const info = d.costOfLiving;
   if (!col || !info) return { letter, year: n, start: y.start, end: y.end, rows };
+  const place = shortCity(info.area.name);
   const monthly = info.monthlyRent * (1 + info.rentGrowth) ** (n - 1);
   rows.push({ id: id("rent"), line: "rent", kind: "less", label: "rent", value: -col.rent,
     gloss: Math.abs(12 * monthly - col.rent) < 1 ? `${dollars(monthly)} a month` : "for the months you work there" });
-  // The identity, so the bridge foots: after rent = total rewards - rent + (factor - 1) x (local spending - out-of-pocket).
-  const prices = col.total - (y.totalRewards - col.rent);
+  // Its own prices: a factor of 1, so after rent is total rewards less rent (M-6.3's identity), in its own city's dollars.
+  const own = y.totalRewards - col.rent;
+  // The prices picked are its own city's (a factor of 1): nothing to step across.
+  const same = info.area.code === info.reference.code;
+  if (of === "own") {
+    const last = same || !ctx.own?.withRef;
+    rows.push({ id: id("own"), line: "own", kind: last ? "total" : "subtotal", label: `After rent, at ${place} prices`, value: own });
+    const month = { spend: (col.local - y.oop) / 12, saved: col.face / 12, city: place };
+    if (last) return { letter, year: n, start: y.start, end: y.end, rows, ...month };
+    rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
+    return { letter, year: n, start: y.start, end: y.end, rows, ...month };
+  }
+  rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
+  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: col.face / 12, city: place };
+}
+
+/**
+ * The step from an offer's own prices to the prices picked, and after rent at those: the bridge's last two lines. The identity,
+ * so it foots: after rent = total rewards - rent + (factor - 1) x (local spending - out-of-pocket).
+ */
+function pricesRows(ctx: WorkContext, letter: L, n: number, total: number, own: number, info: NonNullable<OfferDetail["costOfLiving"]>,
+  city: string): BridgeRow[] {
+  const id = (line: BridgeLine) => `br.${letter}.${n}.${line}` as MetricId;
   const above = 1 / info.nonHousingFactor - 1;
   const p = pricesOf(ctx);
-  rows.push({ id: id("prices"), line: "prices", kind: prices < 0 ? "less" : "plus", label: `${shortCity(info.area.name)} prices`, value: prices,
-    gloss: info.area.code === info.reference.code ? `the prices you picked under Prices in: a factor of 1`
-      : `non-housing prices ${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} ${p.average}` });
-  rows.push({ id: id("total"), line: "total", kind: "total", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: col.total });
-  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: col.face / 12 };
+  const prices = total - own;
+  return [
+    { id: id("prices"), line: "prices", kind: prices < 0 ? "less" : "plus", label: `${city} prices`, value: prices,
+      gloss: info.area.code === info.reference.code ? `the prices you picked under Prices in: a factor of 1`
+        : `non-housing prices ${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} ${p.average}` },
+    { id: id("total"), line: "total", kind: "total", label: p.phrase[0].toUpperCase() + p.phrase.slice(1), value: total },
+  ];
 }

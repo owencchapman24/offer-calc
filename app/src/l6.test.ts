@@ -11,8 +11,9 @@ import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { addCents, exactPay, FOOTS, paymentYears, stayRows, taxTables, yearCell, yearTable } from "./workpaper";
 
-// L-6 · The work (docs/ui-design.md §4.8; slice 6, stop A): every column adds up as displayed, the tables tie to L-1, the bridge and
-// the lead schedule, the payments tie to the years, and each calendar year's tax foots with and without the offer.
+// A-7 · The work (docs/ui-design.md §4.8; L-6 from slice 6 until stop 5B): every column adds up as displayed, the tables tie to L-1,
+// the bridge and the lead schedule, the payments tie to the years, and each calendar year's tax foots with and without the offer. Each
+// offer's tables are over its own stay (docs/v2-plan.md, item 5, B3).
 
 /** The samples, and the same with B starting later (its last year runs past your stay) and other wages in the first year. */
 const later = () => context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)),
@@ -25,7 +26,7 @@ const CONTEXTS: Array<[string, () => WorkContext]> = [
 ];
 const LETTERS: Letter[] = ["A", "B", "C"];
 
-describe("L-6: every column adds up as displayed", () => {
+describe("A-7: every column adds up as displayed", () => {
   for (const [name, make] of CONTEXTS) {
     it(`${name}: the years, the stay, the payments and the tax years`, () => {
       const ctx = withWork(make()).ctx;
@@ -58,7 +59,7 @@ describe("L-6: every column adds up as displayed", () => {
           if (typeof y.ey === "number") expect(-yearCell(t, "tax", y.ey)).toBe(Math.round(y.tax));
         }
         // Each calendar year: every column foots, the offer's column is with less without, and the offer's pay and tax are its payments'.
-        const payments = ctx.results!.work![ctx.results!.letters.indexOf(letter)].payments;
+        const payments = ctx.own!.work![letter]!.payments;
         for (const tt of taxTables(ctx, letter)) {
           const taxes = tt.rows.filter((x) => x.kind === "tax");
           const total = tt.rows.find((x) => x.line === "total")!;
@@ -77,7 +78,7 @@ describe("L-6: every column adds up as displayed", () => {
     });
   }
 
-  it("every L-6 figure's derivation, and L-1's and the bridge's, foot as displayed", () => {
+  it("every A-7 figure's derivation, and L-1's and the bridge's, foot as displayed", () => {
     for (const [, make] of CONTEXTS) {
       const ctx = withWork(make()).ctx;
       const html = renderWork(ctx) + renderPage(ctx);
@@ -88,7 +89,7 @@ describe("L-6: every column adds up as displayed", () => {
   }, 60_000);
 });
 
-describe("L-6: a joint return with a spouse's wages (audit C1)", () => {
+describe("A-7: a joint return with a spouse's wages (audit C1)", () => {
   it("each year's tax shows the spouse's wages, the same with and without the offer, grown with inflation, and foots", () => {
     const ctx = withWork(context("colAdjustedTotal", undefined, 4, { filingStatus: "joint", spouseWages: 90_000 })).ctx;
     for (const letter of LETTERS) {
@@ -107,7 +108,7 @@ describe("L-6: a joint return with a spouse's wages (audit C1)", () => {
   });
 });
 
-describe("L-6 ties to L-1, the bridge and the lead schedule", () => {
+describe("A-7 ties to L-1, the bridge and the lead schedule", () => {
   const ctx = withWork(context()).ctx;
   it("each year's after-tax pay, total rewards and after-rent figure is L-1's and the bridge's", () => {
     for (const letter of LETTERS) {
@@ -148,18 +149,18 @@ describe("L-6 ties to L-1, the bridge and the lead schedule", () => {
     expect(derive("l6y.A.total.4", ctx).title).toBe("A · year 4 · after rent, at U.S. prices");
     expect(derive("br.A.1.total", ctx).title).toBe("A · year 1 · after rent, at U.S. prices");
     expect(derive("l6t.A.2027.state.with", ctx).title).toBe("A · 2027 · NY income tax, with the offer");
-    const rsu = ctx.results!.work![2].payments.findIndex((p) => p.component === "rsu");
+    const rsu = ctx.own!.work!.C!.payments.findIndex((p) => p.component === "rsu");
     expect(derive(`l6p.C.${rsu}.gross`, ctx).title).toBe("C · new-hire RSUs, tranche 1 of 7");
   });
-  it("L-1's table view keeps its years and your stay; its present-value row moved to L-6", () => {
+  it("L-1's table view keeps its years and your stay; its present-value row is in each offer's A-7", () => {
     const html = renderPage(ctx);
     expect(html).toContain('id="l1-table"');
     expect(html).not.toContain("Present value today");
-    expect(html).toContain("Each year ties to L-6, The work");
+    expect(html).toContain("Each year ties to the offer");
   });
 });
 
-describe("L-6 at the edges", () => {
+describe("A-7 at the edges", () => {
   /** A plain offer with a cash award `days` after its start, a year's pay, and nothing else. */
   const plain = (letter: Letter, days: number): ((os: AppOffer[]) => AppOffer[]) => (os) => os.map((o) => (o.letter !== letter ? o : {
     ...o, sample: null, draft: { ...blankDraft(), label: "Plain", salary: { ...blankDraft().salary, annual: 100_000 }, residence: { state: "TX", nyc: false },
@@ -183,7 +184,7 @@ describe("L-6 at the edges", () => {
   });
 });
 
-describe("L-6 opens only when asked", () => {
+describe("A-7 opens only when asked", () => {
   it("is collapsed by default: no tables and no figures until it's opened", () => {
     const w = withWork(context());
     const closed = renderToStaticMarkup(createElement(WorkProvider, { ctx: w.ctx, children: createElement(TheWork, { ...w.props, open: false }) }));
@@ -196,8 +197,8 @@ describe("L-6 opens only when asked", () => {
   });
   it("without the payments yet, the years show and the payments say they're being worked out", () => {
     const w = withWork(context());
-    const ctx = { ...w.ctx, results: { ...w.ctx.results!, work: undefined } };
-    const html = renderToStaticMarkup(createElement(WorkProvider, { ctx, children: createElement(TheWork, { ...w.props, ctx, work: { ...w.props.work, result: null } }) }));
+    const ctx = { ...w.ctx, own: { ...w.ctx.own!, work: undefined } };
+    const html = renderToStaticMarkup(createElement(WorkProvider, { ctx, children: createElement(TheWork, { ...w.props, ctx, fresh: false }) }));
     expect(html).toContain('data-metric="l6y.A.total.1"');
     expect(html).toContain("Working out every payment…");
     expect(html).not.toContain('data-metric="l6p.');

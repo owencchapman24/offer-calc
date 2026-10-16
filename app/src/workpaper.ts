@@ -1,16 +1,17 @@
 import type { Component, ValueBasis } from "../../src/offer/types";
 import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
-import { detailOf, indexOf, type L6Line, offerByLetter, pricesOf, res, shortCity, type TaxLine, type WorkContext } from "./metrics";
+import { type L6Line, offerByLetter, ownOf, pricesOf, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { cashName } from "./byYearModel";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
-import type { TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
+import type { OfferDetail, TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 
-// L-6 · The work (docs/ui-design.md §4.8): each offer's employment years line by line (cash; total rewards and hours;
-// after rent), its stay's totals tied to the lead schedule and L-1, every payment with its formula and tax, and each calendar
-// year's tax with and without the offer. Every column adds up as displayed: the year figures are footing.ts's, the payments
-// are to the cent and their subtotals add them exactly, and each tax year's columns foot (below). Pure: no React. Shared by
-// TheWork.tsx and the derivations (derive.ts), so a figure and its work are the same number.
+// A-7 · The work (docs/ui-design.md §4.8, L-6 until stop 5B; docs/v2-plan.md, item 5): an offer's employment years line by line
+// (cash; total rewards and hours; after rent), its stay's totals, every payment with its formula and tax, and each calendar year's
+// tax with and without the offer, each over the offer's own stay (its breakdown's, B3). Every column adds up as displayed: the year
+// figures are footing.ts's, the payments are to the cent and their subtotals add them exactly, and each tax year's columns foot
+// (below). Pure: no React. Shared by TheWork.tsx, the breakdown's parts and the derivations (derive.ts), so a figure and its work
+// are the same number.
 
 type L = Letter;
 
@@ -66,11 +67,11 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** "NYC" or "Philadelphia", for an offer taxed by the city it's in; null otherwise. */
 const cityLine = (o: AppOffer | undefined) => (o && cityTax(o.draft) ? CITY_TAX[cityTax(o.draft)!].line : null);
 
-/** L-6's employment-year table for one offer, over your stay. */
+/** A-7's employment-year table for one offer, over its own stay. */
 export function yearTable(ctx: WorkContext, letter: L): YearTable {
-  const r = res(ctx);
-  const n = r.view.row.years;
-  const d = detailOf(ctx, letter);
+  const b = ownOf(ctx, letter);
+  const n = b.years;
+  const d = b.detail;
   const ys = shownYears(d).slice(0, n);
   const o = offerByLetter(ctx, letter);
   const rows: L6Row[] = [];
@@ -156,14 +157,14 @@ const rowNo = (rows: L6Row[], l: L6Line) => rows.find((x) => x.line === l && x.k
 /** A line's number in an offer's table (its first row, not a carried one). */
 export function lineNo(ctx: WorkContext, letter: L, l: L6Line): number {
   const no = rowNo(yearTable(ctx, letter).rows, l);
-  if (no === undefined) throw new Error(`L-6.${letter} has no such line.`);
+  if (no === undefined) throw new Error(`${letter}-7 has no such line.`);
   return no;
 }
 
 /** The figure in a line's year (1 through your stay) or its years added ("sum"), as the table has it. */
 export function yearCell(t: YearTable, l: L6Line, col: number | "sum"): number {
   const row = t.rows.find((x) => x.line === l);
-  if (!row) throw new Error(`L-6.${t.letter} has no such line.`);
+  if (!row) throw new Error(`${t.letter}-7 has no such line.`);
   if (col === "sum") return row.sum;
   if (!(col >= 1 && col <= row.values.length)) throw new Error(`Year ${col} isn't in your stay.`);
   return row.values[col - 1];
@@ -171,7 +172,7 @@ export function yearCell(t: YearTable, l: L6Line, col: number | "sum"): number {
 
 /** "federal, FICA, NY, NYC": the taxes an offer pays. */
 function taxWho(ctx: WorkContext, letter: L): string {
-  const d = detailOf(ctx, letter);
+  const d = ownOf(ctx, letter).detail;
   const o = offerByLetter(ctx, letter);
   const t = d.taxYears;
   return [
@@ -181,13 +182,13 @@ function taxWho(ctx: WorkContext, letter: L): string {
 }
 
 function vestedGloss(ctx: WorkContext, letter: L): string {
-  const ret = detailOf(ctx, letter).assumptions.find((a) => a.code === "retirement");
+  const ret = ownOf(ctx, letter).detail.assumptions.find((a) => a.code === "retirement");
   if (ret?.code !== "retirement") return "the part vested by the end of your stay";
   const s = ret.params.vestedShare;
   return s >= 1 ? "all of it vested by the end of your stay" : s > 0 ? `${percent(s)} vested by the end of your stay` : "none vested by the end of your stay";
 }
 
-function rentGloss(d: ReturnType<typeof detailOf>): string {
+function rentGloss(d: OfferDetail): string {
   const info = d.costOfLiving!;
   return `${dollars(info.monthlyRent)} a month the first lease year${info.rentGrowth ? `, rising ${percent(info.rentGrowth)} a year` : ""}`;
 }
@@ -200,7 +201,7 @@ function faceGloss(ys: ShownYear[]): string {
   return parts.length ? parts.join(", ") : "nothing saved";
 }
 
-// ---- your stay: tied to L-1 and the lead schedule --------------------------------------------------------
+// ---- its stay: tied to L-1 and the lead schedule where the comparison's projection of it is this one -----------------------
 
 export interface StayRow {
   basis: ValueBasis;
@@ -212,21 +213,32 @@ export interface StayRow {
   after: number;
   /** Your stay, as paid: L-1's "Your stay, as paid" on this basis. */
   stay: number;
-  /** Present value today: the rank list's figure on this basis. */
+  /** Present value today: the rank list's figure on this basis, where the comparison's projection of the offer is its own (`sameStay`). */
   pv: number;
 }
 
 export const BASIS_LINE: Record<ValueBasis, L6Line> = { cash: "afterTax", totalRewards: "totalRewards", colAdjustedTotal: "total" };
 
-/** Your stay's totals on each dollar basis the offers have. */
+/** The comparison projects the offer over its own stay too (it starts on the comparison's first day): its figures are the breakdown's. */
+export function sameStay(ctx: WorkContext, letter: L): boolean {
+  const r = ctx.results;
+  const b = ctx.own?.breakdowns[letter];
+  return !!r && !!b && r.letters.includes(letter) && r.view.row.window.start === b.window.start && r.view.row.years === b.years;
+}
+
+/** An offer's stay's totals on each dollar basis it has, over its own stay. */
 export function stayRows(ctx: WorkContext, letter: L): StayRow[] {
-  const r = res(ctx);
-  const n = r.view.row.years;
-  const s = shownStay(detailOf(ctx, letter), n);
-  const i = indexOf(ctx, letter);
+  const own = ownOf(ctx, letter);
+  const n = own.years;
+  const d = own.detail;
+  const s = shownStay(d, n);
   const label: Record<ValueBasis, string> = { cash: "After-tax pay", totalRewards: "Total rewards", colAdjustedTotal: cap(pricesOf(ctx).phrase) };
+  const w = d.window;
+  const pvs: Record<ValueBasis, number | undefined> = {
+    cash: w.presentValue?.afterTaxComp, totalRewards: w.totalRewards.presentValue, colAdjustedTotal: w.costOfLiving?.presentValue?.total,
+  };
   return (["cash", "totalRewards", "colAdjustedTotal"] as ValueBasis[]).flatMap((b) => {
-    const pv = r.view.row.values[b]?.[i];
+    const pv = pvs[b];
     const years = s.years[b];
     if (pv === undefined || years === null) return [];
     return [{ basis: b, label: label[b], line: BASIS_LINE[b], years, after: s.after[b]!, stay: s.stay[b]!, pv }];
@@ -263,19 +275,19 @@ export interface PaymentYear {
   tax: number;
 }
 
-/** The worker's payments and tax years for an offer (L-6 open), or an error to show while they're on their way. */
+/** The worker's payments and tax years for an offer (A-7 open), or an error to show while they're on their way. */
 export function workOf(ctx: WorkContext, letter: L): WorkOffer {
-  const w = res(ctx).work?.[indexOf(ctx, letter)];
-  if (!w) throw new Error("Open L-6, The work, to see this.");
+  const w = ctx.own?.work?.[letter];
+  if (!w) throw new Error(`Show ${letter}-7's tables to see this.`);
   return w;
 }
 
-/** An offer's payments, by employment year of your stay and then by kind, as L-6 lists them. */
+/** An offer's payments, by employment year of its stay and then by kind, as A-7 lists them. */
 export function paymentYears(ctx: WorkContext, letter: L): PaymentYear[] {
   const w = workOf(ctx, letter);
-  const r = res(ctx);
-  const n = r.view.row.years;
-  const ys = shownYears(detailOf(ctx, letter)).slice(0, n);
+  const own = ownOf(ctx, letter);
+  const n = own.years;
+  const ys = shownYears(own.detail).slice(0, n);
   const indexed = w.payments.map((p, i) => ({ i, p }));
   const year = (ey: number | "after", list: typeof indexed): PaymentYear => {
     const groups = COMPONENTS.flatMap((c): PaymentGroup[] => {
@@ -290,7 +302,7 @@ export function paymentYears(ctx: WorkContext, letter: L): PaymentYear[] {
   return after.length ? [...out, year("after", after)] : out;
 }
 
-/** A payment's place in L-6's list. */
+/** A payment's place in A-7's list. */
 export function paymentAt(ctx: WorkContext, letter: L, i: number): WorkPayment {
   const p = workOf(ctx, letter).payments[i];
   if (!p) throw new Error(`No payment ${i + 1} for ${letter}.`);
@@ -386,7 +398,7 @@ export interface TaxTable {
   /** The offer's tax ÷ its pay, unrounded: every payment in the year carries it. */
   rate: number;
   digits: number;
-  /** The payments in the year, to the cent: their pay and tax added, by employment year (L-6's list). */
+  /** The payments in the year, to the cent: their pay and tax added, by employment year (A-7's list). */
   pay: number;
   tax: number;
   parts: Array<{ ey: number | "after"; gross: number; tax: number }>;
@@ -402,7 +414,7 @@ const TAX_LINES: Array<{ line: TaxLine; key: keyof TaxRun }> = [
 ];
 
 /**
- * An offer's calendar years of tax, as L-6 shows them, each column footing as displayed. The offer's pay and tax are its
+ * An offer's calendar years of tax, as A-7 shows them, each column footing as displayed. The offer's pay and tax are its
  * payments that year, added to the cent and rounded once, so they tie to its list. Without the offer, each line is the tax
  * engine's figure, rounded, and the total adds them. With it, the total is the one without plus the offer's tax, and its
  * federal income tax (the largest line) takes the rounding: the total less the other lines as rounded. The offer's column is
@@ -414,7 +426,7 @@ export function taxTables(ctx: WorkContext, letter: L): TaxTable[] {
   const st = o?.draft.residence.state ?? "State";
   const local = cityLine(o) ?? "Local";
   const joint = ctx.household.filingStatus === "joint";
-  const n = res(ctx).view.row.years;
+  const n = ownOf(ctx, letter).years;
   // Worked out once for a result (the derivations ask for a year at a time).
   const key = `${n}|${st}|${local}|${joint}`;
   const hit = taxMemo.get(w)?.get(key);
@@ -476,10 +488,10 @@ function taxTablesOf(w: WorkOffer, st: string, local: string, joint: boolean, n:
 /** One calendar year's table for an offer. */
 export function taxTable(ctx: WorkContext, letter: L, year: number): TaxTable {
   const t = taxTables(ctx, letter).find((x) => x.year === year);
-  if (!t) throw new Error(`No ${year} tax for ${letter} in L-6.`);
+  if (!t) throw new Error(`No ${year} tax for ${letter} in ${letter}-7.`);
   return t;
 }
 
-/** "Year 1 (Jul 13, 2026 – Jul 12, 2027)", or for payments past your stay "After your stay". */
+/** "Year 1 (Jul 13, 2026 – Jul 12, 2027)", or for payments past its stay "After its stay". */
 export const yearName = (y: PaymentYear) =>
-  (y.ey === "after" ? "After your stay" : `Year ${y.ey}${y.start && y.end ? ` (${longDate(y.start)} – ${longDate(dayBefore(y.end))})` : ""}`);
+  (y.ey === "after" ? "After its stay" : `Year ${y.ey}${y.start && y.end ? ` (${longDate(y.start)} – ${longDate(dayBefore(y.end))})` : ""}`);

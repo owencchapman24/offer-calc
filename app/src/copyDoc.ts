@@ -347,7 +347,8 @@ const TOTALS = new Set<BridgeLine>(["paid", "afterTax", "totalRewards", "total"]
 function bridgeSection(ctx: WorkContext, add: Add, worked: Worked[]) {
   const r = res(ctx);
   const p = pricesOf(ctx);
-  const bs = r.letters.map((l) => bridge(ctx, l, 1));
+  // The comparison's bridges, side by side: from rent straight to the prices picked, never through an offer's own city's dollars.
+  const bs = r.letters.map((l) => bridge(ctx, l, 1, "comparison"));
   const col = bs.every((b) => b.rows.some((x) => x.line === "total"));
   const at = (i: number, line: BridgeLine) => bs[i].rows.find((x) => x.line === line);
   add({ kind: "heading", text: "3. From the offer letter to what you'd have: year 1" });

@@ -12,7 +12,7 @@ import { priceWords } from "./prices";
 import type { CompareRequest } from "./protocol";
 import { SECTIONS } from "./sections";
 import { initialSession, reducer } from "./session";
-import { alone, context, footsAsDisplayed, ownOffers, renderAlone, renderBreakdowns, VALUATION } from "./testing";
+import { alone, context, footsAsDisplayed, ownOffers, renderAlone, renderBreakdowns, VALUATION, withParts } from "./testing";
 import { WorkProvider } from "./Tickmarks";
 
 // An offer's breakdown, stop 5A (docs/v2-plan.md, item 5): one offer is enough, its bottom line (A-1) over its own stay at its own
@@ -108,8 +108,9 @@ describe("A-1's Show the work", () => {
 
   it("every figure has a tickmark kind, a methodology section and a derivation that foots as displayed, drill-downs included", () => {
     const ids = [...new Set([...html.matchAll(/data-metric="([^"]+)"/g)].map((m) => m[1] as MetricId))].filter((id) => id.startsWith("own."));
-    expect(ids.sort()).toEqual(["own.A.bear", "own.A.drop", "own.A.hour", "own.A.rate", "own.A.saved", "own.A.spend", "own.A.total", "own.A.y1saved",
-      "own.A.y1spend"]);
+    // A-1's, and A-4's bull case (its bear case and drop are A-1's figures, shown again in A-4).
+    expect(ids.sort()).toEqual(["own.A.bear", "own.A.bull", "own.A.drop", "own.A.hour", "own.A.rate", "own.A.saved", "own.A.spend", "own.A.total",
+      "own.A.y1saved", "own.A.y1spend"]);
     const seen = new Set<string>();
     const check = (id: MetricId) => {
       if (seen.has(id)) return;
@@ -213,20 +214,26 @@ describe("one offer is enough (v2-plan.md, item 5, \"Quick mode from one offer\"
   it("the page's slots: with one offer A-1 pinned, its bar and sentence; with two or more, the section and the ledger's row instead", () => {
     const one = alone("A");
     const slots = (ctx: WorkContext) => ownSlots({ offers: ctx.offers, breakdowns: Object.fromEntries(ctx.offers.map((o) => [o.id, ctx.own!.breakdowns[o.letter]!])),
-      prices: priceWords(undefined), stayYears: 4, updating: false, sample: true, notes: [], firstUse: false, dispatch: () => {}, problems: null });
+      prices: priceWords(undefined), stayYears: 4, updating: false, sample: true, notes: [], firstUse: false, dispatch: () => {}, problems: null,
+      parts: withParts(ctx).parts });
     const s1 = slots(one);
-    expect([!!s1.pinned, !!s1.section, !!s1.foot, !!s1.bar("bottom")]).toEqual([true, false, false, true]);
+    // With one offer, the section under the columns is its A-2 to A-7; with two or more, the breakdowns, one at a time.
+    const section = (s: ReturnType<typeof slots>, ctx: WorkContext) => words(renderToStaticMarkup(createElement(WorkProvider, { ctx, children: s.section(ctx) })));
+    expect([!!s1.pinned, !!s1.foot, !!s1.bar("bottom")]).toEqual([true, false, true]);
+    expect(section(s1, one)).toMatch(/^A · NYC bank, in full Sample A-2 Where the money goes/);
     expect(s1.said).toMatch(/^A leaves you about \$7,563 a month over your stay, after rent: .* in today's dollars at New York prices\.$/);
     expect(s1.own.withRef).toBe(false);
-    const s3 = slots(context());
-    expect([!!s3.pinned, !!s3.section, !!s3.foot, s3.bar("bottom"), s3.said]).toEqual([false, true, true, null, null]);
+    const three = context();
+    const s3 = slots(three);
+    expect([!!s3.pinned, !!s3.foot, s3.bar("bottom"), s3.said]).toEqual([false, true, null, null]);
+    expect(section(s3, three)).toMatch(/^A · NYC bank, on its own Illustrative samples Skip to the comparison A NYC bank B Charlotte corp C Seattle tech A-1 The bottom line/);
     expect(s3.own.withRef).toBe(true);
   });
 
   it("the bar with one offer: A-1's figure with its dollars, and one button to A-1", () => {
     const ctx = alone("A");
     const s = ownSlots({ offers: ctx.offers, breakdowns: { [ctx.offers[0].id]: ctx.own!.breakdowns.A! }, prices: priceWords(undefined), stayYears: 4,
-      updating: false, sample: true, notes: [], firstUse: false, dispatch: () => {}, problems: null });
+      updating: false, sample: true, notes: [], firstUse: false, dispatch: () => {}, problems: null, parts: withParts(ctx).parts });
     const bar = words(renderToStaticMarkup(s.bar("bottom")!));
     expect(bar).toBe("A New York $7,563 a month · stay 4 yrs. Go to its bottom line A-1");
     expect(words(renderToStaticMarkup(s.bar("top")!))).toBe("A New York $7,563 a month over your stay, after rent · stay 4 years. Go to its bottom line A-1");
@@ -262,7 +269,7 @@ describe("the methodology with one offer", () => {
     const ctx = alone("A");
     const text = words(renderToStaticMarkup(createElement(Methodology, { ctx, section: null, sample: true })));
     expect(text).toContain("Your numbers: A, year 1, as paid");
-    expect(text).toContain("total rewards $111,262 → after rent, at New York prices, New York $65,662.");
+    expect(text).toContain("total rewards $111,262 → after rent, at New York prices, $65,662 in New York dollars.");
     expect(text).toContain("A's total after rent, present value, New York $ 329,149 ÷ Annuity factor: 48 month-ends at 5% a year 43.5191 = A month over "
       + "your stay, New York $ $7,563");
     expect(text).toContain("Taxed as a full-year resident of NY and New York City.");

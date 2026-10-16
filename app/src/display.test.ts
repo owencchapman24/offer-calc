@@ -50,7 +50,7 @@ function page(c: Case, basis: Basis): Page | null {
   // L-2's table (and its CSV) is there only when some offer has a range.
   const ranges = compareOf(ctx).offers.some(hasRanges);
   const tables: CsvTable[] = [{ kind: "l1", running: false }, { kind: "l1", running: true }, ...(ranges ? [{ kind: "l2" as const }] : []),
-    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "l6" as const, letter, part })))];
+    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "a7" as const, letter, part })))];
   const csv = tables.map((t) => JSON.stringify(csvBuild(ctx, t)));
   const at = firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years));
   const doc = buildDoc(ctx, { offers: compareOf(ctx).offers, at, picked: false });

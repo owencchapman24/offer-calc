@@ -63,8 +63,11 @@ function expectOf(id: string, ctx: WorkContext): Expect | null {
     case "ey": case "run": return by(basis, basis === "perHour");
     case "eysum": return by(basis, false);
     case "br":
+      // A-2's bridge (stop 5B): after rent at the offer's own prices, and its month, in its own city's dollars; then the prices picked.
       if (c === "prices") return { money: "prices", rate: false };
-      return c === "total" ? common(false) : c === "spend" || c === "saved" ? common(true) : { money: "paid", rate: false };
+      if (c === "own") return { money: "after", unit: city(a), rate: false, own: a as Letter };
+      if (c === "spend" || c === "saved") return { money: "after", unit: city(a), rate: true, own: a as Letter };
+      return c === "total" ? common(false) : { money: "paid", rate: false };
     case "risk": return by(basis, basis === "perHour");
     case "drop": case "win": return by(basis, true);
     // A starting salary, and the change to it that ties: amounts a year, as a salary is, not rates over a stay.
@@ -89,6 +92,11 @@ function expectOf(id: string, ctx: WorkContext): Expect | null {
       if (b === "prices") return { money: "prices", rate: true };
       return { money: "after", unit: city(a), rate: true, own: a as Letter };
     case "alone": return common(true);
+    // A-2 to A-6 (stop 5B): dollars as paid; a share of each $100 states its year; A-5's month and A-6's rate their periods.
+    case "a2": return c.endsWith("Share") || c === "hundred" ? { money: null, rate: true } : { money: "paid", rate: false };
+    case "when": case "cliff": case "nextup": return { money: "paid", rate: b === "salary" };
+    case "a5": return { money: "paid", rate: b === "month" };
+    case "a6": return c === "rate" ? { money: null, rate: true } : { money: "paid", rate: false };
   }
   return { money: "paid", rate: false };
 }
@@ -344,7 +352,7 @@ function comparison(ctx0: WorkContext) {
     + renderBreakdowns(ctx);
   const ranges = compareOf(ctx).offers.some(hasRanges);
   const tables: CsvTable[] = [{ kind: "l1", running: false }, { kind: "l1", running: true }, ...(ranges ? [{ kind: "l2" as const }] : []),
-    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "l6" as const, letter, part })))];
+    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "a7" as const, letter, part })))];
   const at = firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years));
   const doc = buildDoc(ctx, { offers: compareOf(ctx).offers, at, picked: false });
   return { ctx, html, csv: tables.map((t) => csvBuild(ctx, t)), doc };

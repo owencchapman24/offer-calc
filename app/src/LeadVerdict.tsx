@@ -19,9 +19,11 @@ import {
 /** A touch screen: the hint says "Tap". */
 const touch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-export function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, onWarnings, flip, rentNotes, showBridge }: {
-  changes: number; onWarnings?: () => void; flip: FlipLine | null; rentNotes: RentNote[];
-  /** "See how we get there": the bridge, under L-1 (Later.tsx, which this chunk mustn't import). */ showBridge: () => Promise<void>;
+export function Verdict({ view, letters, stayYears, dismissed, dispatch, cautions, changes, warnAt = [], onWarnings, flip, rentNotes, showBridge }: {
+  changes: number; flip: FlipLine | null; rentNotes: RentNote[];
+  /** The offers whose warnings change the numbers, and the way to each one's A-6. */
+  warnAt?: Letter[]; onWarnings?: (letter: Letter) => void;
+  /** "See how we get there": the leader's bridge, in its A-2 (App.tsx; Later.tsx, which this chunk mustn't import). */ showBridge: () => Promise<void>;
   view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf, prices } = view;
@@ -87,7 +89,9 @@ export function Verdict({ view, letters, stayYears, dismissed, dispatch, caution
           <p className="lead-pointer">
             <span className="warn-icon" aria-hidden="true">⚠</span> {changes === 1 ? "A warning changes" : `${changes} warnings change`} these
             numbers.{" "}
-            {onWarnings && <button type="button" className="link" onClick={onWarnings}>See L-5</button>}
+            {onWarnings && warnAt.map((l, i) => (
+              <span key={l}>{i ? " · " : ""}<button type="button" className="link" onClick={() => onWarnings(l)}>See {l}-6</button></span>
+            ))}
           </p>
         )}
         {cautions.length > 0 && (

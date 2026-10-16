@@ -1,138 +1,81 @@
-import { memo, type ReactNode, useEffect, useMemo, useRef } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import type { L6Part } from "./csv";
-import { CsvButton, Fig, useRovingTicks } from "./figures";
+import { CsvButton, Fig } from "./figures";
 import { type MetricId, type WorkContext } from "./metrics";
 import { cashName } from "./byYearModel";
 import type { Letter } from "./model";
-import { type CompareRequest, workJob, type WorkOffer } from "./protocol";
 import { cents, dollars, figure, longDate } from "./text";
-import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrintScope } from "./ui";
-import type { Engine, SlowState } from "./useEngine";
+import { usePrintScope } from "./ui";
 import {
-  KIND_NAME, moneyText as money, paymentFormula, paymentLabel, type PaymentYear, paymentYears, rateText, rowText as shown, sectionName, stayRows,
-  type StayRow, type TaxCol, type TaxTable, taxTables, toCent, type YearTable, yearName, yearTable,
+  KIND_NAME, moneyText as money, paymentFormula, paymentLabel, type PaymentYear, paymentYears, rateText, rowText as shown, sameStay, sectionName,
+  stayRows, type StayRow, type TaxCol, type TaxTable, taxTables, toCent, type YearTable, yearName, yearTable,
 } from "./workpaper";
 
-// L-6 · The work (docs/ui-design.md §4.8): the full tables behind every figure, one offer at a time, ticked like a workpaper.
-// Collapsed by default. Each offer's employment years come with the comparison (the fast lane); its payments and tax years
-// are worked out in the slow lane only once the tables are open. Every column adds up as shown (workpaper.ts), and the
-// totals tie (<) to the lead schedule and L-1. Loaded as you scroll toward it, like the schedules before it. Each table downloads
-// as CSV (csv.ts). In print, it's open on every offer, one after another; a summary leaves out the list of every payment.
+// A-7 · The work (docs/ui-design.md §4.8, L-6 until stop 5B; docs/v2-plan.md, item 5): an offer's full tables, over its own stay,
+// ticked like a workpaper, in its breakdown (BreakdownParts.tsx). Collapsed until "Show the tables". Its employment years come with
+// the breakdown (the fast lane); its payments and tax years are worked out in the slow lane only once the tables are open. Every
+// column adds up as shown (workpaper.ts), and where the comparison projects the offer over the same stay, the totals tie (<) to the
+// lead schedule and L-1. Each table downloads as CSV (csv.ts). In print it's open; a summary leaves out the list of every payment.
 
 export interface TheWorkProps {
   ctx: WorkContext;
-  sample: boolean;
-  /** The comparison's request: the offers L-6 lists, in the comparison's order. */
-  compare: CompareRequest | null;
-  /** The comparison is current and valid: the slow job can start. */
-  ready: boolean;
-  /** The comparison itself is from earlier inputs. */
-  status?: Stale;
-  work: SlowState<WorkOffer[]>;
-  requestSlow: Engine["requestSlow"];
-  /** The tables are open (closed by default), and the offer shown (null: the first). */
+  letter: Letter;
+  /** The tables are open (closed by default; open in print). */
   open: boolean;
-  letter: Letter | null;
   onOpen(open: boolean): void;
-  onLetter(letter: Letter): void;
+  /** Its payments and tax years are for the current inputs; the error that stopped them, if one did. */
+  fresh: boolean;
+  error: string | null;
 }
 
 export function TheWork(p: TheWorkProps) {
-  const ref = useRef<HTMLElement>(null);
-  useRovingTicks(ref);
-  const job = p.compare ? workJob(p.compare) : null;
-  const key = job && JSON.stringify(job);
   const scope = usePrintScope();
   const printing = scope !== null;
-  const { requestSlow, ready } = p;
   const open = p.open || printing;
-  // The payments and tax years, only while the tables are open.
-  useEffect(() => {
-    if (open && ready && job) requestSlow(job, key!);
-    // The job is compared by value (its key).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, ready, key, requestSlow]);
-
-  const r = p.ctx.results;
-  const letter = r && p.letter && r.letters.includes(p.letter) ? p.letter : r?.letters[0] ?? "A";
-  // The tables are worked out, and rendered, only when what they show changes: the comparison, the payments, the offer shown,
-  // or a word they use (its label, state, cash awards' name, an estimated rent, the prices picked). Not on every key.
-  const o = p.ctx.offers.find((x) => x.letter === letter);
-  const words = [letter, open, p.ctx.household.pricesIn, p.ctx.household.filingStatus, p.ctx.household.healthUsage, o?.draft.label, o?.draft.residence.state,
-    o?.draft.residence.nyc, o?.draft.residence.philadelphia, cashName(o), o?.draft.costOfLiving.monthlyRent === null, o?.sample].join("|");
-  const current = r?.detail && r.detail.years === r.view.row.years ? r : null;
-  const workOffer = current?.work?.[current.letters.indexOf(letter)];
-  const ctx = p.ctx;
-  const modelsOf = (l: Letter, w: boolean) => ({
-    t: yearTable(ctx, l), stay: stayRows(ctx, l), payments: w ? paymentYears(ctx, l) : null, taxes: w ? taxTables(ctx, l) : null,
-  });
-  const models = useMemo(() => (current && open && !printing ? modelsOf(letter, !!workOffer) : null),
+  const { ctx, letter } = p;
+  // The tables are worked out, and rendered, only when what they show changes: the breakdown, the payments, or a word they use (its
+  // label, state, cash awards' name, an estimated rent, the prices picked). Not on every key.
+  const o = ctx.offers.find((x) => x.letter === letter);
+  const words = [letter, open, ctx.household.pricesIn, ctx.household.filingStatus, ctx.household.healthUsage, o?.draft.label, o?.draft.residence.state,
+    o?.draft.residence.nyc, o?.draft.residence.philadelphia, cashName(o), o?.draft.costOfLiving.monthlyRent === null, o?.sample, sameStay(ctx, letter)].join("|");
+  const b = ctx.own?.breakdowns[letter];
+  const workOffer = ctx.own?.work?.[letter];
+  const models = useMemo(() => (b && open ? {
+    t: yearTable(ctx, letter), stay: stayRows(ctx, letter), payments: workOffer ? paymentYears(ctx, letter) : null,
+    taxes: workOffer ? taxTables(ctx, letter) : null, same: sameStay(ctx, letter),
+  } : null),
   // The context is read when these change: see above.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [current?.detail, current?.view.row, workOffer, words, printing]);
-  if (!current || !r) return <section ref={ref} id="l6" className="later" />;
-  const fresh = p.work.key === key && !p.work.updating && !!r.work;
-  // Dimmed while the comparison or the payments are worked out; nothing to dim while closed.
-  const status: Stale = !open ? null : p.status ?? (fresh || !r.work ? null : "updating");
+  [b, workOffer, words]);
+  const ready = !open || (p.fresh && !!workOffer);
   return (
-    <section ref={ref} id="l6" className={`schedule the-work${staleClass(status)}`} aria-labelledby="l6-title" aria-busy={open && !fresh}
-      data-ready={!open || fresh ? "1" : "0"}>
-      <header className="schedule-head">
-        <h2 id="l6-title" tabIndex={-1}><span className="ref">L-6</span> The work</h2>
-        {p.sample && <Stamp>Illustrative samples</Stamp>}
-        <StaleNote status={status} />
-      </header>
+    <section className="part the-work" aria-labelledby={`${letter}-7-title`} aria-busy={!ready} data-ready={ready ? "1" : "0"}>
+      <h3 id={`${letter}-7-title`} className="part-title" tabIndex={-1}><span className="ref">{letter}-7</span> The work</h3>
       {scope === "summary" ? (
         <p className="l6-lede">
-          Every figure above, line by line, for each offer: its employment years and each calendar year's tax with and without the offer. Every
-          column adds up as shown, and the totals tie to the lead schedule and L-1. The list of every payment is in the full workpaper.
+          Every figure in {letter}'s breakdown, line by line: its employment years and each calendar year's tax with and without the offer. Every
+          column adds up as shown. The list of every payment is in the full workpaper.
         </p>
       ) : (
         <p className="l6-lede">
-          Every figure above, line by line, for {printing ? "each offer" : "one offer at a time"}: its employment years, every payment with its
-          formula and tax, and each calendar year's tax with and without the offer. Every column adds up as shown, and the totals tie to the lead
-          schedule and L-1.
+          Every figure in {letter}'s breakdown, line by line: its employment years, every payment with its formula and tax, and each calendar year's
+          tax with and without the offer. Every column adds up as shown.
         </p>
       )}
-      <button type="button" className="got-it data-button l6-toggle no-print" aria-expanded={open} aria-controls="l6-body" onClick={() => p.onOpen(!open)}>
+      <button type="button" className="got-it data-button l6-toggle no-print" aria-expanded={open} aria-controls={`${letter}-7-body`} onClick={() => p.onOpen(!open)}>
         {open ? "Hide the tables" : "Show the tables"}
       </button>
-      {open && (
-        <div id="l6-body" className="l6-body">
-          {printing ? r.letters.map((l) => (
-            // In print, every offer's tables, one after another.
-            <div key={l} className="l6-offer">
-              <h3 className="chart-title l6-title"><OfferTitle ctx={ctx} letter={l} /></h3>
-              <OfferTables letter={l} {...modelsOf(l, !!r.work?.[r.letters.indexOf(l)])} error={p.work.error} listed={scope === "full"} />
-            </div>
-          )) : (
-            <>
-              <div className="chart-bar">
-                <h3 className="chart-title l6-title"><OfferTitle ctx={ctx} letter={letter} /></h3>
-                <div className="segmented" role="group" aria-label="Offer">
-                  {r.letters.map((l) => (
-                    <button key={l} type="button" className={l === letter ? "is-on" : ""} aria-pressed={l === letter} onClick={() => p.onLetter(l)}>{l}</button>
-                  ))}
-                </div>
-              </div>
-              {models && <OfferTables letter={letter} {...models} error={p.work.error} />}
-            </>
-          )}
+      {open && models && (
+        <div id={`${letter}-7-body`} className="l6-body">
+          <OfferTables letter={letter} {...models} error={p.error} listed={scope !== "summary"} />
           <p className="caption">
             Base case, as paid, not discounted, except the present values. Figures are rounded to the dollar, payments to the cent; a total is
-            its lines as shown, added. <a href="#/method/M-13">Methodology M-13</a>.{p.sample ? " (Sample inputs.)" : ""}
+            its lines as shown, added. <a href="#/method/M-13">Methodology M-13</a>.
           </p>
-          <TickLegend />
         </div>
       )}
     </section>
   );
-}
-
-/** "L-6.A · NYC bank" */
-function OfferTitle({ ctx, letter }: { ctx: WorkContext; letter: Letter }) {
-  const name = ctx.offers.find((o) => o.letter === letter)?.draft.label;
-  return <><span className="l6-ref">L-6.{letter}</span>{name ? ` · ${name}` : ""}</>;
 }
 
 /** A part's heading, with its CSV (once its figures are there). */
@@ -140,7 +83,7 @@ function PartHead({ letter, part, title, name, csv }: { letter: Letter; part: L6
   return (
     <div className="l6-part-head">
       <h4 className="extra-title l6-part">{title}</h4>
-      {csv && <CsvButton table={{ kind: "l6", letter, part }} name={`L-6.${letter}, ${name}`} />}
+      {csv && <CsvButton table={{ kind: "a7", letter, part }} name={`${letter}-7, ${name}`} />}
     </div>
   );
 }
@@ -149,21 +92,23 @@ function PartHead({ letter, part, title, name, csv }: { letter: Letter; part: L6
  * One offer's tables. Memoized: it renders again only when its view models do. `listed`: every payment is listed (on screen, and in
  * the full workpaper; a printed summary says where they are instead).
  */
-const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes, error, listed = true }: {
+const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes, error, listed = true, same }: {
   letter: Letter; t: YearTable; stay: StayRow[]; payments: PaymentYear[] | null; taxes: TaxTable[] | null; error: string | null; listed?: boolean;
+  /** The comparison projects it over the same stay: its totals tie to the lead schedule and L-1, its present value is the rank list's. */
+  same: boolean;
 }) {
   return (
     <>
       <PartHead letter={letter} part="years" title="Employment years" name="employment years" csv />
-      <Scroll label={`L-6.${letter}, employment years`}><YearsTable t={t} common={t.prices?.unit ?? ""} /></Scroll>
-      <PartHead letter={letter} part="stay" title="Your stay, tied to the lead schedule and L-1" name="your stay" csv />
-      <Scroll label={`L-6.${letter}, your stay`}><StayTable letter={letter} n={t.n} rows={stay} common={t.prices?.unit ?? ""} /></Scroll>
+      <Scroll label={`${letter}-7, employment years`}><YearsTable t={t} common={t.prices?.unit ?? ""} /></Scroll>
+      <PartHead letter={letter} part="stay" title={same ? "Its stay, tied to the lead schedule and L-1" : "Its stay"} name="its stay" csv />
+      <Scroll label={`${letter}-7, its stay`}><StayTable letter={letter} n={t.n} rows={stay} common={t.prices?.unit ?? ""} pv={same} /></Scroll>
       <PartHead letter={letter} part="payments" title="Every payment" name="every payment" csv={!!payments} />
-      {!listed ? <p className="note l6-elsewhere">Every payment, with its formula and its tax, to the cent: in the full workpaper (Print…, then Full workpaper), and in L-6's CSV of every payment.</p>
-        : payments ? <Scroll label={`L-6.${letter}, every payment`}><Payments letter={letter} years={payments} /></Scroll>
+      {!listed ? <p className="note l6-elsewhere">Every payment, with its formula and its tax, to the cent: in the full workpaper (Print…, then Full workpaper), and in {letter}-7's CSV of every payment.</p>
+        : payments ? <Scroll label={`${letter}-7, every payment`}><Payments letter={letter} years={payments} /></Scroll>
         : <p className="note l6-wait">{error ?? "Working out every payment…"}</p>}
       <PartHead letter={letter} part="tax" title="Tax by calendar year, with and without the offer" name="tax by calendar year" csv={!!taxes} />
-      {taxes ? <Scroll label={`L-6.${letter}, tax by calendar year`}><TaxYears letter={letter} tables={taxes} /></Scroll>
+      {taxes ? <Scroll label={`${letter}-7, tax by calendar year`}><TaxYears letter={letter} tables={taxes} /></Scroll>
         : <p className="note l6-wait">{error ?? "Working out each year's tax…"}</p>}
     </>
   );
@@ -188,7 +133,7 @@ function YearsTable({ t, common }: { t: YearTable; /** The prices picked, as a f
   const sections = (["cash", "rewards", "rent"] as const).filter((s) => t.rows.some((x) => x.section === s));
   return (
     <table className="year-table l6-table l6-years">
-      <caption className="sr-only">L-6.{t.letter}: each employment year of your stay, line by line, and the years added</caption>
+      <caption className="sr-only">{t.letter}-7: each employment year of its stay, line by line, and the years added</caption>
       <thead>
         <tr>
           <th scope="col" className="l6-no"><span className="sr-only">Number</span></th>
@@ -227,19 +172,19 @@ function YearsTable({ t, common }: { t: YearTable; /** The prices picked, as a f
   );
 }
 
-function StayTable({ letter, n, rows, common }: { letter: Letter; n: number; rows: StayRow[]; common: string }) {
+function StayTable({ letter, n, rows, common, pv }: { letter: Letter; n: number; rows: StayRow[]; common: string; /** Its present value is the rank list's. */ pv: boolean }) {
   const after = rows.some((x) => x.after);
   const say = (x: StayRow, v: number) => `${x.basis === "colAdjustedTotal" ? `${common} ` : ""}${dollars(v)}`;
   return (
     <table className="year-table l6-table l6-stay">
-      <caption className="sr-only">L-6.{letter}: your stay on each basis, as paid and in present value</caption>
+      <caption className="sr-only">{letter}-7: its stay on each basis, as paid{pv ? " and in present value" : ""}</caption>
       <thead>
         <tr>
           <th scope="col">Basis</th>
           <th scope="col">Years 1–{n}</th>
-          {after && <th scope="col">Past your stay's last day</th>}
-          <th scope="col">Your stay, as paid</th>
-          <th scope="col">Present value today</th>
+          {after && <th scope="col">Past its stay's last day</th>}
+          <th scope="col">Its stay, as paid</th>
+          {pv && <th scope="col">Present value today</th>}
         </tr>
       </thead>
       <tbody>
@@ -248,10 +193,10 @@ function StayTable({ letter, n, rows, common }: { letter: Letter; n: number; row
             <th scope="row">{x.label}</th>
             <td><Fig id={`l6y.${letter}.${x.line}.sum`} label={`${x.label}, years 1 to ${n}, ${say(x, x.years)}`}>{figure(x.years)}</Fig></td>
             {after && (
-              <td>{x.after ? <Fig id={`l6s.${letter}.${x.basis}.after`} label={`${x.label} past your stay, ${say(x, -x.after)}`}>{money(-x.after)}</Fig> : "—"}</td>
+              <td>{x.after ? <Fig id={`l6s.${letter}.${x.basis}.after`} label={`${x.label} past its stay, ${say(x, -x.after)}`}>{money(-x.after)}</Fig> : "—"}</td>
             )}
-            <td><Fig id={`l6s.${letter}.${x.basis}.stay`} label={`${x.label}, your stay as paid, ${say(x, x.stay)}`}>{figure(x.stay)}</Fig></td>
-            <td><Fig id={`l6s.${letter}.${x.basis}.pv`} label={`${x.label}, present value today, ${say(x, x.pv)}`}>{figure(x.pv)}</Fig></td>
+            <td><Fig id={`l6s.${letter}.${x.basis}.stay`} label={`${x.label}, its stay as paid, ${say(x, x.stay)}`}>{figure(x.stay)}</Fig></td>
+            {pv && <td><Fig id={`l6s.${letter}.${x.basis}.pv`} label={`${x.label}, present value today, ${say(x, x.pv)}`}>{figure(x.pv)}</Fig></td>}
           </tr>
         ))}
       </tbody>
@@ -262,7 +207,7 @@ function StayTable({ letter, n, rows, common }: { letter: Letter; n: number; row
 function Payments({ letter, years }: { letter: Letter; years: PaymentYear[] }) {
   return (
     <table className="year-table l6-table l6-payments">
-      <caption className="sr-only">L-6.{letter}: every payment, by employment year and kind, with its tax, to the cent</caption>
+      <caption className="sr-only">{letter}-7: every payment, by employment year and kind, with its tax, to the cent</caption>
       <thead>
         <tr><th scope="col">Payment</th><th scope="col">Pay</th><th scope="col">Tax</th></tr>
       </thead>
@@ -303,7 +248,7 @@ const COLS: TaxCol[] = ["with", "without", "offer"];
 function TaxYears({ letter, tables }: { letter: Letter; tables: TaxTable[] }) {
   return (
     <table className="year-table l6-table l6-tax">
-      <caption className="sr-only">L-6.{letter}: each calendar year's tax with the offer, without it, and the offer's share</caption>
+      <caption className="sr-only">{letter}-7: each calendar year's tax with the offer, without it, and the offer's share</caption>
       <thead>
         <tr><th scope="col">Line</th><th scope="col">With the offer</th><th scope="col">Without it</th><th scope="col">The offer's share</th></tr>
       </thead>

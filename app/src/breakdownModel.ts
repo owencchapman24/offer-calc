@@ -56,6 +56,8 @@ export interface OwnView {
   hour: { total: number; hours: number; value: number } | null;
   /** The bear case a month over its stay, at its own prices, and how far under the base case (a share of it); null with no range. */
   bear: { pv: number; month: number; drop: number | null } | null;
+  /** The bull case a month over its stay, at its own prices (A-4); null with no range. */
+  bull: { pv: number; month: number } | null;
 }
 
 /** An offer's own-stay figures. `withRef`: restate the total at the prices picked (a comparison, or Prices in a city). */
@@ -92,17 +94,21 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   const nominal = w.totalRewards.nominal - col.nominal.rent;
   const hour = hoursIn ? { total: nominal, hours: hoursIn, value: nominal / hoursIn } : null;
 
-  const bw = d.cases.bear;
-  const bearPv = bw.totalRewards.presentValue !== undefined && bw.costOfLiving?.presentValue
-    ? R(bw.totalRewards.presentValue - bw.costOfLiving.presentValue.rent) : null;
-  const bearMonth = bearPv === null ? null : R(bearPv / factor);
-  const bear = hasRanges(offer) && bearPv !== null && bearMonth !== null
-    ? { pv: bearPv, month: bearMonth, drop: month.total > 0 && bearMonth < month.total ? (month.total - bearMonth) / month.total : null } : null;
+  // A case's after-rent total at its own prices, as shown: total rewards − rent, each a present value; and a month, rounded once.
+  const caseOf = (s: "bear" | "bull") => {
+    const cw = d.cases[s];
+    const pv = cw.totalRewards.presentValue !== undefined && cw.costOfLiving?.presentValue
+      ? R(cw.totalRewards.presentValue - cw.costOfLiving.presentValue.rent) : null;
+    return pv === null || !hasRanges(offer) ? null : { pv, month: R(pv / factor) };
+  };
+  const bw = caseOf("bear");
+  const bear = bw ? { ...bw, drop: month.total > 0 && bw.month < month.total ? (month.total - bw.month) / month.total : null } : null;
+  const bull = caseOf("bull");
 
   return {
     letter, years: b.years, start: b.window.start, last: dayBefore(b.window.end), place, factor, months: b.annuity.length,
     pv: { totalRewards, rent: totalRewards - total, total, saved, spend: total - saved }, month, ref, year1,
-    differs: whyDiffers(d, ys.slice(0, b.years), b.years, offer), tax, hour, bear,
+    differs: whyDiffers(d, ys.slice(0, b.years), b.years, offer), tax, hour, bear, bull,
   };
 }
 

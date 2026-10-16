@@ -3,6 +3,7 @@
 
 export const SECTIONS = {
   "M-1": "The pipeline",
+  "M-1.1": "Where every $100 goes",
   "M-2": "Pay",
   "M-3": "Equity",
   "M-4": "Tax",
