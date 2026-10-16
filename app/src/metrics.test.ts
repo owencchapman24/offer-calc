@@ -205,8 +205,9 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
 
   it("the sentence: C holds up best and wins every scenario; A has the most to lose, $1,250 a month (−17%)", () => {
     // Bear: C 313,862 - A 258,793 = 55,070 / 43.5191 = $1,265 a month. A's drop: 313,175 - 258,793 = 54,382 / 43.5191 = $1,250 (17%).
-    expect(text(page(ctx))).toContain("C holds up best, and wins in every scenario. In the bear case it leads A by U.S.-avg $1,265 a month over your stay. "
-      + "A has the most to lose: U.S.-avg $1,250 a month below its base case over your stay (−17%), because its bonuses and promotion carry the risk.");
+    expect(text(page(ctx))).toContain("C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month over your stay, in "
+      + "U.S.-average dollars. A has the most to lose: $1,250 a month below its base case over your stay, in U.S.-average dollars (−17%), because its "
+      + "bonuses and promotion carry the risk.");
   });
 
   it("at 5 years A wins only the bull case, and the sentence says so", () => {

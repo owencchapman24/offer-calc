@@ -231,7 +231,6 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* The verdict is one sentence, its parts on lines of their own; the hero names its dollars, smaller (condition 1). */
 .verdict-sentence { margin: 0; }
 .verdict-sentence > .verdict-lede, .verdict-sentence > .hero { display: block; }
-.hero-place { font-size: 0.42em; font-weight: 600; letter-spacing: 0; }
 .scope { margin: 8px 0 0; font-size: 13.5px; color: var(--graphite); }
 .close { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
 .close .stamp { margin-right: 6px; }
@@ -730,6 +729,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .is-updating .own-body { opacity: 0.6; }
 .own-body > p { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
 .breakdown .own-body { max-width: 880px; }
+/* A-1's head is one sentence (its dollars said once), its parts on lines of their own. */
+.own-lines > span { display: block; }
 .own-hero { margin: 2px 0 4px !important; font-size: clamp(30px, 4vw, 42px); line-height: 1.15; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: proportional-nums !important; }
 .own-hero .tick { font-size: 15px; transform: translateY(-0.9em) rotate(-6deg); }
 .own-per { font-size: 16px; font-weight: 400; letter-spacing: 0; }

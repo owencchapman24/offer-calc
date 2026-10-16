@@ -127,6 +127,10 @@ From the NN/g calculator guidelines and the project's own conventions:
     in its column's head; before rent and prices, "$". An offer's own city's dollars stay inside its breakdown: wherever offers sit
     together (the verdict, the ledger's "On its own" row, L-1 to L-4, a table, a chart, print, a document), they're in the common
     dollars of "Prices in", or the conversion sits inline beside them.
+  - **A sentence says its dollars once, in words** (the user's amendment, 2026-10-16): the verdict, the bottom line, the copied
+    document's paragraphs and what a screen reader is told read "C leaves you about $507 a month more than A over your stay, after
+    rent, in U.S.-average dollars", not "U.S.-avg $507 … at U.S. prices". The compact "U.S.-avg $" and "New York $" stay in tables,
+    column heads and figure labels (a figure's accessible name, its Show the work, a CSV's head).
   - **Every rate and share states its period:** "a month over your stay", "a month in year 1", "32.4% of its pay over your stay",
     "of its 2027 pay".
 - **Every figure is ticked and traceable.** Each figure carries an audit tickmark. Clicking
@@ -1669,7 +1673,9 @@ line.
 - **The live region and the bars with one offer** say A-1's figure; when the comparison appears, its verdict is said once. Removing
   offers down to one moves focus to A-1's heading; adding one leaves it where it was.
 - **The label rules** (§2) across every schedule, derivation, CSV and the copied document, with their test (`labels.test.ts`). The
-  verdict now reads "C leaves you about U.S.-avg $487 a month more than A over your stay, after rent, at U.S. prices."
+  verdict read "C leaves you about U.S.-avg $487 a month more than A over your stay, after rent, at U.S. prices." until the user's
+  review of 5A (2026-10-16) amended the rule for sentences: each says its dollars once, in words ("C leaves you about $487 a month
+  more than A over your stay, after rent, in U.S.-average dollars."), and the test checks each sentence (§2).
 - **The methodology:** M-1 for one offer first, then "Comparing offers"; M-5.4 (per hour at the offer's own prices, or the common
   ones); M-7.2 with A-1's months; M-7.3 with a breakdown's own stay; M-12 with one offer; M-13 with the references. The masthead's
   tagline and "Offers" in the navigation (rev 4).

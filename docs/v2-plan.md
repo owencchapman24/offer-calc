@@ -44,7 +44,10 @@ section follows. 5A started before the testers' first question was answered, at 
    − New York prices $367 = U.S.-avg $7,196"). And every figure says which dollars it's in: an after-rent figure names its place's
    prices on the figure itself ("New York $6,671", "U.S.-avg $7,196"); figures before rent and prices are dollars as paid, and say so
    ("$, as paid"); a column's unit sits in its head, and every figure's accessible name, Show the work title, CSV header and line in the
-   copied document carry it.
+   copied document carry it. **Amended at the user's review of stop 5A (2026-10-16):** a sentence (the verdict, the bottom line, the
+   copied document's paragraphs, what a screen reader is told) states its dollars once, in natural language, and its figures go
+   without them: "C leaves you about $507 a month more than A over your stay, after rent, in U.S.-average dollars," not "U.S.-avg
+   $507 … at U.S. prices". The compact "U.S.-avg $" and "New York $" stay in tables, column heads and figure labels.
 2. **The sample comparison stays one click away (B5).** The first screen has "See a sample comparison" next to "Start with my offer",
    both in view without scrolling on a phone and on a desktop; one click loads the three samples, compared.
 3. **Comparison-only warnings stay with the comparison (B8).** L-5's warnings about one offer fold into that offer's A-6. A warning about
@@ -56,7 +59,8 @@ section follows. 5A started before the testers' first question was answered, at 
 
 **Their test** (stop 5A, like `prices.test.ts`): it renders every breakdown part, the "On its own" row, the comparison, the CSVs and the
 copied document, and fails on an after-rent figure that doesn't name its dollars, two offers' own-city figures in one row, table or chart,
-or a rate or share that doesn't state its period.
+or a rate or share that doesn't state its period. Since the amendment it reads each sentence on its own and fails on one that doesn't
+say its after-rent dollars in words, says them twice, or puts them on a figure in the compact style.
 
 **Why.** From user testing (`docs/user-testing.md`): the project's owner, using the tool with a real offer, had only that one, so had
 to compare it against a sample, which made the real offer harder to understand (finding 2); two testers had already asked for each

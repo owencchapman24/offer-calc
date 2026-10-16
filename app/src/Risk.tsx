@@ -57,7 +57,7 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
         </p>
       ) : (
         <>
-          <Lede v={v} at={at} />
+          <Lede v={v} at={at} said={placeOf(r.view, basis) ? `, in ${pricesOf(ctx).dollars}` : ""} />
           <p className="chart-title risk-title">{title}</p>
           <RangeChart v={v} at={at} />
           <Winners v={v} at={at} place={placeOf(r.view, basis) ? pricesOf(ctx).unit : ""} />
@@ -90,8 +90,12 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
   );
 }
 
-/** "C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month. A has the most to lose: …" */
-function Lede({ v, at }: { v: RiskView; at: (x: string) => string }) {
+/**
+ * "C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month over your stay, in U.S.-average dollars.
+ * A has the most to lose: …" Each sentence says its dollars once, in words (`said`, after rent); its figures' labels name them (`at`).
+ */
+function Lede({ v, at, said }: { v: RiskView; at: (x: string) => string; said: string }) {
+  const plain = (x: string) => (/^[−+(]?\$/.test(x) ? x : `$${x}`);
   const per = v.perHour ? "an hour" : "a month";
   const H = v.holdsUp;
   const own = CASES.filter((s) => v.leads[s].winner === H);
@@ -106,12 +110,13 @@ function Lede({ v, at }: { v: RiskView; at: (x: string) => string }) {
       {others.size === 0 ? ", and wins in every scenario. " : <>: it wins the {cases(own)}, and {join([...others].map(([w, ss]) => `${w} the ${cases(ss)}`))}. </>}
       {bear.margin > (v.perHour ? 0.005 : 0.5) ? (
         <>In the bear case it leads <Who l={bear.runnerUp} /> by{" "}
-          <Fig id="win.bear" label={`${at(leadText(v, bear))} ${per} over your stay in the bear case`}>{at(leadText(v, bear))}</Fig> {per} over your stay.{" "}</>
+          <Fig id="win.bear" label={`${at(leadText(v, bear))} ${per} over your stay in the bear case`}>{plain(leadText(v, bear))}</Fig> {per} over your
+          stay{said}.{" "}</>
       ) : <>In the bear case it ties with <Who l={bear.runnerUp} />.{" "}</>}
       {lose && (
         <><Who l={lose.letter} /> has the most to lose:{" "}
-          <Fig id={`drop.${lose.letter}`} label={`${at(dropAmount(v, lose))} ${per} below its base case over your stay`}>{at(dropAmount(v, lose))}</Fig> {per} below
-          its base case over your stay ({dropText(lose)}){lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.{" "}</>
+          <Fig id={`drop.${lose.letter}`} label={`${at(dropAmount(v, lose))} ${per} below its base case over your stay`}>{plain(dropAmount(v, lose))}</Fig> {per}{" "}
+          below its base case over your stay{said} ({dropText(lose)}){lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.{" "}</>
       )}
       {v.onlyIfWell.map((l) => <span key={l}><Who l={l} /> comes out ahead only if things go well. </span>)}
     </p>

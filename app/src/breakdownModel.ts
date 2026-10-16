@@ -137,10 +137,14 @@ export function whyDiffers(d: OfferDetail, ys: ShownYear[], years: number, offer
 
 const joinAnd = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
-/** The breakdown's sentence for screen readers, said once the inputs rest (docs/v2-plan.md, item 5, "Accessibility"). */
+/**
+ * The breakdown's sentence for screen readers, said once the inputs rest (docs/v2-plan.md, item 5, "Accessibility"), its dollars
+ * said once, in words: "A leaves you about $7,563 a month over your stay, after rent: $6,671 to spend and $892 saved, in today's
+ * dollars at New York prices."
+ */
 export function ownSentence(v: OwnView): string {
-  return `${v.letter} leaves you about ${inDollars(v.place, v.month.total)} a month over your stay, after rent: ${inDollars(v.place, v.month.spend)} `
-    + `to spend and ${inDollars(v.place, v.month.saved)} saved, in today's dollars.`;
+  return `${v.letter} leaves you about ${dollars(v.month.total)} a month over your stay, after rent: ${dollars(v.month.spend)} to spend and `
+    + `${dollars(v.month.saved)} saved, in today's dollars at ${v.place} prices.`;
 }
 
 /** The stay as the breakdown names it: "Your 4-year stay (Jul 13, 2026 – Jul 12, 2030)". */

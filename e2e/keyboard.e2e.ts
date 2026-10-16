@@ -12,7 +12,7 @@ test("the verdict is announced as one sentence once the inputs rest, not read wh
   // The first verdict is on the page as it loads: nothing is announced.
   await expect(live).toHaveText("");
   await page.locator("#in-B-salary-annual").fill("400000");
-  await expect(live).toHaveText(/^B leaves you about U\.S\.-avg \$[\d,]+ a month more than [AC] over your stay, after rent, at U\.S\. prices\.$/,
+  await expect(live).toHaveText(/^B leaves you about \$[\d,]+ a month more than [AC] over your stay, after rent, in U\.S\.-average dollars\.$/,
     { timeout: 10_000 });
   // A change that leaves the verdict as it is says nothing new.
   const said = await live.textContent();
@@ -189,7 +189,7 @@ test("down to one offer, focus goes to its bottom line and it's said once; a sec
   await page.getByRole("button", { name: "Remove offer B" }).click();
   await expect(page.locator("#own-title")).toBeFocused();
   await ownSettled(page);
-  await expect(live).toHaveText(/^A leaves you about New York \$[\d,]+ a month over your stay, after rent: New York \$[\d,]+ to spend and New York \$[\d,]+ saved, in today's dollars\.$/,
+  await expect(live).toHaveText(/^A leaves you about \$[\d,]+ a month over your stay, after rent: \$[\d,]+ to spend and \$[\d,]+ saved, in today's dollars at New York prices\.$/,
     { timeout: 10_000 });
   const add = page.getByRole("button", { name: "+ Add an offer to compare (up to 3)" });
   await addOffer(page);
@@ -197,6 +197,6 @@ test("down to one offer, focus goes to its bottom line and it's said once; a sec
   await expect(page.locator("#own-title")).toBeVisible(); // A's breakdown stays pinned while B is blank
   await fillOffer(page, "B", "300000", "Charlotte-Concord-Gastonia, NC-SC");
   await settled(page);
-  await expect(live).toHaveText(/^[AB] leaves you about U\.S\.-avg \$[\d,]+ a month more than [AB] over your stay, after rent, at U\.S\. prices\.$/,
+  await expect(live).toHaveText(/^[AB] leaves you about \$[\d,]+ a month more than [AB] over your stay, after rent, in U\.S\.-average dollars\.$/,
     { timeout: 10_000 });
 });
