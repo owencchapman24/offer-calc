@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
 import {
-  EDITORS, loadSchedules, openCompare, openEditor, openSection, openWithSaved, openWork, printWithButton, SAVED, SECTIONS, selectOffer, settled,
-  showByYear, showTheWork, stubPrint,
+  addOffer, EDITORS, fillOffer, loadSchedules, openAlone, openCompare, openEditor, openSection, openWithSaved, openWork, ownSettled, printWithButton,
+  quiet, SAVED, SECTIONS, selectOffer, settled, showByYear, showTheWork, stubPrint,
 } from "./lib/app";
 
 // The automated accessibility scan (docs/ui-slices-4-8-plan.md, slice 7): every state below, in each of the config's
@@ -120,6 +120,64 @@ test.describe("compare", () => {
     // An input's default, with "Edit it".
     await showTheWork(page, "about.filing");
     await scan(page, "Show the work: a default");
+  });
+});
+
+// The offer breakdown (docs/v2-plan.md, item 5, stop 5A): one offer, its bottom line pinned; a blank one, saying what's missing;
+// each offer's breakdown behind the tab list; the comparison appearing when a second offer is complete. "compare" in the name: the
+// tablet projects scan it too.
+test.describe("compare: one offer, and the breakdowns", () => {
+  test("one offer: its bottom line pinned, in quick and detailed mode", async ({ page }) => {
+    await openAlone(page);
+    await expect(page.locator("#own-title")).toBeFocused();
+    await scan(page, "one offer: A-1 pinned");
+    await page.getByRole("button", { name: "Detailed", exact: true }).click();
+    const head = page.locator("#section-head-pay");
+    await head.click();
+    await expect(head).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator(".loading-row")).toHaveCount(0);
+    await ownSettled(page);
+    await scan(page, "one offer: detailed, Pay open");
+    // Show the work for its bottom line.
+    await page.locator('[data-metric="own.A.total"]').first().click();
+    await expect(page.locator(".work .work-lines")).toBeVisible();
+    await scan(page, "one offer: A-1's month, its work");
+  });
+
+  test("one blank offer: what's missing, then the comparison appearing", async ({ page }) => {
+    await openCompare(page);
+    await page.getByRole("button", { name: "Start with my offer" }).click();
+    await expect(page.locator("#own .own-missing")).toHaveText("Add a salary, a city and a start date to see A on its own.");
+    await quiet(page);
+    await scan(page, "one blank offer: what's missing");
+    await fillOffer(page, "A", "95000", "Boston-Cambridge-Newton, MA-NH");
+    await ownSettled(page);
+    await scan(page, "your offer on its own");
+    await addOffer(page);
+    await expect(page.locator("#in-B-salary-annual")).toBeVisible();
+    await quiet(page);
+    await scan(page, "a second offer, blank");
+    await fillOffer(page, "B", "88000", "Charlotte-Concord-Gastonia, NC-SC");
+    await settled(page);
+    await expect(page.locator("#breakdown")).toBeAttached();
+    await scan(page, "the comparison, appeared");
+  });
+
+  test("the breakdowns, one offer at a time, and the On its own row", async ({ page }) => {
+    await openCompare(page);
+    await expect(page.locator('[data-metric="alone.A"]').first()).toBeAttached();
+    const section = page.locator("#breakdown");
+    await section.scrollIntoViewIfNeeded();
+    await expect(section.locator(".own-body")).toBeVisible();
+    await quiet(page);
+    await scan(page, "the breakdowns: A");
+    for (const letter of ["B", "C"]) {
+      await page.locator(`#own-tab-${letter}`).click();
+      await expect(page.locator(`#own-tab-${letter}`)).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator("#own-title .ref")).toHaveText(`${letter}-1`);
+      await quiet(page);
+      await scan(page, `the breakdowns: ${letter}`);
+    }
   });
 });
 
@@ -247,6 +305,6 @@ test("the Data page: export, the import review, problems, delete", async ({ page
   await scan(page, "Data page: delete, confirming");
   await page.getByRole("button", { name: "Cancel" }).click();
   // Back on the comparison, the results are as they were.
-  await page.getByRole("link", { name: "Compare" }).click();
+  await page.getByRole("link", { name: "Offers" }).click();
   await settled(page);
 });

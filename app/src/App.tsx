@@ -4,9 +4,10 @@ import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
-import { Lead, VerdictBar } from "./Lead";
+import { Lead, LiveVerdict, Problems, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
-import { BreakevenSlot, ByYearSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
+import { BreakevenSlot, breakdownModule, ByYearSlot, LeavingSlot, loadLater, RiskSlot, TheWorkSlot, WarningsSlot } from "./Later";
+import { useLazyModule, useLoadAfterPaint } from "./lazy";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -24,7 +25,7 @@ import { WorkProvider } from "./Tickmarks";
 import { type Engine, useEngine } from "./useEngine";
 import type { Live } from "./copyDoc";
 import { SECTIONS, type SectionId } from "./sections";
-import { verdict } from "./verdict";
+import { verdict, verdictSentence } from "./verdict";
 
 const STAYS = [2, 3, 4, 5];
 /** Quick mode's fields: "Edit it" focuses them where they are, in either mode. */
@@ -152,20 +153,27 @@ export function App() {
   const built = session.offers.map((o) => ({ o, r: toOfferInput(o) }));
   const complete = built.flatMap((x) => ("offer" in x.r ? [{ o: x.o, offer: x.r.offer }] : []));
   const missing = new Map<string, Missing[]>(built.flatMap((x) => ("missing" in x.r ? [[x.o.id, x.r.missing] as [string, Missing[]]] : [])));
-  const compare = complete.length >= 2 ? {
+  // Every complete offer gets its breakdown (docs/v2-plan.md, item 5); two or more, the comparison too.
+  const request = complete.length ? {
     offers: complete.map((x) => x.offer),
     household: toHousehold(session.household, wagesYear),
     stays: [...new Set([...STAYS, stayYears])].sort((a, b) => a - b),
     stayYears,
     valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate,
   } : null;
+  const comparing = complete.length >= 2;
+  const compare = comparing ? request : null;
   // Rent estimates come from the worker, which holds the HUD and BEA tables.
   const rents = [...new Map(session.offers.flatMap((o) => {
     const area = o.draft.costOfLiving.area;
     const state = o.draft.residence.state;
     return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
   })).values()];
-  const engine = useEngine({ compare, rents, check: complete.map((x) => x.offer) }, session.revision ?? 0);
+  const engine = useEngine({ offers: request, ids: complete.map((x) => x.o.id), rents, check: complete.map((x) => x.offer) }, session.revision ?? 0);
+  // The breakdowns' code loads beside the worker, once the page has first painted (docs/v2-plan.md, item 5, "Bundle and LCP").
+  useLoadAfterPaint(breakdownModule);
+  const breakdown = useLazyModule(breakdownModule);
+  const prices = priceWords(session.household.pricesIn);
   // The validator's problems, by offer: the engine checks the complete offers, in order.
   const issues: Partial<Record<Letter, OfferIssue[]>> = {};
   complete.forEach((x, i) => { if (engine.issues[i]?.length) issues[x.o.letter] = engine.issues[i]; });
@@ -194,7 +202,7 @@ export function App() {
   const letters = complete.map((x) => x.o.letter);
   const noHours = complete.filter((x) => !x.o.draft.hours.weekly).map((x) => x.o.letter);
   const view = engine.sweep && engine.sweep.labels.length === letters.length
-    ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours, priceWords(session.household.pricesIn)) : null;
+    ? verdict(engine.sweep, letters, session.ui.basis, stayYears, noHours, prices) : null;
   // The engine's warnings for your stay (the remote-work rule, limits), by offer, for the fields they're about.
   const warnings: Partial<Record<Letter, OfferWarning[]>> = {};
   if (view && engine.detail) letters.forEach((l, i) => { if (engine.detail!.offers[i]?.warnings.length) warnings[l] = engine.detail!.offers[i].warnings; });
@@ -214,7 +222,6 @@ export function App() {
   const cautions = asymmetries(complete.map((x) => x.o)).map(asymmetryText);
 
   const notes: string[] = [];
-  if (complete.length < 2) notes.push("Fill in at least two offers to compare them.");
   for (const x of complete) {
     if (x.offer.startDate < today) notes.push(`Offer ${x.o.letter} starts before today, so its present value counts pay already received.`);
   }
@@ -253,14 +260,22 @@ export function App() {
   const workOpen = session.ui.work?.open ?? false;
   const workLetter = session.ui.work?.letter ?? null;
   const payments = (workOpen || printing) && engine.work.result?.length === letters.length ? { work: engine.work.result } : {};
+  // The breakdowns' parts, where the page places them (Breakdown.tsx): pinned with one offer, a section and the ledger's foot row
+  // with two or more.
+  const own = breakdown?.ownSlots({ offers: session.offers, breakdowns: engine.breakdowns, prices, tab: session.ui.offerTab, stayYears,
+    updating: engine.updating, sample, notes, firstUse: !session.ui.dismissed?.afterRent, dispatch,
+    problems: <Problems issues={engine.invalid ? issues : {}} results={Object.keys(engine.breakdowns).length > 0} onFix={edit} /> });
+  const slot = <div className="later own-slot" />;
   const work: WorkContext = {
-    today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents,
+    today, household: session.household, wagesYear, offers: session.offers, rents: engine.rents, ...(own ? { own: own.own } : {}),
     ...(view && engine.sweep ? { results: { sweep: engine.sweep, detail: engine.detail, view, letters, ...leave, ties, ...payments } } : {}),
   };
   // "Copy as document" (docs/copy-as-document-plan.md): waits while the inputs have a problem, and says why. It reads the page as it
   // is when its figures come back (`live`), not as it was when the button was pressed.
   const incomplete = session.offers.filter((o) => missing.has(o.id)).map((o) => o.letter);
   const copyBlocked = copyBlock({ compare: !!compare, view: !!view, invalid: !!engine.invalid, error: !!engine.error, incomplete });
+  // The live region's sentence: the verdict, or with one offer its bottom line (docs/v2-plan.md, item 5, "Accessibility").
+  const said = engine.updating || engine.error ? null : view ? verdictSentence(view) : own?.said ?? null;
   const live = useRef<Live | null>(null);
   live.current = { work, compare, ready, breakeven: engine.breakeven, cursor: engine.cursor, leaveAt };
 
@@ -274,9 +289,10 @@ export function App() {
           <span className="brand-mark" aria-hidden="true">✓</span>
           <span className="brand-name">Offer Calc</span>
         </a>
-        <p className="tagline">Job offers compared the way they'd pay out: after tax, after rent and prices, per hour, year by year.</p>
+        <p className="tagline">Job offers worked out the way they'd pay out: after tax, after rent and prices, per hour, year by year, and
+          compared side by side when you have more than one.</p>
         <nav className="pages" aria-label="Pages">
-          <a href="#/" aria-current={route.page === "compare" ? "page" : undefined}>Compare</a>
+          <a href="#/" aria-current={route.page === "compare" ? "page" : undefined}>Offers</a>
           <a href="#/method" aria-current={route.page === "method" ? "page" : undefined}>Methodology</a>
           <a href="#/data" aria-current={route.page === "data" ? "page" : undefined}>Data</a>
         </nav>
@@ -310,16 +326,22 @@ export function App() {
         <>
           <About session={session} dispatch={dispatch} today={today} wagesYear={wagesYear} />
           {tablet && view && <VerdictBar view={view} stayYears={stayYears} place="top" updating={engine.updating} />}
+          {tablet && own?.bar("top")}
+          <LiveVerdict text={said} />
 
           <main className="workpaper">
             <LedgerView offers={session.offers} missing={missing} rents={engine.rents} issues={issues} warnings={warnings} ui={session.ui}
-              dispatch={dispatch} tabbed={phone && !printing} />
+              dispatch={dispatch} tabbed={phone && !printing}
+              foot={own?.foot} />
             <div className="results">
-              <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
-                sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
-                cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} />
+              {comparing ? (
+                <Lead view={view} letters={letters} stayYears={stayYears} updating={engine.updating} error={engine.error} notes={notes}
+                  sample={sample} dismissed={session.ui.dismissed} dispatch={dispatch} issues={engine.invalid ? issues : {}} onFix={edit}
+                  cautions={cautions} changes={changes} onWarnings={toWarnings} flip={flip} rentNotes={rentNotes(work)} />
+              ) : own?.pinned ?? slot}
             </div>
           </main>
+          {comparing && (own?.section ?? slot)}
           {work.results && <ByYearSlot ctx={work} ui={session.ui} sample={sample} dispatch={dispatch} status={stale} />}
           {work.results && <RiskSlot ctx={work} sample={sample} status={stale} />}
           {work.results && (
@@ -381,6 +403,7 @@ export function App() {
       {route.page === "compare" && phone && view && (
         <VerdictBar view={view} stayYears={stayYears} place="bottom" updating={engine.updating} hidden={keyboardUp} />
       )}
+      {route.page === "compare" && phone && own?.bar("bottom", keyboardUp)}
     </div>
     </Printing.Provider>
     </TickSetting.Provider>
@@ -396,7 +419,7 @@ export function App() {
  */
 export function copyBlock(s: { compare: boolean; view: boolean; invalid: boolean; error: boolean; incomplete: string[] }):
   { why: string; shown: boolean } | null {
-  if (!s.compare) return { why: "Fill in at least two offers to copy the comparison.", shown: true };
+  if (!s.compare) return { why: "Add a second offer to copy a comparison.", shown: true };
   if (s.invalid) return { why: "Fix the problems listed under the verdict to copy the comparison.", shown: true };
   if (s.error) return { why: "The comparison couldn't be worked out, so there's nothing to copy.", shown: true };
   if (s.incomplete.length) return { why: `Fill in or remove offer ${s.incomplete.join(" and ")} to copy the comparison.`, shown: true };

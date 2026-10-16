@@ -104,7 +104,7 @@ describe("L-3 on the samples (W7a)", () => {
   const page = l3Text(ctx);
 
   it("A and B: the salary and the sign-on that tie C, after rent at U.S. prices, over 4 years", () => {
-    expect(page).toContain("To tie C: its 4-year total after rent, at U.S. prices, 334,357 in today's dollars");
+    expect(page).toContain("To tie C: its 4-year total after rent, at U.S. prices, 334,357 in today's U.S.-average dollars");
     expect(page).toMatch(/A Starting salary \$110,000 → \$118,626 \(\+\$8,626, \+7\.8%\)/);
     expect(page).toMatch(/or Sign-on, paid Aug 12, 2026: \$10,000 → \$45,487 \(\+\$35,487\)/);
     expect(page).toMatch(/B Starting salary \$80,000 → \$125,404 \(\+\$45,404, \+56\.8%\)/);
@@ -126,10 +126,10 @@ describe("L-3 on the samples (W7a)", () => {
   });
   it("says per offer what scales with salary: A's bonus is entered by year, so it doesn't", () => {
     expect(page).toContain("Promotions and the 401(k) match scale with A's salary; its bonus, entered by year, doesn't.");
-    expect(page).toContain("Raises, the 10% bonus and the 401(k) match scale with B's salary.");
-    expect(page).toContain("Raises, the 15% bonus and the 401(k) match scale with C's salary.");
+    expect(page).toContain("Raises, the yearly 10% bonus and the 401(k) match scale with B's salary.");
+    expect(page).toContain("Raises, the yearly 15% bonus and the 401(k) match scale with C's salary.");
     // On after-tax pay the match isn't counted, so it isn't said to scale.
-    expect(l3Text(context("cash"))).toContain("Raises and the 15% bonus scale with C's salary.");
+    expect(l3Text(context("cash"))).toContain("Raises and the yearly 15% bonus scale with C's salary.");
   });
   it("on the per-hour basis, ties the total per hour divides, and says so", () => {
     const p = l3Text(context("perHour"));
@@ -196,7 +196,7 @@ describe("the close-call line (docs/ui-design.md §4.1)", () => {
     const t = withTies(ctx);
     const html = renderPage(t.ctx, { ties: t.props });
     const close = text(html.match(/<p class="close[^>]*>.*?<\/p>/)![0]);
-    expect(close).toBe("Close call The lead is under 3% of C's value. $2,651 more starting salary for A would tie.");
+    expect(close).toBe("Close call The lead is under 3% of C's value over your stay. $2,651 more starting salary for A would tie.");
     const flip = t.ctx.results!.ties!.flip!.rows[0];
     expect(flip.salary).toEqual(t.ctx.results!.ties!.l3!.rows[0].salary);
     expect(derive("flip", t.ctx).notes[0]).toBe("The lead is under 3% of C's value, a close call: this is the change to A's offer that would tie it.");

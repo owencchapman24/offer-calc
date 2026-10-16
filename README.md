@@ -1,7 +1,8 @@
 # Offer Calc
 
-Compare job offers the way they'd actually pay out: after federal, state, local and payroll tax,
-after rent and local prices, and per hour worked, year by year. Every figure shows its work.
+Work out a job offer the way it would actually pay out: after federal, state, local and payroll tax,
+after rent and local prices, and per hour worked, year by year. One offer gets its own bottom line;
+two or three are compared side by side. Every figure shows its work.
 
 **Live:** https://offer-calc.vercel.app
 

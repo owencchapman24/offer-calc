@@ -228,6 +228,10 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .verdict-lede { margin: 0; font-size: 19px; }
 .hero { margin: 2px 0; font-size: clamp(40px, 5vw, 56px); line-height: 1.1; font-weight: 650; letter-spacing: -0.01em; }
+/* The verdict is one sentence, its parts on lines of their own; the hero names its dollars, smaller (condition 1). */
+.verdict-sentence { margin: 0; }
+.verdict-sentence > .verdict-lede, .verdict-sentence > .hero { display: block; }
+.hero-place { font-size: 0.42em; font-weight: 600; letter-spacing: 0; }
 .scope { margin: 8px 0 0; font-size: 13.5px; color: var(--graphite); }
 .close { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
 .close .stamp { margin-right: 6px; }
@@ -716,6 +720,34 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 @media (max-width: 759px) { .later.l1-slot { min-height: 1406px; } }
 @media print { .later.l1-slot { min-height: 0; } }
 .printing .later.l1-slot { min-height: 0; }
+
+/* ---- an offer's breakdown, A-1 (docs/v2-plan.md, item 5): pinned with one offer, a section with two or more ------------------ */
+
+.breakdown { margin-top: 24px; }
+.part-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.part-title .ref { min-width: 34px; height: 30px; font-size: 13px; }
+.own-body { transition: opacity 120ms; }
+.is-updating .own-body { opacity: 0.6; }
+.own-body > p { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+.breakdown .own-body { max-width: 880px; }
+.own-hero { margin: 2px 0 4px !important; font-size: clamp(30px, 4vw, 42px); line-height: 1.15; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: proportional-nums !important; }
+.own-hero .tick { font-size: 15px; transform: translateY(-0.9em) rotate(-6deg); }
+.own-per { font-size: 16px; font-weight: 400; letter-spacing: 0; }
+.own-split { font-size: 16px; line-height: 1.5; }
+.own-ref, .own-year1, .own-facts, .own-bear { font-size: 14.5px; line-height: 1.6; }
+.own-ref { padding: 6px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.own-print { margin-top: 18px; }
+.breakdown .schedule-head .skip { margin-left: auto; font-size: 13px; }
+.breakdown .schedule-head .skip + .updating { margin-left: 12px; }
+.own-tabs { margin: 0 0 14px; border-bottom: 1px solid var(--rule); max-width: 560px; }
+.row-own > * { border-top: 2px solid var(--ink); }
+.own-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-variant-numeric: tabular-nums; }
+.own-cell .fig { font-weight: 700; }
+.own-open { font-size: 12.5px; }
+/* A-1's place before its code arrives (it loads beside the worker), about as tall as A-1, so nothing shifts when it comes. */
+.later.own-slot { min-height: 420px; }
+@media print { .later.own-slot { min-height: 0; } }
+.printing .later.own-slot { min-height: 0; }
 
 /* ---- L-3 what it would take ------------------------------------------------------------------------- */
 

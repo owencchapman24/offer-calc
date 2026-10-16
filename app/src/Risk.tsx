@@ -5,6 +5,7 @@ import { basisPhrase, join, pricesOf, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { CASES, changeText, dropAmount, dropText, leadText, type RiskRow, type RiskView, riskCarriers, riskView } from "./cases";
 import { cents, figure } from "./text";
+import { placeOf } from "./verdict";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 
@@ -37,7 +38,10 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
     return null;
   }
   const basis = r.view.basis;
-  const title = v.perHour ? `Per hour worked over your stay (${v.years} ${v.years === 1 ? "year" : "years"}), nominal`
+  // A figure with its dollars (condition 1): the prices picked after rent ("U.S.-avg $1,265"), "$" before rent and prices.
+  const at = (x: string) => `${placeOf(r.view, basis)} ${/^[−+(]?\$/.test(x) ? x : `$${x}`}`.trim();
+  const title = v.perHour ? `Per hour worked over your stay (${v.years} ${v.years === 1 ? "year" : "years"}), ${r.sweep.perHourOf === "colAdjustedTotal"
+    ? `${pricesOf(ctx).phrase}, ` : ""}nominal`
     : `${basisPhrase(pricesOf(ctx))[basis][0].toUpperCase()}${basisPhrase(pricesOf(ctx))[basis].slice(1)}, ${v.years}-year total, present value`;
   return (
     <section ref={ref} className={`schedule risk${staleClass(status)}`} aria-labelledby="l2-title" aria-busy={status === "updating"}>
@@ -53,10 +57,10 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
         </p>
       ) : (
         <>
-          <Lede v={v} />
+          <Lede v={v} at={at} />
           <p className="chart-title risk-title">{title}</p>
-          <RangeChart v={v} />
-          <Winners v={v} />
+          <RangeChart v={v} at={at} />
+          <Winners v={v} at={at} place={placeOf(r.view, basis) ? pricesOf(ctx).unit : ""} />
           <div className="risk-wrong">
             <p className="extra-title">What goes wrong in the bear case</p>
             <ul>
@@ -78,7 +82,7 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
               {table && <>{" · "}<CsvButton table={{ kind: "l2" }} name="L-2, if things go badly" /></>}
             </span>
           </p>
-          {table && <CaseTable v={v} />}
+          {table && <CaseTable v={v} at={at} />}
         </>
       )}
       <TickLegend />
@@ -87,7 +91,7 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
 }
 
 /** "C holds up best, and wins in every scenario. In the bear case it leads A by $1,265 a month. A has the most to lose: …" */
-function Lede({ v }: { v: RiskView }) {
+function Lede({ v, at }: { v: RiskView; at: (x: string) => string }) {
   const per = v.perHour ? "an hour" : "a month";
   const H = v.holdsUp;
   const own = CASES.filter((s) => v.leads[s].winner === H);
@@ -102,12 +106,12 @@ function Lede({ v }: { v: RiskView }) {
       {others.size === 0 ? ", and wins in every scenario. " : <>: it wins the {cases(own)}, and {join([...others].map(([w, ss]) => `${w} the ${cases(ss)}`))}. </>}
       {bear.margin > (v.perHour ? 0.005 : 0.5) ? (
         <>In the bear case it leads <Who l={bear.runnerUp} /> by{" "}
-          <Fig id="win.bear" label={`${leadText(v, bear)} ${per} in the bear case`}>{leadText(v, bear)}</Fig> {per}.{" "}</>
+          <Fig id="win.bear" label={`${at(leadText(v, bear))} ${per} over your stay in the bear case`}>{at(leadText(v, bear))}</Fig> {per} over your stay.{" "}</>
       ) : <>In the bear case it ties with <Who l={bear.runnerUp} />.{" "}</>}
       {lose && (
         <><Who l={lose.letter} /> has the most to lose:{" "}
-          <Fig id={`drop.${lose.letter}`} label={`${dropAmount(v, lose)} ${per} below its base case`}>{dropAmount(v, lose)}</Fig> {per} below its base
-          case ({dropText(lose)}){lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.{" "}</>
+          <Fig id={`drop.${lose.letter}`} label={`${at(dropAmount(v, lose))} ${per} below its base case over your stay`}>{at(dropAmount(v, lose))}</Fig> {per} below
+          its base case over your stay ({dropText(lose)}){lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.{" "}</>
       )}
       {v.onlyIfWell.map((l) => <span key={l}><Who l={l} /> comes out ahead only if things go well. </span>)}
     </p>
@@ -121,7 +125,7 @@ const ROW = 36;
 const M = { top: 6, right: 200, bottom: 26, left: 40 };
 const NARROW = 520;
 
-function RangeChart({ v }: { v: RiskView }) {
+function RangeChart({ v, at }: { v: RiskView; at: (x: string) => string }) {
   const box = useRef<HTMLDivElement>(null);
   const width = useChartWidth(box, 640);
   const values = v.rows.flatMap((x) => CASES.map((s) => x.values[s]));
@@ -168,12 +172,12 @@ function RangeChart({ v }: { v: RiskView }) {
           <span key={row.letter} className={`risk-letter offer-${row.letter}`} style={{ top: y(i) - 11 }}><span className="end-letter">{row.letter}</span></span>
         ))}
         {!narrow && v.rows.map((row, i) => (
-          <span key={row.letter} className="risk-label" style={{ left: M.left + plotW + 16, top: y(i) - 11 }}><RowLabel row={row} v={v} /></span>
+          <span key={row.letter} className="risk-label" style={{ left: M.left + plotW + 16, top: y(i) - 11 }}><RowLabel row={row} v={v} at={at} /></span>
         ))}
       </div>
       {narrow && (
         <ul className="risk-labels">
-          {v.rows.map((row) => <li key={row.letter}><span className={`end-letter offer-${row.letter}`}>{row.letter}</span> <RowLabel row={row} v={v} /></li>)}
+          {v.rows.map((row) => <li key={row.letter}><span className={`end-letter offer-${row.letter}`}>{row.letter}</span> <RowLabel row={row} v={v} at={at} /></li>)}
         </ul>
       )}
       <p className="risk-key">
@@ -184,23 +188,24 @@ function RangeChart({ v }: { v: RiskView }) {
 }
 
 /** Beside a row: its bear value and drop, or its one value when it has no range. */
-function RowLabel({ row, v }: { row: RiskRow; v: RiskView }) {
+function RowLabel({ row, v, at }: { row: RiskRow; v: RiskView; at: (x: string) => string }) {
   const fmt = (val: number) => (v.perHour ? cents(val) : figure(val));
+  const say = (val: number) => `${at(fmt(val))}${v.perHour ? " an hour over your stay" : ""}`;
   if (!row.ranged || Math.abs(row.values.bull - row.values.bear) < (v.perHour ? 0.005 : 0.5)) {
     return (
-      <><Fig id={`risk.${row.letter}.base`} label={`${row.letter}'s base case, ${fmt(row.values.base)}`}>{fmt(row.values.base)}</Fig>{" "}
+      <><Fig id={`risk.${row.letter}.base`} label={`${row.letter}'s base case, ${say(row.values.base)}`}>{fmt(row.values.base)}</Fig>{" "}
         <span className="risk-flat">{row.ranged ? "same in every case" : "no ranges entered"}</span></>
     );
   }
   return (
-    <>bear <Fig id={`risk.${row.letter}.bear`} label={`${row.letter}'s bear case, ${fmt(row.values.bear)}`}>{fmt(row.values.bear)}</Fig>{" "}
-      <Fig id={`drop.${row.letter}`} label={`${row.letter}'s bear case is ${dropText(row)} on its base case`}>{dropText(row)}</Fig></>
+    <>bear <Fig id={`risk.${row.letter}.bear`} label={`${row.letter}'s bear case, ${say(row.values.bear)}`}>{fmt(row.values.bear)}</Fig>{" "}
+      <Fig id={`drop.${row.letter}`} label={`${row.letter}'s bear case is ${dropText(row)} on its base case, over your stay`}>{dropText(row)}</Fig></>
   );
 }
 
 // ---- who wins, and the table view ----------------------------------------------------------------
 
-function Winners({ v }: { v: RiskView }) {
+function Winners({ v, at, place }: { v: RiskView; at: (x: string) => string; /** The unit after rent, for the row's head. */ place: string }) {
   const per = v.perHour ? "an hour" : "a month";
   return (
     <div className="stays risk-wins" role="table" aria-label="Who wins in each scenario">
@@ -209,7 +214,7 @@ function Winners({ v }: { v: RiskView }) {
         {CASES.map((s) => <span role="columnheader" key={s} className="stays-years">{CASE_WORD[s]}</span>)}
       </div>
       <div role="row" className="stays-row">
-        <span role="rowheader" className="stays-label stays-sub">Leads by</span>
+        <span role="rowheader" className="stays-label stays-sub">Leads by{place && `, ${place}`}, over your stay</span>
         {CASES.map((s) => {
           const lead = v.leads[s];
           return (
@@ -217,7 +222,8 @@ function Winners({ v }: { v: RiskView }) {
               {lead.margin > (v.perHour ? 0.005 : 0.5) ? (
                 <>
                   <span className={`who offer-${lead.winner}`}>{lead.winner}</span>
-                  <Fig id={`win.${s}`} label={`${lead.winner} +${leadText(v, lead)} ${per} in the ${s} case`} className="stays-margin">+{leadText(v, lead)}</Fig>
+                  <Fig id={`win.${s}`} label={`${lead.winner} leads by ${at(leadText(v, lead))} ${per} over your stay in the ${s} case`}
+                    className="stays-margin">+{leadText(v, lead)}</Fig>
                   <span className="stays-per">{per}</span>
                 </>
               ) : <span className="stays-per">tie</span>}
@@ -229,11 +235,12 @@ function Winners({ v }: { v: RiskView }) {
   );
 }
 
-function CaseTable({ v }: { v: RiskView }) {
+function CaseTable({ v, at }: { v: RiskView; at: (x: string) => string }) {
   const fmt = (val: number) => (v.perHour ? cents(val) : figure(val));
+  const say = (val: number) => `${at(fmt(val))}${v.perHour ? " an hour over your stay" : ""}`;
   return (
     <table className="year-table risk-table" id="l2-table">
-      <caption className="sr-only">Each offer in the bear, base and bull cases, and the bear case against the base case</caption>
+      <caption className="sr-only">Each offer in the bear, base and bull cases over your stay, {at("").replace(/\$$/, "$")}, and the bear case against the base case</caption>
       <thead>
         <tr>
           <th scope="col">Offer</th>
@@ -246,9 +253,9 @@ function CaseTable({ v }: { v: RiskView }) {
           <tr key={row.letter}>
             <th scope="row"><span className={`who offer-${row.letter}`}>{row.letter}</span></th>
             {CASES.map((s) => (
-              <td key={s}><Fig id={`risk.${row.letter}.${s}`} label={`${row.letter}'s ${s} case, ${fmt(row.values[s])}`}>{fmt(row.values[s])}</Fig></td>
+              <td key={s}><Fig id={`risk.${row.letter}.${s}`} label={`${row.letter}'s ${s} case, ${say(row.values[s])}`}>{fmt(row.values[s])}</Fig></td>
             ))}
-            <td><Fig id={`drop.${row.letter}`} label={`${row.letter}'s bear case is ${dropText(row)} on its base case`}>{dropText(row)}</Fig></td>
+            <td><Fig id={`drop.${row.letter}`} label={`${row.letter}'s bear case is ${dropText(row)} on its base case, over your stay`}>{dropText(row)}</Fig></td>
           </tr>
         ))}
       </tbody>

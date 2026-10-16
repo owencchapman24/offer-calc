@@ -387,7 +387,7 @@ describe("why Copy as document waits (copyBlock)", () => {
     expect(copyBlock({ ...ok, view: false })).toEqual({ why: "Working out the comparison…", shown: false });
   });
   it("a problem with the offers is said beside the button", () => {
-    expect(copyBlock({ ...ok, compare: false, view: false })).toEqual({ why: "Fill in at least two offers to copy the comparison.", shown: true });
+    expect(copyBlock({ ...ok, compare: false, view: false })).toEqual({ why: "Add a second offer to copy a comparison.", shown: true });
     expect(copyBlock({ ...ok, invalid: true })?.why).toBe("Fix the problems listed under the verdict to copy the comparison.");
     // A stored session with a problem, before any results: the problem, not "fill in".
     expect(copyBlock({ ...ok, view: false, invalid: true })).toEqual({ why: "Fix the problems listed under the verdict to copy the comparison.", shown: true });

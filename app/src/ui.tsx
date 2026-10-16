@@ -3,6 +3,18 @@ import { figure, parseMoney, parseNumber, parsePercent } from "./text";
 
 // Small building blocks shared by the schedules.
 
+/**
+ * The time to the first answer (audit P2): a performance mark, "first-answer", once a visit, after the frame that first shows
+ * an answer, the verdict or an offer's bottom line (A-1), whichever paints first. The Lighthouse check reports it from the trace
+ * (scripts/lib/lighthouse.ts).
+ */
+let answered = false;
+export function markFirstAnswer() {
+  if (answered) return;
+  answered = true;
+  requestAnimationFrame(() => setTimeout(() => performance.mark("first-answer")));
+}
+
 export type TickKind = "recomputed" | "footed" | "crossFooted" | "traced" | "default" | "estimate";
 
 export const TICKS: Record<TickKind, { mark: string; name: string }> = {

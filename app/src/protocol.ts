@@ -24,9 +24,14 @@ export interface EngineRequest {
   /** The fast lane, every edit (the default). */
   lane?: "compare";
   gen: number;
-  /** Null until at least two offers are complete: then only rent estimates are computed. */
-  compare: CompareRequest | null;
-  /** Every complete offer, to check (validateOffer) before anything is computed. Default: the compared offers. */
+  /**
+   * Every complete offer, in the ledger's order; null until one is complete (then only rent estimates are computed). Each offer
+   * gets its breakdown, over its own stay; two or more get the comparison too.
+   */
+  offers: CompareRequest | null;
+  /** The offers' ids, in the same order: the breakdowns come back under them. */
+  ids?: string[];
+  /** Every complete offer, to check (validateOffer) before anything is computed. Default: `offers`' offers. */
   check?: OfferInput[];
   /** Places (with the residence state) whose rent estimate the inputs show. */
   rents: Array<{ area: string; state: string }>;
@@ -62,6 +67,23 @@ export interface OfferDetail {
 
 export interface AnnuityTerm { date: ISODate; days: number; factor: number }
 
+/**
+ * One offer on its own (docs/v2-plan.md, item 5, B3): projected over its own stay, from its own start for your stay's years, so
+ * adding or editing another offer never changes it. Where its start is the comparison's, the comparison's projection of it is
+ * this one (the same object).
+ */
+export interface Breakdown {
+  /** Its own stay: [its start, the anniversary `years` on), the end exclusive. */
+  window: { start: ISODate; end: ISODate };
+  years: number;
+  detail: OfferDetail;
+  /** What $1 at each month-end of its stay is worth today (M-7.2), and the month-ends it sums. */
+  annuityFactor: number;
+  annuity: AnnuityTerm[];
+  valuationDate: ISODate;
+  discountRate: number;
+}
+
 export interface StayDetail {
   years: number;
   /** In the order of the request's offers. */
@@ -82,7 +104,8 @@ export type EngineResponse = {
   /** The validator's problems for each checked offer, in order: all empty when the comparison ran. */
   issues: OfferIssue[][];
 } & (
-  | { ok: true; sweep: HorizonSweep | null; detail: StayDetail | null }
+  /** `breakdowns`: each offer's, by its id (the request's `ids`). `sweep` and `detail`: the comparison, null under two offers. */
+  | { ok: true; sweep: HorizonSweep | null; detail: StayDetail | null; breakdowns: Record<string, Breakdown> }
   /** error null: the inputs have problems (`issues`), so nothing was computed. */
   | { ok: false; error: string | null }
 );

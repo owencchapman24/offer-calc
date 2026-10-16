@@ -1,9 +1,11 @@
-import { compute } from "./compute";
+import { compute, type OwnCache } from "./compute";
 import { createRunner } from "./jobs";
 import type { EngineRequest, EngineResponse, SlowRequest, SlowResponse } from "./protocol";
 import { breakevenJob, cursorJob, leaveJob, paymentsJob } from "./slowJobs";
 
-// The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). It
+// The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). Each complete offer gets its
+// breakdown, over its own stay, remembered by its inputs so an edit projects only the offer edited; two or more offers get the
+// comparison too (docs/v2-plan.md, item 5). It
 // also holds the full BEA and HUD tables: the main thread ships only the slim city list and asks
 // here for rent estimates. Requests carry a generation number; while one runs, only the newest
 // waiting request is kept. Edits take the fast lane (jobs.ts): they run ahead of any slow job's
@@ -16,6 +18,8 @@ const scope = self as unknown as {
 };
 
 const runner = createRunner(run);
+/** The breakdowns worked out lately, by their inputs. */
+const cache: OwnCache = new Map();
 const post = (r: SlowResponse) => scope.postMessage(r);
 scope.onmessage = (e) => {
   const m = e.data;
@@ -33,14 +37,14 @@ const isEdit = (m: EngineRequest | SlowRequest): m is EngineRequest => m.lane ==
 function run(req: EngineRequest) {
   const t = performance.now();
   try {
-    const { sweep, detail, rents, issues } = compute(req);
+    const { sweep, detail, breakdowns, rents, issues } = compute(req, cache);
     const ms = performance.now() - t;
-    // Problems with the inputs: nothing was compared, and the results keep the last valid state.
+    // Problems with the inputs: nothing was worked out, and the results keep the last valid state.
     if (issues.some((x) => x.length)) scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error: null, issues, rents, ms });
-    else scope.postMessage({ lane: "compare", gen: req.gen, ok: true, sweep, detail, rents, issues, ms });
+    else scope.postMessage({ lane: "compare", gen: req.gen, ok: true, sweep, detail, breakdowns: breakdowns ?? {}, rents, issues, ms });
   } catch (err) {
-    // Rent estimates don't depend on the comparison, so they still come back.
-    const { rents } = compute({ ...req, compare: null, check: [] });
+    // Rent estimates don't depend on the offers' results, so they still come back.
+    const { rents } = compute({ ...req, offers: null, check: [] });
     scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), issues: [], rents, ms: performance.now() - t });
   }
 }

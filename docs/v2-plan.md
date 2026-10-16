@@ -3,7 +3,8 @@
 **Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
 pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next section), is approved (2026-10-15): B1-B12 as
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
-built (pull request #31); nothing else is, and nothing starts until testers have answered each item's questions. What to build after v1
+built (pull request #31), and item 5's stop 5A (pull request #62, 2026-10-15, started before the testers' first answer at the user's
+word); nothing else is. What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
@@ -30,9 +31,10 @@ stop.
 
 ## 5. Offer breakdown (approved 2026-10-15, with conditions; first in priority)
 
-**Status: approved, not built.** Proposed and approved on 2026-10-15 (pull request #45): B1-B12 as recommended, with the conditions
-below on B4, B5 and B8 and a rule for labels (B13), which the rest of this section follows. No code until the audit's items under
-"Before stop 5A" are done and the testers' first question is answered.
+**Status: approved; stop 5A built (2026-10-15, pull request #62), 5B and 5C to come.** Proposed and approved on 2026-10-15 (pull
+request #45): B1-B12 as recommended, with the conditions below on B4, B5 and B8 and a rule for labels (B13), which the rest of this
+section follows. 5A started before the testers' first question was answered, at the user's word; how 5A differs from this section is in
+`docs/ui-design.md` §12.
 
 **The conditions** (the user's review of pull request #45, 2026-10-15):
 1. **Own-city dollars stay inside one breakdown (B4).** An offer's own city's dollars are for its breakdown alone. Two offers' figures
@@ -462,7 +464,11 @@ by year, and compared side by side when you have more than one") and the first p
 
 ### Bundle and LCP (within budget)
 
-**Where it stands** (2026-10-15, `main` at #54; `npm run check-bundle`, and CI's `npm run lighthouse`): the main thread 365.6 / 111.7 kB
+**At stop 5A** (2026-10-16, #62; `docs/ui-design.md` §12): the main thread 358.4 / 110.2 kB raw / gzip, 1.5 kB less than before it (A-1
+and the verdict's body load beside the worker); the worker 68.4 kB gzip; LCP 1.95 s side by side with main's 1.95 s, on a local server
+that now keeps each file compressed (it compressed each response anew, which Lighthouse read as server latency).
+
+**Where it stood** (2026-10-15, `main` at #54; `npm run check-bundle`, and CI's `npm run lighthouse`): the main thread 365.6 / 111.7 kB
 raw / gzip for a quick-mode visit, one chunk, against 120 kB: 8.3 kB of room. The worker 68.1 kB gzip against its 75 kB budget. LCP 1.87 s
 (the median of five; single runs 1.86-2.38 s) against 2.5 s; its element is About you's assumptions line, painted before the worker
 answers. The first answer, observed unthrottled, 1.29 s.
@@ -510,7 +516,7 @@ answers. The first answer, observed unthrottled, 1.29 s.
 
 | Stop | What | Needs first |
 |---|---|---|
-| 5A | One offer works: one is the minimum, "Start with my offer", the worker's per-offer job (its own stay, remembered by its inputs), A-1 pinned with one offer and its derivations, the live region and bars with one offer, the ledger's "On its own" row, the comparison appearing and going, M-1 and M-7, §1's wording into `docs/ui-design.md` rev 4, the conditions' label rules (1 and 4) and their test. Live screenshots, light and dark, of one offer and of three | B1-B13 (approved 2026-10-15), the audit items above, the testers' first question |
+| 5A (built, #62) | One offer works: one is the minimum, "Start with my offer", the worker's per-offer job (its own stay, remembered by its inputs), A-1 pinned with one offer and its derivations, the live region and bars with one offer, the ledger's "On its own" row, the comparison appearing and going, M-1 and M-7, §1's wording into `docs/ui-design.md` rev 4, the conditions' label rules (1 and 4) and their test. Live screenshots, light and dark, of one offer and of three | B1-B13 (approved 2026-10-15), the audit items above, the testers' first question |
 | 5B | A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved; the comparison's cross-foots and the step between windows; CSV names; print; M-1.1, M-4, M-6.3, M-9 | 5A |
 | 5C | Copy as document for one offer, and its choice with two or more; the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the NVDA walkthrough's new parts | 5B |
 

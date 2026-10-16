@@ -60,21 +60,23 @@ export function byYear(ctx: WorkContext, letter: L): ByYear {
 /** L-1's notes on what bends the lines: a promotion in a year (base case), and the year the new-hire RSUs finish vesting. */
 export function yearNotes(ctx: WorkContext): Array<{ n: number; letter: L; text: string }> {
   const r = res(ctx);
-  const notes: Array<{ n: number; letter: L; text: string }> = [];
-  r.letters.forEach((letter, i) => {
-    const d = r.detail!.offers[i];
-    const ys = d.employmentYears.slice(0, r.view.row.years);
-    const yearAt = (date: string) => ys.findIndex((y) => date >= y.start && date < y.end) + 1;
-    for (const a of d.assumptions) {
-      if (a.code !== "salaryChanges") continue;
-      for (const c of a.params.changes) {
-        const n = yearAt(c.date);
-        if (n > 0 && c.reasons.some((x) => x.kind === "promotion")) notes.push({ n, letter, text: `promotion (${longDate(c.date)}, base case)` });
-      }
+  return r.letters.flatMap((letter, i) => notesOf(r.detail!.offers[i], r.view.row.years).map((x) => ({ ...x, letter })));
+}
+
+/** One offer's notes over its first `years` employment years (L-1's, and the breakdown's year 1). */
+export function notesOf(d: OfferDetail, years: number): Array<{ n: number; text: string }> {
+  const notes: Array<{ n: number; text: string }> = [];
+  const ys = d.employmentYears.slice(0, years);
+  const yearAt = (date: string) => ys.findIndex((y) => date >= y.start && date < y.end) + 1;
+  for (const a of d.assumptions) {
+    if (a.code !== "salaryChanges") continue;
+    for (const c of a.params.changes) {
+      const n = yearAt(c.date);
+      if (n > 0 && c.reasons.some((x) => x.kind === "promotion")) notes.push({ n, text: `promotion (${longDate(c.date)}, base case)` });
     }
-    const lastNewHire = d.rsus.filter((v) => !v.refresher).at(-1);
-    if (lastNewHire && lastNewHire.ey <= ys.length) notes.push({ n: lastNewHire.ey, letter, text: "new-hire RSUs finish vesting" });
-  });
+  }
+  const lastNewHire = d.rsus.filter((v) => !v.refresher).at(-1);
+  if (lastNewHire && lastNewHire.ey <= ys.length) notes.push({ n: lastNewHire.ey, text: "new-hire RSUs finish vesting" });
   return notes;
 }
 

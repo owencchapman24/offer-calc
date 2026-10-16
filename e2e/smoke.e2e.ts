@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, stubPrint, verdictText } from "./lib/app";
+import { loadByYearOnly, openCompare, openWithSaved, openWork, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -98,6 +98,7 @@ const shownText = async (page: Page, sel: string) => (await page.locator(`${sel}
 
 test("CSV: a table downloads with the figures shown, as plain numbers, flagged as samples", async ({ page }) => {
   await openCompare(page);
+  await showByYear(page);
   await page.locator(".by-year").getByRole("button", { name: "Table view" }).click();
   const l1 = await csvOf(page, "Download CSV: L-1, by year");
   expect(l1.name).toMatch(/^offer-calc-\d{4}-\d{2}-\d{2}-L-1-by-year-sample\.csv$/);
@@ -120,6 +121,8 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   async ({ page }) => {
   await stubPrint(page);
   await openCompare(page);
+  // L-1 loads as you scroll toward it, and only L-1 here: L-2 to L-6 are for the button to load.
+  await loadByYearOnly(page);
   // The browser's own print: what's loaded is laid out for print at once (L-1's table view), before it prints.
   expect(await page.evaluate(() => { window.dispatchEvent(new Event("beforeprint")); return !!document.getElementById("l1-table"); })).toBe(true);
   await expect(page.locator("html")).toHaveClass(/printing/);
@@ -154,8 +157,9 @@ test("Print: a summary or the full workpaper; the button loads every schedule an
   await expect(page.locator(".l6-payments")).toHaveCount(3);
   await expect(page.locator(".l6-elsewhere")).toHaveCount(0);
   await page.emulateMedia({ media: "print" });
-  // On paper: every schedule's legend, no buttons but the figures, B's lines dashed and C's dotted, the footer's sample flag.
-  await expect(page.locator(".schedule .legend")).toHaveCount(7);
+  // On paper: every schedule's legend (the lead, the breakdowns and L-1 to L-6), no buttons but the figures, B's lines dashed and C's
+  // dotted, the footer's sample flag.
+  await expect(page.locator(".schedule .legend")).toHaveCount(8);
   await expect(page.getByRole("button", { name: "Print…" })).toBeHidden();
   await expect(page.locator(".segmented").first()).toBeHidden();
   const dash = (letter: string) => page.locator(`.by-year .series.offer-${letter} .series-line`).evaluate((el) => getComputedStyle(el).strokeDasharray);
@@ -190,7 +194,7 @@ test("Copy as document: one click puts the comparison on the clipboard, as HTML 
   const got = await clipboard(page);
   expect(Object.keys(got).sort()).toEqual(["text/html", "text/plain"]);
   for (const flavor of [got["text/html"], got["text/plain"]]) {
-    expect(flavor).toContain(`C leaves you about ${hero} more than A, after rent, at U.S. prices.`);
+    expect(flavor).toContain(`C leaves you about ${hero} more than A over your stay, after rent, at U.S. prices.`);
     expect(flavor).toContain(SAMPLE_LINE);
     expect(flavor).toContain("If your last day were");
     expect(flavor).toContain("To tie C's");
@@ -245,7 +249,7 @@ test("export, then import: the same results", async ({ page }) => {
   expect(JSON.parse(file)).toMatchObject({ format: "offer-calc", schemaVersion: 3 });
 
   // Change the inputs, so the import has something to restore.
-  await page.getByRole("link", { name: "Compare" }).click();
+  await page.getByRole("link", { name: "Offers" }).click();
   await settled(page);
   await page.locator("#in-C-salary-annual").fill("50000");
   await expect.poll(() => verdictText(page)).not.toEqual(before);

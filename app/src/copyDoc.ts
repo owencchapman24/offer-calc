@@ -14,7 +14,7 @@ import { ASSUMPTIONS, CITY_TAX, cityTax, type Letter } from "./model";
 import { type CompareRequest, cursorJobFor, type LeavePanel, tieJob, type Ties } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import type { SlowJob, SlowState } from "./useEngine";
-import { extraHoursView, marginText, perText, pipeline, verdictSentence } from "./verdict";
+import { extraHoursView, marginText, perText, pipeline, placeOf, verdictSentence } from "./verdict";
 import { stayWarnings, WARNING_KIND } from "./warningKinds";
 import { warningWords } from "./warningWords";
 
@@ -164,7 +164,8 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
       const b = marginText("colAdjustedTotal", col);
       const sum = dollars(num(a) + num(b));
       worked.push({ op: "+", of: [a, b], is: sum });
-      detail += `Rent and prices cost ${tr.winnerLetter} about ${sum} a month more than ${col.winnerLetter} (${a} + ${b}), which turns ${tr.winnerLetter}'s `
+      detail += `Rent and prices cost ${tr.winnerLetter} about ${sum} a month more than ${col.winnerLetter} over your stay (${a} in total rewards + `
+        + `${placeOf(v, "colAdjustedTotal")} ${b} after rent), which turns ${tr.winnerLetter}'s `
         + `lead into ${col.winnerLetter}'s.`;
     }
     add({ kind: "para", runs: [{ b: head }, detail ? ` ${detail}` : ""] });
@@ -174,7 +175,7 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
   const perHourOf = r.sweep.perHourOf;
   const titles: Record<string, string> = {
     cash: "After-tax pay", totalRewards: "Total rewards", colAdjustedTotal: cap(p.phrase),
-    perHour: perHourOf === "colAdjustedTotal" ? "After rent, per hour worked" : "Total rewards, per hour worked",
+    perHour: perHourOf === "colAdjustedTotal" ? `${cap(p.phrase)}, per hour worked` : "Total rewards, per hour worked",
   };
   const rows: Row[] = v.steps.filter((s) => s.lead).map((s) => ({
     label: titles[s.basis],
@@ -196,18 +197,20 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
   if (lead && lead.margin > 0 && others.length) {
     const close = others.filter((s) => s.lead!.closeCall).map((s) => `at ${years(s.years)}, a close call: under 3% of ${s.lead!.winnerLetter}'s total`);
     const per = perText(v.basis);
+    const at = placeOf(v, v.basis);
     parts.push(others.every((s) => s.lead!.winnerLetter === lead.winnerLetter)
-      ? `If you stay ${join(others.map((s) => String(s.years)), "or")} years instead, ${lead.winnerLetter} still leads: by `
+      ? `If you stay ${join(others.map((s) => String(s.years)), "or")} years instead, ${lead.winnerLetter} still leads: by ${at ? `${at} ` : ""}`
         + `${join(others.map((s) => marginText(v.basis, s.lead!)))} ${per}${close.length ? ` (${close.join("; ")})` : ""}.`
-      : `How long you stay changes it: ${others.map((s) => `at ${years(s.years)}, ${s.lead!.winnerLetter} leads by ${marginText(v.basis, s.lead!)} ${per}`
+      : `How long you stay changes it: ${others.map((s) => `at ${years(s.years)}, ${s.lead!.winnerLetter} leads by ${at ? `${at} ` : ""}${marginText(v.basis, s.lead!)} ${per}`
         + `${s.lead!.closeCall ? " (a close call)" : ""}`).join("; ")}.`);
   }
   const pair = lead ? [lead.winnerLetter, lead.runnerUpLetter] : [];
   for (const x of extraHoursView(v, r.letters).filter((e) => pair.includes(e.more) && pair.includes(e.fewer))) {
     const phrase = x.basis === "colAdjustedTotal" ? p.phrase : x.basis === "cash" ? "after tax" : "in total rewards";
-    const asks = `${x.more} asks ${figure(x.hoursPerYear)} more hours a year than ${x.fewer}`;
-    parts.push(x.perExtraHour !== null ? `${asks} and pays ${cents(x.perExtraHour)} for each, ${phrase}.`
-      : `${asks} and leaves you ${dollars(Math.abs(x.gapPerYear))} a year less ${phrase}: more hours for less pay.`);
+    const asks = `Over your stay, ${x.more} asks ${figure(x.hoursPerYear)} more hours a year than ${x.fewer}`;
+    const at = x.basis === "colAdjustedTotal" ? `${p.unit.slice(0, -2)} ` : "";
+    parts.push(x.perExtraHour !== null ? `${asks} and pays ${at}${cents(x.perExtraHour)} for each, ${phrase}.`
+      : `${asks} and leaves you ${at}${dollars(Math.abs(x.gapPerYear))} a year less, ${phrase}: more hours for less pay.`);
   }
   if (parts.length) add({ kind: "para", runs: [parts.join(" ")] });
 
@@ -222,7 +225,8 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
   // If things go badly (L-2), when any offer has a range.
   const risk = riskView(ctx);
   if (risk.anyRange) {
-    const amount = (x: number) => (risk.perHour ? cents(x) : dollars(x / risk.factor));
+    const at = placeOf(v, v.basis);
+    const amount = (x: number) => `${at ? `${at} ` : ""}${risk.perHour ? cents(x) : dollars(x / risk.factor)}`;
     const per = risk.perHour ? "an hour" : "a month";
     const H = risk.holdsUp;
     const own = CASES.filter((s) => risk.leads[s].winner === H);
@@ -232,11 +236,11 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
     const bear = risk.leads.bear;
     let t = `${H} holds up best${rest.size === 0 ? ", and wins in every scenario."
       : `: it wins the ${cases(own)}, and ${join([...rest].map(([w, ss]) => `${w} the ${cases(ss)}`))}.`}`;
-    t += bear.margin > (risk.perHour ? 0.005 : 0.5) ? ` In the bear case it leads ${bear.runnerUp} by ${amount(bear.margin)} ${per}.`
+    t += bear.margin > (risk.perHour ? 0.005 : 0.5) ? ` In the bear case it leads ${bear.runnerUp} by ${amount(bear.margin)} ${per} over your stay.`
       : ` In the bear case it ties with ${bear.runnerUp}.`;
     const lose = risk.mostToLose;
     if (lose) {
-      t += ` ${lose.letter} has the most to lose: ${amount(lose.drop)} ${per} below its base case (${dropText(lose)})`
+      t += ` ${lose.letter} has the most to lose: ${amount(lose.drop)} ${per} below its base case over your stay (${dropText(lose)})`
         + `${lose.changes.length ? `, because ${riskCarriers(lose.changes)}` : ""}.`;
     }
     for (const l of risk.onlyIfWell) t += ` ${l} comes out ahead only if things go well.`;
@@ -465,7 +469,7 @@ function yearsSection(ctx: WorkContext, add: Add, worked: Worked[]) {
     const m = cents(lead.margin);
     worked.push({ op: "−", of: [a, c], is: m });
     add({ kind: "para", runs: [`Per hour worked is each total as paid, divided by its hours over your stay (${r.letters.map((l, i) => `${l} ${figure(hrs[i])}`).join(", ")}). `
-      + `${W}'s ${a} less ${R}'s ${c} is ${m} an hour.`] });
+      + `${W}'s ${a} less ${R}'s ${c} is ${m} an hour over your stay${placeOf(v, "perHour") ? `, in ${p.dollars}` : ""}.`] });
     return;
   }
   const gap = Math.round(pv[lead.winner]) - Math.round(pv[lead.runnerUp]);
@@ -474,8 +478,10 @@ function yearsSection(ctx: WorkContext, add: Add, worked: Worked[]) {
   const perMonth = marginText(v.basis, lead);
   worked.push({ op: "−", of: [figure(pv[lead.winner]), figure(pv[lead.runnerUp])], is: figure(gap) });
   worked.push({ op: "÷", of: [figure(gap), factor], is: perMonth });
-  let t = `${W}'s ${figure(pv[lead.winner])} less ${R}'s ${figure(pv[lead.runnerUp])} is ${figure(gap)} today. As a level amount over the ${months} `
-    + `months, that's ${perMonth} a month: ${figure(gap)} ÷ ${factor}, the value today of $1 at each month's end, at ${percent(r.sweep.discountRate)} a year`;
+  const at = placeOf(v, v.basis);
+  let t = `${at ? `In ${p.dollars}, ` : ""}${W}'s ${figure(pv[lead.winner])} less ${R}'s ${figure(pv[lead.runnerUp])} is ${figure(gap)} today. As a level `
+    + `amount each month over your stay, its ${months} months, that's ${at ? `${at} ` : ""}${perMonth} a month: ${figure(gap)} ÷ ${factor}, the value today `
+    + `of $1 at each month's end, at ${percent(r.sweep.discountRate)} a year`;
   if (v.row.annuityFactor < months - 0.005) {
     const plain = dollars(gap / months);
     worked.push({ op: "÷", of: [figure(gap), String(months)], is: plain });
@@ -554,7 +560,7 @@ function tiesSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Worke
     const clauses = notes.map((x) => {
       const whose = x.wins !== x.letter || notes.some((m) => m !== x && m.city === x.city);
       const where = x.estimate.source === "fmr" ? "HUD's estimate" : "the estimate";
-      return `at ${where} for ${whose ? `${x.letter}'s rent in ${x.city}` : x.city} (${dollars(x.estimate.monthlyRent)} a month), ${x.wins} wins`;
+      return `at ${where} for ${whose ? `${x.letter}'s rent in ${x.city}` : x.city} (${dollars(x.estimate.monthlyRent)} a month in the first lease year), ${x.wins} wins`;
     });
     const why = notes.map((x) => (x.wins === x.letter
       ? `${x.letter}'s rent as entered is ${dollars(x.entered)}, and ${x.letter} wins at any ${x.city} rent under ${dollars(x.flip.to!)}.`

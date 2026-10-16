@@ -1,8 +1,9 @@
-# UI design (rev 3, approved 2026-10-09; historical)
+# UI design (rev 4, 2026-10-15: §1 current, the rest historical)
 
-**Status (2026-10-15): historical, the design as approved.** v1 is built from it: UI slices 1-8, Copy as document and v2's step
-0. Read it for why the UI is as it is, not as a spec: where the build differs, §12 says so slice by slice, and the code is what
-runs (`app/src`; CLAUDE.md's conventions and settled decisions are current). Differences §12 doesn't record:
+**Status (2026-10-15): historical, the design as approved, except §1 (rev 4, current).** v1 is built from it: UI slices 1-8, Copy as
+document and v2's step 0, and v2's item 5 builds on it (stop 5A, §12). Read it for why the UI is as it is, not as a spec: where the
+build differs, §12 says so slice by slice, and the code is what runs (`app/src`; CLAUDE.md's conventions and settled decisions are
+current). Differences §12 doesn't record:
 - **About you** as built: filing status, the stay, other wages, your spouse's wages (when filing jointly, since audit C1), health
   use and "Prices in", with the assumptions as one line under them, not a panel. Not built: your current rent (decision 2's
   estimate from it gave way to HUD's Fair Market Rents, §13.2), a savings rate (held at 0%) and a bedrooms setting (always 1).
@@ -11,7 +12,10 @@ runs (`app/src`; CLAUDE.md's conventions and settled decisions are current). Dif
 - **The worked figures** (W4, W8, §9.1's 62,595) are the engine's, from before the year figures as shown. Under that rule
   (CLAUDE.md, "The year figures as shown"), A's year 1 after rent reads 62,594 (§12, slice 6).
 - **§10:** the worker takes messages (no Comlink); the site is on Vercel, not GitHub Pages.
-- **Rev 4** comes with v2's stop 5A (`docs/v2-plan.md`, item 5): §1 rewritten for an evaluator-first tool, and the offer breakdown.
+- **Rev 4** (2026-10-15, with v2's stop 5A, `docs/v2-plan.md`, item 5): §1 replaced whole with the approved evaluator-first wording
+  (B1), a row for it in §0, the label rules approved with it in §2 (conditions 1 and 4), one offer's layout in §3.2, and stop 5A as
+  built in §12. The other sections the breakdown changes (§3.1's map, §3.3, §4, §7, §8, §10) are designed in the plan's item 5 and come
+  with stops 5B and 5C; until then the plan is where to read them.
 
 Roadmap item 6. It covers:
 - who the app is for;
@@ -62,32 +66,45 @@ Approved on 2026-10-08. Rows 2, 5, 7 and 9 were changed in review.
 | 7 | **Stay length is an input** in quick mode: "How long do you expect to stay?", default 4 years. It sets the comparison window. A "winner if you stay 2 / 3 / 4 / 5 years" row sits under the verdict. | 3.3, 4.1 |
 | 8 | **Sharing:** no URL sharing. Export JSON, CSV or print-to-PDF; everything is saved in this browser only. | 10 |
 | 9 | **Visual direction:** a workpaper whose signature is audit tickmarks. Every figure carries a tickmark that opens its derivation, and that's how "methodology linked from every number" works. Cool ledger neutrals, not cream; cobalt, berry and bronze for offers, not terracotta. Schedules with workpaper references, not a hairline-ruled broadsheet. | 9 |
+| 10 | **Evaluator-first** (rev 4; v2's B1, approved 2026-10-15): every offer gets its own breakdown, and that's the primary view; the comparison is a layer that appears with two or more offers. | 1 |
 
 ## 1. Audience and job
 
-**Who.** A new grad or early-career analyst (0-3 years out) holding two or three offers,
-usually on a deadline: exploding offers give one to three weeks.
+Rev 4 (2026-10-15): the wording approved with v2's item 5 (B1, `docs/v2-plan.md`, "The scope change"), replacing rev 3's whole.
+
+**Who.** A new grad or early-career analyst (0-3 years out) with a job offer, often on a deadline: exploding offers give one to three
+weeks. Many hold a single offer; some hold two or three at once.
 - **Finance-literate:** knows what a bonus, an RSU and a 401(k) match are. Not a tax expert.
-- **Often comparing cities:** New York vs Charlotte vs Seattle.
-- **Often comparing unlike pay:** a bonus-heavy banking offer, salary plus RSUs in tech,
-  steady corporate finance.
+- **Often moving:** the offer is in a city they don't live in yet (New York, Charlotte, Seattle).
+- **Often unlike pay:** a bonus-heavy banking offer, salary plus RSUs in tech, steady corporate finance.
 
-**Context.** Laptop first: one sitting of 10-20 minutes, then return visits as offers
-change (a negotiated sign-on, a recruiter's new number). Phone second: checking the verdict
-or showing a friend.
+**What the tool is: an evaluator first.** Every offer gets its own breakdown, and that's the primary view: what the offer pays out, year
+by year, after tax and rent and per hour worked; what its terms can cost you; and the work behind every figure. Comparison is a layer
+that appears when there are two or more offers. It adds the verdict and what lies between the offers: the gaps, the winner on each
+basis, what would tie, what would flip it. It never replaces an offer's breakdown, and an offer's breakdown never depends on the others.
 
-**Jobs, in order:**
-1. **Which offer leaves me better off, honestly?** The verdict.
-2. **By how much, in terms I can feel?** Per month, not "$21,182 of present value".
-3. **Does it depend on how long I stay?** The "if you stay" row.
-4. **What if things go badly?** Downside risk.
-5. **What would it take for the other offer to win?** Breakeven, for negotiation.
-6. **What does leaving early cost me?** Clawbacks, vesting cliffs, forfeited bonuses.
-7. **Can I trust this?** Every figure's tickmark opens its work.
+**The principle: the tool informs the decision and shows its work; you make the call.**
+
+**Context.** Laptop first: one sitting of 10-20 minutes, then return visits as an offer changes (a negotiated sign-on, a recruiter's
+new number) or another one arrives. Phone second: checking an offer's bottom line or the verdict, or showing someone.
+
+**Jobs, in order.** For any offer:
+1. **What would I actually have?** A month to spend after rent, plus what I'd save, in today's dollars (A-1).
+2. **Where does the money go?** Tax, rent, health costs, savings (A-2).
+3. **When does it arrive?** Pay by year and component, with the dates (A-3).
+4. **What can bite?** Bonus conditions, clawback windows, vesting cliffs, the bad case (A-4).
+5. **Can I trust this?** Every figure's tickmark opens its work.
+
+With two or more offers, the comparison adds:
+
+6. **Which leaves me better off, honestly, and by how much?** The verdict, per month, not "$21,182 of present value".
+7. **Does it depend on how long I stay, or on things going badly? What would it take for another offer to win? What would leaving
+   early cost under each?** The if-you-stay row, L-2, L-3, L-4.
 
 **Not the job:**
-- Market data or salary benchmarks.
-- Telling you which job to take: we compare money, time and prices; career fit is yours.
+- Telling you which job to take, or whether an offer is good. Career fit is yours: values you set (beyond the money) are added up,
+  never suggested.
+- Market data as a verdict. Published wages are context, traced to their source, never an input to a figure, a total or a tie.
 - Financial advice.
 
 The methodology page and the footer say this once, plainly.
@@ -104,7 +121,14 @@ From the NN/g calculator guidelines and the project's own conventions:
   a value. Uncertain inputs default to 0 and say so: raises, price growth, refreshers,
   savings.
 - **Units and a time frame on every number:** "$487 a month, if you stay 4 years, in today's
-  dollars".
+  dollars". Rev 4 makes both rules (v2's item 5, conditions 1 and 4; `app/src/labels.test.ts` checks them on every figure, its
+  accessible name, its Show the work, the CSVs and the copied document):
+  - **Every figure names its dollars.** After rent, the place's prices on the figure itself ("New York $6,671", "U.S.-avg $7,196") or
+    in its column's head; before rent and prices, "$". An offer's own city's dollars stay inside its breakdown: wherever offers sit
+    together (the verdict, the ledger's "On its own" row, L-1 to L-4, a table, a chart, print, a document), they're in the common
+    dollars of "Prices in", or the conversion sits inline beside them.
+  - **Every rate and share states its period:** "a month over your stay", "a month in year 1", "32.4% of its pay over your stay",
+    "of its 2027 pay".
 - **Every figure is ticked and traceable.** Each figure carries an audit tickmark. Clicking
   it opens the derivation with your values, and from there the methodology (§8, §9.1).
 - **Say what isn't counted.** Omissions sit beside the results: "Not counted: 401(k) match,
@@ -147,6 +171,10 @@ cites a workpaper.
   a sticky bar at the bottom (W9).
 - **The sticky bars (slice 7)** never hide the focused field (WCAG 2.2, 2.4.11): the page gets
   scroll padding for the bar, and on phones the bar hides while the keyboard is up.
+- **One offer (rev 4, v2's stop 5A):** the results column holds that offer's bottom line (A-1), pinned where the verdict goes, and
+  the bars show it ("A New York $7,563 a month · stay 4 yrs"). With two or more complete offers, the verdict takes the column as
+  before, the ledger gains a foot row, "On its own", and each offer's breakdown is a section under the columns, one offer at a time
+  behind a tab list, before the comparison's L-1 to L-6.
 
 ### 3.3 Quick mode and detailed mode
 
@@ -1622,6 +1650,48 @@ them. Until its code arrives, L-1's place is held at about its own height, so th
 early) and nothing shifts when it comes. The first-use note's "See how we get there" loads it first. Quick mode's and About you's ⓘ help
 loads as a pointer or focus reaches an ⓘ; the hints stay. The main thread went from 117.35 to 109.69 kB gzip, one chunk. One change off
 screen: Ctrl+P on a phone before scrolling prints without L-1, as it already printed without L-2 to L-6 (Print… loads them all).
+
+**v2's item 5, stop 5A** (2026-10-15; `docs/v2-plan.md`, item 5, "Review stops"): one offer works, and every offer has its bottom
+line.
+- **One offer is enough.** × removes an offer while two or more remain; "Start with my offer" makes one blank offer A; "+ Add an offer
+  to compare (up to 3)". Until the offer is complete, A-1's place says what's missing.
+- **The worker's per-offer job:** every complete offer's breakdown over its own stay (its own start, your stay's years: base, bear and
+  bull, withholding, its annuity terms), remembered by its inputs (the offer, About you, the stay, today), so an edit projects only the
+  offer edited. The comparison takes each breakdown's projection where the offer starts on the comparison's first day, and projects a
+  later start again over its window. `horizonSweep` runs only with two or more.
+- **A-1, the bottom line:** a month over its own stay in today's dollars at its own prices, as total = to spend + saved; with "Prices
+  in" a city, or a comparison, one more line with the conversion inline ("New York $7,563 − New York prices $367 = U.S.-avg $7,196");
+  year 1 as paid, with why the stay's figure differs; tax as a share of its pay over the stay; per hour; the bear case. Every figure
+  ticked, with its derivation (`own.*`), footing as displayed. Pinned with one offer; with two or more, in the section behind the tab
+  list (the phone's ledger tab is the same choice), with "Skip to the comparison"; print prints each offer's.
+- **The ledger's "On its own" row** with two or more offers: each offer's bottom line in the common dollars (`alone.*`), its work
+  stepping from the own-city figure, and "Its breakdown".
+- **The live region and the bars with one offer** say A-1's figure; when the comparison appears, its verdict is said once. Removing
+  offers down to one moves focus to A-1's heading; adding one leaves it where it was.
+- **The label rules** (§2) across every schedule, derivation, CSV and the copied document, with their test (`labels.test.ts`). The
+  verdict now reads "C leaves you about U.S.-avg $487 a month more than A over your stay, after rent, at U.S. prices."
+- **The methodology:** M-1 for one offer first, then "Comparing offers"; M-5.4 (per hour at the offer's own prices, or the common
+  ones); M-7.2 with A-1's months; M-7.3 with a breakdown's own stay; M-12 with one offer; M-13 with the references. The masthead's
+  tagline and "Offers" in the navigation (rev 4).
+
+**Stop 5A versus the plan:**
+- **The section with two or more offers holds A-1 only;** A-2 to A-7 come at 5B. The first-use note's link goes to M-1 until A-2 is
+  there to point to.
+- **The lead's verdict loads beside the worker too** (`LeadVerdict.tsx`): it can't show before the first answer anyway, and with A-1's
+  chunk out of the main thread as well, the main chunk went from 111.73 to 110.19 kB gzip, room for 5B and 5C.
+- **Both chunks are requested once the first contentful paint is recorded,** not at the first render: requested sooner, they were in
+  the network Lighthouse simulates before the first paint.
+- **Lighthouse's local server now keeps each file compressed** (`scripts/lib/serve.ts`), as Vercel's CDN does. It compressed every
+  response anew, Brotli at full quality, so 5A's chunks queued behind the worker's and Lighthouse read the wait as the origin's server
+  latency (221 ms, against main's 38), which it adds to every request it simulates: LCP 2.32 s. With the files kept, side by side on one
+  machine: main LCP 1.95 s, TBT 49 ms, the first answer 0.58 s; 5A LCP 1.95 s, TBT 48 ms, the first answer 0.60 s; CLS 0 for both, and
+  0 in the late-fonts pass. The LCP element is now the masthead's tagline (rev 4's longer wording), painted in the same frame as About
+  you's assumptions line, which it was.
+- **Ctrl+P on a desktop before scrolling** prints without L-1 now, as it already did on a phone: the breakdowns sit between the columns
+  and L-1, which loads as you scroll toward it. Print… loads every schedule, as before.
+- **About you's other wages** stay in the earliest start's calendar year, the year About you names, for every breakdown: an added offer
+  that starts in an earlier calendar year moves that year, as editing About you would.
+- **Started before the testers' first question was answered:** the user's call, 2026-10-15.
 
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.

@@ -119,7 +119,7 @@ describe("Copy as document: its figures are the page's", () => {
     expect(text).toContain(verdictSentence(r.view));
     expect(rowOf("Your stay, in today's dollars").cells).toEqual(r.letters.map((_, i) => figure(r.view.row.values.colAdjustedTotal![i])));
     expect(rowOf("After rent, at U.S. prices").cells.slice(0, 3)).toEqual(r.letters.map((_, i) => figure(r.view.row.values.colAdjustedTotal![i])));
-    expect(rowOf("After rent, per hour worked").cells[3]).toBe("C, $19.47 an hour");
+    expect(rowOf("After rent, at U.S. prices, per hour worked").cells[3]).toBe("C, $19.47 an hour");
     expect(text).toContain("A pays more; C wins once rent and prices are counted.");
   });
 
@@ -141,7 +141,7 @@ describe("Copy as document: its figures are the page's", () => {
   it("what would tie is L-3's, and leaving early is L-4's panel", () => {
     const a = r.ties!.l3!.rows.find((x) => r.letters[x.offer] === "A")!;
     expect(rowOf("A: starting salary").cells).toEqual(["$110,000", dollars(a.salary.to!), "+$8,626 (+7.8%)"]);
-    expect(text).toContain("This depends on rent: at HUD's estimate for New York ($2,729 a month), A wins.");
+    expect(text).toContain("This depends on rent: at HUD's estimate for New York ($2,729 a month in the first lease year), A wins.");
     const panels = r.leave!.panels;
     expect(rowOf("You'd keep, after tax, as paid").cells).toEqual(panels.map((p) => dollars(p!.afterTaxCompKept)));
   });

@@ -15,9 +15,12 @@ import { Risk } from "./Risk";
 import { Warnings } from "./Warnings";
 import { breakevenJob, cursorJob, leaveJob, paymentsJob } from "./slowJobs";
 import { TheWork, type TheWorkProps } from "./TheWork";
-import { type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties, workJob } from "./protocol";
+import { type Breakdown, type CompareRequest, type LeaveCurve, type LeavePanel, type SlowResponse, tieJob, type Ties, workJob } from "./protocol";
+import { BreakdownSection, OwnPinned, type OwnOffer, OwnRow } from "./Breakdown";
 import * as Derive from "./derive";
 import * as Detailed from "./Detailed";
+import * as VerdictCode from "./LeadVerdict";
+import { verdictModule } from "./Later";
 import { detailedModule, Ledger } from "./Ledger";
 import {
   type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, firstYear, type Letter, type Missing, sampleOffers, toHousehold, toOfferInput,
@@ -35,6 +38,7 @@ import { verdict } from "./verdict";
 // wait for one, so they're supplied up front.
 detailedModule.provide(Detailed);
 derivations.provide(Derive);
+verdictModule.provide(VerdictCode);
 
 /** The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's. */
 export const VALUATION = "2026-07-13";
@@ -64,14 +68,61 @@ export function contextOf(offers: AppOffer[], household: AppHousehold, today: st
   const letters = offers.map((o) => o.letter);
   const wagesYear = firstYear(offers, today);
   const out = compute({
-    compare: { offers: inputs, household: toHousehold(household, wagesYear), stays: staysFor(household.stayYears), stayYears: household.stayYears,
+    offers: { offers: inputs, household: toHousehold(household, wagesYear), stays: staysFor(household.stayYears), stayYears: household.stayYears,
       valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
+    ids: letters,
     rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
   });
-  if (!out.sweep) return { issues: out.issues };
+  if (!out.breakdowns || out.issues.some((x) => x.length)) return { issues: out.issues };
+  // Each offer's breakdown, as the app keeps it: restated at the prices picked once they're a city's or there's a comparison.
+  const prices = priceWords(household.pricesIn);
+  const own = { breakdowns: out.breakdowns as Partial<Record<Letter, Breakdown>>, withRef: offers.length >= 2 || !prices.us };
+  const base = { today, household, wagesYear, offers, rents: out.rents, own };
+  if (!out.sweep) return base;
   const noHours = offers.filter((o) => !o.draft.hours.weekly).map((o) => o.letter);
-  const view = verdict(out.sweep, letters, basis, household.stayYears, noHours, priceWords(household.pricesIn))!;
-  return { today, household, wagesYear, offers, rents: out.rents, results: { sweep: out.sweep, detail: out.detail, view, letters } };
+  const view = verdict(out.sweep, letters, basis, household.stayYears, noHours, prices)!;
+  return { ...base, results: { sweep: out.sweep, detail: out.detail, view, letters } };
+}
+
+/** One offer's work context, on its own (no comparison): the samples' offer `letter`, as the app has it with that offer alone. */
+export function alone(letter: Letter = "A", tweak: (o: AppOffer) => AppOffer = (o) => o, about: Partial<AppHousehold> = {}): WorkContext {
+  const o = sampleOffers(VALUATION).find((x) => x.letter === letter)!;
+  const ctx = contextOf([tweak({ ...o, letter: "A" })], { ...DEFAULT_HOUSEHOLD, stayYears: 4, ...about }, VALUATION);
+  if ("issues" in ctx) throw new Error(`Sample ${letter} doesn't work out: ${JSON.stringify(ctx.issues)}`);
+  return ctx;
+}
+
+/** The breakdown's offers as the app passes them (App.tsx): each offer with its input and breakdown. */
+export function ownOffers(ctx: WorkContext): OwnOffer[] {
+  return ctx.offers.map((o) => {
+    const r = toOfferInput(o);
+    return { offer: o, input: "offer" in r ? r.offer : null, breakdown: ctx.own?.breakdowns[o.letter] ?? null, missing: "missing" in r ? r.missing : [] };
+  });
+}
+
+/** One offer's page: About you, the ledger, and its bottom line (A-1) pinned beside it. */
+export function renderAlone(ctx: WorkContext, opts: { firstUse?: boolean } = {}): string {
+  const session = { ...initialSession(VALUATION), household: ctx.household, offers: ctx.offers };
+  const x = ownOffers(ctx)[0];
+  const prices = priceWords(ctx.household.pricesIn);
+  return renderToStaticMarkup(tree(ctx, [
+    createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
+    createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: { mode: "quick" }, dispatch: noop }),
+    createElement(OwnPinned, { key: "o", x, prices, withRef: ctx.own!.withRef, updating: false, sample: x.offer.sample !== null, problems: null, notes: [],
+      firstUse: opts.firstUse ?? false, dispatch: noop }),
+  ]));
+}
+
+/** The breakdown section with two or more offers, on each offer's tab in turn, and the ledger's "On its own" row. */
+export function renderBreakdowns(ctx: WorkContext): string {
+  const offers = ownOffers(ctx);
+  const prices = priceWords(ctx.household.pricesIn);
+  return [
+    renderToStaticMarkup(tree(ctx, [createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: { mode: "quick" },
+      dispatch: noop, foot: createElement(OwnRow, { offers, prices, dispatch: noop }) })])),
+    ...offers.map((x) => renderToStaticMarkup(tree(ctx, [createElement(BreakdownSection, { key: "b", offers, tab: x.offer.letter, prices, updating: false,
+      sample: true, dispatch: noop })]))),
+  ].join("\n");
 }
 
 const noop = () => {};

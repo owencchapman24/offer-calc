@@ -41,7 +41,7 @@ export async function settled(page: Page) {
  */
 export async function quiet(page: Page) {
   const busy = page.locator(".lead.is-updating, .lead[aria-busy='true'], .by-year[aria-busy='true'], .risk[aria-busy='true'], .warnings[aria-busy='true'], "
-    + ".the-work[aria-busy='true']");
+    + ".the-work[aria-busy='true'], .own[aria-busy='true'], .breakdown[aria-busy='true']");
   const loading = () => page.evaluate(() => [...document.querySelectorAll(".later")]
     .some((el) => { const r = el.getBoundingClientRect(); return r.top < 2 * window.innerHeight && r.bottom > -window.innerHeight; }));
   for (let still = 0, tries = 0; still < 2; tries++) {
@@ -94,6 +94,42 @@ export async function openCompare(page: Page) {
   await settled(page);
 }
 
+/** With one offer: its bottom line (A-1) shows, worked out, and the page is quiet. */
+export async function ownSettled(page: Page) {
+  await expect(page.locator("#own .own-body")).toBeVisible({ timeout: 30_000 });
+  await quiet(page);
+}
+
+/** Removes an offer with its ×; on a phone, its tab first. */
+export async function removeOffer(page: Page, letter: string) {
+  await selectOffer(page, letter);
+  await page.getByRole("button", { name: `Remove offer ${letter}` }).click();
+}
+
+/** One offer on its own: the first visit's sample A, with B and C removed, its bottom line pinned and worked out. */
+export async function openAlone(page: Page) {
+  await openCompare(page);
+  await removeOffer(page, "C");
+  await removeOffer(page, "B");
+  await ownSettled(page);
+}
+
+/** "+ Add an offer to compare": the button under the ledger, or on a phone the tabs' +. */
+export async function addOffer(page: Page) {
+  const tabAdd = page.locator(".tab-add");
+  if (await tabAdd.isVisible()) await tabAdd.click();
+  else await page.getByRole("button", { name: "+ Add an offer to compare (up to 3)" }).click();
+}
+
+/** A blank offer's quick fields: a salary, a city (from the list) and a start date a year out. */
+export async function fillOffer(page: Page, letter: string, salary: string, city: string) {
+  await selectOffer(page, letter);
+  await page.locator(`#in-${letter}-salary-annual`).fill(salary);
+  await page.getByRole("combobox", { name: `Offer ${letter} city` }).fill(city);
+  const next = new Date().getFullYear() + 1;
+  await page.locator(`#in-${letter}-startDate`).fill(`${next}-07-01`);
+}
+
 /**
  * Saved sessions for the recovery tests: one this version reads but can't show (an offer whose draft is empty: it threw on
  * every page before there was a recovery screen), and one a newer version saved (schema 4).
@@ -127,6 +163,20 @@ async function scrollTo(page: Page, id: string) {
 /** L-1 and the bridge: they load as you scroll toward them, so on a phone they're further down than the first screen. */
 export async function showByYear(page: Page) {
   await scrollTo(page, "l1");
+  await settled(page);
+}
+
+/**
+ * L-1 alone: its slot scrolled to a screen and a half down, inside its load margin (useLoadNear's: a screen past the viewport), so
+ * L-2 to L-6, a pixel tall each until they load and just after its slot, stay outside it (for a screen shorter than twice its
+ * slot). Since stop 5A the breakdowns sit above L-1, past a desktop's first screen too.
+ */
+export async function loadByYearOnly(page: Page) {
+  await page.evaluate(() => {
+    const slot = document.querySelector(".l1-slot");
+    if (slot) window.scrollTo(0, Math.max(0, slot.getBoundingClientRect().top + window.scrollY - 1.5 * window.innerHeight));
+  });
+  await expect(page.locator("#l1-title")).toBeAttached();
   await settled(page);
 }
 

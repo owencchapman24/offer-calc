@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
-import type { EngineRequest, EngineResponse, LeaveCurve, LeavePanel, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties, WorkOffer } from "./protocol";
+import type {
+  Breakdown, EngineRequest, EngineResponse, LeaveCurve, LeavePanel, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties, WorkOffer,
+} from "./protocol";
 
 /** A slow-lane result (L-3, L-4, L-6, the close-call line): the latest one back, the request it answers, and whether a newer one is on its way. */
 export interface SlowState<T> {
@@ -20,6 +22,8 @@ export interface EngineState {
   sweep: HorizonSweep | null;
   /** Your stay's full projections, from the same request as `sweep`. */
   detail: StayDetail | null;
+  /** Each complete offer's breakdown, by its id: the latest for the current inputs, or the previous one while recomputing. */
+  breakdowns: Record<string, Breakdown>;
   /** Rent estimates by `rentKey(area, state)`. */
   rents: Record<string, RentEstimate>;
   updating: boolean;
@@ -68,7 +72,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
   /** Slow jobs asked for before the worker started. */
   const queued = useRef<SlowRequest[]>([]);
   const [state, setState] = useState<EngineState>({
-    sweep: null, detail: null, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null,
+    sweep: null, detail: null, breakdowns: {}, rents: {}, updating: true, error: null, issues: [], invalid: false, ms: null,
     leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow,
   });
   // An import or "Delete all data" replaces every offer: the last valid results were for offers that are gone.
@@ -77,7 +81,7 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
     if (seen.current === revision) return;
     seen.current = revision;
     for (const l of LANES) slow.current[l].key = null;
-    setState((s) => ({ ...s, sweep: null, detail: null, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow }));
+    setState((s) => ({ ...s, sweep: null, detail: null, breakdowns: {}, leave: noSlow, cursor: noSlow, flip: noSlow, breakeven: noSlow, work: noSlow }));
   }, [revision]);
 
   useEffect(() => {
@@ -97,7 +101,8 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
       setAnswered(sent.current.get(r.gen) ?? null);
       sent.current.clear();
       setState((s) => r.ok
-        ? { ...s, sweep: r.sweep, detail: r.detail, rents: r.rents, updating: false, error: null, issues: r.issues, invalid: false, ms: r.sweep ? r.ms : s.ms }
+        ? { ...s, sweep: r.sweep, detail: r.detail, breakdowns: r.breakdowns, rents: r.rents, updating: false, error: null, issues: r.issues,
+          invalid: false, ms: Object.keys(r.breakdowns).length ? r.ms : s.ms }
         : { ...s, rents: r.rents, updating: false, error: r.error, issues: r.issues, invalid: r.error === null });
     };
     worker.current = w;

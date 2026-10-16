@@ -69,10 +69,10 @@ describe("the main thread's rules", () => {
     const c = closure(app("figures.tsx"));
     expect([...c].filter((f) => f.startsWith("pkg:react-dom") || f === app("metrics.ts")).map(rel)).toEqual([]);
   });
-  it("the lazy schedules (L-1 to L-6, loaded by Later.tsx) import figures.tsx, never Tickmarks.tsx", () => {
+  it("the lazy schedules (the breakdowns, the verdict and L-1 to L-6, loaded by Later.tsx) import figures.tsx, never Tickmarks.tsx", () => {
     const later = dynamicTargets([app("Later.tsx")]);
-    expect([...later].map(rel).sort()).toEqual(["app/src/Breakeven.tsx", "app/src/ByYear.tsx", "app/src/Leaving.tsx", "app/src/Risk.tsx",
-      "app/src/TheWork.tsx", "app/src/Warnings.tsx"]);
+    expect([...later].map(rel).sort()).toEqual(["app/src/Breakdown.tsx", "app/src/Breakeven.tsx", "app/src/ByYear.tsx", "app/src/LeadVerdict.tsx",
+      "app/src/Leaving.tsx", "app/src/Risk.tsx", "app/src/TheWork.tsx", "app/src/Warnings.tsx"]);
     for (const f of later) {
       const direct = importsOf(readFileSync(f, "utf8")).filter((i) => !i.typeOnly && !i.dynamic).map((i) => resolveImport(i.specifier, f));
       expect({ schedule: rel(f), tickmarks: direct.includes(app("Tickmarks.tsx")) }).toEqual({ schedule: rel(f), tickmarks: false });

@@ -145,7 +145,7 @@ describe("the rent note under the verdict", () => {
     expect(notes.map((n) => [n.letter, n.wins, n.against, n.entered, n.estimate.monthlyRent, n.flip.to, n.city]))
       .toEqual([["A", "A", "C", 3_800, 2_729, 3_303.16, "New York"]]);
     const html = renderPage(ctx);
-    expect(words(html)).toContain("This depends on rent: at HUD's estimate for New York ($2,729), A wins.");
+    expect(words(html)).toContain("This depends on rent: at HUD's estimate for New York ($2,729 a month in the first lease year), A wins.");
     expect(html).toContain('data-metric="rentnote.A"');
     expect(metricKind("rentnote.A", ctx)).toBe("estimate");
   });
@@ -178,8 +178,8 @@ describe("the rent note under the verdict", () => {
   it("the winner's own rent: with HUD at $3,500 for Seattle, over C's $3,086.42, A would win; the note names whose rent", () => {
     const high = { ...ctx, rents: { ...ctx.rents, "42660|WA": { ...ctx.rents["42660|WA"], monthlyRent: 3_500 } } };
     expect(rentNotes(high).map((n) => [n.letter, n.wins, n.against, n.flip.to])).toEqual([["A", "A", "C", 3_303.16], ["C", "A", "A", 3_086.42]]);
-    expect(words(renderPage(high))).toContain("This depends on rent: at HUD's estimate for New York ($2,729), A wins; at HUD's "
-      + "estimate for C's rent in Seattle ($3,500), A wins.");
+    expect(words(renderPage(high))).toContain("This depends on rent: at HUD's estimate for New York ($2,729 a month in the first lease year), A wins; at "
+      + "HUD's estimate for C's rent in Seattle ($3,500 a month in the first lease year), A wins.");
     const d = derive("rentnote.C", high);
     // C's lead, 334,357 − 313,175 = 21,182, × 103.4795 ÷ 99.8802 = 21,945 in Seattle dollars, ÷ 45.1155 = $486 more rent it can carry:
     // $2,600 + $486 = $3,086, and HUD's $3,500 is over it by $414.

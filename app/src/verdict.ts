@@ -15,7 +15,7 @@ export function pipeline(p: PriceWords = priceWords(undefined)): PipelineStep[] 
     { basis: "colAdjustedTotal", step: "− Rent & prices", title: p.phrase[0].toUpperCase() + p.phrase.slice(1), phrase: p.phrase,
       counted: "once rent and prices are counted" },
     // "Per hour", not "÷ Hours": at 13px the font's ÷ reads as +.
-    { basis: "perHour", step: "Per hour", title: "Per hour worked", phrase: "per hour worked", counted: "per hour worked" },
+    { basis: "perHour", step: "Per hour", title: `Per hour worked, ${p.phrase}`, phrase: "per hour worked", counted: "per hour worked" },
   ];
 }
 
@@ -132,14 +132,24 @@ export const marginText = (basis: Basis, lead: Lead) => (basis === "perHour" ? c
 /** "a month", or "an hour" per hour worked. */
 export const perText = (basis: Basis) => (basis === "perHour" ? "an hour" : "a month");
 
-/** The verdict as one sentence: "C leaves you about $487 a month more than A, after rent, at U.S. prices." */
+/**
+ * The dollars a basis's figures are in, said before the amount (docs/v2-plan.md, item 5, condition 1): the prices picked after rent
+ * ("U.S.-avg", "Charlotte"), nothing before rent and prices.
+ */
+export const placeOf = (view: Pick<VerdictView, "prices" | "perHourOf">, basis: Basis) =>
+  (basis === "colAdjustedTotal" || (basis === "perHour" && view.perHourOf === "colAdjustedTotal") ? view.prices.unit.slice(0, -2) : "");
+/** A lead with its dollars: "U.S.-avg $487", "$1,373". */
+export const leadAmount = (view: Pick<VerdictView, "prices" | "perHourOf">, basis: Basis, lead: Lead) =>
+  `${placeOf(view, basis)} ${marginText(basis, lead)}`.trim();
+
+/** The verdict as one sentence: "C leaves you about U.S.-avg $487 a month more than A over your stay, after rent, at U.S. prices." */
 export function verdictSentence(view: VerdictView): string {
   const { lead, basis, prices } = view;
   const step = pipeline(prices).find((p) => p.basis === basis)!;
   return lead && lead.margin > 0
-    ? `${lead.winnerLetter} ${basis === "perHour" ? "pays about" : "leaves you about"} ${marginText(basis, lead)} ${perText(basis)} more than `
-      + `${lead.runnerUpLetter}, ${step.phrase}.`
-    : `The offers tie ${step.phrase}.`;
+    ? `${lead.winnerLetter} ${basis === "perHour" ? "pays about" : "leaves you about"} ${leadAmount(view, basis, lead)} ${perText(basis)} more than `
+      + `${lead.runnerUpLetter} over your stay, ${step.phrase}.`
+    : `The offers tie over your stay, ${step.phrase}.`;
 }
 
 /** Pay per extra hour for the lead's winner against each other offer whose hours differ enough. */

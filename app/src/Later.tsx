@@ -11,6 +11,13 @@ import type { Stale } from "./ui";
 // quick visit that never gets there doesn't download it, and the main chunk stays in budget (`npm run check-bundle`). They
 // import figures.tsx, not Tickmarks.tsx: see figures.tsx for why.
 
+/**
+ * The offers' breakdowns (docs/v2-plan.md, item 5): A-1, the "On its own" row and the one-offer bar. Loaded once the page has painted, beside
+ * the worker, whose first answer it can't render before anyway (App.tsx).
+ */
+export const breakdownModule = lazyModule(() => import("./Breakdown"));
+/** The lead schedule's verdict (LeadVerdict.tsx): requested as the lead first shows, beside the worker. */
+export const verdictModule = lazyModule(() => import("./LeadVerdict"));
 const byYearSchedule = lazyModule(() => import("./ByYear"));
 const riskSchedule = lazyModule(() => import("./Risk"));
 const breakevenSchedule = lazyModule(() => import("./Breakeven"));
@@ -20,7 +27,7 @@ const workSchedule = lazyModule(() => import("./TheWork"));
 
 /** Every schedule's code, for the Print button: what Ctrl+P can't wait for. */
 export const loadLater = () =>
-  Promise.all([byYearSchedule, riskSchedule, breakevenSchedule, leavingSchedule, warningsSchedule, workSchedule].map((m) => m.load()));
+  Promise.all([breakdownModule, verdictModule, byYearSchedule, riskSchedule, breakevenSchedule, leavingSchedule, warningsSchedule, workSchedule].map((m) => m.load()));
 
 /** L-1 and the bridge, once their code has loaded. */
 export function ByYearSlot(props: ByYearProps) {

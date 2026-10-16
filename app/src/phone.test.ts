@@ -31,7 +31,7 @@ describe("the phone's offer tabs", () => {
     const two = { ...ctx, offers: ctx.offers.slice(0, 2) };
     const html = renderLedger(two, { mode: "detailed", section: "pay", offerTab: "C" }, { tabbed: true, missing: new Map([[two.offers[1].id, ["salary"]]]) });
     expect(html).toContain("is-tabbed tab-A");
-    expect(html).toContain('aria-label="Add an offer"');
+    expect(html).toContain('aria-label="Add an offer to compare"');
     expect(html).toMatch(/id="offer-tab-B"[^>]*>.*?<span class="sr-only">, needs a fix<\/span>/);
     expect(html).not.toMatch(/id="offer-tab-A"[^>]*>[^]*?needs a fix[^]*?id="offer-tab-B"/);
   });
@@ -63,6 +63,6 @@ describe("the sticky verdict bar", () => {
   it("on a tablet: the verdict's own sentence and the stay", () => {
     const html = bar("top");
     expect(html).toContain(`${verdictSentence(view).replace(/\.$/, "")}<span class="bar-scope"> · stay 4 years</span>`);
-    expect(verdictSentence(view)).toMatch(/^[ABC] leaves you about \$[\d,]+ a month more than [ABC], after rent, at U\.S\. prices\.$/);
+    expect(verdictSentence(view)).toMatch(/^[ABC] leaves you about U\.S\.-avg \$[\d,]+ a month more than [ABC] over your stay, after rent, at U\.S\. prices\.$/);
   });
 });

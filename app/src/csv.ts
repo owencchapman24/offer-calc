@@ -103,7 +103,8 @@ const offersLine = (ctx: WorkContext, letters: Letter[]) => `Offers: ${letters.m
 
 /** L-1's units, as its chart and table say them: after rent, in the dollars of the prices picked. */
 const l1Units = (basis: Basis, ctx: WorkContext, running: boolean) => {
-  const u = basis === "colAdjustedTotal" ? `${pricesOf(ctx).unit}, as paid` : basis === "perHour" ? "$ an hour, as paid" : "$, as paid";
+  const after = basis === "colAdjustedTotal" || (basis === "perHour" && res(ctx).sweep.perHourOf === "colAdjustedTotal");
+  const u = `${after ? pricesOf(ctx).unit : "$"}${basis === "perHour" ? " an hour" : ""}, as paid`;
   return running ? u.replace("as paid", "running total, as paid") : u;
 };
 
@@ -142,14 +143,15 @@ function l2(ctx: WorkContext): Built {
   const v = riskView(ctx);
   if (!v.anyRange) throw new Error("No ranges entered, so L-2 has no table.");
   const r = res(ctx);
-  const units = v.perHour ? "$ an hour, nominal" : `${r.view.basis === "colAdjustedTotal" ? pricesOf(ctx).unit : "$"}, ${v.years}-year total, present value`;
+  const after = r.view.basis === "colAdjustedTotal" || (v.perHour && r.sweep.perHourOf === "colAdjustedTotal");
+  const units = `${after ? pricesOf(ctx).unit : "$"}${v.perHour ? " an hour over your stay, nominal" : `, ${v.years}-year total, present value`}`;
   const fmt = (x: number) => (v.perHour ? cents(x) : figure(x));
   const word = { bear: "Bear", base: "Base", bull: "Bull" } as const;
   const phrase = v.perHour ? "per hour worked" : basisPhrase(pricesOf(ctx))[r.view.basis];
   return {
     slug: "L-2-if-things-go-badly",
     title: `L-2 · If things go badly · ${cap(phrase)}, each offer in the bear, base and bull cases. ${offersLine(ctx, r.letters)}`,
-    header: ["Offer", ...CASES.flatMap((s) => [`${word[s]} (${units})`, `${word[s]} tickmark`]), "Bear vs base (%)", "Bear vs base tickmark"],
+    header: ["Offer", ...CASES.flatMap((s) => [`${word[s]} (${units})`, `${word[s]} tickmark`]), "Bear vs base, over your stay (%)", "Bear vs base tickmark"],
     rows: [...v.rows].sort((a, b) => a.letter.localeCompare(b.letter)).map((row) => [
       row.letter,
       ...CASES.flatMap((s) => fig(ctx, `risk.${row.letter}.${s}`, fmt(row.values[s]))),
@@ -167,14 +169,18 @@ const slug = (letter: Letter, part: L6Part) => `L-6-${letter}-${PART_SLUG[part]}
 const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
   years(ctx, letter) {
     const t = yearTable(ctx, letter);
-    const unit = (u: "dollars" | "hours" | "perHour") => (u === "hours" ? " (hours)" : u === "perHour" ? " ($ an hour)" : "");
+    // A row whose figures aren't the header's "$, as paid" says its own unit: hours, per hour, or the prices picked where its label
+    // doesn't name them already (money saved, at face value, counts in them too).
+    const p = pricesOf(ctx);
+    const unit = (row: (typeof t.rows)[number]) => (row.unit === "hours" ? " (hours)"
+      : row.unit === "perHour" ? ` (${row.line === "totalHour" ? p.unit : "$"} an hour)` : row.line === "face" ? ` (${p.unit})` : "");
     return {
       slug: slug(letter, "years"),
       title: ref(ctx, letter, "Employment years, line by line, as paid, not discounted"),
       header: ["Line", "Section", "Label", "Note", ...t.years.flatMap((y) => [`Year ${y.n} ($, as paid)`, `Year ${y.n} tickmark`]),
         `Years 1–${t.n} ($, as paid)`, `Years 1–${t.n} tickmark`],
       rows: t.rows.map((row) => [
-        num(row.no), sectionName(t, row.section), `${row.label}${unit(row.unit)}`, row.gloss ?? "",
+        num(row.no), sectionName(t, row.section), `${row.label}${unit(row)}`, row.gloss ?? "",
         ...row.values.flatMap((v, i) => fig(ctx, `l6y.${letter}.${row.line}.${i + 1}`, rowText(row, v))),
         ...fig(ctx, `l6y.${letter}.${row.line}.sum`, rowText(row, row.sum)),
       ]),

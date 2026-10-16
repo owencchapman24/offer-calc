@@ -5,7 +5,7 @@ import { isDefault } from "./defaults";
 import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, type Letter } from "./model";
 import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
-import { type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
+import { type Breakdown, type LeavePanel, type OfferDetail, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
 import type { SectionId } from "./sections";
 import type { TickKind } from "./ui";
 import type { VerdictView } from "./verdict";
@@ -40,6 +40,9 @@ const L6_KIND: Record<L6Line, TickKind> = {
   savings: "recomputed", rent: "traced", local: "footed", atRef: "recomputed", oopRef: "recomputed", face: "recomputed", total: "footed",
   totalHour: "recomputed",
 };
+
+/** An offer's breakdown, A-1 (docs/v2-plan.md, item 5): its bottom line over its own stay, and what it's built from. */
+export type OwnLine = "total" | "spend" | "saved" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "rate" | "hour" | "bear" | "drop";
 
 export type MetricId =
   | "hero" // the verdict: the lead a month (or an hour) on the selected basis, for your stay
@@ -78,7 +81,9 @@ export type MetricId =
   | `l6g.${L}.${number | "after"}.${Component | "all"}.${"gross" | "tax"}` // L-6: a year's payments of a kind, added (all: the year's tax)
   | `l6t.${L}.${number}.${TaxLine}.${"with" | "without" | "offer"}` // L-6: a calendar year's tax, with and without the offer
   | `in.${L}.${string}` // an input in the ledger, by its path ("salary.annual", "equity.grants.0.schedule"), or "also"
-  | `about.${AboutField}`; // an input in About you
+  | `about.${AboutField}` // an input in About you
+  | `own.${L}.${OwnLine}` // an offer's breakdown, A-1: its bottom line over its own stay, at its own prices
+  | `alone.${L}`; // the ledger's "On its own" row: an offer's bottom line in the common dollars (the prices picked)
 
 export interface WorkLine {
   op?: "+" | "−" | "×" | "÷" | "=";
@@ -129,6 +134,11 @@ export interface WorkContext {
   /** Every offer in the ledger. */
   offers: AppOffer[];
   rents: Record<string, RentEstimate>;
+  /**
+   * Each complete offer's breakdown, by letter, once the worker has sent it (docs/v2-plan.md, item 5); `withRef`: A-1 restates
+   * its total at the prices picked (they're a city's, or there's a comparison).
+   */
+  own?: { breakdowns: Partial<Record<Letter, Breakdown>>; withRef: boolean };
   results?: {
     sweep: HorizonSweep;
     /** Your stay's projections; null until the worker has sent them. */
@@ -179,6 +189,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "risk": return b === "base" ? "crossFooted" : "recomputed";
     case "tie": return a === "target" ? "crossFooted" : "recomputed";
     case "rentnote": return "estimate";
+    case "alone": return "crossFooted";
     case "l6y":
       if (c === "sum") return "footed";
       if (b === "rent") return offerByLetter(ctx, a as L)?.draft.costOfLiving.monthlyRent === null ? "estimate" : "traced";

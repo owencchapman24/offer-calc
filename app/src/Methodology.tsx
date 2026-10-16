@@ -1,14 +1,15 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef } from "react";
 import { DATA_YEARS } from "../../src/col/cities";
 import { formatAssumption } from "../../src/format/index";
-import type { ValueBasis } from "../../src/offer/types";
+import type { Assumption, ValueBasis } from "../../src/offer/types";
+import { ownView } from "./breakdownModel";
+import type { Breakdown } from "./protocol";
 import { CASES, changeText, riskView } from "./cases";
 import { cashLever, changeText as tieChangeText } from "./breakevenModel";
 import { shownYears } from "./footing";
 import { forfeits, leaveTerms } from "./leaveModel";
 import { ASSUMPTIONS, type Letter, toOfferInput } from "./model";
 import { basisPhrase, pricesOf, shortCity, type WorkContext } from "./metrics";
-import { bridge } from "./byYearModel";
 import { SECTIONS, type SectionId, sectionTitle } from "./sections";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import { TICKS, type TickKind } from "./ui";
@@ -54,8 +55,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <header className="method-head">
           <h1 ref={top} tabIndex={-1}>Methodology</h1>
           <p>
-            How every figure is worked out, with your numbers where they help. We compare money, time and prices; which job fits
-            your career is yours to judge. Nothing here is financial advice. <a href="#/">Back to the comparison</a>
+            How every figure is worked out, with your numbers where they help: for each offer on its own, and for offers compared.
+            We work out money, time and prices; which job fits your career is yours to judge. Nothing here is financial advice.{" "}
+            <a href="#/">Back to your offers</a>
           </p>
           <p className="method-version">
             Engine {ENGINE_VERSION} · tax law 2026, later years projected · prices: BEA Regional Price Parities {DATA_YEARS.rpp} ·
@@ -65,8 +67,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
 
         <Section id="M-1">
           <p>
-            Every comparison runs one pipeline, left to right. Each step is a basis you can pick in the lead schedule, and each
-            shows its own winner:
+            Every offer runs one pipeline, left to right, and gets a breakdown of its own: what it would leave you with, worked out
+            over your stay from its own start date, whatever other offers you add. Its references are its letter and a part: A-1
+            is offer A's bottom line, B-1 offer B's.
           </p>
           <ol className="pipeline-list">
             <li><strong>Gross pay</strong>: salary, bonuses, cash awards such as a sign-on, and RSUs as they vest.</li>
@@ -74,16 +77,29 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               premiums (<Ref id="M-4" />).</li>
             <li><strong>+ Benefits (total rewards)</strong>: plus the employer 401(k) money you'd keep, perks and employer HSA money,
               minus the health costs you'd pay out of pocket (<Ref id="M-5" />).</li>
-            <li><strong>− Rent &amp; prices ({p.phrase})</strong>: minus rent, with what's left to spend priced as in
-              {" "}{p.city}, plus what you save at face value (<Ref id="M-6.3" />). This is the default verdict.</li>
-            <li><strong>Per hour</strong>: the step-4 total, after rent, as paid, divided by the hours you'd work (<Ref id="M-5.4" />).</li>
+            <li><strong>− Rent (after rent, at the offer's own prices)</strong>: minus rent. What's left is what you'd have where
+              you'd live: money to spend there, plus what you save, in that city's dollars. It's total rewards less rent. An offer's
+              bottom line is this, a month over your stay in today's dollars (<Ref id="M-7.2" />), split into what's left to spend
+              and what's saved.</li>
+            <li><strong>Per hour</strong>: the step-4 total, as paid, divided by the hours you'd work (<Ref id="M-5.4" />).</li>
           </ol>
+          <h3 className="method-sub">Comparing offers</h3>
+          <p>
+            A dollar doesn't buy the same things in every city, so offers set side by side are restated at one place's prices:
+            {" "}{p.name}, unless you pick a city under Prices in. What's left to spend after rent is priced as in {p.city}; what
+            you save counts at face value (<Ref id="M-6.1" />, <Ref id="M-6.3" />). That's the comparison's one extra step, "− Rent
+            &amp; prices" in the lead schedule's pipeline, whose steps are each a basis you can pick, each with its own winner;
+            "{p.phrase}" is the default verdict. Wherever offers sit together (the verdict, the rank list, the ledger's "On its own"
+            row, L-1 to L-4) their figures are in these common dollars, and each says so. An offer's own breakdown stays in its own
+            city's dollars, and where it's restated, the step sits beside it: its own city's figure, less (or plus) that city's
+            prices, equals its figure in {p.dollars}.
+          </p>
           <p>
             Every payment and vest is a dated event. Tax is worked out per calendar year, the way the law works; the events are
-            then grouped into employment years (year 1 is your first 12 months) for L-1 and the bridge, and summed over your stay
-            for the verdict. All three views come from the same events, so they reconcile: the bridge's year-1 total is the
-            chart's year 1, and the years add up to your stay. L-6, The work, lists them all: each year line by line, every
-            payment with its formula and tax, and each calendar year's tax with and without the offer.
+            then grouped into employment years (year 1 is your first 12 months) for the breakdown's year 1, L-1 and the bridge,
+            and summed over a stay for the bottom line and the verdict. All of these come from the same events, so they reconcile:
+            the bridge's year-1 total is the chart's year 1, and the years add up to your stay. L-6, The work, lists them all:
+            each year line by line, every payment with its formula and tax, and each calendar year's tax with and without the offer.
           </p>
           <PipelineExample ctx={ctx} sample={sample} />
         </Section>
@@ -219,9 +235,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-5.4">
           <p>
             Hours are weekly hours times weeks a year (50 unless entered), prorated for a partial year and counted only inside
-            your stay. Per hour is the step-4 total ({p.phrase}: <Ref id="M-6.3" />), as paid, divided by those hours. It isn't
-            discounted, and it's a lens rather than the verdict: hours are the softest input, and people trade hours for experience
-            on purpose.
+            your stay. Per hour is the step-4 total, after rent, as paid, divided by those hours: in an offer's breakdown at its own
+            prices, and in the comparison {p.phrase} (<Ref id="M-6.3" />). It isn't discounted, and it's a lens rather than the
+            verdict: hours are the softest input, and people trade hours for experience on purpose.
           </p>
         </Section>
         <Section id="M-5.5">
@@ -311,20 +327,28 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         <Section id="M-7.2">
           <p>
             A figure a month is easier to feel than a present-value total. The monthly figure is the level amount, paid at the
-            end of each month of your stay, that's worth the same today as the present-value gap. Here's the verdict's own
-            arithmetic:
+            end of each month of a stay, that's worth the same today as a present value: an offer's bottom line over its own stay
+            (A-1), or the verdict's gap over the comparison's. It's the present value as shown ÷ the annuity factor as shown,
+            rounded once. In a bottom line, the total and what's saved are each worked out so, and what's left to spend is the
+            total less what's saved. Here it is with your numbers:
           </p>
           <PerMonth ctx={ctx} sample={sample} />
         </Section>
         <Section id="M-7.3">
           <p>
-            Every offer is compared over the same stretch: from the earliest start date for the number of years you expect to
+            An offer's breakdown runs over its own stay: from its own start date, for the number of years you expect to stay. So
+            adding, changing or removing another offer never changes it.
+          </p>
+          <p>
+            Offers compared are compared over the same stretch: from the earliest start date for the number of years you expect to
             stay. An offer that starts later has less pay inside it, which is the real cost of starting later: exactly the days it
             starts later, since its pay, benefits and rent count for each of its own days in the stretch, its last partial month
             included. Money paid before an offer's start date, such as relocation paid before day one, counts from the start date
             (it's taxed in the year it's paid). Pay after the stay isn't counted. The stay's last calendar year is still taxed as though you kept earning through December, as at a
             next job, so a short stay doesn't get an artificially low tax rate. Leaving at the end of the stay doesn't trigger
             clawbacks here; leaving early is <Ref id="M-9" />. The row under the verdict shows the winner for stays of 2 to 5 years.
+            For an offer that starts on the earliest date, its breakdown and its place in the comparison cover the same stretch; for
+            one that starts later, the comparison's stretch holds fewer of its days, so its figures there are smaller by those days.
           </p>
           <p>Today, the valuation date, is your device's date when the page loads.</p>
         </Section>
@@ -505,6 +529,11 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             figures; Enter opens one and Escape closes it.
           </p>
           <p>
+            Each schedule has a reference, as on a workpaper: an offer's breakdown is its letter and a part (A-1, offer A's bottom
+            line); the comparison's are L (the lead schedule) and L-1 to L-6; the methodology's are M-1 to M-13. A printed page cites
+            them the same way.
+          </p>
+          <p>
             For a cleaner read, "Hide tickmarks" at the foot of the page hides the marks: each figure keeps a dotted underline and still
             opens its work. The inputs' D and E stay, since a default or an estimate always says so. A table's CSV has each figure's mark
             in a column beside it, and the marks print, with each schedule's legend.
@@ -591,28 +620,32 @@ function Live({ children }: { children: ReactNode }) {
   return <div className="method-live">{children}</div>;
 }
 
-/** M-1: one offer's year 1, from the letter to after rent. */
+/** M-1: one offer's year 1, from the letter to after rent at its own prices, then restated at the prices picked. */
 function PipelineExample({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
-  const r = ctx.results;
-  if (!r?.detail || r.detail.years !== r.view.row.years) return null;
-  const letter = r.letters[0];
-  try {
-    const b = bridge(ctx, letter, 1);
-    const at = (line: string) => b.rows.find((x) => x.line === line)?.value;
-    const steps: Array<[string, number | undefined]> = [
-      ["the offer letter", at("letter")], ["paid in year 1", at("paid")], ["after tax", at("afterTax")],
-      ["total rewards", at("totalRewards")], [pricesOf(ctx).phrase, at("total")],
-    ];
-    return (
-      <Live>
-        <p className="live-head">Your numbers: {letter}, year 1 <Illustrative sample={sample} /></p>
-        <p>{steps.filter(([, v]) => v !== undefined).map(([k, v]) => `${k} ${dollars(v!)}`).join(" → ")}.
-          The bridge under L-1 shows every line. <a href="#/">See it on the comparison</a></p>
-      </Live>
-    );
-  } catch {
-    return null;
-  }
+  const letter = (Object.keys(ctx.own?.breakdowns ?? {}) as Letter[]).sort()[0];
+  const b = letter ? ctx.own!.breakdowns[letter] : undefined;
+  const y = b ? shownYears(b.detail)[0] : undefined;
+  const info = b?.detail.costOfLiving;
+  if (!b || !y?.col || !info) return null;
+  const place = shortCity(info.area.name);
+  const own = y.totalRewards - y.col.rent;
+  const p = pricesOf(ctx);
+  const step = own - y.col.total;
+  const steps: Array<[string, number]> = [
+    ["the offer letter", y.quoted.letter], ["paid in year 1", y.gross], ["after tax", y.afterTax], ["total rewards", y.totalRewards],
+  ];
+  return (
+    <Live>
+      <p className="live-head">Your numbers: {letter}, year 1, as paid <Illustrative sample={sample} /></p>
+      <p>
+        {steps.map(([k, v]) => `${k} ${dollars(v)}`).join(" → ")} → after rent, at {place} prices, {place} {dollars(own)}.
+        {info.area.code !== info.reference.code && (
+          <> Restated at {p.place} prices for a comparison: {place} {dollars(own)} {step >= 0 ? "−" : "+"} {place} prices {dollars(Math.abs(step))} ={" "}
+            {p.unit}{figure(y.col.total)}.</>
+        )}
+      </p>
+    </Live>
+  );
 }
 
 /** M-6.3: each offer's year 1 after rent, at the prices picked. */
@@ -633,10 +666,10 @@ function YearOne({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   );
 }
 
-/** M-7.2: the verdict's per-month figure, worked with its own numbers. */
+/** M-7.2: the verdict's per-month figure, worked with its own numbers; with one offer, its bottom line's. */
 function PerMonth({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const r = ctx.results;
-  if (!r) return <p className="method-note">Fill in two offers to see this worked with your numbers.</p>;
+  if (!r) return <OwnMonth ctx={ctx} sample={sample} />;
   const basis: ValueBasis = r.view.basis === "perHour" ? "colAdjustedTotal" : r.view.basis;
   const row = r.view.row;
   const lead = row.leads[basis];
@@ -674,6 +707,42 @@ function PerMonth({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
       <p className="method-note">
         Stay {row.years} years: {longDate(row.window.start)} – {longDate(dayBefore(row.window.end))}. Discount rate{" "}
         {percent(r.sweep.discountRate)} a year.
+      </p>
+    </Live>
+  );
+}
+
+/** M-7.2 with one offer: its bottom line a month, from its present value after rent at its own prices. */
+function OwnMonth({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
+  const letter = (Object.keys(ctx.own?.breakdowns ?? {}) as Letter[]).sort()[0];
+  const b = letter ? ctx.own!.breakdowns[letter] : undefined;
+  const o = letter ? ctx.offers.find((x) => x.letter === letter) : undefined;
+  const input = o ? toOfferInput(o) : null;
+  if (!b || !input || !("offer" in input)) return <p className="method-note">Fill in an offer to see this worked with your numbers.</p>;
+  let v: ReturnType<typeof ownView>;
+  try {
+    v = ownView(letter, b, input.offer, pricesOf(ctx), false);
+  } catch {
+    return null;
+  }
+  const last = b.annuity[b.annuity.length - 1];
+  return (
+    <Live>
+      <p className="live-head">{letter}'s bottom line, after rent at {v.place} prices, its {v.years}-year stay <Illustrative sample={sample} /></p>
+      <table className="method-table work-like">
+        <tbody>
+          <tr><th scope="row">{letter}'s total after rent, present value, {v.place} $</th><td>{figure(v.pv.total)}</td></tr>
+          <tr><th scope="row">÷ Annuity factor: {v.months} month-ends at {percent(b.discountRate)} a year</th><td>{v.factor.toFixed(4)}</td></tr>
+          <tr className="rule-double"><th scope="row">= A month over your stay, {v.place} $</th><td>{dollars(v.month.total)}</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Why not {dollars(v.pv.total)} ÷ {v.months} = {dollars(v.pv.total / v.months)}? Because later dollars are worth less today: a
+        payment at the end of month {v.months} counts for about ${last ? last.factor.toFixed(2) : "1.00"} on the dollar. Of it,{" "}
+        {dollars(v.month.saved)} is saved ({figure(v.pv.saved)} ÷ {v.factor.toFixed(4)}) and {dollars(v.month.spend)} is left to spend.
+      </p>
+      <p className="method-note">
+        Its stay: {longDate(v.start)} – {longDate(v.last)}. Discount rate {percent(b.discountRate)} a year.
       </p>
     </Live>
   );
@@ -797,9 +866,11 @@ function WhatItWouldTake({ ctx, sample }: { ctx: WorkContext; sample: boolean })
 }
 
 
-/** M-12: each offer's live assumptions, in words. */
+/** M-12: each offer's live assumptions, in words: the comparison's, or each offer's own (its breakdown's) with one offer. */
 function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
   const r = ctx.results;
+  const mine: Array<[Letter, Assumption[]]> = r?.detail ? r.letters.map((l, i) => [l, r.detail!.offers[i].assumptions])
+    : (Object.entries(ctx.own?.breakdowns ?? {}) as Array<[Letter, Breakdown]>).sort(([a], [b]) => a.localeCompare(b)).map(([l, b]) => [l, b.detail.assumptions]);
   return (
     <>
       <p>
@@ -807,13 +878,13 @@ function Assumptions({ ctx, sample }: { ctx: WorkContext; sample: boolean }) {
         {percent(ASSUMPTIONS.discountRate)}; present values as of today, {longDate(ctx.today)}; health usage {ctx.household.healthUsage ?? "medium"};
         no savings beyond the 401(k); prices in {pricesOf(ctx).dollars}; base case.
       </p>
-      {!r?.detail ? <p className="method-note">Fill in two offers to see each one's assumptions.</p> : r.letters.map((l, i) => {
+      {!mine.length ? <p className="method-note">Fill in an offer to see its assumptions.</p> : mine.map(([l, assumptions]) => {
         const offer = ctx.offers.find((o) => o.letter === l);
         return (
           <div key={l} className="method-assumptions">
             <h4><span className={`who offer-${l}`}>{l}</span>{offer?.draft.label ? ` · ${offer.draft.label}` : ""}{" "}
               {offer?.sample && sample ? <span className="stamp">Sample</span> : null}</h4>
-            <ul>{r.detail!.offers[i].assumptions.map((a, k) => <li key={k}>{formatAssumption(a)}</li>)}</ul>
+            <ul>{assumptions.map((a, k) => <li key={k}>{formatAssumption(a)}</li>)}</ul>
           </div>
         );
       })}

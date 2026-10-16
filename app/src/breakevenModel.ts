@@ -60,7 +60,7 @@ export function scalesText(letter: Letter, o: OfferInput, basis: ValueBasis): st
   if ((o.salary.raise?.base ?? 0) !== 0) scales.push("raises");
   if (o.salary.promotions?.some((p) => (p.scenarios ?? ["base"]).includes("base"))) scales.push("promotions");
   const b = o.bonus;
-  if (b?.basis === "percentOfSalary" && b.amount.base > 0) scales.push(`the ${percent(b.amount.base)} bonus`);
+  if (b?.basis === "percentOfSalary" && b.amount.base > 0) scales.push(`the yearly ${percent(b.amount.base)} bonus`);
   const r = o.retirement;
   if (basis !== "cash" && r && ((r.contributionPct > 0 && (r.match?.length ?? 0) > 0) || (r.nonElectivePct ?? 0) > 0)) {
     scales.push(r.match?.length ? "the 401(k) match" : "employer 401(k) money");

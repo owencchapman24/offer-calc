@@ -5,7 +5,7 @@ import { type MetricId, type WorkContext } from "./metrics";
 import { cashName } from "./byYearModel";
 import type { Letter } from "./model";
 import { type CompareRequest, workJob, type WorkOffer } from "./protocol";
-import { figure, longDate } from "./text";
+import { cents, dollars, figure, longDate } from "./text";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrintScope } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 import {
@@ -155,9 +155,9 @@ const OfferTables = memo(function OfferTables({ letter, t, stay, payments, taxes
   return (
     <>
       <PartHead letter={letter} part="years" title="Employment years" name="employment years" csv />
-      <Scroll label={`L-6.${letter}, employment years`}><YearsTable t={t} /></Scroll>
+      <Scroll label={`L-6.${letter}, employment years`}><YearsTable t={t} common={t.prices?.unit ?? ""} /></Scroll>
       <PartHead letter={letter} part="stay" title="Your stay, tied to the lead schedule and L-1" name="your stay" csv />
-      <Scroll label={`L-6.${letter}, your stay`}><StayTable letter={letter} n={t.n} rows={stay} /></Scroll>
+      <Scroll label={`L-6.${letter}, your stay`}><StayTable letter={letter} n={t.n} rows={stay} common={t.prices?.unit ?? ""} /></Scroll>
       <PartHead letter={letter} part="payments" title="Every payment" name="every payment" csv={!!payments} />
       {!listed ? <p className="note l6-elsewhere">Every payment, with its formula and its tax, to the cent: in the full workpaper (Print…, then Full workpaper), and in L-6's CSV of every payment.</p>
         : payments ? <Scroll label={`L-6.${letter}, every payment`}><Payments letter={letter} years={payments} /></Scroll>
@@ -174,7 +174,16 @@ function Scroll({ label, children }: { label: string; children: ReactNode }) {
   return <div className="l6-scroll" role="region" aria-label={label} tabIndex={0}>{children}</div>;
 }
 
-function YearsTable({ t }: { t: YearTable }) {
+/** The lines after rent at the prices picked, whose labels name those dollars (condition 1); `local` is in the offer's own city's. */
+const AFTER = new Set(["atRef", "oopRef", "face", "total", "totalHour"]);
+
+/** A line's figure as its label says it: "$110,000", "U.S.-avg $62,594", "New York $55,762", "$21.85 an hour", "4,000 hours". */
+function sayRow(row: YearTable["rows"][number], v: number, common: string, city = "") {
+  const place = AFTER.has(row.line) ? `${common} ` : row.line === "local" ? `${city} ` : "";
+  return row.unit === "hours" ? `${figure(v)} hours` : row.unit === "perHour" ? `${place}${cents(v)} an hour` : `${place}${dollars(v)}`;
+}
+
+function YearsTable({ t, common }: { t: YearTable; /** The prices picked, as a figure names them: "U.S.-avg". */ common: string }) {
   const years = t.years.map((y) => y.n);
   const sections = (["cash", "rewards", "rent"] as const).filter((s) => t.rows.some((x) => x.section === s));
   return (
@@ -202,11 +211,13 @@ function YearsTable({ t }: { t: YearTable }) {
               </th>
               {row.values.map((v, i) => (
                 <td key={i}>
-                  <Fig id={`l6y.${t.letter}.${row.line}.${i + 1}`} label={`${t.letter}, year ${i + 1}, line ${row.no}, ${row.label}, ${shown(row, v)}`}>{shown(row, v)}</Fig>
+                  <Fig id={`l6y.${t.letter}.${row.line}.${i + 1}`} label={`${t.letter}, year ${i + 1}, line ${row.no}, ${row.label}, ${sayRow(row, v, common, t.prices?.city)}`}>
+                    {shown(row, v)}</Fig>
                 </td>
               ))}
               <td className="l6-sum">
-                <Fig id={`l6y.${t.letter}.${row.line}.sum`} label={`${t.letter}, years 1 to ${t.n}, line ${row.no}, ${row.label}, ${shown(row, row.sum)}`}>{shown(row, row.sum)}</Fig>
+                <Fig id={`l6y.${t.letter}.${row.line}.sum`} label={`${t.letter}, years 1 to ${t.n}, line ${row.no}, ${row.label}, ${sayRow(row, row.sum, common, t.prices?.city)}`}>
+                  {shown(row, row.sum)}</Fig>
               </td>
             </tr>
           ))}
@@ -216,8 +227,9 @@ function YearsTable({ t }: { t: YearTable }) {
   );
 }
 
-function StayTable({ letter, n, rows }: { letter: Letter; n: number; rows: StayRow[] }) {
+function StayTable({ letter, n, rows, common }: { letter: Letter; n: number; rows: StayRow[]; common: string }) {
   const after = rows.some((x) => x.after);
+  const say = (x: StayRow, v: number) => `${x.basis === "colAdjustedTotal" ? `${common} ` : ""}${dollars(v)}`;
   return (
     <table className="year-table l6-table l6-stay">
       <caption className="sr-only">L-6.{letter}: your stay on each basis, as paid and in present value</caption>
@@ -234,12 +246,12 @@ function StayTable({ letter, n, rows }: { letter: Letter; n: number; rows: StayR
         {rows.map((x) => (
           <tr key={x.basis}>
             <th scope="row">{x.label}</th>
-            <td><Fig id={`l6y.${letter}.${x.line}.sum`} label={`${x.label}, years 1 to ${n}, ${figure(x.years)}`}>{figure(x.years)}</Fig></td>
+            <td><Fig id={`l6y.${letter}.${x.line}.sum`} label={`${x.label}, years 1 to ${n}, ${say(x, x.years)}`}>{figure(x.years)}</Fig></td>
             {after && (
-              <td>{x.after ? <Fig id={`l6s.${letter}.${x.basis}.after`} label={`${x.label} past your stay, ${money(-x.after)}`}>{money(-x.after)}</Fig> : "—"}</td>
+              <td>{x.after ? <Fig id={`l6s.${letter}.${x.basis}.after`} label={`${x.label} past your stay, ${say(x, -x.after)}`}>{money(-x.after)}</Fig> : "—"}</td>
             )}
-            <td><Fig id={`l6s.${letter}.${x.basis}.stay`} label={`${x.label}, your stay as paid, ${figure(x.stay)}`}>{figure(x.stay)}</Fig></td>
-            <td><Fig id={`l6s.${letter}.${x.basis}.pv`} label={`${x.label}, present value today, ${figure(x.pv)}`}>{figure(x.pv)}</Fig></td>
+            <td><Fig id={`l6s.${letter}.${x.basis}.stay`} label={`${x.label}, your stay as paid, ${say(x, x.stay)}`}>{figure(x.stay)}</Fig></td>
+            <td><Fig id={`l6s.${letter}.${x.basis}.pv`} label={`${x.label}, present value today, ${say(x, x.pv)}`}>{figure(x.pv)}</Fig></td>
           </tr>
         ))}
       </tbody>
@@ -263,22 +275,22 @@ function Payments({ letter, years }: { letter: Letter; years: PaymentYear[] }) {
             ...g.rows.map(({ i, p }) => (
               <tr key={i}>
                 <th scope="row">{paymentLabel(p)}<span className="bridge-gloss">paid {longDate(p.date)} · {paymentFormula(p)}</span></th>
-                <td><Fig id={`l6p.${letter}.${i}.gross`} label={`${paymentLabel(p)}, ${toCent(p.gross)}`}>{toCent(p.gross)}</Fig></td>
-                <td><Fig id={`l6p.${letter}.${i}.tax`} label={`Tax on ${paymentLabel(p)}, ${toCent(p.tax)}`}>{toCent(p.tax)}</Fig></td>
+                <td><Fig id={`l6p.${letter}.${i}.gross`} label={`${paymentLabel(p)}, ${cents(p.gross)}`}>{toCent(p.gross)}</Fig></td>
+                <td><Fig id={`l6p.${letter}.${i}.tax`} label={`Tax on ${paymentLabel(p)}, ${cents(p.tax)}`}>{toCent(p.tax)}</Fig></td>
               </tr>
             )),
             ...(g.rows.length > 1 ? [(
               <tr key={`${g.component}-sum`} className="rule-single l6-subtotal">
                 <th scope="row">{KIND_NAME[g.component]}, {y.ey === "after" ? "after your stay" : `year ${y.ey}`}</th>
-                <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.gross` as MetricId} label={`${KIND_NAME[g.component]} payments added, ${toCent(g.gross)}`}>{toCent(g.gross)}</Fig></td>
-                <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.tax` as MetricId} label={`Their tax added, ${toCent(g.tax)}`}>{toCent(g.tax)}</Fig></td>
+                <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.gross` as MetricId} label={`${KIND_NAME[g.component]} payments added, ${cents(g.gross)}`}>{toCent(g.gross)}</Fig></td>
+                <td><Fig id={`l6g.${letter}.${y.ey}.${g.component}.tax` as MetricId} label={`Their tax added, ${cents(g.tax)}`}>{toCent(g.tax)}</Fig></td>
               </tr>
             )] : []),
           ])}
           <tr className="rule-double l6-total">
             <th scope="row">Tax on {y.ey === "after" ? "these payments" : `year ${y.ey}'s payments`}</th>
             <td />
-            <td><Fig id={`l6g.${letter}.${y.ey}.all.tax` as MetricId} label={`Tax on ${y.ey === "after" ? "the payments after your stay" : `year ${y.ey}'s payments`}, ${toCent(y.tax)}`}>{toCent(y.tax)}</Fig></td>
+            <td><Fig id={`l6g.${letter}.${y.ey}.all.tax` as MetricId} label={`Tax on ${y.ey === "after" ? "the payments after your stay" : `year ${y.ey}'s payments`}, ${cents(y.tax)}`}>{toCent(y.tax)}</Fig></td>
           </tr>
         </tbody>
       ))}
@@ -306,13 +318,13 @@ function TaxYears({ letter, tables }: { letter: Letter; tables: TaxTable[] }) {
               {row.kind === "rate" ? (
                 <>
                   <td /><td />
-                  <td><Fig id={`l6t.${letter}.${t.year}.rate.offer`} label={`The offer's ${t.year} tax rate, ${rateText(t.rate, t.digits)}`}>{rateText(t.rate, t.digits)}</Fig></td>
+                  <td><Fig id={`l6t.${letter}.${t.year}.rate.offer`} label={`The offer's tax, ${rateText(t.rate, t.digits)} of its ${t.year} pay`}>{rateText(t.rate, t.digits)}</Fig></td>
                 </>
               ) : COLS.map((c) => {
                 const v = row[c]!;
                 return (
                   <td key={c}>
-                    <Fig id={`l6t.${letter}.${t.year}.${row.line}.${c}`} label={`${t.year}, ${row.label}, ${c === "offer" ? "the offer's share" : c === "with" ? "with the offer" : "without it"}, ${money(v)}`}>
+                    <Fig id={`l6t.${letter}.${t.year}.${row.line}.${c}`} label={`${t.year}, ${row.label}, ${c === "offer" ? "the offer's share" : c === "with" ? "with the offer" : "without it"}, ${dollars(v)}`}>
                       {money(v)}
                     </Fig>
                   </td>

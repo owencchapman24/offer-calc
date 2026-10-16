@@ -36,7 +36,7 @@ function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
       w.terminate();
       resolve(e.data.issues.flatMap((list, i) => list.map((issue) => ({ letter: complete[i].letter, issue }))));
     };
-    w.postMessage({ gen: 1, compare: null, check: complete.map((x) => x.offer), rents: [] });
+    w.postMessage({ gen: 1, offers: null, check: complete.map((x) => x.offer), rents: [] });
   });
 }
 

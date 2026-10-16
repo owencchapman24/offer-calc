@@ -22,7 +22,7 @@ function results(s: Session) {
     return r.offer;
   });
   return compute({
-    compare: { offers, household: toHousehold(s.household, 2027), stays: [4], stayYears: 4, valuationDate: TODAY, inflation: ASSUMPTIONS.inflation,
+    offers: { offers, household: toHousehold(s.household, 2027), stays: [4], stayYears: 4, valuationDate: TODAY, inflation: ASSUMPTIONS.inflation,
       discountRate: ASSUMPTIONS.discountRate },
     rents: [],
   }).sweep!.rows[0].values;
@@ -129,7 +129,7 @@ describe("import", () => {
       view: null, letters: ["A", "B", "C"], stayYears: 4, updating: false, error: null, notes: [], sample: false, dispatch: () => {}, issues,
     }));
     const waiting = lead({ C: [issue] });
-    expect(waiting).toContain("Nothing to compare yet.");
+    expect(waiting).toContain("Nothing to work out yet.");
     expect(waiting).not.toContain("Working out the comparison");
     // With nothing to fix, no results yet means the worker is on it.
     expect(lead({})).toContain("Working out the comparison");
