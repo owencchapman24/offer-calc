@@ -63,6 +63,6 @@ describe("the sticky verdict bar", () => {
   it("on a tablet: the verdict's own sentence and the stay", () => {
     const html = bar("top");
     expect(html).toContain(`${verdictSentence(view).replace(/\.$/, "")}<span class="bar-scope"> · stay 4 years</span>`);
-    expect(verdictSentence(view)).toMatch(/^[ABC] leaves you about U\.S\.-avg \$[\d,]+ a month more than [ABC] over your stay, after rent, at U\.S\. prices\.$/);
+    expect(verdictSentence(view)).toMatch(/^[ABC] leaves you about \$[\d,]+ a month more than [ABC] over your stay, after rent, in U\.S\.-average dollars\.$/);
   });
 });

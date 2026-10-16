@@ -158,6 +158,9 @@ section 2's and the plan's in step):
     places them, so `App.tsx` stays light) and the lead's verdict (`LeadVerdict.tsx`).
     Neither imports `Lead.tsx` (it imports `Tickmarks.tsx`: the main chunk split when one did), so the problems list reaches A-1 as a
     node from `App.tsx`.
+  - Which lazy chunks import a main-thread module moves Rolldown's chunking, not only what's new: `LeadVerdict.tsx` imports
+    `metrics.ts` at run time (`basisPhrase`) and `verdict.ts` doesn't. Without the first, `prices.ts` and the city list split off the
+    main chunk; with the second, `model.ts`, `protocol.ts` and `text.ts` did (2026-10-16). `npm run check-bundle` catches either.
 - **The year figures as shown:** every figure is rounded once, where it's worked out, and a subtotal is the sum of the rounded items
   above it, so every column adds up as displayed and a figure shown in two places is one figure (`footing.ts`). Every Show the work
   foots as displayed exactly (`footsAsDisplayed`); a present value's total stays the engine's, with one line taking the rounding
@@ -184,11 +187,16 @@ section 2's and the plan's in step):
   whole years to start on or after today, so present values are from today. They're stamped illustrative wherever they appear.
 - **Today:** the app passes the user's local date as `valuationDate`.
 - **Words:** labels follow "Prices in" (`app/src/prices.ts`). Under v2's B13, every rate and share states its period ("a month over
-  your stay", "of its 2027 pay"), and under condition 1 every figure names its dollars: after rent the place's ("U.S.-avg $7,196",
-  "New York $6,671": on the figure or its column's head, in its accessible name, its Show the work, its CSV header and the copied
-  document), "$" before rent and prices; an offer's own city's dollars only inside its breakdown (`docs/v2-plan.md`, item 5's
-  conditions). `labels.test.ts` checks every figure the app renders, the CSVs and the document; a new figure needs its entry in its
-  `expectOf`.
+  your stay", "of its 2027 pay"), and under condition 1 every figure names its dollars: after rent the place's, "$" before rent and
+  prices; an offer's own city's dollars only inside its breakdown (`docs/v2-plan.md`, item 5's conditions). Where it's said:
+  - **tables, column heads and figure labels** (accessible names, Show the work, CSV headers) in the compact style: "U.S.-avg
+    $7,196", "New York $6,671";
+  - **sentences** (the verdict, the bottom line, the document's paragraphs, the live region) once, in words, the figures without it:
+    "C leaves you about $507 a month more than A over your stay, after rent, in U.S.-average dollars" (`basisSaid`, `verdict.ts`;
+    the user's amendment, 2026-10-16).
+
+  `labels.test.ts` checks every figure the app renders, each sentence, the CSVs and the document; a new figure needs its entry in
+  its `expectOf`.
 - **Accessibility:** WCAG 2.2 A and AA, checked by the scan in every state (`e2e/a11y.e2e.ts`); an exception needs a rule, a
   selector and a reason in `test/a11y-exceptions.json` (none today). Behaviors to keep:
   - the verdict is announced in one polite live region (`#verdict-live`), one sentence a second after the last result, only when

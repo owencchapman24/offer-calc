@@ -1,14 +1,14 @@
 import { type Dispatch, useContext, useEffect } from "react";
+import type { Basis } from "../../src/offer/types";
 import type { Letter } from "./model";
 import type { Action, UiState } from "./session";
 import { cents, dayBefore, dollars, figure, longDate } from "./text";
 import { markFirstAnswer, Stamp, TickSetting } from "./ui";
 import { basisPhrase, type RentNote } from "./metrics";
-import type { PriceWords } from "./prices";
 import { Fig } from "./figures";
 import type { FlipLine } from "./Lead";
 import {
-  extraHoursView, type ExtraHoursLine, leadAmount, marginText as margin, perText as per, pipeline, placeOf, totalsCaption, type VerdictView,
+  basisSaid, extraHoursView, type ExtraHoursLine, leadAmount, marginText as margin, perText as per, placeOf, totalsCaption, type VerdictView,
 } from "./verdict";
 
 // L · Lead schedule's verdict (docs/ui-design.md §4.1-4.2): the sentence, the rank list, the "winner if you stay" row, the basis
@@ -25,8 +25,8 @@ export function Verdict({ view, letters, stayYears, dismissed, dispatch, caution
   view: VerdictView; letters: Letter[]; stayYears: number; dismissed: UiState["dismissed"]; dispatch: Dispatch<Action>; cautions: string[];
 }) {
   const { lead, basis, row, perHourOf, prices } = view;
-  const step = pipeline(prices).find((p) => p.basis === basis)!;
-  // Each figure names its dollars (condition 1): the prices picked after rent, "$" before rent and prices.
+  // Each figure's label names its dollars (condition 1): the prices picked after rent, "$" before rent and prices; a sentence says
+  // them once, in words (basisSaid).
   const place = (b: typeof basis) => placeOf(view, b);
   const amount = (b: typeof basis, x: string) => `${place(b)} ${x}`.trim();
   const pv = basis !== "perHour";
@@ -57,12 +57,12 @@ export function Verdict({ view, letters, stayYears, dismissed, dispatch, caution
               {basis === "perHour" ? " pays about" : " leaves you about"}
             </span>{" "}
             <span className="hero"><Fig id="hero" label={`${leadAmount(view, basis, lead)} ${per(basis)} over your stay`}>
-              {place(basis) && <span className="hero-place">{place(basis)} </span>}{margin(basis, lead)} {per(basis)}</Fig></span>{" "}
+              {margin(basis, lead)} {per(basis)}</Fig></span>{" "}
             <span className="verdict-lede">more than <strong className={`who offer-${lead.runnerUpLetter}`}>{lead.runnerUpLetter}</strong> over your stay,{" "}
-              {step.phrase}.</span>
+              {basisSaid(view, basis)}.</span>
           </p>
         ) : (
-          <p className="verdict-lede">The offers tie over your stay, {step.phrase}.</p>
+          <p className="verdict-lede">The offers tie over your stay, {basisSaid(view, basis)}.</p>
         )}
         {basis === "colAdjustedTotal" && (
           <p className="subtitle">Spending money after rent, priced as in {prices.city}, plus what you save.</p>
@@ -174,7 +174,8 @@ export function Verdict({ view, letters, stayYears, dismissed, dispatch, caution
       {extra.length > 0 && (
         <div className="extra">
           <p className="extra-title">Extra hours</p>
-          {extra.map((x) => <ExtraLine key={`${x.more}${x.fewer}`} x={x} prices={prices} place={place(x.basis)} />)}
+          {extra.map((x) => <ExtraLine key={`${x.more}${x.fewer}`} x={x} said={basisSaid(view, x.basis)} place={place(x.basis)}
+            phrase={basisPhrase(prices)} />)}
         </div>
       )}
     </>
@@ -210,18 +211,17 @@ function RentNoteLine({ notes }: { notes: RentNote[] }) {
 }
 
 const LOWER_PHRASE = { cash: "On after-tax pay", totalRewards: "In total rewards" } as const;
-const AVERAGE_PHRASE = { cash: "after tax", totalRewards: "in total rewards", colAdjustedTotal: "after rent" } as const;
 
 /**
- * "Over your stay, A asks 1,750 more hours a year than C and leaves you U.S.-avg $5,577 a year less, after rent, at U.S. prices: more
- * hours for less pay." `place`: the dollars its figures are in, after rent.
+ * "Over your stay, A asks 1,750 more hours a year than C and leaves you $5,577 a year less, after rent, in U.S.-average dollars: more
+ * hours for less pay." `said`: its basis in words (basisSaid); `place`: the dollars its figures' labels name, after rent; `phrase`:
+ * each basis's words (basisPhrase), for what it falls back to.
  */
-function ExtraLine({ x, prices, place }: { x: ExtraHoursLine; prices: PriceWords; place: string }) {
-  const phrase = basisPhrase(prices);
-  const lowerPhrase = (b: ExtraHoursLine["basis"]) => (b === "colAdjustedTotal" ? prices.phrase[0].toUpperCase() + prices.phrase.slice(1) : LOWER_PHRASE[b]);
+function ExtraLine({ x, said, place, phrase }: { x: ExtraHoursLine; said: string; place: string; phrase: Record<Basis, string> }) {
+  // What it falls back to is before rent (cash or total rewards), in plain "$".
+  const lowerPhrase = (b: ExtraHoursLine["basis"]) => LOWER_PHRASE[b as keyof typeof LOWER_PHRASE];
   const pair = `${x.more}${x.fewer}` as `${Letter}${Letter}`;
   const hoursText = figure(x.hoursPerYear);
-  const at = (b: ExtraHoursLine["basis"], v: string) => `${b === "colAdjustedTotal" ? prices.unit.slice(0, -2) : ""} ${v}`.trim();
   const asks = (
     <>Over your stay, <strong className={`who offer-${x.more}`}>{x.more}</strong> asks{" "}
       <Fig id={`extra.${pair}.hours`} label={`${hoursText} more hours a year over your stay`}>{hoursText}</Fig> more hours a year than{" "}
@@ -231,7 +231,8 @@ function ExtraLine({ x, prices, place }: { x: ExtraHoursLine; prices: PriceWords
     const rate = `${place} ${cents(x.perExtraHour)}`.trim();
     return (
       <p className="extra-line">
-        {asks} and pays <Fig id={`extra.${pair}.${x.basis}`} label={`${rate} for each extra hour over your stay`}>{rate}</Fig> for each, {phrase[x.basis]}.
+        {asks} and pays <Fig id={`extra.${pair}.${x.basis}`} label={`${rate} for each extra hour over your stay`}>{cents(x.perExtraHour)}</Fig> for each,{" "}
+        {said}.
       </p>
     );
   }
@@ -239,16 +240,16 @@ function ExtraLine({ x, prices, place }: { x: ExtraHoursLine; prices: PriceWords
   const lower = x.lower;
   return (
     <p className="extra-line">
-      {asks} and leaves you <Fig id={`extra.${pair}.${x.basis}`} label={`${gap} a year less over your stay`}>{gap}</Fig> a year less, {phrase[x.basis]}: more
-      hours for less pay.
+      {asks} and leaves you <Fig id={`extra.${pair}.${x.basis}`} label={`${gap} a year less over your stay`}>{dollars(Math.abs(x.gapPerYear))}</Fig> a year
+      less, {said}: more hours for less pay.
       {lower && (
         <>
-          {" "}{lowerPhrase(lower.basis)}, those extra hours pay{" "}
-          <Fig id={`extra.${pair}.${lower.basis}`} label={`${at(lower.basis, cents(lower.perExtraHour))} each, over your stay`}>
-            {at(lower.basis, cents(lower.perExtraHour))}</Fig> each, against {x.more}'s
-          average of <Fig id={`avg.${x.more}.${lower.basis}`} label={`${at(lower.basis, cents(lower.average))} an hour over your stay`}>
-            {at(lower.basis, cents(lower.average))}</Fig> an hour{" "}
-          {AVERAGE_PHRASE[lower.basis]}.
+          {" "}{lowerPhrase(lower.basis)} over your stay, those extra hours pay{" "}
+          <Fig id={`extra.${pair}.${lower.basis}`} label={`${cents(lower.perExtraHour)} each, over your stay`}>
+            {cents(lower.perExtraHour)}</Fig> each, against {x.more}'s
+          average of <Fig id={`avg.${x.more}.${lower.basis}`} label={`${cents(lower.average)} an hour over your stay`}>
+            {cents(lower.average)}</Fig> an hour{" "}
+          {phrase[lower.basis]}.
         </>
       )}
     </p>

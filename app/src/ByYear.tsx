@@ -314,9 +314,9 @@ function Bridge({ ctx, ui, dispatch }: { ctx: WorkContext; ui: UiState; dispatch
       </table>
       {b.spend !== undefined && b.saved !== undefined && (
         <p className="bridge-month">
-          = <Fig id={`br.${letter}.${n}.spend`} label={`${place} ${dollars(b.spend)} a month to spend after rent, in year ${n}`}>{place} {dollars(b.spend)}</Fig> a
-          month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${place} ${dollars(b.saved)} a month saved, in year ${n}`}>{place}{" "}
-            {dollars(b.saved)}</Fig> a month saved, in year {n}
+          = <Fig id={`br.${letter}.${n}.spend`} label={`${place} ${dollars(b.spend)} a month to spend after rent, in year ${n}`}>{dollars(b.spend)}</Fig> a
+          month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${place} ${dollars(b.saved)} a month saved, in year ${n}`}>
+            {dollars(b.saved)}</Fig> a month saved, in year {n}, in {pricesOf(ctx).dollars}
         </p>
       )}
       <p className="caption">

@@ -194,7 +194,7 @@ test("Copy as document: one click puts the comparison on the clipboard, as HTML 
   const got = await clipboard(page);
   expect(Object.keys(got).sort()).toEqual(["text/html", "text/plain"]);
   for (const flavor of [got["text/html"], got["text/plain"]]) {
-    expect(flavor).toContain(`C leaves you about ${hero} more than A over your stay, after rent, at U.S. prices.`);
+    expect(flavor).toContain(`C leaves you about ${hero} more than A over your stay, after rent, in U.S.-average dollars.`);
     expect(flavor).toContain(SAMPLE_LINE);
     expect(flavor).toContain("If your last day were");
     expect(flavor).toContain("To tie C's");

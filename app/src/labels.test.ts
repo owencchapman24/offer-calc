@@ -10,17 +10,22 @@ import { cityName, type MetricId, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { priceWords, shortCity } from "./prices";
 import {
-  alone, compareOf, context, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork,
+  alone, compareOf, context, ownOffers, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork,
 } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { hasRanges } from "./cases";
+import { sentenceOf } from "./Breakdown";
+import { verdictSentence } from "./verdict";
 
-// The label rules approved with the offer breakdown (docs/v2-plan.md, item 5, conditions 1 and 4), checked wherever figures are
-// shown: every breakdown part, the ledger's "On its own" row, the comparison's schedules, every Show the work, the CSVs and the
-// copied document. It fails on
-// - an after-rent figure that doesn't name its dollars ("New York $6,671", "U.S.-avg $7,196"), or a dollar figure before rent and
-//   prices without its "$": on the figure or in its column's head, in its accessible name, in its Show the work and its CSV column;
+// The label rules approved with the offer breakdown (docs/v2-plan.md, item 5, conditions 1 and 4, with condition 1 as the user
+// amended it on 2026-10-16), checked wherever figures are shown: every breakdown part, the ledger's "On its own" row, the
+// comparison's schedules, every Show the work, the CSVs, the copied document and the sentences said to screen readers. It fails on
+// - an after-rent figure that doesn't name its dollars, or a dollar figure before rent and prices without its "$": in its accessible
+//   name ("New York $6,671", "U.S.-avg $7,196"), in its Show the work and its CSV column, and on the figure or in its column's head;
+// - a sentence that doesn't say its after-rent figures' dollars once, in words ("in U.S.-average dollars", "at New York prices"):
+//   one that doesn't say them, says them twice, or puts them on a figure in the compact style ("U.S.-avg $507"), which is for
+//   tables, column heads and figure labels;
 // - two offers' own-city figures in one row, table, list or chart (where offers sit together, they're in the common dollars);
 // - a rate or share that doesn't state its period ("a month over your stay", "of its 2027 pay", "in year 1").
 
@@ -95,11 +100,31 @@ const named = (unit: string) => new RegExp(`${escape(unit.replace(/ \$$/, ""))} 
 const PAID = /[−+(]?\$\d/;
 /** A period: over a stay, in a year, of a year's pay, the first lease year. */
 const PERIOD = /over (?:your|its own|its|the|a \d+-year|your \d+-year|its \d+-year|the \d+-year) stay|if you stay \d+|\bstay \d+ (?:yrs?|years?)\b|in year \d+|\byear-\d+\b|\byear \d+\b|in \d{4}|of its \d{4} pay|\b\d{4} pay\b|first lease year|over \d+ years|each employment year|over the \d+ years|\byears? \d+ ?(?:–|to) ?\d+|\b\d+ yrs?\b|\byearly\b|\d% a year|starting salary|\d+-year total|\byour stay\b/i;
-/** Words that name a place's dollars, beside a figure or in its column's head. */
-const dollarsWords = (unit: string) => {
-  const place = unit.replace(/ \$$/, "").replace(/-avg$/, "");
-  return new RegExp(`${escape(unit.replace(/ \$$/, ""))} \\$|${escape(place)}(?:-average)? dollars|at ${escape(place)} prices|${escape(unit)}`);
+/** A place's dollars in words, as a sentence says them: "U.S.-average dollars", "at U.S. prices", "New York dollars". */
+const wordsOf = (unit: string, flags = "") => {
+  const place = escape(unit.replace(/ \$$/, "").replace(/-avg$/, ""));
+  return new RegExp(`${place}(?:-average)? dollars|at ${place} prices`, flags);
 };
+/** Words that name a place's dollars, beside a figure or in its column's head: in words, or the compact "U.S.-avg $". */
+const dollarsWords = (unit: string) => new RegExp(`${wordsOf(unit).source}|${escape(unit.replace(/ \$$/, ""))} \\$|${escape(unit)}`);
+
+/** A block's sentences: split at a full stop or semicolon before a capital, and at " · ". A colon's lead-in stays with what follows. */
+const sentences = (t: string) => t.split(/(?<=[.;])\s+(?=[A-Z(])|\s+·\s+/);
+
+/**
+ * A sentence's dollars (condition 1, as amended on 2026-10-16): said once, in words, for each place whose after-rent figures it
+ * states (`units`), and never in the compact style on a figure (`known`: every place's units the page might use).
+ */
+function checkSentence(sentence: string, units: string[], known: string[]): string[] {
+  const out: string[] = [];
+  for (const u of new Set(units)) {
+    const n = sentence.match(wordsOf(u, "g"))?.length ?? 0;
+    if (n === 0) out.push(`doesn't say its dollars (${u}) in words`);
+    if (n > 1) out.push(`says its dollars (${u}) ${n} times`);
+  }
+  for (const u of new Set(known)) if (named(u).test(sentence)) out.push(`puts its dollars on a figure in the compact style (${u})`);
+  return out;
+}
 
 // ---- a static render, as a tree ---------------------------------------------------------------------------------------------
 
@@ -166,38 +191,61 @@ function context_(fig: Node, root: Node): string {
   return parts.join(" · ");
 }
 
-interface Shown { id: string; name: string; value: string; around: string; node: Node }
+/** The prose a figure sits in, if any: a paragraph, or a list's item that isn't the rank list's (a figure and its letter). */
+const proseOf = (fig: Node) => {
+  const block = ancestors(fig).find((x) => x.tag === "p" || x.tag === "li");
+  return block && !(block.tag === "li" && ancestors(block).some((x) => has(x, "ranks"))) ? block : null;
+};
+const MARK = "\u0001";
+/** A block's text with a figure marked, so its sentence can be found. */
+const marked = (n: Node | string, fig: Node): string => (typeof n === "string" ? n : n === fig ? `${MARK}${text(n)}`
+  : n.attrs.class?.split(" ").includes("tick") ? ""
+  : n.children.map((c) => (typeof c === "string" ? c : ` ${marked(c, fig)} `)).join("").replace(/\s+/g, " ").trim());
+
+interface Shown { id: string; name: string; value: string; around: string; node: Node; sentence: string | null }
 
 function figures(html: string): { root: Node; figs: Shown[] } {
   const root = parse(html);
-  const figs = all(root, (n) => n.tag === "button" && !!n.attrs["data-metric"]).map((n) => ({
-    id: n.attrs["data-metric"], name: n.attrs["aria-label"] ?? "", value: text(n), around: context_(n, root), node: n,
-  }));
+  const figs = all(root, (n) => n.tag === "button" && !!n.attrs["data-metric"]).map((n) => {
+    const prose = proseOf(n);
+    const sentence = prose ? sentences(marked(prose, n)).find((x) => x.includes(MARK))!.replace(MARK, "") : null;
+    return { id: n.attrs["data-metric"], name: n.attrs["aria-label"] ?? "", value: text(n), around: context_(n, root), node: n, sentence };
+  });
   return { root, figs };
 }
+
+/** Every place's units the page might use: the prices picked and each offer's city. */
+const unitsOf = (ctx: WorkContext) => [priceWords(ctx.household.pricesIn).unit,
+  ...ctx.offers.map((o) => `${shortCity(cityName(o.draft.costOfLiving.area))} $`)];
 
 // ---- the checks -------------------------------------------------------------------------------------------------------------
 
 function checkPage(ctx: WorkContext, html: string, where: string): string[] {
   const problems: string[] = [];
   const { root, figs } = figures(html);
+  const known = unitsOf(ctx);
+  // Each sentence with a figure in it, and the after-rent dollars its figures are in: checked once each, below.
+  const said = new Map<string, Set<string>>();
   for (const f of figs) {
     const found = expectOf(f.id, ctx);
     if (!found) continue;
     // L-2's drop is a figure a month in its sentence and a share in its table.
     const e = f.value.includes("%") ? { ...found, money: null } : found;
     const say = (what: string) => problems.push(`${where}: ${f.id} "${f.value}" (${f.name}): ${what}`);
+    if (f.sentence !== null && !said.has(f.sentence)) said.set(f.sentence, new Set());
     if (e.money === "after") {
       if (!named(e.unit!).test(f.name)) say(`its accessible name doesn't name its dollars (${e.unit})`);
-      if (!named(e.unit!).test(f.value) && !dollarsWords(e.unit!).test(f.around)) say(`neither it nor its head names its dollars (${e.unit})`);
+      if (f.sentence !== null) said.get(f.sentence)!.add(e.unit!);
+      else if (!named(e.unit!).test(f.value) && !dollarsWords(e.unit!).test(f.around)) say(`neither it nor its head names its dollars (${e.unit})`);
     }
     if (e.money === "paid" && !PAID.test(f.name)) say("its accessible name has no $");
     if (e.money === "prices" && !/ prices\b/.test(f.name)) say("its accessible name doesn't name the prices it steps across");
     if (e.rate) {
       if (!PERIOD.test(f.name)) say("its accessible name doesn't state its period");
-      if (!PERIOD.test(`${f.value} ${f.around}`)) say("neither it nor its sentence or head states its period");
+      if (!PERIOD.test(f.sentence ?? `${f.value} ${f.around}`)) say(`neither it nor its ${f.sentence === null ? "head" : "sentence"} states its period`);
     }
   }
+  for (const [sentence, units] of said) for (const x of checkSentence(sentence, [...units], known)) problems.push(`${where}: "${sentence}" ${x}`);
   // Two offers' own-city figures in one row, table, list or chart.
   for (const box of all(root, (n) => ["tr", "table", "ol", "ul"].includes(n.tag) || ["row", "table"].includes(n.attrs.role ?? "") || has(n, "row")
     || has(n, "chart"))) {
@@ -254,6 +302,7 @@ function checkDoc(ctx: WorkContext, doc: Doc): string[] {
   const problems: string[] = [];
   const p = priceWords(ctx.household.pricesIn);
   const words = dollarsWords(p.unit);
+  const known = unitsOf(ctx);
   for (const b of doc.blocks) {
     if (b.kind === "table") {
       const t = b.table;
@@ -271,9 +320,10 @@ function checkDoc(ctx: WorkContext, doc: Doc): string[] {
     }
     if (b.kind === "para" || b.kind === "note") {
       const para = b.runs.map((x) => (typeof x === "string" ? x : "b" in x ? x.b : x.href)).join("");
-      for (const s of para.split(/(?<=[.:;])\s+(?=[A-Z(])/)) {
+      for (const s of sentences(para)) {
         if (/\$\d[\d,.]*\s+(a month|an hour|a year)|\d%/.test(s) && !PERIOD.test(s)) problems.push(`document: "${s}" doesn't state its period`);
-        if (/after rent/i.test(s) && /\$\d/.test(s) && !words.test(s)) problems.push(`document: "${s}" doesn't name its dollars`);
+        // A sentence that states an after-rent figure says its dollars once, in words, and none puts them on a figure.
+        for (const x of checkSentence(s, /after rent/i.test(s) && /\$\d/.test(s) ? [p.unit] : [], known)) problems.push(`document: "${s}" ${x}`);
       }
     }
   }
@@ -309,6 +359,10 @@ describe("every figure names its dollars, and every rate or share its period (co
       const html = renderAlone(ctx);
       expect(html).toContain('data-metric="own.A.total"');
       problems.push(...checkPage(ctx, html, where), ...checkWork(ctx, html, where));
+      // The live region's sentence with one offer: its dollars said once, in words.
+      const x = ownOffers(ctx).find((o) => o.input)!;
+      const said = sentenceOf(x, priceWords(ctx.household.pricesIn))!;
+      problems.push(...checkSentence(said, [`${shortCity(cityName(x.offer.draft.costOfLiving.area))} $`], unitsOf(ctx)).map((y) => `${where}: "${said}" ${y}`));
     }
     expect(problems).toEqual([]);
   }, 60_000);
@@ -320,6 +374,11 @@ describe("every figure names its dollars, and every rate or share its period (co
       expect(c.html).toContain('data-metric="own.C.ref"');
       const problems = [...checkPage(c.ctx, c.html, basis), ...checkWork(c.ctx, c.html, basis), ...c.csv.flatMap((b) => checkCsv(c.ctx, b)),
         ...checkDoc(c.ctx, c.doc)];
+      // The verdict as the live region and the tablet's bar say it: its dollars once, in words, after rent.
+      const v = c.ctx.results!.view;
+      const said = verdictSentence(v);
+      const after = basis === "colAdjustedTotal" || (basis === "perHour" && v.perHourOf === "colAdjustedTotal");
+      problems.push(...checkSentence(said, after ? [v.prices.unit] : [], unitsOf(c.ctx)).map((y) => `"${said}" ${y}`));
       expect(problems).toEqual([]);
     }, 120_000);
   }
@@ -348,5 +407,27 @@ describe("the test itself catches what it's for", () => {
   it("a rate or share without its period", () => {
     const bare = html.replace(/(data-metric="own\.A\.rate"[^>]*aria-label="[^"]*?) of its pay over your stay/, "$1");
     expect(checkPage(ctx, bare, "test").some((x) => x.includes("own.A.rate") && x.includes("doesn't state its period"))).toBe(true);
+  });
+  it("passes a sentence that says its dollars once, in words, its figures without them", () => {
+    expect(html).toContain("dollars at New York prices:");
+    expect(checkPage(ctx, html, "test")).toEqual([]);
+  });
+  it("a sentence that doesn't say its dollars", () => {
+    const bare = html.replace("dollars at New York prices:", "dollars:");
+    expect(checkPage(ctx, bare, "test").some((x) => x.includes("$7,563 a month over your stay") && x.includes("doesn't say its dollars (New York $) in words")))
+      .toBe(true);
+    const said = "C leaves you about $487 a month more than A over your stay, after rent.";
+    expect(checkSentence(said, ["U.S.-avg $"], unitsOf(ctx))).toEqual(["doesn't say its dollars (U.S.-avg $) in words"]);
+  });
+  it("a sentence that says its dollars twice", () => {
+    const twice = html.replace("Year 1, as paid, in New York dollars:", "Year 1, as paid, in New York dollars, at New York prices:");
+    expect(checkPage(ctx, twice, "test").some((x) => x.includes("Year 1, as paid") && x.includes("says its dollars (New York $) 2 times"))).toBe(true);
+  });
+  it("a sentence that puts its dollars on a figure, in the compact style", () => {
+    const compact = html.replace(/(data-metric="own\.A\.y1spend"[^>]*>(?:<[^>]*>)*)\$/, "$1New York $");
+    expect(compact).not.toBe(html);
+    expect(checkPage(ctx, compact, "test").some((x) => x.includes("Year 1, as paid") && x.includes("compact style (New York $)"))).toBe(true);
+    const said = "C leaves you about U.S.-avg $487 a month more than A over your stay, after rent, at U.S. prices.";
+    expect(checkSentence(said, ["U.S.-avg $"], unitsOf(ctx))).toEqual(["puts its dollars on a figure in the compact style (U.S.-avg $)"]);
   });
 });

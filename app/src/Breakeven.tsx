@@ -69,7 +69,8 @@ export function Breakeven(p: BreakevenProps) {
       {!v ? <p className="note">{p.ties.error ?? "Working out what would tie…"}</p> : (
         <>
           <p className="tie-scope">
-            To tie <Who l={v.winner} />: its {years}-year total {basisPhrase(pricesOf(p.ctx))[v.basis]},{" "}
+            {/* After rent, its dollars are said once, in words, after the figure. */}
+            To tie <Who l={v.winner} />: its {years}-year total {v.basis === "colAdjustedTotal" ? "after rent" : basisPhrase(pricesOf(p.ctx))[v.basis]},{" "}
             <Fig id="tie.target" label={`${v.basis === "colAdjustedTotal" ? pricesOf(p.ctx).unit : "$"}${figure(v.target)}, ${v.winner}'s total over your stay`}>
               {figure(v.target)}</Fig> in today's {v.basis === "colAdjustedTotal" ? pricesOf(p.ctx).dollars : "dollars"}, base case, over your
             stay ({longDate(row.window.start)} – {longDate(dayBefore(row.window.end))}). Each line changes one input and leaves the rest as entered.

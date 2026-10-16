@@ -146,7 +146,7 @@ test.describe("tablet", () => {
     await expect(page.getByRole("tablist", { name: "Offers", exact: true })).toHaveCount(0); // every offer shows
     const bar = page.locator(".verdict-bar.is-top");
     await expect(bar).toBeVisible();
-    await expect(bar).toContainText(/^[ABC] leaves you about U\.S\.-avg \$[\d,]+ a month more than [ABC] over your stay, after rent, at U\.S\. prices · stay 4 years/);
+    await expect(bar).toContainText(/^[ABC] leaves you about \$[\d,]+ a month more than [ABC] over your stay, after rent, in U\.S\.-average dollars · stay 4 years/);
     const about = (await page.locator(".about").boundingBox())!;
     expect((await bar.boundingBox())!.y).toBeGreaterThan(about.y + about.height - 1);
     await page.evaluate(() => window.scrollTo(0, 1200));

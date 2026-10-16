@@ -104,7 +104,7 @@ describe("L-3 on the samples (W7a)", () => {
   const page = l3Text(ctx);
 
   it("A and B: the salary and the sign-on that tie C, after rent at U.S. prices, over 4 years", () => {
-    expect(page).toContain("To tie C: its 4-year total after rent, at U.S. prices, 334,357 in today's U.S.-average dollars");
+    expect(page).toContain("To tie C: its 4-year total after rent, 334,357 in today's U.S.-average dollars");
     expect(page).toMatch(/A Starting salary \$110,000 → \$118,626 \(\+\$8,626, \+7\.8%\)/);
     expect(page).toMatch(/or Sign-on, paid Aug 12, 2026: \$10,000 → \$45,487 \(\+\$35,487\)/);
     expect(page).toMatch(/B Starting salary \$80,000 → \$125,404 \(\+\$45,404, \+56\.8%\)/);
@@ -134,7 +134,7 @@ describe("L-3 on the samples (W7a)", () => {
   it("on the per-hour basis, ties the total per hour divides, and says so", () => {
     const p = l3Text(context("perHour"));
     expect(p).toContain("Per hour can't be tied by one number, so these tie the total it divides by your hours: after rent, at U.S. prices.");
-    expect(p).toContain("To tie C: its 4-year total after rent, at U.S. prices, 334,357");
+    expect(p).toContain("To tie C: its 4-year total after rent, 334,357 in today's U.S.-average dollars");
   });
 });
 

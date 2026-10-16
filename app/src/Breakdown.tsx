@@ -79,7 +79,9 @@ export function toOwn() {
 
 /**
  * A-1's body: the bottom line over the offer's own stay, year 1 as paid, tax, per hour and the bad case. `compared`: there's a
- * comparison, whose figure (at the prices picked) the restated line names.
+ * comparison, whose figure (at the prices picked) the restated line names. Each sentence says its dollars once, in words, and its
+ * figures go without them; each figure's label keeps them ("New York $7,563"), as a table's heads do (condition 1, as amended on
+ * 2026-10-16).
  */
 function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; compared: boolean }) {
   useEffect(markFirstAnswer, []);
@@ -88,31 +90,35 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
   const a = v.month;
   return (
     <div className="own-body">
-      <p className="scope own-scope">{stayText(v)}, a month, in today's dollars at {v.place} prices:</p>
-      <p className="own-hero">
-        <Fig id={`own.${L}.total`} label={`${$(a.total)} a month over your stay`}>{$(a.total)}</Fig>{" "}
-        <span className="own-per">a month over your stay</span>
-      </p>
-      <p className="own-split">
-        <Fig id={`own.${L}.spend`} label={`${$(a.spend)} a month to spend after rent, over your stay`}>{$(a.spend)}</Fig> to spend after rent{" "}
-        + <Fig id={`own.${L}.saved`} label={`${$(a.saved)} a month saved, over your stay`}>{$(a.saved)}</Fig> saved, a month over your stay
+      {/* One sentence, its parts on lines of their own: the stay and its dollars, the total, and its two parts. */}
+      <p className="own-lines">
+        <span className="scope own-scope">{stayText(v)}, a month, in today's dollars at {v.place} prices:</span>{" "}
+        <span className="own-hero">
+          <Fig id={`own.${L}.total`} label={`${$(a.total)} a month over your stay`}>{dollars(a.total)}</Fig>{" "}
+          <span className="own-per">a month over your stay</span>
+        </span>{" "}
+        <span className="own-split">
+          = <Fig id={`own.${L}.spend`} label={`${$(a.spend)} a month to spend after rent, over your stay`}>{dollars(a.spend)}</Fig> to spend after rent{" "}
+          + <Fig id={`own.${L}.saved`} label={`${$(a.saved)} a month saved, over your stay`}>{dollars(a.saved)}</Fig> saved
+        </span>
       </p>
       {a.total < 0 && <p className="note">Rent and tax take more than this offer pays, so there's less than nothing left to spend.</p>}
       {v.ref && (
         <p className="own-ref">
-          {compared ? `In the comparison, in ${prices.dollars}` : `In ${prices.dollars} (Prices in)`}:{" "}
-          <Fig id={`own.${L}.total`} label={`${$(a.total)} a month over your stay`}>{$(a.total)}</Fig>{" "}
+          {compared ? "In the comparison" : "At the prices you picked"}:{" "}
+          <Fig id={`own.${L}.total`} label={`${$(a.total)} a month over your stay`}>{dollars(a.total)}</Fig> in {v.place} dollars{" "}
           {v.ref.step >= 0 ? "−" : "+"} <Fig id={`own.${L}.prices`} label={`${v.place} prices, ${dollars(Math.abs(v.ref.step))} a month over your stay`}>
-            {v.place} prices {dollars(Math.abs(v.ref.step))}</Fig>{" "}
-          = <Fig id={`own.${L}.ref`} label={`${inDollars(v.ref.place, v.ref.month)} a month over your stay`}>{inDollars(v.ref.place, v.ref.month)}</Fig> a
-          month over your stay
+            {dollars(Math.abs(v.ref.step))}</Fig> for {v.place}'s {v.ref.step >= 0 ? "higher" : "lower"} prices{" "}
+          = <Fig id={`own.${L}.ref`} label={`${inDollars(v.ref.place, v.ref.month)} a month over your stay`}>{dollars(v.ref.month)}</Fig> in{" "}
+          {prices.dollars}, a month over your stay
         </p>
       )}
       {v.year1 && (
         <p className="own-year1">
-          Year 1, as paid: <Fig id={`own.${L}.y1spend`} label={`${$(v.year1.spendMonth)} a month to spend after rent, in year 1`}>{$(v.year1.spendMonth)}</Fig> a
-          month to spend after rent + <Fig id={`own.${L}.y1saved`} label={`${$(v.year1.savedMonth)} a month saved, in year 1`}>{$(v.year1.savedMonth)}</Fig> a
-          month saved, in year 1. {v.differs}
+          Year 1, as paid, in {v.place} dollars:{" "}
+          <Fig id={`own.${L}.y1spend`} label={`${$(v.year1.spendMonth)} a month to spend after rent, in year 1`}>{dollars(v.year1.spendMonth)}</Fig> a
+          month to spend after rent + <Fig id={`own.${L}.y1saved`} label={`${$(v.year1.savedMonth)} a month saved, in year 1`}>
+            {dollars(v.year1.savedMonth)}</Fig> a month saved. {v.differs}
         </p>
       )}
       <p className="own-facts">
@@ -122,14 +128,15 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
         )}
         {v.tax && v.hour && " · "}
         {v.hour && (
-          <>Per hour worked over your stay, after tax and rent:{" "}
+          <>Per hour worked over your stay, after tax and rent, in {v.place} dollars:{" "}
             <Fig id={`own.${L}.hour`} label={`${v.place} ${cents(v.hour.value)} an hour worked over your stay, after tax and rent`}>
-              {v.place} {cents(v.hour.value)}</Fig></>
+              {cents(v.hour.value)}</Fig></>
         )}
       </p>
       <p className="own-bear">
         {v.bear ? (
-          <>Bear case: <Fig id={`own.${L}.bear`} label={`${$(v.bear.month)} a month over your stay, bear case`}>{$(v.bear.month)}</Fig> a month over your stay
+          <>Bear case, in {v.place} dollars: <Fig id={`own.${L}.bear`} label={`${$(v.bear.month)} a month over your stay, bear case`}>{dollars(v.bear.month)}</Fig> a
+            month over your stay
             {v.bear.drop !== null ? (
               <>, <Fig id={`own.${L}.drop`} label={`${shareText(v.bear.drop)} under the base case, over your stay`}>{shareText(v.bear.drop)}</Fig> under the base
                 case over your stay.</>

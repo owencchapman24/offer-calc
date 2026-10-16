@@ -59,25 +59,28 @@ describe("A-1, the bottom line: sample A on its own, as the plan works it out (v
     expect(v.bear).toEqual({ pv: 271_770, month: 6_245, drop: (7_563 - 6_245) / 7_563 });
   });
 
-  it("the page: A-1 pinned, every figure naming its dollars; no prices line at U.S. prices with one offer", () => {
-    const text = words(renderAlone(ctx));
+  it("the page: A-1 pinned, each sentence saying its dollars once, in words; no prices line at U.S. prices with one offer", () => {
+    const html = renderAlone(ctx);
+    const text = words(html);
     expect(text).toContain("A · NYC bank, on its own");
     expect(text).toContain("A-1 The bottom line");
-    expect(text).toContain("Your 4-year stay (Jul 13, 2026 – Jul 12, 2030), a month, in today's dollars at New York prices:");
-    expect(text).toContain("New York $7,563 a month over your stay");
-    expect(text).toContain("New York $6,671 to spend after rent + New York $892 saved, a month over your stay");
-    expect(text).toContain("Year 1, as paid: New York $4,647 a month to spend after rent + New York $825 a month saved, in year 1.");
-    expect(text).toContain("Tax: 32.4% of its pay over your stay · Per hour worked over your stay, after tax and rent: New York $22.96");
-    expect(text).toContain("Bear case: New York $6,245 a month over your stay, 17% under the base case over your stay.");
+    expect(text).toContain("Your 4-year stay (Jul 13, 2026 – Jul 12, 2030), a month, in today's dollars at New York prices: $7,563 a month over your stay "
+      + "= $6,671 to spend after rent + $892 saved");
+    expect(text).toContain("Year 1, as paid, in New York dollars: $4,647 a month to spend after rent + $825 a month saved.");
+    expect(text).toContain("Tax: 32.4% of its pay over your stay · Per hour worked over your stay, after tax and rent, in New York dollars: $22.96");
+    expect(text).toContain("Bear case, in New York dollars: $6,245 a month over your stay, 17% under the base case over your stay.");
     expect(text).not.toContain("U.S.-avg");
-    expect(ownSentence(v)).toBe("A leaves you about New York $7,563 a month over your stay, after rent: New York $6,671 to spend and New York $892 "
-      + "saved, in today's dollars.");
+    expect(text).not.toMatch(/New York \$\d/);
+    // Each figure's label keeps its dollars, as a table's head would.
+    expect(html).toMatch(/aria-label="[^"]*New York \$7,563 a month over your stay/);
+    expect(ownSentence(v)).toBe("A leaves you about $7,563 a month over your stay, after rent: $6,671 to spend and $892 saved, in today's dollars at "
+      + "New York prices.");
   });
 
   it("with Prices in a city, one more line restates it there, the step inline: Charlotte prices are below New York's", () => {
     const clt = alone("A", undefined, { pricesIn: "16740" });
     const text = words(renderAlone(clt));
-    expect(text).toMatch(/In Charlotte dollars \(Prices in\): New York \$7,563 − New York prices \$[\d,]+ = Charlotte \$[\d,]+ a month over your stay/);
+    expect(text).toMatch(/At the prices you picked: \$7,563 in New York dollars − \$[\d,]+ for New York's higher prices = \$[\d,]+ in Charlotte dollars, a month over your stay/);
     const w = ownView("A", clt.own!.breakdowns.A!, offerOf(clt), priceWords("16740"), true);
     expect(w.month).toEqual(v.month); // its own dollars don't move with Prices in
     expect(w.month.total - w.ref!.step).toBe(w.ref!.month);
@@ -213,7 +216,7 @@ describe("one offer is enough (v2-plan.md, item 5, \"Quick mode from one offer\"
       prices: priceWords(undefined), stayYears: 4, updating: false, sample: true, notes: [], firstUse: false, dispatch: () => {}, problems: null });
     const s1 = slots(one);
     expect([!!s1.pinned, !!s1.section, !!s1.foot, !!s1.bar("bottom")]).toEqual([true, false, false, true]);
-    expect(s1.said).toMatch(/^A leaves you about New York \$7,563 a month over your stay/);
+    expect(s1.said).toMatch(/^A leaves you about \$7,563 a month over your stay, after rent: .* in today's dollars at New York prices\.$/);
     expect(s1.own.withRef).toBe(false);
     const s3 = slots(context());
     expect([!!s3.pinned, !!s3.section, !!s3.foot, s3.bar("bottom"), s3.said]).toEqual([false, true, true, null, null]);
@@ -249,7 +252,7 @@ describe("two or more offers: the ledger's \"On its own\" row and the section, o
     expect(html).toContain('id="own-tab-B" class="tab offer-B" aria-selected="false"');
     const text = words(html);
     expect(text).toContain("B · Charlotte corp, on its own");
-    expect(text).toContain("In the comparison, in U.S.-average dollars: Charlotte $4,412 + Charlotte prices $98 = U.S.-avg $4,510 a month over your stay");
+    expect(text).toContain("In the comparison: $4,412 in Charlotte dollars + $98 for Charlotte's lower prices = $4,510 in U.S.-average dollars, a month over your stay");
     expect(text).toContain("Skip to the comparison");
   });
 });
