@@ -36,6 +36,16 @@ export function headersFor(path: string, rules: VercelHeaders[]): Record<string,
 export function serveDist(dir: string, vercelJson: string, port = 0, holdBack?: (path: string) => number): Promise<{ server: Server; url: string }> {
   const rules: VercelHeaders[] = JSON.parse(readFileSync(vercelJson, "utf8")).headers ?? [];
   const root = normalize(dir);
+  // Each file compressed once per encoding, as a CDN keeps it (a build doesn't change while it's served). Compressing on every
+  // request, Brotli at its default quality held the server for each script in turn (the worker's for hundreds of milliseconds), and
+  // Lighthouse read the requests queued behind it as the origin's server latency, which it adds to every request it simulates.
+  const compressed = new Map<string, Buffer>();
+  const compress = (file: string, enc: "br" | "gzip", body: Buffer) => {
+    const key = `${enc}|${file}`;
+    let out = compressed.get(key);
+    if (!out) compressed.set(key, out = enc === "br" ? brotliCompressSync(body) : gzipSync(body));
+    return out;
+  };
   const server = createServer(async (req, res) => {
     const path = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
     const wait = holdBack?.(path) ?? 0;
@@ -52,8 +62,8 @@ export function serveDist(dir: string, vercelJson: string, port = 0, holdBack?: 
     const ext = extname(file);
     const accept = String(req.headers["accept-encoding"] ?? "");
     const headers: Record<string, string> = { ...headersFor(path, rules), "Content-Type": TYPES[ext] ?? "application/octet-stream" };
-    if (TEXT.has(ext) && /\bbr\b/.test(accept)) { body = brotliCompressSync(body); headers["Content-Encoding"] = "br"; }
-    else if (TEXT.has(ext) && /\bgzip\b/.test(accept)) { body = gzipSync(body); headers["Content-Encoding"] = "gzip"; }
+    if (TEXT.has(ext) && /\bbr\b/.test(accept)) { body = compress(file, "br", body); headers["Content-Encoding"] = "br"; }
+    else if (TEXT.has(ext) && /\bgzip\b/.test(accept)) { body = compress(file, "gzip", body); headers["Content-Encoding"] = "gzip"; }
     res.writeHead(200, { ...headers, "Content-Length": String(body.length) }).end(body);
   });
   return new Promise((resolve, reject) => {
