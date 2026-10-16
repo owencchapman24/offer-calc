@@ -737,6 +737,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .own-ref, .own-year1, .own-facts, .own-bear { font-size: 14.5px; line-height: 1.6; }
 .own-ref { padding: 6px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
 .own-print { margin-top: 18px; }
+/* Its head has no reference box (each offer's parts have theirs): the frame's padding, a box's height, and on a phone the stamp and
+   "Skip to the comparison" wrap under the name rather than squeezing it to a word a line. */
+.own > .schedule-head, .breakdown > .schedule-head { flex-wrap: wrap; row-gap: 4px; min-height: 40px; padding: 8px 22px; }
 .breakdown .schedule-head .skip { margin-left: auto; font-size: 13px; }
 .breakdown .schedule-head .skip + .updating { margin-left: 12px; }
 .own-tabs { margin: 0 0 14px; border-bottom: 1px solid var(--rule); max-width: 560px; }
