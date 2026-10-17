@@ -1744,7 +1744,7 @@ own stay (B3), with L-5 and L-6 folded in (B8) and the bridge moved (B7). Each p
 
 **v2's item 5, stop 5C** (2026-10-16; `docs/v2-plan.md`, item 5, "Review stops"): the last of item 5. Copy as document for one offer,
 the first visit's single sample, every table in a breakdown with its CSV, the scan's new states and the NVDA walkthrough's new parts.
-- **Copy as document, one offer:** its breakdown, about 2 pages, for someone who's never seen the tool: 1. the bottom line (A-1's
+- **Copy as document, one offer:** its breakdown, about 3 pages, for someone who's never seen the tool: 1. the bottom line (A-1's
   month, the step to the prices picked when there's one, year 1, per hour); 2. where the money goes (the $100 and year 1's bridge);
   3. pay by year (years as rows, so 10 years fit in 80 columns) and every payment by date; 4. the terms, the next cliff, the day
   A-4 shows for leaving, the bad case and every cliff; 5. the benefits by year; 6. tax by calendar year and the warnings; 7. the
@@ -1770,6 +1770,8 @@ the first visit's single sample, every table in a breakdown with its CSV, the sc
 - **The copy choice lists the comparison first** (the plan lists the breakdown first), so a returning visitor's one click and
   Enter copy what it always did.
 - **Year 1's bridge in the document is the breakdown's** (its own prices, then the prices picked), not the comparison's.
+- **One offer's document is about 3 pages,** not the plan's about 2: pasted into Word (2026-10-16), sample A's fills 3 pages and its
+  closing lines run onto a 4th, with 5 tables, since it lists every payment and every cliff in the stay.
 
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.

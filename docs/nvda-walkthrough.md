@@ -167,7 +167,7 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
 
 39. **Insert+F12. Ctrl+Home**, then **B** until "Copy as document, button, collapsed". **Enter.** NVDA should say "What to
     copy, grouping" and "The comparison, the offers side by side: 2-3 pages, radio button, checked, 1 of 3", in focus mode.
-40. **Down Arrow** goes to "C's breakdown, the offer shown, on its own: about 2 pages, radio button, checked, 2 of 3" (the
+40. **Down Arrow** goes to "C's breakdown, the offer shown, on its own: about 3 pages, radio button, checked, 2 of 3" (the
     offer whose breakdown is shown: C after step 38), and again to "Both, each offer's breakdown, then the comparison, 3 of 3".
 41. **Tab** to "Copy, button", then **Enter**. The choice closes and NVDA should say "Copy as document, button, collapsed",
     then "Getting the document ready…" and "Copied: paste it into a document or an email."

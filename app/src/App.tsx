@@ -491,7 +491,7 @@ const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
 };
 
 /**
- * "Copy as document": one offer's breakdown (about 2 pages), the comparison (2-3 pages) or both, on the clipboard, HTML with a
+ * "Copy as document": one offer's breakdown (about 3 pages), the comparison (2-3 pages) or both, on the clipboard, HTML with a
  * plain-text fallback. The click writes to the clipboard at once, with the document as a promise its code (copyDoc.ts, loaded now)
  * keeps once the slow lane has what it needs, since Safari allows a write only inside the click. A browser that won't take that gets
  * "Copy now", which copies the ready document through a copy event. Disabled (aria-disabled, so it stays focusable and says why)
@@ -544,7 +544,7 @@ const SCOPES: Array<{ value: PrintScope; name: string; hint: string }> = [
 /** What "Copy as document" offers with two or more offers (docs/v2-plan.md, item 5, B10): the comparison first, as before. */
 const copyKinds = (l: Letter): Array<{ value: DocKind; name: string; hint: string }> => [
   { value: "comparison", name: "The comparison", hint: "the offers side by side: 2-3 pages" },
-  { value: "breakdown", name: `${l}'s breakdown`, hint: "the offer shown, on its own: about 2 pages" },
+  { value: "breakdown", name: `${l}'s breakdown`, hint: "the offer shown, on its own: about 3 pages" },
   { value: "both", name: "Both", hint: "each offer's breakdown, then the comparison" },
 ];
 

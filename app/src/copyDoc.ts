@@ -27,7 +27,7 @@ import { yearTable } from "./workpaper";
 
 // "Copy as document" (docs/copy-as-document-plan.md): the comparison as a 2-3 page summary someone who has never seen the tool can
 // read, for the clipboard as HTML with a plain-text fallback, so it pastes into Google Docs, Word and email with its tables. Since
-// stop 5C (docs/v2-plan.md, item 5) also one offer's breakdown, about 2 pages, or with two or more offers each breakdown and then the
+// stop 5C (docs/v2-plan.md, item 5) also one offer's breakdown, about 3 pages, or with two or more offers each breakdown and then the
 // comparison ("both"). One document model (blocks), two renderers, so the two can't disagree. Every figure comes from the view model that draws it on the
 // page; what the document adds keeps "the year figures as shown" (CLAUDE.md): a total is the lines above it as shown, and each
 // calculation it states in words is listed in `worked`, which the tests check. No tickmarks, workpaper references or "basis".
@@ -751,7 +751,7 @@ function ownScope(x: Own): Scope {
     anyRange: hasRanges(x.o), own: { place: x.v.place, withRef: x.withRef } };
 }
 
-/** One offer's breakdown, on its own: about 2 pages. */
+/** One offer's breakdown, on its own: about 3 pages (sample A: 3 and a few lines in Word). */
 function ownDoc(ctx: WorkContext, opts: DocOptions, L: Letter): Doc {
   const x = ownFor(ctx, opts, L);
   const blocks: Block[] = [];
