@@ -88,9 +88,14 @@ async function nearbyWorkedOut(page: Page) {
   for (const schedule of working) await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
 }
 
-/** The comparison page on a first visit, worked out. */
+/**
+ * The three samples, compared and worked out: a first visit (sample A on its own, docs/v2-plan.md, item 5, B5), then "See a sample
+ * comparison".
+ */
 export async function openCompare(page: Page) {
   await page.goto("/#/");
+  await page.getByRole("button", { name: "See a sample comparison" }).click();
+  await expect(page.locator("#lead-title")).toBeAttached();
   await settled(page);
 }
 
@@ -106,11 +111,21 @@ export async function removeOffer(page: Page, letter: string) {
   await page.getByRole("button", { name: `Remove offer ${letter}` }).click();
 }
 
-/** One offer on its own: the first visit's sample A, with B and C removed, its bottom line pinned and worked out. */
+/**
+ * "Copy as document": with one offer it copies its breakdown at once; with two or more it offers a choice (the comparison, the
+ * breakdown shown, or both), then Copy (docs/v2-plan.md, item 5, B10).
+ */
+export async function copyDocument(page: Page, kind?: "comparison" | "breakdown" | "both") {
+  await page.getByRole("button", { name: "Copy as document" }).click();
+  if (!kind) return;
+  const choice = page.locator("#copy-choice");
+  await choice.getByRole("radio", { name: { comparison: /^The comparison/, breakdown: /'s breakdown/, both: /^Both/ }[kind] }).check();
+  await choice.getByRole("button", { name: "Copy", exact: true }).click();
+}
+
+/** One offer on its own: a first visit, sample A, its bottom line pinned and worked out. */
 export async function openAlone(page: Page) {
-  await openCompare(page);
-  await removeOffer(page, "C");
-  await removeOffer(page, "B");
+  await page.goto("/#/");
   await ownSettled(page);
 }
 

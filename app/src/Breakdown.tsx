@@ -47,7 +47,7 @@ export function ownSlots(a: {
     /** Each offer's breakdown, by letter; restated at the prices picked once they're a city's or there's a comparison. */
     own: { breakdowns, withRef: comparing || !a.prices.us },
     said: alone ? sentenceOf(alone, a.prices) : null,
-    pinned: alone ? <OwnPinned x={alone} prices={a.prices} withRef={!a.prices.us} updating={a.updating} sample={alone.offer.sample !== null}
+    pinned: alone ? <OwnPinned x={alone} prices={a.prices} withRef={!a.prices.us} updating={a.updating}
       problems={a.problems} notes={a.notes} firstUse={a.firstUse} dispatch={a.dispatch} /> : null,
     /** Under the columns, given the page's context: with two or more offers the breakdowns, one at a time; with one, its A-2 to A-7. */
     section: (ctx: WorkContext) => (comparing
@@ -168,8 +168,8 @@ function OwnWaiting({ x }: { x: OwnOffer }) {
  * One offer: its breakdown's head, pinned where the verdict goes (docs/v2-plan.md, item 5, "How it's reached"), so the answer stays
  * in view as you edit. `problems` and `notes` are the page's, as the lead schedule shows them.
  */
-export function OwnPinned({ x, prices, withRef, updating, sample, problems, notes, firstUse, dispatch }: {
-  x: OwnOffer; prices: PriceWords; withRef: boolean; updating: boolean; sample: boolean; problems: ReactNode; notes: string[];
+export function OwnPinned({ x, prices, withRef, updating, problems, notes, firstUse, dispatch }: {
+  x: OwnOffer; prices: PriceWords; withRef: boolean; updating: boolean; problems: ReactNode; notes: string[];
   /** The first-use note for the after-rent figure, until "Got it". */ firstUse: boolean; dispatch: Dispatch<Action>;
 }) {
   const ref = useRef<HTMLElement>(null);
@@ -183,12 +183,6 @@ export function OwnPinned({ x, prices, withRef, updating, sample, problems, note
         {x.offer.sample === "edited" && <Stamp>Edited sample</Stamp>}
         <span className="updating" aria-hidden={!updating}>{updating ? "Updating…" : ""}</span>
       </header>
-      {sample && (
-        <p className="banner">
-          Sample offer: illustrative inputs, not market data.{" "}
-          <button type="button" className="link" onClick={() => dispatch({ type: "startBlank" })}>Start with my offer</button>
-        </p>
-      )}
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
       {problems}
       <h3 id="own-title" className="part-title" tabIndex={-1}><span className="ref">{x.offer.letter}-1</span> The bottom line</h3>

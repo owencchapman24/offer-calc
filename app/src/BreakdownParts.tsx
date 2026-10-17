@@ -4,12 +4,13 @@ import { inDollars, ownView, type OwnView, prefixOf, shareText } from "./breakdo
 import { inSentence } from "./breakevenModel";
 import { bridge, notesOf } from "./byYearModel";
 import { caseChanges, changeText, hasRanges } from "./cases";
-import { Fig, useApi, useRovingTicks } from "./figures";
+import { CsvButton, Fig, useApi, useRovingTicks } from "./figures";
 import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms } from "./leaveModel";
 import type { A2Part, MetricId, WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, rateText, taxYearsOf,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, payRows, rateText,
+  taxYearsOf,
 } from "./partsModel";
 import type { PriceWords } from "./prices";
 import { type CompareRequest, cursorJobFor, type LeavePanel, type OfferTerms, termsJob, workJob, type WorkOffer } from "./protocol";
@@ -20,7 +21,7 @@ import { type Stale, staleClass, usePrinting } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 import { WARNING_AT, withholdingParts } from "./warningAt";
 import { stayWarnings, WARNING_KIND, type WarningKind } from "./warningKinds";
-import { warningWords } from "./warningWords";
+import { KIND_TITLE, warningWords } from "./warningWords";
 import { moneyText, yearTable } from "./workpaper";
 import type { OwnOffer } from "./Breakdown";
 import type { LeaveBasis } from "./leaveModel";
@@ -147,6 +148,7 @@ function WhereItGoes({ ctx, x, prices, ui, dispatch, open, show }: Part) {
                 </tr>
               </tfoot>
             </table>
+            <p className="part-csv"><CsvButton table={{ kind: "part", letter: L, part: "a2", n }} name={`${L}-2, where each $100 of ${year} pay goes`} /></p>
           </div>
           {h.parts[4].cents < 0 && (
             <p className="note">Rent, tax and the rest take more than year {n} pays: the money left to spend is below zero, in parentheses.</p>
@@ -207,7 +209,10 @@ function BridgeView({ ctx, letter, n, prices }: { ctx: WorkContext; letter: Lett
     : line === "prices" ? figure(Math.abs(v)) : dollars(Math.abs(v)));
   return (
     <div className="bridge" id={`bridge-${letter}`}>
-      <h4 className="extra-title" id={`bridge-${letter}-title`} tabIndex={-1}>From the offer letter, year {n}</h4>
+      <div className="l6-part-head">
+        <h4 className="extra-title" id={`bridge-${letter}-title`} tabIndex={-1}>From the offer letter, year {n}</h4>
+        <CsvButton table={{ kind: "part", letter, part: "bridge", n }} name={`${letter}-2, from the offer letter, year ${n}`} />
+      </div>
       <table className="bridge-table" id={`${letter}-2-bridge`}>
         <caption className="sr-only">{letter}'s year {n}, from the offer letter to after rent, $, as paid</caption>
         <tbody>
@@ -245,13 +250,12 @@ function BridgeView({ ctx, letter, n, prices }: { ctx: WorkContext; letter: Lett
 
 // ---- A-3: pay by year, and when it arrives -----------------------------------------------------------------------------------
 
-const PAY_LINES = ["salary", "bonus", "cash", "rsu", "clawback", "gross"] as const;
 
 function PayByYear({ ctx, x, open, show }: Part) {
   const L = x.offer.letter;
   const b = x.breakdown!;
   const t = yearTable(ctx, L);
-  const rows = t.rows.filter((r) => (PAY_LINES as readonly string[]).includes(r.line) && r.section === "cash");
+  const rows = payRows(t);
   const notes = notesOf(b.detail, b.years);
   const arrivals = arrivalsOf(b.detail, b.years);
   const salary = x.input?.salary.annual ?? 0;
@@ -285,6 +289,7 @@ function PayByYear({ ctx, x, open, show }: Part) {
           </tbody>
         </table>
       </div>
+      <p className="part-csv"><CsvButton table={{ kind: "part", letter: L, part: "a3" }} name={`${L}-3, pay by year`} /></p>
       {notes.length > 0 && <ul className="chart-notes">{notes.map((nt) => <li key={`${nt.n}${nt.text}`}>Yr {nt.n}: {nt.text}</li>)}</ul>}
       <p className="part-note">
         Gross, as paid in each employment year: the same figures as {L}-7's. Salary is paid monthly:{" "}
@@ -481,18 +486,12 @@ function CliffList({ L, terms }: { L: Letter; terms: OfferTerms }) {
 
 // ---- A-5: what the benefits are worth -----------------------------------------------------------------------------------------
 
-const BENEFIT_LINES = ["employer", "hsa", "perks", "premiums", "oop", "yours"] as const;
-
 function Benefits({ ctx, x, open, show }: Part) {
   const L = x.offer.letter;
   const b = x.breakdown!;
   const o = x.input!;
   const t = yearTable(ctx, L);
-  const rows = t.rows.filter((r) => (BENEFIT_LINES as readonly string[]).includes(r.line) && r.kind === "line");
-  const credited = t.years.map((y) => y.credited);
-  const creditedSum = credited.reduce((s, v) => s + v, 0);
-  const added = t.years.map((y) => y.totalRewards - y.afterTax);
-  const addedSum = added.reduce((s, v) => s + v, 0);
+  const { rows, credited, creditedSum, added, addedSum } = benefitsOf(t);
   const month = addedSum / (12 * b.years);
   const missing = [!o.retirement && "No 401(k) entered: its match isn't counted.", !o.health && "No health plan entered: premiums and out-of-pocket costs aren't counted.",
   ].filter(Boolean) as string[];
@@ -515,7 +514,7 @@ function Benefits({ ctx, x, open, show }: Part) {
         </p>
       ) : null}
       <p className="part-more">{show}</p>
-      {open && (
+      {open && (<>
         <div className="l6-scroll" role="region" aria-label={`${L}-5, the benefits by year`} tabIndex={0} id={`${L}-5-years`}>
           <table className="year-table benefits-table">
             <caption className="sr-only">{L}'s benefits and health costs by employment year, $, as paid</caption>
@@ -547,7 +546,8 @@ function Benefits({ ctx, x, open, show }: Part) {
             </tbody>
           </table>
         </div>
-      )}
+        <p className="part-csv"><CsvButton table={{ kind: "part", letter: L, part: "a5" }} name={`${L}-5, the benefits by year`} /></p>
+      </>)}
     </section>
   );
 }
@@ -555,9 +555,9 @@ function Benefits({ ctx, x, open, show }: Part) {
 // ---- A-6: tax, and warnings ------------------------------------------------------------------------------------------------------
 
 const WARN_KINDS: Array<{ kind: WarningKind; icon: string; title: string }> = [
-  { kind: "changes", icon: "⚠", title: "Changes your numbers" },
-  { kind: "notModeled", icon: "ⓘ", title: "Not modeled: may cost you" },
-  { kind: "cash", icon: "$", title: "Cash timing" },
+  { kind: "changes", icon: "⚠", title: KIND_TITLE.changes },
+  { kind: "notModeled", icon: "ⓘ", title: KIND_TITLE.notModeled },
+  { kind: "cash", icon: "$", title: KIND_TITLE.cash },
 ];
 
 function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
@@ -604,7 +604,7 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
         );
       })}
       <p className="part-more">{show}</p>
-      {open && (
+      {open && (<>
         <div className="l6-scroll" role="region" aria-label={`${L}-6, tax by calendar year`} tabIndex={0} id={`${L}-6-years`}>
           <table className="year-table tax-years-table">
             <caption className="sr-only">{L}'s tax by calendar year: its pay, its tax by kind and its rate, $, as paid</caption>
@@ -628,7 +628,8 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
             </tbody>
           </table>
         </div>
-      )}
+        <p className="part-csv"><CsvButton table={{ kind: "part", letter: L, part: "a6" }} name={`${L}-6, tax by calendar year`} /></p>
+      </>)}
     </section>
   );
 }

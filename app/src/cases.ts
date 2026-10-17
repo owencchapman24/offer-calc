@@ -99,13 +99,13 @@ export function hasRanges(o: OfferInput): boolean {
 const signedRate = (x: number) => `${x < 0 ? "−" : "+"}${percent(Math.abs(x))}`;
 const year = (iso: string) => iso.slice(0, 4);
 
-/** "bonus 5% of salary instead of 10%", "no promotion in 2029": a change in words. */
+/** "bonus 5% of each year's salary instead of 10%", "no promotion in 2029": a change in words (a share with its period, B13). */
 export function changeText(c: CaseChange): string {
   const guaranteed = "firstGuaranteed" in c && c.firstGuaranteed ? " (the first is guaranteed)" : "";
   switch (c.kind) {
     case "bonus":
       return c.basis === "percentOfSalary"
-        ? `bonus ${percent(c.value)} of salary instead of ${percent(c.base)}${guaranteed}`
+        ? `bonus ${percent(c.value)} of each year's salary instead of ${percent(c.base)}${guaranteed}`
         : `bonus ${dollars(c.value)} a year instead of ${dollars(c.base)}${guaranteed}`;
     case "bonusByYear":
       if (c.ratio === null) return `bonuses differ in year${c.years.length > 1 ? "s" : ""} ${join(c.years.map(String))}${guaranteed}`;

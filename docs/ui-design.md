@@ -1742,6 +1742,35 @@ own stay (B3), with L-5 and L-6 folded in (B8) and the bridge moved (B7). Each p
 - **With one offer, A-2 to A-7 are a section under the columns,** headed "A · NYC bank, in full", A-1 being pinned beside the ledger.
 - **L-1's and the parts' placeholders** are measured again (L-1 is 521 px tall without the bridge, 652 on a phone).
 
+**v2's item 5, stop 5C** (2026-10-16; `docs/v2-plan.md`, item 5, "Review stops"): the last of item 5. Copy as document for one offer,
+the first visit's single sample, every table in a breakdown with its CSV, the scan's new states and the NVDA walkthrough's new parts.
+- **Copy as document, one offer:** its breakdown, about 2 pages, for someone who's never seen the tool: 1. the bottom line (A-1's
+  month, the step to the prices picked when there's one, year 1, per hour); 2. where the money goes (the $100 and year 1's bridge);
+  3. pay by year (years as rows, so 10 years fit in 80 columns) and every payment by date; 4. the terms, the next cliff, the day
+  A-4 shows for leaving, the bad case and every cliff; 5. the benefits by year; 6. tax by calendar year and the warnings; 7. the
+  offer as entered; 8. the assumptions. Its own city's dollars throughout (B4), each sentence saying them once in words, every rate
+  and share with its period, every table footing as displayed and every calculation it states in `worked` (`copydoc.test.ts`); the
+  sample flagged first and last ("A sample offer: …").
+- **With two or more,** "Copy as document" opens a choice under the masthead, as "Print…" does (one `Choice` component now serves
+  both): the comparison (first, as before), the breakdown of the offer shown, or both. "Both" is each offer's breakdown under its
+  own part heading, then the comparison's document, unchanged, its tables in the common dollars (condition 1).
+- **The first visit** is sample A on its own (B5): its column, A-1 pinned, A-2 to A-7 below. "Sample offer: illustrative inputs,
+  not market data. [Start with my offer] [See a sample comparison]" sits under the masthead, both in view without scrolling on a
+  phone, a tablet and a desktop (condition 2); "See a sample comparison" loads all three. With the three, the banner keeps "Start
+  with my offer". The lead's and A-1's own sample banners are gone.
+- **CSVs:** every table in a breakdown has one: A-2's $100 (for the year picked) and its bridge, A-3's pay by year, A-5's benefits by
+  year, A-6's tax by calendar year, and A-7's four. Each is built from the rows the part draws (`payRows`, `benefitsOf`, `bridge`).
+- **Shares state their period** where 5C's test found one that didn't: the bear case's "bonus 5% of each year's salary".
+- **The NVDA walkthrough** (`docs/nvda-walkthrough.md`) starts from the first visit, with parts for one offer, its breakdown, the
+  breakdowns' switch and the copy choice; Print… and the tickmark setting are still audit D11's.
+
+**Stop 5C versus the plan:**
+- **The breakdown document's sections are numbered 1-8,** as the comparison's 1-7; "both" restarts them under each part.
+- **A-1's first-use note keeps "Got it" alone;** the plan's "See where the money goes" beside it isn't built.
+- **The copy choice lists the comparison first** (the plan lists the breakdown first), so a returning visitor's one click and
+  Enter copy what it always did.
+- **Year 1's bridge in the document is the breakdown's** (its own prices, then the prices picked), not the comparison's.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

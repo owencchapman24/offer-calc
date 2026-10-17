@@ -6,6 +6,7 @@ import { isProratedStep, periodText } from "./leaveModel";
 import type { A2Part, A6Line } from "./metrics";
 import type { OfferDetail } from "./protocol";
 import { dayBefore } from "./text";
+import type { YearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-6 (docs/v2-plan.md, item 5, "What a breakdown holds"), the view model: where a year's pay goes,
 // its payments by date, the terms that can bite, and its tax by calendar year, each over the offer's own stay (B3). Shared by the
@@ -105,6 +106,10 @@ export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
 /** An arrival's figure, as shown: to the dollar. */
 export const arrivalShown = (a: Arrival) => R(a.gross);
 
+/** A-3's lines: pay by kind, footed into pay each year. A-7's lines, the same figures and ids. */
+export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "clawback", "gross"] as const;
+export const payRows = (t: YearTable) => t.rows.filter((r) => (PAY_LINES as readonly string[]).includes(r.line) && r.section === "cash");
+
 // ---- A-4: terms that can bite -----------------------------------------------------------------------------------------------
 
 /** A cliff inside the stay, as A-4 lists it: by itself, or a prorated clawback's monthly steps as one line. */
@@ -163,6 +168,24 @@ export function bonusTerms(o: OfferInput): string[] {
 
 /** The stay's last day. */
 export const lastDayOf = (window: { end: ISODate }) => dayBefore(window.end);
+
+// ---- A-5: what the benefits are worth -------------------------------------------------------------------------------------
+
+const BENEFIT_LINES = ["employer", "hsa", "perks", "premiums", "oop", "yours"] as const;
+
+/**
+ * A-5's table: the employer 401(k) money credited each year, the benefit and health-cost lines (A-7's), and what they add to after-tax
+ * pay (total rewards less after-tax pay, each year's as shown), with the years added.
+ */
+export function benefitsOf(t: YearTable) {
+  const credited = t.years.map((y) => y.credited);
+  const added = t.years.map((y) => y.totalRewards - y.afterTax);
+  const sum = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+  return {
+    rows: t.rows.filter((r) => (BENEFIT_LINES as readonly string[]).includes(r.line) && r.kind === "line"),
+    credited, creditedSum: sum(credited), added, addedSum: sum(added),
+  };
+}
 
 // ---- A-6: tax by calendar year ----------------------------------------------------------------------------------------------
 

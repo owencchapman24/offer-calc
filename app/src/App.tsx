@@ -23,7 +23,7 @@ import { dayBefore, localToday, longDate } from "./text";
 import { Printing, type PrintScope, type Stale, TickSetting } from "./ui";
 import { WorkProvider } from "./Tickmarks";
 import { type Engine, useEngine } from "./useEngine";
-import type { Live } from "./copyDoc";
+import type { DocKind, Live } from "./copyDoc";
 import { SECTIONS, type SectionId } from "./sections";
 import { verdict, verdictSentence } from "./verdict";
 import { changingWarnings } from "./warningKinds";
@@ -117,6 +117,10 @@ export function App() {
   const [choosing, setChoosing] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const printToggle = useRef<HTMLButtonElement>(null);
+  // "Copy as document" with two or more offers: which document (the breakdown shown, the comparison, or both).
+  const [copyChoosing, setCopyChoosing] = useState(false);
+  const [copyKind, setCopyKind] = useState<DocKind>("comparison");
+  const copyToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const before = () => {
       document.documentElement.classList.add("printing");
@@ -293,11 +297,14 @@ export function App() {
   // "Copy as document" (docs/copy-as-document-plan.md): waits while the inputs have a problem, and says why. It reads the page as it
   // is when its figures come back (`live`), not as it was when the button was pressed.
   const incomplete = session.offers.filter((o) => missing.has(o.id)).map((o) => o.letter);
-  const copyBlocked = copyBlock({ compare: !!compare, view: !!view, invalid: !!engine.invalid, error: !!engine.error, incomplete });
+  const copyBlocked = copyBlock({ offers: complete.length, view: !!view, own: ownReady, invalid: !!engine.invalid, error: !!engine.error, incomplete });
+  // The breakdown shown, the one "Copy as document" copies.
+  const shownLetter = letters.includes(session.ui.offerTab as Letter) ? session.ui.offerTab as Letter : letters[0] ?? null;
   // The live region's sentence: the verdict, or with one offer its bottom line (docs/v2-plan.md, item 5, "Accessibility").
   const said = engine.updating || engine.error ? null : view ? verdictSentence(view) : own?.said ?? null;
   const live = useRef<Live | null>(null);
-  live.current = { work, compare, ready, breakeven: engine.breakeven, cursor: engine.cursor, leaveAt };
+  live.current = { work, compare, ready, breakeven: engine.breakeven, cursor: engine.cursor, leaveAt, request, letters, ownReady, terms: engine.terms };
+  const copier = useCopy(live, requestSlow, engine.sweep ?? engine.breakdowns, copyBlocked?.why ?? null);
 
   return (
     <WorkProvider ctx={work} onEdit={edit} onOpen={() => { if (!session.ui.dismissed?.ticks) dispatch({ type: "dismiss", hint: "ticks" }); }}>
@@ -321,18 +328,50 @@ export function App() {
             {/* Ctrl+P prints only what's loaded: the button offers a summary or the full workpaper, then loads every schedule and works
                 them out first. */}
             <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
-              onClick={() => setChoosing(!choosing)}>Print…</button>
+              onClick={() => { setChoosing(!choosing); setCopyChoosing(false); }}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
-            <CopyDocument blocked={copyBlocked?.why ?? null} quietly={copyBlocked ? !copyBlocked.shown : false} live={live}
-              requestSlow={requestSlow} results={engine.sweep} />
+            <button ref={copyToggle} type="button" className="link" aria-disabled={copyBlocked ? true : undefined}
+              aria-describedby={copyBlocked ? "copy-why" : undefined} aria-expanded={comparing ? copyChoosing : undefined}
+              aria-controls={comparing ? "copy-choice" : undefined} onClick={() => {
+                if (copyBlocked) return;
+                if (!comparing) copier.copy("breakdown", shownLetter);
+                else {
+                  setCopyChoosing(!copyChoosing);
+                  setChoosing(false);
+                }
+              }}>Copy as document</button>
+            {copier.state === "again" && <button type="button" className="link" onClick={copier.copyNow}>Copy now</button>}
+            <span className="print-status" role="status">{copier.state ? COPY_SAID[copier.state] : ""}</span>
+            {copyBlocked && <span id="copy-why" className={copyBlocked.shown ? "print-status" : "sr-only"}>{copyBlocked.why}</span>}
           </p>
         )}
         {route.page === "compare" && choosing && (
-          <PrintChoice scope={scope} onScope={setScope} onPrint={() => void print()}
-            onCancel={() => { setChoosing(false); printToggle.current?.focus(); }} />
+          <Choice<PrintScope> id="print-choice" legend="What to print" name="print-scope" options={SCOPES} value={scope} onChange={setScope} action="Print"
+            onAction={() => void print()} onCancel={() => { setChoosing(false); printToggle.current?.focus(); }} />
+        )}
+        {route.page === "compare" && copyChoosing && comparing && shownLetter && (
+          <Choice<DocKind> id="copy-choice" legend="What to copy" name="copy-kind" options={copyKinds(shownLetter)} value={copyKind} onChange={setCopyKind}
+            action="Copy" onAction={() => {
+              setCopyChoosing(false);
+              copyToggle.current?.focus();
+              copier.copy(copyKind, shownLetter);
+            }} onCancel={() => { setCopyChoosing(false); copyToggle.current?.focus(); }} />
         )}
       </header>
       {saved === "newer" && <NewerSave schema={loaded.newer} />}
+      {/* The first visit is sample A on its own (docs/v2-plan.md, item 5, B5): your own offer and the sample comparison are each one
+          click away, side by side, in view on a phone and a desktop without scrolling (condition 2). */}
+      {route.page === "compare" && sample && (
+        <p className="banner sample-banner">
+          {session.offers.length > 1 ? "Sample offers" : "Sample offer"}: illustrative inputs, not market data.{" "}
+          <span className="banner-actions">
+            <button type="button" className="link" onClick={() => dispatch({ type: "startBlank" })}>Start with my offer</button>
+            {session.offers.length === 1 && (
+              <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>See a sample comparison</button>
+            )}
+          </span>
+        </p>
+      )}
 
       {route.page === "method" ? (
         <Suspense fallback={<p className="note">Loading the methodology…</p>}>
@@ -426,18 +465,20 @@ export function App() {
 }
 
 /**
- * Why "Copy as document" waits, if it does: a problem with the offers, said beside the button; or, while the comparison is first
- * being worked out (two offers are complete, its results aren't in yet), a reason said only to screen readers. Shown, that reason
- * was "Fill in at least two offers…", which wasn't so, and on a phone it wrapped onto a line of its own and was gone a moment later,
- * moving everything under it up 24 px (a layout shift of 0.020 in Lighthouse's mobile run, 2026-10-13).
+ * Why "Copy as document" waits, if it does: a problem with the offers, said beside the button; or, while the results are first
+ * being worked out, a reason said only to screen readers. Shown, that reason once was "Fill in at least two offers…", which wasn't
+ * so, and on a phone it wrapped onto a line of its own and was gone a moment later, moving everything under it up 24 px (a layout
+ * shift of 0.020 in Lighthouse's mobile run, 2026-10-13). One complete offer copies its breakdown (docs/v2-plan.md, item 5); two or
+ * more, a choice of documents. `offers`: the complete offers; `own`: every one's breakdown is in.
  */
-export function copyBlock(s: { compare: boolean; view: boolean; invalid: boolean; error: boolean; incomplete: string[] }):
+export function copyBlock(s: { offers: number; view: boolean; own: boolean; invalid: boolean; error: boolean; incomplete: string[] }):
   { why: string; shown: boolean } | null {
-  if (!s.compare) return { why: "Add a second offer to copy a comparison.", shown: true };
-  if (s.invalid) return { why: "Fix the problems listed under the verdict to copy the comparison.", shown: true };
-  if (s.error) return { why: "The comparison couldn't be worked out, so there's nothing to copy.", shown: true };
-  if (s.incomplete.length) return { why: `Fill in or remove offer ${s.incomplete.join(" and ")} to copy the comparison.`, shown: true };
-  if (!s.view) return { why: "Working out the comparison…", shown: false };
+  const comparing = s.offers >= 2;
+  if (!s.offers) return { why: "Fill in an offer to copy its breakdown.", shown: true };
+  if (s.invalid) return { why: `Fix the problems listed ${comparing ? "under the verdict" : "with its bottom line"} to copy the document.`, shown: true };
+  if (s.error) return { why: "The offers couldn't be worked out, so there's nothing to copy.", shown: true };
+  if (comparing && s.incomplete.length) return { why: `Fill in or remove offer ${s.incomplete.join(" and ")} to copy the comparison.`, shown: true };
+  if (comparing ? !s.view || !s.own : !s.own) return { why: comparing ? "Working out the comparison…" : "Working out the breakdown…", shown: false };
   return null;
 }
 
@@ -450,27 +491,23 @@ const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
 };
 
 /**
- * "Copy as document": the comparison as a 2-3 page summary on the clipboard, HTML with a plain-text fallback. The click writes to
- * the clipboard at once, with the document as a promise its code (copyDoc.ts, loaded now) keeps once the slow lane has what it
- * needs, since Safari allows a write only inside the click. A browser that won't take that gets "Copy now", which copies the ready
- * document through a copy event. Disabled (aria-disabled, so it stays focusable and says why) while the inputs have a problem.
+ * "Copy as document": one offer's breakdown (about 2 pages), the comparison (2-3 pages) or both, on the clipboard, HTML with a
+ * plain-text fallback. The click writes to the clipboard at once, with the document as a promise its code (copyDoc.ts, loaded now)
+ * keeps once the slow lane has what it needs, since Safari allows a write only inside the click. A browser that won't take that gets
+ * "Copy now", which copies the ready document through a copy event. Disabled (aria-disabled, so it stays focusable and says why)
+ * while the inputs have a problem. `results`: what's on the page; a new one makes what was copied, or got ready, an earlier one's.
  */
-function CopyDocument({ blocked, quietly = false, live, requestSlow, results }: {
-  blocked: string | null; /** The reason is for screen readers only (copyBlock). */ quietly?: boolean;
-  live: { current: Live | null }; requestSlow: Engine["requestSlow"];
-  /** The comparison on the page: a new one makes what was copied, or got ready, an earlier comparison's. */
-  results: unknown;
-}) {
+function useCopy(live: { current: Live | null }, requestSlow: Engine["requestSlow"], results: unknown, blocked: string | null) {
   const [state, setState] = useState<CopyState>(null);
   const ready = useRef<{ html: string; text: string } | null>(null);
   useEffect(() => {
     setState((s) => (s === "working" ? s : null));
     ready.current = null;
   }, [results, blocked]);
-  const copy = () => {
+  const copy = (kind: DocKind, letter: Letter | null) => {
     if (blocked || state === "working") return;
     setState("working");
-    const doc = import("./copyDoc").then((m) => m.prepare(() => live.current!, requestSlow));
+    const doc = import("./copyDoc").then((m) => m.prepare(() => live.current!, requestSlow, kind, letter ?? undefined));
     const blob = (type: "text/html" | "text/plain") => doc.then((d) => new Blob([type === "text/html" ? d.html : d.text], { type }));
     let wrote: Promise<void>;
     try {
@@ -496,44 +533,44 @@ function CopyDocument({ blocked, quietly = false, live, requestSlow, results }: 
     document.removeEventListener("copy", put);
     setState(ok ? "copied" : "failed");
   };
-  return (
-    <>
-      <button type="button" className="link" aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? "copy-why" : undefined}
-        onClick={copy}>Copy as document</button>
-      {state === "again" && <button type="button" className="link" onClick={copyNow}>Copy now</button>}
-      <span className="print-status" role="status">{state ? COPY_SAID[state] : ""}</span>
-      {blocked && <span id="copy-why" className={quietly ? "sr-only" : "print-status"}>{blocked}</span>}
-    </>
-  );
+  return { state, copy, copyNow };
 }
 
-const SCOPES: Array<{ scope: PrintScope; name: string; hint: string }> = [
-  { scope: "summary", name: "Summary", hint: "every offer's breakdown, with its A-7 tables but not its list of every payment, then the comparison" },
-  { scope: "full", name: "Full workpaper", hint: "adds every payment, to the cent: many more pages" },
+const SCOPES: Array<{ value: PrintScope; name: string; hint: string }> = [
+  { value: "summary", name: "Summary", hint: "every offer's breakdown, with its A-7 tables but not its list of every payment, then the comparison" },
+  { value: "full", name: "Full workpaper", hint: "adds every payment, to the cent: many more pages" },
+];
+
+/** What "Copy as document" offers with two or more offers (docs/v2-plan.md, item 5, B10): the comparison first, as before. */
+const copyKinds = (l: Letter): Array<{ value: DocKind; name: string; hint: string }> => [
+  { value: "comparison", name: "The comparison", hint: "the offers side by side: 2-3 pages" },
+  { value: "breakdown", name: `${l}'s breakdown`, hint: "the offer shown, on its own: about 2 pages" },
+  { value: "both", name: "Both", hint: "each offer's breakdown, then the comparison" },
 ];
 
 /**
- * The Print button's choice (docs/ui-design.md §9.5): a summary (the default) or the full workpaper, then Print. Under the masthead,
- * not a dialog: focus starts on the choice, and Escape or Cancel goes back to the Print button.
+ * A choice under the masthead (docs/ui-design.md §9.5), Print's (a summary or the full workpaper) or Copy as document's, then its
+ * action. Not a dialog: focus starts on the choice, and Escape or Cancel goes back to the button that opened it.
  */
-function PrintChoice({ scope, onScope, onPrint, onCancel }: {
-  scope: PrintScope; onScope(s: PrintScope): void; onPrint(): void; onCancel(): void;
+function Choice<T extends string>({ id, legend, name, options, value, onChange, action, onAction, onCancel }: {
+  id: string; legend: string; name: string; options: Array<{ value: T; name: string; hint: string }>; value: T; onChange(v: T): void;
+  action: string; onAction(): void; onCancel(): void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => { box.current?.querySelector<HTMLInputElement>("input:checked")?.focus(); }, []);
   return (
-    <div id="print-choice" className="print-choice no-print" ref={box} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }}>
+    <div id={id} className="print-choice no-print" ref={box} onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }}>
       <fieldset>
-        <legend>What to print</legend>
-        {SCOPES.map((x) => (
-          <label key={x.scope} className="print-scope">
-            <input type="radio" name="print-scope" value={x.scope} checked={scope === x.scope} onChange={() => onScope(x.scope)} />
+        <legend>{legend}</legend>
+        {options.map((x) => (
+          <label key={x.value} className="print-scope">
+            <input type="radio" name={name} value={x.value} checked={value === x.value} onChange={() => onChange(x.value)} />
             <span><strong>{x.name}</strong> <span className="print-hint">{x.hint}</span></span>
           </label>
         ))}
       </fieldset>
       <p className="data-actions">
-        <button type="button" className="got-it data-button" onClick={onPrint}>Print</button>
+        <button type="button" className="got-it data-button" onClick={onAction}>{action}</button>
         <button type="button" className="link" onClick={onCancel}>Cancel</button>
       </p>
     </div>

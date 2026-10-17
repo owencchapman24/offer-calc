@@ -186,3 +186,12 @@ test("with one offer, the bar shows its bottom line with its dollars, and goes t
   await twoFrames(page);
   expect(await focusCovered(page)).toBeNull();
 });
+
+// The first visit (docs/v2-plan.md, item 5, condition 2): sample A on its own, and both ways on side by side, in view without scrolling.
+test("the first visit: Start with my offer and See a sample comparison, both in view without scrolling", async ({ page }) => {
+  await openAlone(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  for (const name of ["Start with my offer", "See a sample comparison"]) await expect(page.getByRole("button", { name })).toBeInViewport({ ratio: 1 });
+  const [a, b] = await Promise.all(["Start with my offer", "See a sample comparison"].map((name) => page.getByRole("button", { name }).boundingBox()));
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(a!.height); // side by side
+});

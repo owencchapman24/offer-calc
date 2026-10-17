@@ -2,12 +2,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ByYear } from "./ByYear";
-import { build, type Cell, type CsvTable, csvFile, guard, type L6Part, plain, SAMPLE_LINE } from "./csv";
+import { build, type Cell, type CsvTable, csvFile, guard, type L6Part, type PartTable, plain, SAMPLE_LINE } from "./csv";
 import type { MetricId, WorkContext } from "./metrics";
 import type { AppOffer, Letter } from "./model";
 import { Risk } from "./Risk";
 import { initialSession } from "./session";
-import { context, renderPage, renderWork, VALUATION, withWork } from "./testing";
+import { context, renderBreakdowns, renderPage, renderWork, VALUATION, withWork } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { Printing, type PrintScope, TICKS, type TickKind } from "./ui";
@@ -18,6 +18,16 @@ import { Printing, type PrintScope, TICKS, type TickKind } from "./ui";
 
 const LETTERS: Letter[] = ["A", "B", "C"];
 const PARTS: L6Part[] = ["years", "stay", "payments", "tax"];
+const BREAKDOWN: PartTable[] = ["a2", "bridge", "a3", "a5", "a6"];
+
+/** The figures a breakdown table shows (year 1 for A-2's), by id: every one of them should be in its CSV. */
+const PART_IDS: Record<PartTable, (l: Letter) => RegExp> = {
+  a2: (l) => new RegExp(`^a2\\.${l}\\.1\\.((tax|rent|health|saved|spend)(Share)?|hundred)$`),
+  bridge: (l) => new RegExp(`^br\\.${l}\\.1\\.(?!spend$|saved$)`),
+  a3: (l) => new RegExp(`^l6y\\.${l}\\.(salary|bonus|cash|rsu|clawback|gross)\\.`),
+  a5: (l) => new RegExp(`^(a5\\.${l}\\.(credited|added)\\.|l6y\\.${l}\\.(employer|hsa|perks|premiums|oop|yours)\\.)`),
+  a6: (l) => new RegExp(`^a6\\.${l}\\.`),
+};
 
 /** A CSV's rows, read back (RFC 4180: quotes, doubled quotes, commas and line breaks inside quotes). */
 function parseCsv(text: string): string[][] {
@@ -51,6 +61,7 @@ function csvFigures(rows: Cell[][]): Array<{ id: MetricId; num: string; mark: Ce
 const tables = (letters: Letter[]): CsvTable[] => [
   { kind: "l1", running: false }, { kind: "l1", running: true }, { kind: "l2" },
   ...letters.flatMap((letter) => PARTS.map((part): CsvTable => ({ kind: "a7", letter, part }))),
+  ...letters.flatMap((letter) => BREAKDOWN.map((part): CsvTable => ({ kind: "part", letter, part }))),
 ];
 
 describe("CSV: every figure is the figure shown, with its tickmark", () => {
@@ -62,7 +73,7 @@ describe("CSV: every figure is the figure shown, with its tickmark", () => {
   for (const [name, make] of contexts) {
     it(name, () => {
       const ctx = withWork(make()).ctx;
-      const html = renderWork(ctx) + renderPage(ctx) + renderPage(ctx, { running: true });
+      const html = renderWork(ctx) + renderPage(ctx) + renderPage(ctx, { running: true }) + renderBreakdowns(ctx);
       const shown = shownFigures(html);
       for (const t of tables(LETTERS)) {
         const b = build(ctx, t);
@@ -78,12 +89,13 @@ describe("CSV: every figure is the figure shown, with its tickmark", () => {
         // Each table's figures on screen are all in its CSV (L-1 and L-2: the table views'; A-7: the offer's).
         const ids = new Set(figs.map((f) => f.id));
         const of = t.kind === "a7" ? ({ years: /^l6y\./, stay: /^l6s\./, payments: /^l6[pg]\./, tax: /^l6t\./ })[t.part]
+          : t.kind === "part" ? PART_IDS[t.part](t.letter)
           : t.kind === "l2" ? /^(risk|drop)\./ : t.running && ctx.results!.view.basis !== "perHour" ? /^(run|eysum)\./ : /^(ey|eysum)\./;
         const want = [...shown.keys()].filter((id) => of.test(id) && (t.kind !== "a7" || id.split(".")[1] === t.letter));
         expect(want.length, JSON.stringify(t)).toBeGreaterThan(3);
         for (const id of want) expect(ids.has(id as MetricId), `${id} in ${JSON.stringify(t)}`).toBe(true);
       }
-    });
+    }, 60_000);
   }
 
   it("ties to the tables shown: A's year 1 after rent is L-1's, the bridge's and A-7's 62,594", () => {

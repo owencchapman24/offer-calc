@@ -10,7 +10,7 @@ import { cityName, type MetricId, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { priceWords, shortCity } from "./prices";
 import {
-  alone, compareOf, context, ownOffers, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork,
+  alone, compareOf, context, ownOffers, renderAlone, renderBreakdowns, renderPage, requestOf, withLeave, withTies, withWork,
 } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
@@ -107,7 +107,7 @@ const named = (unit: string) => new RegExp(`${escape(unit.replace(/ \$$/, ""))} 
 /** A dollar figure before rent and prices: "$110,000", "−$510", "($41,724)". */
 const PAID = /[−+(]?\$\d/;
 /** A period: over a stay, in a year, of a year's pay, the first lease year. */
-const PERIOD = /over (?:your|its own|its|the|a \d+-year|your \d+-year|its \d+-year|the \d+-year) stay|if you stay \d+|\bstay \d+ (?:yrs?|years?)\b|in year \d+|\byear-\d+\b|\byear \d+\b|in \d{4}|of its \d{4} pay|\b\d{4} pay\b|first lease year|over \d+ years|each employment year|over the \d+ years|\byears? \d+ ?(?:–|to) ?\d+|\b\d+ yrs?\b|\byearly\b|\d% a year|starting salary|\d+-year total|\byour stay\b/i;
+const PERIOD = /over (?:your|its own|its|the|a \d+-year|your \d+-year|its \d+-year|the \d+-year) stay|if you stay \d+|\bstay \d+ (?:yrs?|years?)\b|in year \d+|\byear-\d+\b|\byear \d+\b|in \d{4}|of its \d{4} pay|\b\d{4} pay\b|first lease year|over \d+ years|each employment year|over the \d+ years|\byears? \d+ ?(?:–|to) ?\d+|\b\d+ yrs?\b|\byearly\b|\d% a year|starting salary|\d+-year total|\byour stay\b|of (?:each|that) calendar year's pay|of each year's (?:salary|pay)/i;
 /** A place's dollars in words, as a sentence says them: "U.S.-average dollars", "at U.S. prices", "New York dollars". */
 const wordsOf = (unit: string, flags = "") => {
   const place = escape(unit.replace(/ \$$/, "").replace(/-avg$/, ""));
@@ -306,17 +306,25 @@ function checkCsv(ctx: WorkContext, b: Built): string[] {
  * The copied document: a table's after-rent rows name their dollars (in the table's title, head or the row's label), its rates
  * their period; a sentence that states an after-rent figure names its prices, and one that states a rate or share its period.
  */
-function checkDoc(ctx: WorkContext, doc: Doc): string[] {
+function checkDoc(ctx: WorkContext, doc: Doc, letter?: Letter): string[] {
   const problems: string[] = [];
   const p = priceWords(ctx.household.pricesIn);
-  const words = dollarsWords(p.unit);
   const known = unitsOf(ctx);
+  // One offer's breakdown (stop 5C), alone or as a part of "both": its own city's dollars, or the prices picked.
+  const cityOf = (l: string) => `${shortCity(cityName(ctx.offers.find((o) => o.letter === l)!.draft.costOfLiving.area))} $`;
+  let own: string | null = letter ? cityOf(letter) : null;
   for (const b of doc.blocks) {
+    if (b.kind === "part") {
+      const l = /^([A-C]),/.exec(b.text)?.[1];
+      own = l ? cityOf(l) : null;
+      continue;
+    }
+    const units = own ? [p.unit, own] : [p.unit];
     if (b.kind === "table") {
       const t = b.table;
       for (const row of t.rows) {
         const around = `${t.title ?? ""} · ${t.head.join(" · ")} · ${row.label}`;
-        if (/after rent/i.test(row.label) && row.cells.some((x) => /\d/.test(x)) && !words.test(around)) {
+        if (/after rent/i.test(row.label) && row.cells.some((x) => /\d/.test(x)) && !units.some((u) => dollarsWords(u).test(around))) {
           problems.push(`document table "${t.title}": the row "${row.label}" doesn't name its dollars`);
         }
         for (const cell of row.cells) {
@@ -331,7 +339,9 @@ function checkDoc(ctx: WorkContext, doc: Doc): string[] {
       for (const s of sentences(para)) {
         if (/\$\d[\d,.]*\s+(a month|an hour|a year)|\d%/.test(s) && !PERIOD.test(s)) problems.push(`document: "${s}" doesn't state its period`);
         // A sentence that states an after-rent figure says its dollars once, in words, and none puts them on a figure.
-        for (const x of checkSentence(s, /after rent/i.test(s) && /\$\d/.test(s) ? [p.unit] : [], known)) problems.push(`document: "${s}" ${x}`);
+        const named = units.filter((u) => wordsOf(u).test(s));
+        const said = /after rent/i.test(s) && /\$\d/.test(s) ? (named.length ? named : [own ?? p.unit]) : [];
+        for (const x of checkSentence(s, said, known)) problems.push(`document: "${s}" ${x}`);
       }
     }
   }
@@ -352,10 +362,15 @@ function comparison(ctx0: WorkContext) {
     + renderBreakdowns(ctx);
   const ranges = compareOf(ctx).offers.some(hasRanges);
   const tables: CsvTable[] = [{ kind: "l1", running: false }, { kind: "l1", running: true }, ...(ranges ? [{ kind: "l2" as const }] : []),
-    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "a7" as const, letter, part })))];
+    ...r.letters.flatMap((letter) => (["years", "stay", "payments", "tax"] as const).map((part) => ({ kind: "a7" as const, letter, part }))),
+    ...r.letters.flatMap((letter) => (["a2", "bridge", "a3", "a5", "a6"] as const).map((part) => ({ kind: "part" as const, letter, part })))];
   const at = firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years));
-  const doc = buildDoc(ctx, { offers: compareOf(ctx).offers, at, picked: false });
-  return { ctx, html, csv: tables.map((t) => csvBuild(ctx, t)), doc };
+  const opts = { offers: compareOf(ctx).offers, at, picked: false, letters: r.letters };
+  const doc = buildDoc(ctx, opts);
+  // Copy as document's other two (stop 5C): each offer's breakdown, and both.
+  const docs: Array<[Doc, Letter | undefined]> = [[doc, undefined], [buildDoc(ctx, { ...opts, kind: "both" }), undefined],
+    ...r.letters.map((l): [Doc, Letter] => [buildDoc(ctx, { ...opts, kind: "breakdown", letter: l }), l])];
+  return { ctx, html, csv: tables.map((t) => csvBuild(ctx, t)), doc, docs };
 }
 
 const CLT = "16740";
@@ -371,6 +386,9 @@ describe("every figure names its dollars, and every rate or share its period (co
       const x = ownOffers(ctx).find((o) => o.input)!;
       const said = sentenceOf(x, priceWords(ctx.household.pricesIn))!;
       problems.push(...checkSentence(said, [`${shortCity(cityName(x.offer.draft.costOfLiving.area))} $`], unitsOf(ctx)).map((y) => `${where}: "${said}" ${y}`));
+      // Its copied breakdown (stop 5C).
+      const doc = buildDoc(ctx, { offers: requestOf(ctx).offers, at: ctx.own!.leave!.at, picked: false, kind: "breakdown", letter: "A", letters: ["A"] });
+      problems.push(...checkDoc(ctx, doc, "A").map((y) => `${where}: ${y}`));
     }
     expect(problems).toEqual([]);
   }, 60_000);
@@ -381,7 +399,7 @@ describe("every figure names its dollars, and every rate or share its period (co
       expect(c.html).toContain('data-metric="alone.A"');
       expect(c.html).toContain('data-metric="own.C.ref"');
       const problems = [...checkPage(c.ctx, c.html, basis), ...checkWork(c.ctx, c.html, basis), ...c.csv.flatMap((b) => checkCsv(c.ctx, b)),
-        ...checkDoc(c.ctx, c.doc)];
+        ...c.docs.flatMap(([d, l]) => checkDoc(c.ctx, d, l))];
       // The verdict as the live region and the tablet's bar say it: its dollars once, in words, after rent.
       const v = c.ctx.results!.view;
       const said = verdictSentence(v);

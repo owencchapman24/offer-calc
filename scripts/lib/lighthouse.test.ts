@@ -35,7 +35,7 @@ describe("the Lighthouse budget", () => {
     const v = verdict([run(1900, 98, { firstAnswerMs: 380 }), run(1900, 98, { firstAnswerMs: 420 }), run(1900, 98, { firstAnswerMs: 900 })]);
     expect(v).toMatchObject({ ok: true, firstAnswerMs: 420 });
     expect(verdict([run(1900), run(1900, 98, { firstAnswerMs: undefined }), run(1900)]).problems)
-      .toEqual(['1 of 3 runs had no "first-answer" mark: the page showed no verdict.']);
+      .toEqual(['1 of 3 runs had no "first-answer" mark: the page showed no answer.']);
   });
   it("reads a Lighthouse result, and refuses one where the page didn't load", () => {
     const lhr = {

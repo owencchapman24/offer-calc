@@ -63,7 +63,8 @@ export const BACKUP_KEY = "offer-calc:backup";
 export const SCHEMA = 3;
 
 export function initialSession(today: string): Session {
-  return { schemaVersion: 3, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today), ui: { basis: "colAdjustedTotal", theme: "system" } };
+  // The first visit: sample A on its own, a breakdown (docs/v2-plan.md, item 5, B5); "See a sample comparison" loads all three.
+  return { schemaVersion: 3, household: DEFAULT_HOUSEHOLD, offers: sampleOffers(today).slice(0, 1), ui: { basis: "colAdjustedTotal", theme: "system" } };
 }
 
 export type Action =

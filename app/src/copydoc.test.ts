@@ -1,21 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { buildDoc, type Doc, type DocOptions, num, SAMPLE_LINE, type Table, toHtml, toText, vestingText } from "./copyDoc";
+import { buildDoc, type Doc, type DocKind, type DocOptions, num, SAMPLE_LINE, SAMPLE_ONE, type Table, toHtml, toText, vestingText } from "./copyDoc";
 import { firstLastDay, leaveAxis } from "./leaveModel";
 import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
-import type { AppOffer } from "./model";
+import type { AppOffer, Letter } from "./model";
 import { dollars, figure, longDate } from "./text";
-import { compareOf, context, withLeave, withTies } from "./testing";
+import { alone, compareOf, context, requestOf, withLeave, withTies } from "./testing";
 import { verdictSentence } from "./verdict";
 
 // "Copy as document" (docs/copy-as-document-plan.md): every total in the document adds up as displayed, every calculation it
 // states works out as displayed, the HTML and the plain text carry the same figures, and its figures are the page's.
 
-/** The document for a comparison, with L-3's ties and L-4's panel at its last day worked out, as the worker would. */
-function made(base: WorkContext, at?: string) {
+/**
+ * The document for a comparison, with L-3's ties and L-4's panel at its last day worked out, as the worker would; or with `kind`,
+ * one offer's breakdown (A-4's cliffs and last day are the context's, as the page's breakdowns ask for them) or both.
+ */
+function made(base: WorkContext, at?: string, kind: DocKind = "comparison", letter?: Letter) {
+  if (kind === "breakdown" && !base.results) {
+    const req = requestOf(base);
+    const doc = buildDoc(base, { offers: req.offers, at: base.own!.leave!.at, picked: false, kind, letter: letter ?? "A", letters: base.offers.map((o) => o.letter) });
+    return { ctx: base, doc, html: toHtml(doc), text: toText(doc) };
+  }
   const ctx = withLeave(withTies(base).ctx, at).ctx;
   const r = ctx.results!;
-  const opts: DocOptions = { offers: compareOf(ctx).offers, at: at ?? firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years)), picked: !!at };
+  const opts: DocOptions = { offers: compareOf(ctx).offers, at: at ?? firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years)), picked: !!at, kind,
+    letter, letters: r.letters };
   const doc = buildDoc(ctx, opts);
   return { ctx, doc, html: toHtml(doc), text: toText(doc) };
 }
@@ -44,7 +53,7 @@ function flat(x: unknown): unknown {
 
 const later = () => context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)),
   4, { otherWagesThisYear: 20_000 });
-const CONTEXTS: Array<[string, () => WorkContext]> = [
+const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?]> = [
   ["the samples", () => context()],
   ["a 5-year stay (a close call)", () => context("colAdjustedTotal", undefined, 5)],
   ["per hour", () => context("perHour")],
@@ -53,12 +62,20 @@ const CONTEXTS: Array<[string, () => WorkContext]> = [
   ["B starting later, with other wages in 2026", later],
   ["two offers", () => context("colAdjustedTotal", (os) => os.filter((o) => o.letter !== "C"))],
   ["no ranges, not samples", () => context("colAdjustedTotal", (os) => os.map((o) => ({ ...o, sample: null, draft: flat(o.draft) as AppOffer["draft"] })))],
+  // One offer's breakdown (stop 5C): each sample on its own, at its own prices; one at Charlotte's; one in a comparison; and both.
+  ["A on its own", () => alone("A"), "breakdown"],
+  ["B on its own, a 5-year stay", () => alone("B", undefined, { stayYears: 5 }), "breakdown"],
+  ["C on its own, prices in Charlotte", () => alone("C", undefined, { pricesIn: "16740" }), "breakdown"],
+  ["no ranges, not a sample, on its own", () => alone("A", (o) => ({ ...o, sample: null, draft: flat(o.draft) as AppOffer["draft"] })), "breakdown"],
+  ["C's breakdown, in a comparison", () => context(), "breakdown", "C"],
+  ["B's breakdown, starting later", later, "breakdown", "B"],
+  ["both", () => context(), "both"],
 ];
 
 describe("Copy as document: every total adds up as displayed", () => {
-  for (const [name, make] of CONTEXTS) {
+  for (const [name, make, kind, letter] of CONTEXTS) {
     it(`${name}: each table's totals are the lines above them, and each worked line works out, as shown`, () => {
-      const { doc, html, text } = made(make());
+      const { doc, html, text } = made(make(), undefined, kind, letter);
       const footed = tables(doc).filter((t) => t.foots);
       expect(footed.length).toBeGreaterThanOrEqual(2);
       for (const t of footed) {
@@ -68,7 +85,7 @@ describe("Copy as document: every total adds up as displayed", () => {
             if (row.kind === "group") continue;
             const v = num(row.cells[j]);
             const total = row.kind === "subtotal" || row.kind === "total";
-            if (total) expect(v, `${t.title ?? "table"}, ${t.head[j + 1]}: ${row.label}`).toBe(acc);
+            if (total) expect(v, `${t.title ?? "table"}, ${t.head[j + 1]}: ${row.label}`).toBeCloseTo(acc ?? NaN, 6);
             acc = total ? v : (acc ?? 0) + v;
           }
         }
@@ -99,9 +116,9 @@ describe("Copy as document: every total adds up as displayed", () => {
 });
 
 describe("Copy as document: the HTML and the plain text carry identical figures", () => {
-  for (const [name, make] of CONTEXTS) {
+  for (const [name, make, kind, letter] of CONTEXTS) {
     it(name, () => {
-      const { html, text } = made(make());
+      const { html, text } = made(make(), undefined, kind, letter);
       const a = figures(textOf(html));
       expect(a.length).toBeGreaterThan(150);
       expect(a).toEqual(figures(text));
@@ -192,8 +209,8 @@ describe("Copy as document: for a reader who has never seen the tool", () => {
   });
 
   it("plain-text tables fit in 80 columns", () => {
-    for (const [name, make] of CONTEXTS) {
-      const { doc } = made(make());
+    for (const [name, make, kind, letter] of CONTEXTS) {
+      const { doc } = made(make(), undefined, kind, letter);
       for (const t of tables(doc)) {
         for (const line of toText({ blocks: [{ kind: "table", table: t }], worked: [] }).split("\n").slice(t.title ? 1 : 0)) {
           expect(line.length, `${name}: ${line}`).toBeLessThanOrEqual(80);
@@ -201,4 +218,67 @@ describe("Copy as document: for a reader who has never seen the tool", () => {
       }
     }
   }, 60_000);
+});
+
+describe("Copy as document, for one offer: its breakdown, for someone who's never seen the tool", () => {
+  const a = made(alone("A"), undefined, "breakdown");
+  const all = tables(a.doc);
+
+  it("has the plan's parts in order: the bottom line, where the money goes, pay by year, terms, benefits, tax, the offer, assumptions", () => {
+    const headings = a.doc.blocks.flatMap((b) => (b.kind === "heading" ? [b.text] : []));
+    expect(headings).toEqual(["1. The bottom line", "2. Where the money goes: year 1", "3. Pay by year, and when it arrives", "4. Terms that can bite",
+      "5. What the benefits are worth", "6. Tax by year, and warnings", "7. The offer, as entered", "8. Assumptions"]);
+    expect(a.text.split("\n")[0]).toBe("A, NYC BANK: ONE JOB OFFER, WORKED OUT");
+  });
+
+  it("its figures are the breakdown's: A-1's bottom line, A-2's $100 and bridge, A-6's rate (the plan's worked example)", () => {
+    // A-1: $7,564 a month over the stay at New York prices = $6,672 to spend + $892 saved (as the page shows it, 5A's screenshots).
+    expect(a.text).toMatch(/A leaves you about \$[\d,]+ a month over your stay, after rent, in New York dollars: \$[\d,]+ to spend and \$[\d,]+ saved\./);
+    // A-2: 41,724 / 152,986 = $27.27 of each $100; left to spend takes the rounding, $36.45; 55,762 / 12 = $4,647 a month in year 1.
+    const hundred = all.find((t) => t.head[1] === "Of each $100 of year-1 pay")!;
+    expect(hundred.rows.map((r) => [r.label, ...r.cells])).toEqual([
+      ["Tax", "$27.27", "41,724"], ["Rent", "$29.81", "45,600"], ["Health costs", "$2.16", "3,300"], ["Saved", "$4.31", "6,600"], ["Left to spend", "$36.45", "55,762"],
+      ["Paid to you", "$100.00", "152,986"],
+    ]);
+    expect(a.text).toContain("Left to spend, 55,762 ÷ 12, is $4,647 a month in year 1, after rent, in New York dollars.");
+    const bridgeRows = all.find((t) => t.title?.startsWith("From the offer letter"))!.rows;
+    expect(bridgeRows.at(-1)).toEqual({ label: "After rent, at New York prices", cells: ["65,662"], kind: "total" });
+  });
+
+  it("says the sample is illustrative, first and last; a real offer, never", () => {
+    const lines = a.text.trim().split("\n");
+    expect(lines.slice(0, 5)).toContain(`*** ${SAMPLE_ONE} ***`);
+    expect(lines[lines.length - 1]).toBe(`*** ${SAMPLE_ONE} ***`);
+    const real = made(alone("A", (o) => ({ ...o, sample: null })), undefined, "breakdown");
+    expect(real.text).not.toContain(SAMPLE_ONE);
+  });
+
+  it("has no tickmarks, workpaper references or jargon", () => {
+    expect(a.text).not.toMatch(/[✓^]|\b[LMA]-\d|\bbasis\b|\btickmark/);
+    expect(a.html).not.toMatch(/<style|class=|<script|<img/);
+  });
+
+  it("A-4's terms, cliffs and last day are the page's", () => {
+    expect(a.text).toContain("The $10,000 sign-on is repaid in full if you leave before Jul 12, 2027.");
+    expect(a.text).toContain("Jan 31, 2027: the bonus for 2026");
+    expect(a.text).toMatch(/If your last day were Jan 12, 2027, 6 months in: you'd keep \$[\d,]+ after tax, as paid, repay \$10,000,/);
+    expect(a.text).toMatch(/Bad case, after rent, in New York dollars: \$6,245 a month over your stay, 17% under the base case/);
+  });
+
+  it("in a comparison, a breakdown stays in its own city's dollars, and says what the comparison counts it as", () => {
+    const c = made(context(), undefined, "breakdown", "C");
+    expect(c.text).toMatch(/C leaves you about \$[\d,]+ a month over your stay, after rent, in Seattle dollars/);
+    expect(c.text).toMatch(/In the comparison: \$[\d,]+ a month in Seattle dollars, less \$[\d,]+ for Seattle's higher prices, is \$[\d,]+ a month over your stay in U\.S\.-average dollars\./);
+    expect(c.text).not.toMatch(/New York|Charlotte/);
+  });
+
+  it("both: each breakdown in turn, then the comparison, its tables in the common dollars", () => {
+    const b = made(context(), undefined, "both");
+    const parts = b.doc.blocks.flatMap((x) => (x.kind === "part" ? [x.text] : []));
+    expect(parts).toEqual(["A, NYC bank, on its own", "B, Charlotte corp, on its own", "C, Seattle tech, on its own", "The comparison"]);
+    const comparison = made(context());
+    // The comparison's part is the comparison's document, its body unchanged.
+    const body = (t: string) => t.slice(t.indexOf("1. THE ANSWER"), t.lastIndexOf("Worked out in your browser"));
+    expect(body(b.text).endsWith(body(comparison.text))).toBe(true);
+  });
 });

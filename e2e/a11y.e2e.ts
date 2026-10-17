@@ -91,11 +91,15 @@ test.describe("compare", () => {
     await scan(page, "Print: a summary or the full workpaper");
   });
 
-  test("Copy as document: copied, and waiting on a problem", async ({ page, context }) => {
+  test("Copy as document: its choice, copied, and waiting on a problem", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openCompare(page);
     const button = page.getByRole("button", { name: "Copy as document" });
+    // With two or more offers: which document (stop 5C).
     await button.click();
+    await expect(page.locator("#copy-choice")).toBeVisible();
+    await scan(page, "Copy as document: the choice");
+    await page.locator("#copy-choice").getByRole("button", { name: "Copy", exact: true }).click();
     await expect(page.locator(".print-bar")).toContainText("Copied", { timeout: 30_000 });
     await scan(page, "Copy as document: copied");
     // A problem in the inputs: the button waits, and says why.
@@ -141,8 +145,8 @@ test.describe("compare", () => {
 // tablet projects scan it too.
 test.describe("compare: one offer, and the breakdowns", () => {
   test("one offer: its bottom line pinned, in quick and detailed mode", async ({ page }) => {
+    // A first visit: sample A on its own (focus moving to A-1 when offers are removed down to one is keyboard.e2e.ts').
     await openAlone(page);
-    await expect(page.locator("#own-title")).toBeFocused();
     await scan(page, "one offer: A-1 pinned");
     await page.getByRole("button", { name: "Detailed", exact: true }).click();
     const head = page.locator("#section-head-pay");
@@ -155,6 +159,14 @@ test.describe("compare: one offer, and the breakdowns", () => {
     await page.locator('[data-metric="own.A.total"]').first().click();
     await expect(page.locator(".work .work-lines")).toBeVisible();
     await scan(page, "one offer: A-1's month, its work");
+  });
+
+  test("one offer: its breakdown copied", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openAlone(page);
+    await page.getByRole("button", { name: "Copy as document" }).click();
+    await expect(page.locator(".print-bar")).toContainText("Copied", { timeout: 30_000 });
+    await scan(page, "one offer: Copy as document, copied");
   });
 
   test("one offer: A-2 to A-7 under the columns, every part's detail open", async ({ page }) => {
@@ -281,7 +293,8 @@ test.describe("recovery", () => {
   test("a newer version's save", async ({ page }) => {
     await openWithSaved(page, SAVED.newer);
     await expect(page.locator(".newer-save")).toBeVisible();
-    await settled(page);
+    // Meanwhile, a first visit: sample A on its own.
+    await ownSettled(page);
     await scan(page, "recovery: a newer version's save");
   });
 });
