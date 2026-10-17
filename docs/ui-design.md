@@ -1773,6 +1773,18 @@ the first visit's single sample, every table in a breakdown with its CSV, the sc
 - **One offer's document is about 3 pages,** not the plan's about 2: pasted into Word (2026-10-16), sample A's fills 3 pages and its
   closing lines run onto a 4th, with 5 tables, since it lists every payment and every cliff in the stay.
 
+**After stop 5C: Copy as document's summary** (2026-10-17, at the user's review of 5C): a breakdown's document has the same choice as
+Print…, under the masthead, with one offer too (the button no longer copies at once):
+- **Summary** (the default with one offer): 1. the bottom line, 2. where the money goes (the $100, without year 1's bridge), 3. pay by
+  year (without every payment by date), 4. the key terms and the bad case (the terms, the next cliff, bear and bull, without leaving
+  on a given day or every cliff), then 5. the offer as entered and 6. the assumptions, which hold its warnings that change the
+  numbers. A note says what the full detail adds.
+- **Full detail:** 5C's document, sections 1-8.
+- **With two or more offers:** the comparison (still first and the default), the shown offer's breakdown in summary or in full
+  detail, or both, each breakdown in summary, then the comparison.
+- **Measured in Word** (sample A on a first visit, as pasted, Letter, 2026-10-17): the summary 2 pages with 2 tables; the full detail
+  3 pages and its closing lines on a 4th, with 5 tables.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

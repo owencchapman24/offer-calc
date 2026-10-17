@@ -161,10 +161,13 @@ test.describe("compare: one offer, and the breakdowns", () => {
     await scan(page, "one offer: A-1's month, its work");
   });
 
-  test("one offer: its breakdown copied", async ({ page, context }) => {
+  test("one offer: its breakdown's choice, then copied", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openAlone(page);
     await page.getByRole("button", { name: "Copy as document" }).click();
+    await expect(page.locator("#copy-choice")).toBeVisible();
+    await scan(page, "one offer: Copy as document's choice");
+    await page.locator("#copy-choice").getByRole("button", { name: "Copy", exact: true }).click();
     await expect(page.locator(".print-bar")).toContainText("Copied", { timeout: 30_000 });
     await scan(page, "one offer: Copy as document, copied");
   });

@@ -112,14 +112,14 @@ export async function removeOffer(page: Page, letter: string) {
 }
 
 /**
- * "Copy as document": with one offer it copies its breakdown at once; with two or more it offers a choice (the comparison, the
- * breakdown shown, or both), then Copy (docs/v2-plan.md, item 5, B10).
+ * "Copy as document": its choice, then Copy (docs/v2-plan.md, item 5, B10): the breakdown shown in summary (the default with one
+ * offer) or in full detail; with two or more offers, the comparison (their default) or both too.
  */
-export async function copyDocument(page: Page, kind?: "comparison" | "breakdown" | "both") {
+export async function copyDocument(page: Page, pick: "summary" | "full" | "comparison" | "both") {
   await page.getByRole("button", { name: "Copy as document" }).click();
-  if (!kind) return;
   const choice = page.locator("#copy-choice");
-  await choice.getByRole("radio", { name: { comparison: /^The comparison/, breakdown: /'s breakdown/, both: /^Both/ }[kind] }).check();
+  const name = { summary: /^Summary|breakdown, summary/, full: /^Full detail|breakdown, full detail/, comparison: /^The comparison/, both: /^Both/ }[pick];
+  await choice.getByRole("radio", { name }).check();
   await choice.getByRole("button", { name: "Copy", exact: true }).click();
 }
 
