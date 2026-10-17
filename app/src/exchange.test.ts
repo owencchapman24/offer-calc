@@ -8,6 +8,9 @@ import { ASSUMPTIONS, blankOffer, shiftOffer, toHousehold, toOfferInput } from "
 import { Lead } from "./Lead";
 import { initialSession, migrateOffer, reducer, type Session, type V1Offer } from "./session";
 
+/** The three samples, compared ("See a sample comparison"; the first visit is sample A alone). */
+const samples = (today: string) => reducer(initialSession(today), { type: "loadSamples", today });
+
 // JSON export and import (docs/slice-3-plan.md): a round trip gives the same results; an invalid file
 // lists its problems and changes nothing; an older (schema 1) export migrates.
 
@@ -30,7 +33,7 @@ function results(s: Session) {
 
 describe("export", () => {
   it("one versioned file: format, schema version, when, a note while samples are in it; the name ends -sample then", () => {
-    const { fileName, text } = exportSession(initialSession(TODAY), TODAY, NOW);
+    const { fileName, text } = exportSession(samples(TODAY), TODAY, NOW);
     expect(fileName).toBe("offer-calc-2026-10-08-sample.json");
     const file = JSON.parse(text);
     expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 3, exportedAt: "2026-10-08T15:00:00.000Z",
@@ -44,7 +47,7 @@ describe("export", () => {
 
 describe("import", () => {
   it("a round trip gives the same offers, About you and results", () => {
-    let s = initialSession(TODAY);
+    let s = samples(TODAY);
     s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "hours.weeksPerYear": 48 } });
     s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
     expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
@@ -57,13 +60,13 @@ describe("import", () => {
     if (!r.ok) return;
     expect(r.offers).toEqual(s.offers);
     expect(r.household).toEqual(s.household);
-    const back = reducer(initialSession(TODAY), { type: "replace", household: r.household, offers: r.offers, ui: r.ui });
+    const back = reducer(samples(TODAY), { type: "replace", household: r.household, offers: r.offers, ui: r.ui });
     expect(results(back)).toEqual(results(s));
     expect(back.ui.basis).toBe(s.ui.basis);
   });
 
   it("an invalid file lists its problems and changes nothing", () => {
-    const good = JSON.parse(exportSession(initialSession(TODAY), TODAY, NOW).text);
+    const good = JSON.parse(exportSession(samples(TODAY), TODAY, NOW).text);
     const bad = (f: (x: typeof good) => void) => { const x = structuredClone(good); f(x); return JSON.stringify(x); };
     const cases: Array<[string, string, string]> = [
       ["not JSON", "{oops", "This file isn't JSON, so it isn't an Offer Calc export."],
@@ -94,14 +97,14 @@ describe("import", () => {
   });
 
   it("a schema 2 export (slices 3-5) migrates: prices in the U.S. average, everything else as it was", () => {
-    const file = JSON.parse(exportSession(initialSession(TODAY), TODAY, NOW).text);
+    const file = JSON.parse(exportSession(samples(TODAY), TODAY, NOW).text);
     delete file.household.pricesIn;
     const r = readImport(JSON.stringify({ ...file, schemaVersion: 2 }));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.migratedFrom).toBe(2);
-    expect(r.household).toEqual(initialSession(TODAY).household);
-    expect(r.offers).toEqual(initialSession(TODAY).offers);
+    expect(r.household).toEqual(samples(TODAY).household);
+    expect(r.offers).toEqual(samples(TODAY).offers);
   });
 
   it("an older (schema 1) export migrates: each offer as the v1 app would have computed it", () => {

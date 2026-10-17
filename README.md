@@ -30,7 +30,8 @@ with the winner for stays of 2 to 5 years beside it. Every figure carries an aud
 see its derivation with your values, the figures it uses, and its section of the
 [methodology](https://offer-calc.vercel.app/#/method). Quick mode asks for five fields per offer;
 detailed mode covers raises, promotions, bonus timing, RSU vesting, refreshers, the 401(k), health,
-perks, cash awards with clawbacks, and hours.
+perks, cash awards with clawbacks, and hours. Copy as document puts an offer's breakdown, the comparison, or
+both on the clipboard, tables and all, for a document or an email; each table also downloads as a CSV.
 
 It runs entirely in your browser: no account, no server, no analytics. What you enter is saved in
 this browser only, and the Data page exports it to a JSON file and imports it back.

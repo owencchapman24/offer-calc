@@ -1,9 +1,12 @@
 import type { ISODate, MonthDay, OfferWarning } from "../../src/offer/types";
 import { dollars, longDate } from "./text";
-import { yearOf } from "./warningKinds";
+import { type WarningKind, yearOf } from "./warningKinds";
 
 // The engine's warnings in words, one kind of warning at a time with its years (docs/ui-design.md §4.7): L-5's lines, and the
 // document's (copyDoc.ts). The withholding shortfall is written with its figures in L-5 itself. Pure: no React.
+
+/** Each kind's title, as A-6 heads its warnings and the copied document names them. */
+export const KIND_TITLE: Record<WarningKind, string> = { changes: "Changes your numbers", notModeled: "Not modeled: may cost you", cash: "Cash timing" };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthDay = (m: MonthDay) => `${MONTHS[m.month - 1]} ${m.day}`;

@@ -1,7 +1,8 @@
 import type { Basis } from "../../src/offer/types";
 import { CASES, dropText, riskView } from "./cases";
 import { basisPhrase, type MetricId, metricKind, ownOf, pricesOf, res, type WorkContext } from "./metrics";
-import { byYear } from "./byYearModel";
+import { bridge, byYear } from "./byYearModel";
+import { A2_LABEL, benefitsOf, centsText, hundredOf, payRows, rateText as shareText, taxYearsOf } from "./partsModel";
 import type { Letter } from "./model";
 import { cents, dayBefore, figure, longDate } from "./text";
 import { TICKS, type TickKind } from "./ui";
@@ -10,7 +11,8 @@ import {
   yearTable,
 } from "./workpaper";
 
-// CSV export of each table (docs/ui-design.md §4.8, §10): L-1's and L-2's table views, and an offer's A-7 (L-6 until stop 5B), its four tables.
+// CSV export of each table (docs/ui-design.md §4.8, §10): L-1's and L-2's table views, and every table in an offer's breakdown: A-2's
+// $100 and its bridge, A-3's pay by year, A-5's benefits by year, A-6's tax by calendar year, and A-7's four tables.
 // Each is built from the same view model as the table on screen, and each figure is the figure shown, written as a plain number:
 // its display text with the thousands separators, currency signs and parentheses taken out ("(41,724)" is -41724, "$21.85"
 // is 21.85, "27.2735%" is 27.2735), units in the column headers. Beside each figure, a column with its tickmark (metricKind).
@@ -18,8 +20,11 @@ import {
 // against a spreadsheet running them as formulas: offer labels and award names are free text. Loaded on the first download.
 
 export type L6Part = "years" | "stay" | "payments" | "tax";
-/** A table to export: L-1's table view (each year or the running total), L-2's, or one of an offer's A-7 tables. */
-export type CsvTable = { kind: "l1"; running: boolean } | { kind: "l2" } | { kind: "a7"; letter: Letter; part: L6Part };
+/** A-2 to A-6's tables: A-2's $100 and its bridge (for a year), A-3's pay, A-5's benefits and A-6's tax by calendar year. */
+export type PartTable = "a2" | "bridge" | "a3" | "a5" | "a6";
+/** A table to export: L-1's table view (each year or the running total), L-2's, or one of an offer's breakdown tables. */
+export type CsvTable = { kind: "l1"; running: boolean } | { kind: "l2" } | { kind: "a7"; letter: Letter; part: L6Part }
+  | { kind: "part"; letter: Letter; part: PartTable; n?: number };
 
 /** A cell: text, a number (as written; a figure carries its id, for the tests), or empty. */
 export type Cell = string | { num: string; id?: MetricId } | null;
@@ -81,6 +86,7 @@ export function build(ctx: WorkContext, t: CsvTable): Built {
     case "l1": return l1(ctx, t.running);
     case "l2": return l2(ctx);
     case "a7": return L6[t.part](ctx, t.letter);
+    case "part": return PARTS[t.part](ctx, t.letter, t.n ?? 1);
   }
 }
 
@@ -89,8 +95,9 @@ export function build(ctx: WorkContext, t: CsvTable): Built {
  * offer's A-7 its own stay.
  */
 function scope(ctx: WorkContext, t: CsvTable): string {
-  const w = t.kind === "a7" ? { ...ownOf(ctx, t.letter).window, years: ownOf(ctx, t.letter).years } : { ...res(ctx).view.row.window, years: res(ctx).view.row.years };
-  return `Base case · ${t.kind === "a7" ? "its stay" : "stay"} ${w.years} ${w.years === 1 ? "year" : "years"} (${longDate(w.start)} – ${longDate(dayBefore(w.end))})`
+  const own = t.kind === "a7" || t.kind === "part";
+  const w = own ? { ...ownOf(ctx, t.letter).window, years: ownOf(ctx, t.letter).years } : { ...res(ctx).view.row.window, years: res(ctx).view.row.years };
+  return `Base case · ${own ? "its stay" : "stay"} ${w.years} ${w.years === 1 ? "year" : "years"} (${longDate(w.start)} – ${longDate(dayBefore(w.end))})`
     + ` · Offer Calc, exported ${longDate(ctx.today)}`;
 }
 
@@ -255,6 +262,97 @@ const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
       header: ["Calendar year", "Tax law", "Line", "Note", "With the offer ($)", "With the offer tickmark", "Without it ($)", "Without it tickmark",
         "The offer's share ($)", "The offer's share tickmark"],
       rows,
+    };
+  },
+};
+
+// ---- A-2 to A-6: the breakdown's other tables, over the offer's own stay ------------------------------------------------
+
+const partRef = (ctx: WorkContext, letter: Letter, n: number, what: string) => `${letter}-${n}${label(ctx, letter) ? ` · ${label(ctx, letter)}` : ""} · ${what}`;
+/** Each year of the stay, a figure and its tickmark: "Year 1 ($, as paid)", "Year 1 tickmark", … then the years added. */
+const yearHeads = (n: number) => [...Array.from({ length: n }, (_, i) => [`Year ${i + 1} ($, as paid)`, `Year ${i + 1} tickmark`]).flat(),
+  `Years 1–${n} ($, as paid)`, `Years 1–${n} tickmark`];
+
+const PARTS: Record<PartTable, (ctx: WorkContext, letter: Letter, n: number) => Built> = {
+  a2(ctx, letter, n) {
+    const h = hundredOf(ownOf(ctx, letter).detail, n);
+    if (!h) throw new Error(`${letter} needs a city and pay in year ${n}.`);
+    const year = `year-${n}`;
+    return {
+      slug: `${letter}-2-where-the-money-goes-year-${n}`,
+      title: partRef(ctx, letter, 2, `Where each $100 of ${year} pay goes, and its dollars as paid`),
+      header: ["Part", `Of each $100 of ${year} pay ($)`, "Of each $100 tickmark", `Year ${n} ($, as paid)`, `Year ${n} tickmark`],
+      rows: [
+        ...h.parts.map((q): Cell[] => [cap(A2_LABEL[q.part]), ...fig(ctx, `a2.${letter}.${n}.${q.part}Share` as MetricId, centsText(q.cents)),
+          ...fig(ctx, `a2.${letter}.${n}.${q.part}`, moneyText(q.dollars))]),
+        ["Paid to you", ...fig(ctx, `a2.${letter}.${n}.hundred`, "$100.00"), ...fig(ctx, `br.${letter}.${n}.paid`, figure(h.paid))],
+      ],
+    };
+  },
+
+  bridge(ctx, letter, n) {
+    const b = bridge(ctx, letter, n);
+    // A line's dollars, as its label on the page says them: after rent, the offer's own city's, then the prices picked.
+    const unit = (line: string) => (line === "own" ? `${b.city} $` : line === "total" ? pricesOf(ctx).unit : "$");
+    return {
+      slug: `${letter}-2-from-the-offer-letter-year-${n}`,
+      title: partRef(ctx, letter, 2, `From the offer letter to after rent, year ${n} (${longDate(b.start)} – ${longDate(dayBefore(b.end))}), as paid`),
+      header: ["Line", "Note", "Dollars", `Year ${n} (as paid)`, `Year ${n} tickmark`],
+      rows: b.rows.map((row): Cell[] => {
+        const lead = row.kind === "less" || row.kind === "plus" || row.kind === "change" ? (row.value < 0 ? "less " : "plus ") : "";
+        return [`${lead}${row.label}`, row.gloss ?? "", unit(row.line), ...fig(ctx, row.id, moneyText(row.value))];
+      }),
+    };
+  },
+
+  a3(ctx, letter) {
+    const t = yearTable(ctx, letter);
+    return {
+      slug: `${letter}-3-pay-by-year`,
+      title: partRef(ctx, letter, 3, "Pay by employment year and kind, as paid"),
+      header: ["Line", ...yearHeads(t.n)],
+      rows: payRows(t).map((row): Cell[] => [
+        row.line === "gross" ? "Pay" : row.label,
+        ...row.values.flatMap((v, i) => fig(ctx, `l6y.${letter}.${row.line}.${i + 1}`, moneyText(v))),
+        ...fig(ctx, `l6y.${letter}.${row.line}.sum`, moneyText(row.sum)),
+      ]),
+    };
+  },
+
+  a5(ctx, letter) {
+    const t = yearTable(ctx, letter);
+    const x = benefitsOf(t);
+    const rows: Cell[][] = [];
+    if (x.creditedSum > 0) {
+      rows.push(["Employer 401(k) money credited", "", ...x.credited.flatMap((v, k) => fig(ctx, `a5.${letter}.credited.${k + 1}`, figure(v))),
+        ...fig(ctx, `a5.${letter}.credited.sum`, figure(x.creditedSum))]);
+    }
+    for (const row of x.rows) {
+      rows.push([`${row.lead ? `${row.lead} ` : ""}${row.label}`, row.gloss ?? "", ...row.values.flatMap((v, k) => fig(ctx, `l6y.${letter}.${row.line}.${k + 1}`, moneyText(v))),
+        ...fig(ctx, `l6y.${letter}.${row.line}.sum`, moneyText(row.sum))]);
+    }
+    rows.push(["Total rewards less after-tax pay", "", ...x.added.flatMap((v, k) => fig(ctx, `a5.${letter}.added.${k + 1}`, moneyText(v))),
+      ...fig(ctx, `a5.${letter}.added.sum`, moneyText(x.addedSum))]);
+    return {
+      slug: `${letter}-5-benefits-by-year`,
+      title: partRef(ctx, letter, 5, "The benefits and health costs by employment year, as paid"),
+      header: ["Line", "Note", ...yearHeads(t.n)],
+      rows,
+    };
+  },
+
+  a6(ctx, letter) {
+    const b = ownOf(ctx, letter);
+    const kinds = [["gross", "Pay"], ["federal", "Federal income tax"], ["fica", "FICA"], ["state", "State tax"], ["local", "Local tax"], ["tax", "Tax"]] as const;
+    return {
+      slug: `${letter}-6-tax-by-calendar-year`,
+      title: partRef(ctx, letter, 6, "Tax by calendar year: each year's pay, its tax by kind, and its rate"),
+      header: ["Calendar year", "Tax law", ...kinds.flatMap(([, name]) => [`${name} ($)`, `${name} tickmark`]), "Rate, of that calendar year's pay (%)", "Rate tickmark"],
+      rows: taxYearsOf(b.detail, b.window).map((r): Cell[] => [
+        num(r.year), r.projectedLaw ? "projected from 2026" : "2026 tax law",
+        ...kinds.flatMap(([k]) => fig(ctx, `a6.${letter}.${r.year}.${k}`, figure(r.values[k]))),
+        ...fig(ctx, `a6.${letter}.${r.year}.rate`, shareText(r.rate)),
+      ]),
     };
   },
 };

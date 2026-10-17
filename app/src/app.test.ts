@@ -144,11 +144,15 @@ describe("drafts to the engine's input", () => {
 });
 
 describe("session", () => {
-  const s0 = initialSession(TODAY);
-  it("starts with the samples, a 4-year stay and the after-rent basis", () => {
-    expect(s0.offers.map((o) => o.letter)).toEqual(["A", "B", "C"]);
-    expect(s0.household).toEqual({ filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: "00000" });
-    expect(s0.ui.basis).toBe("colAdjustedTotal");
+  const first = initialSession(TODAY);
+  // "See a sample comparison" (and the footer's "Reload the samples"): all three.
+  const s0 = reducer(first, { type: "loadSamples", today: TODAY });
+  it("a first visit starts with sample A on its own (B5), a 4-year stay and the after-rent basis; one click loads all three", () => {
+    expect(first.offers.map((o) => [o.letter, o.sample])).toEqual([["A", "sample"]]);
+    expect(first.household).toEqual({ filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: "00000" });
+    expect(first.ui.basis).toBe("colAdjustedTotal");
+    expect(s0.offers.map((o) => [o.letter, o.sample])).toEqual([["A", "sample"], ["B", "sample"], ["C", "sample"]]);
+    expect(s0.offers[0]).toEqual(first.offers[0]);
   });
   it("letters stay with their offers: remove B, add one, and it's B again", () => {
     const removed = reducer(s0, { type: "removeOffer", id: s0.offers[1].id });
@@ -170,7 +174,7 @@ describe("session", () => {
     mem.set(STORAGE_KEY, "{not json");
     expect(loadSession(store, TODAY).household.stayYears).toBe(4);
     const blocked: KeyValueStore = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
-    expect(loadSession(blocked, TODAY).offers).toHaveLength(3);
+    expect(loadSession(blocked, TODAY).offers).toHaveLength(1);
     expect(saveSession(blocked, s0)).toBe("unavailable");
     expect(saveSession(undefined, s0)).toBe("unavailable");
   });
@@ -182,14 +186,14 @@ describe("recovery: nothing saved is lost (audit C22, C23)", () => {
     const store: KeyValueStore = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) };
     return { mem, store };
   };
-  const s0 = initialSession(TODAY);
+  const s0 = reducer(initialSession(TODAY), { type: "loadSamples", today: TODAY });
   const newer = JSON.stringify({ schemaVersion: 4, household: { filingStatus: "joint" }, offers: [{ id: "x", letter: "A", future: true }], ui: {} });
 
-  it("a newer version's save loads as the samples, says so, and is never saved over", () => {
+  it("a newer version's save loads as a first visit, says so, and is never saved over", () => {
     const { mem, store } = memory([[STORAGE_KEY, newer]]);
     const loaded = load(store, TODAY);
     expect(loaded.newer).toBe(4);
-    expect(loaded.session.offers.map((o) => o.sample)).toEqual(["sample", "sample", "sample"]);
+    expect(loaded.session.offers.map((o) => o.sample)).toEqual(["sample"]);
     // Before this fix the app saved the samples over it 500 ms after loading.
     expect(saveSession(store, reducer(loaded.session, { type: "household", patch: { stayYears: 2 } }))).toBe("newer");
     expect(mem.get(STORAGE_KEY)).toBe(newer);
@@ -326,7 +330,7 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)
-      .offers.map((o) => o.sample)).toEqual(["sample", "sample", "sample"]);
+      .offers.map((o) => o.sample)).toEqual(["sample"]);
   });
 });
 
@@ -382,19 +386,24 @@ describe("text", () => {
 });
 
 describe("why Copy as document waits (copyBlock)", () => {
-  const ok = { compare: true, view: true, invalid: false, error: false, incomplete: [] as string[] };
-  it("while the first comparison is worked out, it waits without a visible reason, so nothing moves", () => {
+  const ok = { offers: 3, view: true, own: true, invalid: false, error: false, incomplete: [] as string[] };
+  it("while the first results are worked out, it waits without a visible reason, so nothing moves", () => {
     expect(copyBlock({ ...ok, view: false })).toEqual({ why: "Working out the comparison…", shown: false });
+    expect(copyBlock({ ...ok, own: false })).toEqual({ why: "Working out the comparison…", shown: false });
+    expect(copyBlock({ ...ok, offers: 1, view: false, own: false })).toEqual({ why: "Working out the breakdown…", shown: false });
   });
   it("a problem with the offers is said beside the button", () => {
-    expect(copyBlock({ ...ok, compare: false, view: false })).toEqual({ why: "Add a second offer to copy a comparison.", shown: true });
-    expect(copyBlock({ ...ok, invalid: true })?.why).toBe("Fix the problems listed under the verdict to copy the comparison.");
+    expect(copyBlock({ ...ok, offers: 0, view: false, own: false })).toEqual({ why: "Fill in an offer to copy its breakdown.", shown: true });
+    expect(copyBlock({ ...ok, invalid: true })?.why).toBe("Fix the problems listed under the verdict to copy the document.");
+    expect(copyBlock({ ...ok, offers: 1, view: false, invalid: true })?.why).toBe("Fix the problems listed with its bottom line to copy the document.");
     // A stored session with a problem, before any results: the problem, not "fill in".
-    expect(copyBlock({ ...ok, view: false, invalid: true })).toEqual({ why: "Fix the problems listed under the verdict to copy the comparison.", shown: true });
+    expect(copyBlock({ ...ok, view: false, invalid: true })).toEqual({ why: "Fix the problems listed under the verdict to copy the document.", shown: true });
     expect(copyBlock({ ...ok, error: true })?.shown).toBe(true);
     expect(copyBlock({ ...ok, incomplete: ["C"] })).toEqual({ why: "Fill in or remove offer C to copy the comparison.", shown: true });
   });
-  it("with results and no problem, it's ready", () => {
+  it("with results and no problem, it's ready; one complete offer copies its breakdown, a blank second offer or not", () => {
     expect(copyBlock(ok)).toBeNull();
+    expect(copyBlock({ ...ok, offers: 1, view: false })).toBeNull();
+    expect(copyBlock({ ...ok, offers: 1, view: false, incomplete: ["B"] })).toBeNull();
   });
 });

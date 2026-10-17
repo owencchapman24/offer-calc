@@ -179,7 +179,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
 
         <section className="method-section" aria-labelledby="data-delete">
           <h2 id="data-delete"><span className="ref">D-4</span> Delete all data</h2>
-          <p>Deletes everything you've entered in this browser{backup ? ", and what was set aside," : ""} and starts again with the sample offers.</p>
+          <p>Deletes everything you've entered in this browser{backup ? ", and what was set aside," : ""} and starts again with the sample offer, as on a first visit.</p>
           {!confirmDelete ? (
             <p>
               <button type="button" className="got-it data-button" ref={refs.deleteButton as RefObject<HTMLButtonElement>}
@@ -197,7 +197,7 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
                   dispatch({ type: "reset", today });
                   setConfirmDelete(false);
                   setFile(null);
-                  setDone({ at: "delete", text: "Deleted. The sample offers are loaded again." });
+                  setDone({ at: "delete", text: "Deleted. The sample offer is loaded again." });
                   then("deleteButton");
                 }}>Delete</button>
                 {/* Focus starts here, on the action that changes nothing. */}

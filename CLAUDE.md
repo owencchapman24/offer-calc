@@ -9,18 +9,19 @@ behind every figure.
 - **The tool informs the decision and shows its work; you make the call** (v2's D1). It never recommends a job, calls an offer low,
   or gives financial advice.
 - **The direction: evaluator-first** (approved 2026-10-15, `docs/v2-plan.md` item 5, B1). Every offer gets its own standalone
-  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **Built so far: stops 5A and 5B**
-  (2026-10-15 and 16): one offer is enough, and every offer has its breakdown over its own stay, A-1 (its bottom line) to A-7 (the
-  work); 5C builds the rest (one offer's document, the first visit).
+  breakdown, the primary view, and the comparison is a layer that appears with two or more offers. **Built** (stops 5A-5C,
+  2026-10-15 and 16): one offer is enough, a first visit opens on one sample offer, every offer has its breakdown over its own stay,
+  A-1 (its bottom line) to A-7 (the work), and Copy as document copies one offer's breakdown, the comparison or both.
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
 ## 2. Current state (2026-10-16)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (so far 2027's HSA limits and Social Security wage base).
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
-  A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test) and
-  stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2). How each differs from the design:
-  `docs/ui-design.md` §12.
+  A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test),
+  stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
+  offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table). How each differs from
+  the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
@@ -39,10 +40,10 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: v2 item 5's stop 5C** (`docs/v2-plan.md`, "Review stops"): Copy as document for one offer, and its choice with two or more;
-the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the
-NVDA walkthrough's new parts. Stops 5A and 5B were built (2026-10-15 and 16) before the testers' answer to item 5's first question
-("how many offers did you actually have?"), at the user's word; record the answer when it comes.
+**Next: ask.** v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many
+offers did you actually have?"), at the user's word; record the answer when it comes. The plan's order puts item 2 (market
+benchmarks, as A-8) next, after the testers' answers to its questions (`docs/v2-plan.md`, "Questions for testers"). Item 4 gained 4h,
+commission (the owner's own use, finding 3), unranked and not built.
 
 **The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
@@ -60,7 +61,8 @@ section 2's and the plan's in step):
    item 7, has each setting; the ruleset it plans is in place (section 4). What's left of audit S1: Vercel still deploys every push
    to `main` without waiting for CI; have it wait for the checks before promoting.
 2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files).
-3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 30 minutes, after D11's updates to it): the user runs it and sends
+3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
+   and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
 4. **The audit's "fix before going public" items** (its table): C6, C7, C16-C19, C24, C25, C27, C28, T6, T7, T9, S1, S2's
    `npm audit` step, D9-D11, P5-P7.
@@ -107,7 +109,7 @@ section 2's and the plan's in step):
 - `npm run check-bundle` (after a build): the main thread, a quick-mode visit, against 120 kB gzip in one chunk; the worker against
   75 kB gzip; the stylesheet reported (`scripts/lib/bundle.ts`).
 - `npm run lighthouse [-- <url>]` (after a build): Lighthouse's mobile profile, a warm-up and five runs. Fails on a median LCP over
-  2.5 s, CLS over 0.02 or TBT over 200 ms, or a run that shows no verdict; reports the time to the first answer (observed, not
+  2.5 s, CLS over 0.02 or TBT over 200 ms, or a run that shows no answer (A-1 on a first visit, or the verdict); reports the time to the first answer (observed, not
   budgeted). Needs Chrome or `CHROME_PATH` (Edge on Windows). The median LCP's run's report goes to `.lighthouse/report.html`.
   `npm run lighthouse -- --fonts-late [ms]`: the late-fonts pass, three runs with the web fonts held back (1.5 s), so the page paints
   in the fallback fonts first; it gates only CLS (the swap mustn't move text). CI runs both.
@@ -187,7 +189,9 @@ section 2's and the plan's in step):
 - **Colors:** offer colors (cobalt, berry, bronze) are for marks and rules only; text stays ink. Each offer keeps its letter and
   color for life. Tokens and their validation: `docs/ui-design.md` §9; re-run the dataviz validator if a color changes.
 - **Samples:** `src/samples.ts` keeps fixed dates (start 2026-07-13) for the table script and tests; the app moves them forward by
-  whole years to start on or after today, so present values are from today. They're stamped illustrative wherever they appear.
+  whole years to start on or after today, so present values are from today. They're stamped illustrative wherever they appear. A
+  first visit (and "Delete all data") is sample A on its own; "See a sample comparison" and the footer's "Reload the samples" load
+  all three. The banner under the masthead says so, with "Start with my offer".
 - **Today:** the app passes the user's local date as `valuationDate`.
 - **Words:** labels follow "Prices in" (`app/src/prices.ts`). Under v2's B13, every rate and share states its period ("a month over
   your stay", "of its 2027 pay"), and under condition 1 every figure names its dollars: after rent the place's, "$" before rent and
@@ -217,9 +221,12 @@ section 2's and the plan's in step):
   - Print… lays the page out as a 680 px column, loads every schedule and waits for it; Ctrl+P prints what's loaded. A is solid, B
     dashed, C dotted.
   - A CSV writes each figure as shown, as a plain number, with its tickmark beside it: UTF-8 with a BOM, CRLF, samples flagged on
-    line 1, and a text cell starting with `=`, `+`, `-`, `@`, a tab or a CR gets a leading `'`.
-  - Copy as document is one document model with two renderers (HTML with inline styles, text within 80 columns); every calculation
-    it states is in `worked` and checked. The click writes a `ClipboardItem` of promises at once, for Safari.
+    line 1, and a text cell starting with `=`, `+`, `-`, `@`, a tab or a CR gets a leading `'`. L-1's and L-2's table views have
+    one, and every table in a breakdown (A-2's two, A-3, A-5, A-6, A-7's four), built from the rows the part draws.
+  - Copy as document is one document model with two renderers (HTML with inline styles, text within 80 columns); every table foots
+    as displayed and every calculation it states is in `worked`, checked. With one offer it copies that offer's breakdown; with two
+    or more, a choice under the masthead (as Print…'s): the comparison, the breakdown shown, or both. The click writes a
+    `ClipboardItem` of promises at once, for Safari.
 - **Saved state:** this browser's localStorage only. A session the page can't show gets the error boundary's way out (`Recovery.tsx`:
   download what's saved, start again, reload); a session from a newer schema is never saved over; an unreadable one is set aside
   under `offer-calc:backup`.
@@ -367,7 +374,8 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `jobs.ts` (the two lanes), `protocol.ts` (messages), `useEngine.ts` (debounced 200 ms, stale results dropped).
 - **Show the work:** `figures.tsx` (`Fig`, `TickButton`, `CsvButton`), `Tickmarks.tsx` (`WorkProvider`, the popover), `metrics.ts`
   (metric ids, tickmark kinds, the rent note), `derive.ts` (the derivations, loaded on first use), `sections.ts` (methodology ids).
-- **Out of the page:** `copyDoc.ts` (Copy as document), `csv.ts`, `print.ts`, each loaded on first use.
+- **Out of the page:** `copyDoc.ts` (Copy as document: the comparison, one offer's breakdown, or both), `csv.ts`, `print.ts`, each
+  loaded on first use.
 - **Shared:** `ui.tsx` (stamps, tickmark legend, contexts), `text.ts` (money and dates as shown), `prices.ts` ("Prices in" and its
   words), `media.ts` (widths, the phone keyboard, focus clear of the sticky bars), `axes.ts`, `lazy.ts`, `styles.css`.
 - **Tests only:** `testing.ts`, `arbitrary.ts` (the property tests' generators).
@@ -382,7 +390,7 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `labels.test.ts` (every figure names its dollars, every rate its period, no two offers' own-city figures side by side),
   `breakdown.test.ts` (A-1 against the plan's worked example, the worker's per-offer job, one-offer sessions), `parts.test.ts` (A-2
   to A-7 against it, a breakdown that adding offers doesn't change, the step to the comparison's window);
-- each schedule and output: `l3`, `leave` (L-4), `l5` (A-6's warnings), `csv`, `copydoc` (each stated calculation), `ticks`, `names` (buttons' names),
+- each schedule and output: `l3`, `leave` (L-4), `l5` (A-6's warnings), `csv`, `copydoc` (each document's footing and stated calculations), `ticks`, `names` (buttons' names),
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
@@ -448,13 +456,13 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5's stops 5A and 5B built; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5 (stops 5A-5C) built; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |
 | `docs/ui-design.md` | The UI design (rev 4: §1 evaluator-first) and §12, how each slice and stop was built | Historical, except §1 (current); §12 as built |
 | `docs/offer-model.md` | The offer model's design (rev 3) | Historical; `src/offer/types.ts` is authoritative |
 | `docs/ui-slices-4-8-plan.md`, `docs/slice-3-plan.md`, `docs/copy-as-document-plan.md` | Plans, each built (the last with `copy-as-document-sample.html`) | Done; `slice-3-plan.md`'s public-repo settings (item 7) still apply |
-| `docs/nvda-walkthrough.md` | The screen-reader script | Needs D11's updates before it's run |
+| `docs/nvda-walkthrough.md` | The screen-reader script | Updated for item 5 (2026-10-16); needs D11's other steps (Print…, the tickmark setting) before it's run |
 | `docs/history.md` | What CLAUDE.md recorded before 2026-10-15: each slice, the sizes and load times, dated rationale | Archive, not maintained |
 | `README.md` | The project for a visitor: what it does, sources, how to run it | Current, except the screenshot (D10) |

@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { loadByYearOnly, openCompare, openParts, openWithSaved, openWork, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
+import { copyDocument, loadByYearOnly, openAlone, openCompare, openParts, openWithSaved, openWork, ownSettled, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -183,7 +183,7 @@ const clipboard = (page: Page) => page.evaluate(async () => {
 });
 const SAMPLE_LINE = "Includes sample offers: illustrative inputs, not market data.";
 
-test("Copy as document: one click puts the comparison on the clipboard, as HTML and plain text, its code loaded only then", async ({ page, context }) => {
+test("Copy as document: the comparison, chosen, on the clipboard as HTML and plain text, its code loaded only then", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const chunks: string[] = [];
   page.on("request", (r) => { if (/\/assets\/copyDoc-/.test(r.url())) chunks.push(r.url()); });
@@ -191,8 +191,13 @@ test("Copy as document: one click puts the comparison on the clipboard, as HTML 
   expect(chunks).toEqual([]);
   // The hero as the page shows it, without its tickmark: "$500 a month".
   const hero = (await verdictText(page)).hero[0].replace("✓", "").trim();
+  // With two or more offers it asks which document, the comparison first; nothing is loaded until Copy.
   await page.getByRole("button", { name: "Copy as document" }).click();
+  await expect(page.locator("#copy-choice").getByRole("radio", { name: /^The comparison/ })).toBeFocused();
+  expect(chunks).toEqual([]);
+  await page.locator("#copy-choice").getByRole("button", { name: "Copy", exact: true }).click();
   await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
+  await expect(page.locator("#copy-choice")).toHaveCount(0);
   expect(chunks).toHaveLength(1);
   const got = await clipboard(page);
   expect(Object.keys(got).sort()).toEqual(["text/html", "text/plain"]);
@@ -211,7 +216,7 @@ test("Copy as document: where the browser won't write from a promise, Copy now c
   // A browser without ClipboardItem: the first click gets the document ready, the second copies it through a copy event.
   await page.addInitScript(() => { delete (window as unknown as { ClipboardItem?: unknown }).ClipboardItem; });
   await openCompare(page);
-  await page.getByRole("button", { name: "Copy as document" }).click();
+  await copyDocument(page, "comparison");
   await page.getByRole("button", { name: "Copy now" }).click({ timeout: 30_000 });
   await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.");
   const got = await clipboard(page);
@@ -225,20 +230,58 @@ test("Copy as document waits, and says why, while the inputs have a problem", as
   const button = page.getByRole("button", { name: "Copy as document" });
   await expect(button).not.toHaveAttribute("aria-disabled");
   // Copied, then an edit: the status was about the comparison before it, so it goes.
-  await button.click();
+  await copyDocument(page, "comparison");
   await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
   // A start date before 2026: a problem the comparison waits on.
   const start = page.locator("#in-A-startDate");
   const was = await start.inputValue();
   await start.fill("2025-06-01");
   await expect(button).toHaveAttribute("aria-disabled", "true");
-  await expect(button).toHaveAccessibleDescription("Fix the problems listed under the verdict to copy the comparison.");
+  await expect(button).toHaveAccessibleDescription("Fix the problems listed under the verdict to copy the document.");
   await expect(page.locator(".print-bar")).not.toContainText("Copied");
-  // Still focusable and clickable (aria-disabled), so it can say why; a click does nothing.
+  // Still focusable and clickable (aria-disabled), so it can say why; a click does nothing, and opens no choice.
   await button.click({ force: true });
   await expect(page.locator(".print-bar")).not.toContainText("Getting the document ready");
+  await expect(page.locator("#copy-choice")).toHaveCount(0);
   await start.fill(was);
   await expect(button).not.toHaveAttribute("aria-disabled");
+});
+
+test("Copy as document with one offer: a first visit copies sample A's breakdown at once; with three, each and the comparison", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openAlone(page);
+  const own = (await page.locator("#own .own-hero [data-metric]").first().innerText()).replace("✓", "").trim();
+  await copyDocument(page);
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
+  let got = await clipboard(page);
+  expect(got["text/plain"]).toMatch(/^A, NYC BANK: ONE JOB OFFER, WORKED OUT/);
+  for (const flavor of [got["text/html"], got["text/plain"]]) {
+    expect(flavor).toContain(`A leaves you about ${own} a month over your stay, after rent, in New York dollars`);
+    expect(flavor).toContain("A sample offer: illustrative inputs, not market data.");
+    expect(flavor).toContain("Where each $100 of it goes");
+    expect(flavor).toContain("If your last day were");
+  }
+  // Three offers: "both" is each breakdown in turn, then the comparison.
+  await page.getByRole("button", { name: "See a sample comparison" }).click();
+  await settled(page);
+  await copyDocument(page, "both");
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
+  got = await clipboard(page);
+  expect(got["text/plain"]).toMatch(/^THREE JOB OFFERS, EACH ON ITS OWN, THEN COMPARED/);
+  for (const part of ["A, NYC BANK, ON ITS OWN", "B, CHARLOTTE CORP, ON ITS OWN", "C, SEATTLE TECH, ON ITS OWN", "THE COMPARISON"]) expect(got["text/plain"]).toContain(part);
+});
+
+test("the first visit: sample A on its own, its two ways on, side by side and in view", async ({ page }) => {
+  await openAlone(page);
+  await expect(page.locator("[id^=in-][id$=-salary-annual]")).toHaveCount(1);
+  for (const name of ["Start with my offer", "See a sample comparison"]) await expect(page.getByRole("button", { name })).toBeInViewport();
+  await page.getByRole("button", { name: "See a sample comparison" }).click();
+  await settled(page);
+  await expect(page.locator("#lead-title")).toBeVisible();
+  await expect(page.getByRole("button", { name: "See a sample comparison" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Start with my offer" }).click();
+  await expect(page.locator(".sample-banner")).toHaveCount(0);
+  await expect(page.locator("#in-A-salary-annual")).toHaveValue("");
 });
 
 test("export, then import: the same results", async ({ page }) => {
@@ -287,7 +330,7 @@ test.describe("recovery", () => {
     return readFileSync(await (await download).path(), "utf8");
   };
 
-  test("a saved session it can't show: download it, start again with the samples, and it's kept aside", async ({ page }) => {
+  test("a saved session it can't show: download it, start again with the sample offer, and it's kept aside", async ({ page }) => {
     await openWithSaved(page, SAVED.broken);
     await expect(page.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
     // The Data page, where "Delete all data" is, too.
@@ -298,9 +341,9 @@ test.describe("recovery", () => {
     expect(file).toMatchObject({ format: "offer-calc", schemaVersion: 3, offers: [{ id: "mine", draft: {} }] });
     await expect(page.getByRole("status")).toHaveText(/^Saved offer-calc-saved-\d{4}-\d{2}-\d{2}\.json\./);
 
-    await page.getByRole("button", { name: "Start again with the samples" }).click();
-    await settled(page);
-    expect(JSON.parse((await savedNow(page))!).offers.map((o: { sample: string }) => o.sample)).toEqual(["sample", "sample", "sample"]);
+    await page.getByRole("button", { name: "Start again with the sample offer" }).click();
+    await ownSettled(page);
+    expect(JSON.parse((await savedNow(page))!).offers.map((o: { sample: string }) => o.sample)).toEqual(["sample"]);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem("offer-calc:backup")!))).toMatchObject({ why: "startedAgain", saved: SAVED.broken });
     // The Data page offers what was set aside, until all data is deleted.
     await page.getByRole("link", { name: "Data" }).click();
@@ -316,11 +359,11 @@ test.describe("recovery", () => {
   test("a newer version's save: the page says so, offers it as a download, and never saves over it", async ({ page }) => {
     await openWithSaved(page, SAVED.newer);
     await expect(page.getByText("Your saved offers are from a newer version of Offer Calc")).toBeVisible();
-    await settled(page);
+    await ownSettled(page);
     await expect(page.locator(".colophon")).toContainText("Not saving: this browser holds a newer version's save");
-    // An edit, past the save's half-second wait: before this fix, the samples were saved over it once the page had loaded.
-    await page.locator("#in-B-salary-annual").fill("400000");
-    await settled(page);
+    // An edit, past the save's half-second wait: before this fix, the sample was saved over it once the page had loaded.
+    await page.locator("#in-A-salary-annual").fill("400000");
+    await ownSettled(page);
     await page.waitForTimeout(1_000);
     expect(await savedNow(page)).toBe(SAVED.newer);
     const file = JSON.parse(await downloaded(page, () => page.getByRole("button", { name: "Download your saved offers" }).click()));

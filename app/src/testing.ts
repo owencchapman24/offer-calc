@@ -120,7 +120,7 @@ export function renderAlone(ctx0: WorkContext, opts: { firstUse?: boolean; parts
   return renderToStaticMarkup(tree(ctx, [
     createElement(About, { key: "a", session, dispatch: noop, today: ctx.today, wagesYear: ctx.wagesYear }),
     createElement(Ledger, { key: "l", offers: ctx.offers, missing: new Map(), rents: ctx.rents, ui: { mode: "quick" }, dispatch: noop }),
-    createElement(OwnPinned, { key: "o", x, prices, withRef: ctx.own!.withRef, updating: false, sample: x.offer.sample !== null, problems: null, notes: [],
+    createElement(OwnPinned, { key: "o", x, prices, withRef: ctx.own!.withRef, updating: false, problems: null, notes: [],
       firstUse: opts.firstUse ?? false, dispatch: noop }),
     createElement(Parts.OwnParts, { key: "p", ...parts, ctx, x, prices }),
   ]));

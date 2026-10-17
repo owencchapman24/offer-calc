@@ -3,8 +3,9 @@
 **Status: decided in part, not built.** D1 and D14 are approved (2026-10-13); D2-D15 stand as recommended unless the user comments on
 pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next section), is approved (2026-10-15): B1-B12 as
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
-built (pull request #31), and item 5's stops 5A (pull request #62, 2026-10-15, started before the testers' first answer at the user's
-word) and 5B (pull request #65, 2026-10-16); nothing else is. What to build after v1
+built (pull request #31), and item 5, the offer breakdown, in three stops: 5A (pull request #62, 2026-10-15, started before the
+testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16); nothing else is. Item 4 gained 4h, commission
+(2026-10-16, from the owner's own use). What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
@@ -31,7 +32,7 @@ stop.
 
 ## 5. Offer breakdown (approved 2026-10-15, with conditions; first in priority)
 
-**Status: approved; stops 5A (2026-10-15, pull request #62) and 5B (2026-10-16, pull request #65) built, 5C to come.** Proposed and
+**Status: approved and built:** stops 5A (2026-10-15, pull request #62), 5B and 5C (2026-10-16, #65 and #66). Proposed and
 approved on 2026-10-15 (pull request #45): B1-B12 as recommended, with the conditions below on B4, B5 and B8 and a rule for labels (B13),
 which the rest of this section follows. 5A started before the testers' first question was answered, at the user's word; how 5A and 5B
 differ from this section is in `docs/ui-design.md` §12.
@@ -472,6 +473,11 @@ by year, and compared side by side when you have more than one") and the first p
 and the verdict's body load beside the worker); the worker 68.4 kB gzip; LCP 1.95 s side by side with main's 1.95 s, on a local server
 that now keeps each file compressed (it compressed each response anew, which Lighthouse read as server latency).
 
+**At stop 5C** (2026-10-16, #66): the main thread 361.5 / 111.3 kB raw / gzip, 0.4 kB under where item 5 started (the banner and
+the copy choice, one `Choice` for Print… and Copy as document); Copy as document's chunk 16.3 kB gzip with the breakdown's
+document; the worker 68.6 kB; LCP 1.95 s, CLS 0 (the fonts on time and late), TBT 42 ms; the first answer, observed, 0.51 s, from
+0.62 s at 5B, a first visit now working out one offer.
+
 **At stop 5B** (2026-10-16, #65): the main thread 360.3 / 110.9 kB raw / gzip, 0.8 kB under where item 5 started; A-2 to A-7 one lazy
 chunk, 37.4 / 10.6 kB raw / gzip (estimated 8-12 kB); the worker 68.6 kB gzip; LCP 1.95 s, as at 5A, CLS 0 with the fonts on time and
 late. A-4's cliffs are a slow job per offer (`terms`: its cliffs, its next cliff and what you'd keep either side of it, a few
@@ -527,7 +533,7 @@ answers. The first answer, observed unthrottled, 1.29 s.
 |---|---|---|
 | 5A (built, #62) | One offer works: one is the minimum, "Start with my offer", the worker's per-offer job (its own stay, remembered by its inputs), A-1 pinned with one offer and its derivations, the live region and bars with one offer, the ledger's "On its own" row, the comparison appearing and going, M-1 and M-7, §1's wording into `docs/ui-design.md` rev 4, the conditions' label rules (1 and 4) and their test. Live screenshots, light and dark, of one offer and of three | B1-B13 (approved 2026-10-15), the audit items above, the testers' first question |
 | 5B (built, #65) | A-2 to A-6 and A-7 (L-6 moved), L-5 folded in, the bridge moved; the comparison's cross-foots and the step between windows; CSV names; print; M-1.1, M-4, M-6.3, M-9 | 5A |
-| 5C | Copy as document for one offer, and its choice with two or more; the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the NVDA walkthrough's new parts | 5B |
+| 5C (built, #66) | Copy as document for one offer, and its choice with two or more; the first visit's single sample, with "See a sample comparison" beside "Start with my offer" (condition 2); the scan's new states; the NVDA walkthrough's new parts | 5B |
 
 Each stop: `npm run check-bundle` (the main thread at most 0.5 kB more over the three), `npm run lighthouse` (the LCP element
 unchanged, CLS at most 0.02), `npm run bench` side by side with `main`, and the grid unchanged (no engine change unless B11, which goes
@@ -914,6 +920,7 @@ the clipboard in the smoke tests, the scan.
 Seven parts, each its own pull request, in this order (D10): the two small ones that feed "per hour of your life" first, then
 relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for commuters,
 was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4) place it.
+4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked.
 
 | Part | Size | Engine | Main thread |
 |---|---|---|---|
@@ -924,6 +931,7 @@ was added to the backlog on 2026-10-15, unranked: it's small and its engine is b
 | 4e Startup options | Medium-large | an option grant, exit scenarios, its tax | 0 (detailed mode) |
 | 4f Public Service Loan Forgiveness | Large, volatile | loans, payment plans, AGI by year | under 0.3 kB (a closed About-you row) |
 | 4g Philadelphia's wage tax for commuters | Small | none: the nonresident rate is in (`resident: false`) | 0 (detailed mode) |
+| 4h Commission | Small-medium | a pay stream: an expected annual amount with a range, paid monthly or quarterly | 0 (detailed mode) |
 
 Every part's inputs live in detailed mode (a lazy chunk, 14 kB gzip today), or for 4f behind a closed row in About you that loads its
 inputs on first use, so none adds more than an entry point to the main thread. Each grows the worker and may grow the fast lane's
@@ -1114,6 +1122,30 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Bundle:** detailed mode; nothing in the worker beyond the input.
 - **Risk:** small. Philadelphia's rates change each July 1 (CLAUDE.md, the data refresh calendar, already covers it).
 
+### 4h. Commission (added 2026-10-16)
+
+- **Today:** there's no commission field. The owner's own offer includes commission (finding 3): it can go in as a bonus in dollars
+  with a range, but a bonus is paid once a year, on its payout date, and commission is usually paid monthly or quarterly. So its
+  timing is wrong in every figure that depends on when money arrives: A-3's payments, the present values, the employment-year split,
+  the withholding estimate (each payout is supplemental wages), and what you'd keep if you left early (A-4, L-4), where a year's
+  commission earned but not yet paid is all forfeited under the bonus's rule.
+- **Scope:** a "commission" pay type in detailed mode, beside the bonus: an expected annual amount with a range (bear, base and bull,
+  as a bonus's), paid monthly or quarterly, each payout for the period just ended and paid a set number of days after it (a default
+  to decide at the stop, shown with its `D`). The first period prorated from the start date, as salary is; raises don't move it
+  unless entered. In the bear case it's the low amount, so L-2 and A-4's bad case carry it.
+- **Leaving early:** commission earned through the last day and not yet paid is paid, by default, with a choice for a plan that
+  requires employment on the payout date (as `mustBeEmployedOnPayDate` is for a bonus). The leave-date sweep and the cliffs see each
+  payout as a dated event.
+- **Words and figures:** A-2's $100 counts it in pay; A-3 shows it as its own line and its own kind in "when each payment arrives";
+  the bridge gains a "commission" line; the copied document and the CSVs name it. Quoted total compensation (the offer letter) counts
+  the expected annual amount.
+- **Validation:** hand-checked tests at the edges: a start mid-quarter, a last day the day before and the day of a payout, a range's
+  bear and bull, and a session with both a bonus and commission. The tax engine doesn't change, so the 2026 oracle report stays
+  byte-identical.
+- **Bundle:** detailed mode, and a stream in the worker beside the bonus; nothing on the main thread.
+- **Risk:** small to medium: commission plans vary (draws against commission, accelerators, quotas), and those stay out of scope;
+  the help says so.
+
 **Review stops:** one per part, except 4d and 4e (two each: the engine with its hand-checked tests, then the UI); 4f starts with a spike
 (a short written finding, no code merged) and you decide from it.
 
@@ -1194,7 +1226,7 @@ In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f)
 | 0 | Make room: L-1 and the bridge on first use, quick mode's help on first open. **Done** (pull request #31) | D2 |
 | 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules. **Done** (pull request #62) | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
 | 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
-| 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan | 5B |
+| 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
 | 4a-4c | Accuracy, the small parts: days off, commuting, relocation, a stop each | testers (item 4), D10, D14, D15 |

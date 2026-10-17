@@ -1,6 +1,6 @@
 // Lighthouse on the production build, mobile profile: a warm-up run (discarded), then five. Fails if the median
 // Largest Contentful Paint is over 2.5 s, the median layout shift over 0.02 or the median blocking time over 200 ms, or if
-// a run shows no verdict; reports the time to the first answer (scripts/lib/lighthouse.ts). Run after `npm run build`:
+// a run shows no answer; reports the time to the first answer (scripts/lib/lighthouse.ts). Run after `npm run build`:
 // `npm run lighthouse`. CI runs it.
 //   npm run lighthouse -- <url>   audits a deployed page instead (say, https://offer-calc.vercel.app/)
 //   npm run lighthouse -- --fonts-late [ms]   holds the web fonts back (default 1.5 s), so the page paints in the fallback fonts

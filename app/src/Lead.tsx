@@ -113,12 +113,6 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
         {sample && <Stamp>Illustrative samples</Stamp>}
         <span className="updating" aria-hidden={!updating}>{updating ? "Updating…" : ""}</span>
       </header>
-      {sample && (
-        <p className="banner">
-          Sample offers: illustrative inputs, not market data. They start next July.{" "}
-          <button type="button" className="link" onClick={() => dispatch({ type: "startBlank" })}>Start with my offer</button>
-        </p>
-      )}
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
       {error && <p className="note error" role="alert">Couldn't compute: {error}</p>}
       <Problems issues={issues} results={!!view} onFix={onFix} />

@@ -3,12 +3,13 @@
 // Layout Shift is at most 0.02 (0 on 2026-10-15; 0.020 once flagged a real shift, found by reading the numbers) and the
 // median Total Blocking Time at most 200 ms (45-99 ms on 2026-10-15; Google's "good" is 200 ms).
 //
-// The time to the first answer (audit P2): the app marks "first-answer" (performance.mark, app/src/Lead.tsx) after the
-// frame that first shows a verdict, once the worker has answered. LCP doesn't see it: the LCP element is About you's
-// assumptions line, painted before the worker answers. Lighthouse reads the mark from the trace, which simulated throttling
+// The time to the first answer (audit P2): the app marks "first-answer" (performance.mark, app/src/ui.tsx) after the
+// frame that first shows an answer, the verdict or, since a first visit is one sample on its own (v2 item 5, stop 5C), an
+// offer's bottom line (A-1), once the worker has answered. LCP doesn't see it: the LCP element is painted before the worker
+// answers. Lighthouse reads the mark from the trace, which simulated throttling
 // leaves unthrottled, so it's an observed time, reported beside the observed LCP, not a simulated one. Reported, not
 // budgeted, until there's a baseline (docs/v2-plan.md, the performance plan's rule 4); a run without the mark fails,
-// since then no verdict was shown.
+// since then no answer was shown.
 //
 // The bundle check (scripts/lib/bundle.ts) catches a regression in what we ship; this measures what a
 // phone user waits for. Lighthouse's mobile profile: a Moto G Power-sized screen, simulated slow 4G
@@ -85,7 +86,7 @@ export function verdict(runs: Run[], budgets = { lcpMs: LCP_BUDGET_MS, cls: CLS_
   if (cls !== undefined && !(cls <= budgets.cls)) problems.push(`CLS ${cls.toFixed(3)} is over its ${budgets.cls} budget.`);
   if (tbtMs !== undefined && !(tbtMs <= budgets.tbtMs)) problems.push(`TBT ${Math.round(tbtMs)} ms is over its ${budgets.tbtMs} ms budget.`);
   if (answers.length < runs.length) {
-    problems.push(`${runs.length - answers.length} of ${runs.length} runs had no "${FIRST_ANSWER}" mark: the page showed no verdict.`);
+    problems.push(`${runs.length - answers.length} of ${runs.length} runs had no "${FIRST_ANSWER}" mark: the page showed no answer.`);
   }
   return { lcpMs, score, cls, tbtMs, firstAnswerMs, observedLcpMs, median: medianRun(runs), problems, ok: problems.length === 0 };
 }

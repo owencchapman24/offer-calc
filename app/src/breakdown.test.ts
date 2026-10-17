@@ -206,7 +206,7 @@ describe("one offer is enough (v2-plan.md, item 5, \"Quick mode from one offer\"
     const ctx = { ...alone("A"), offers: [blankOffer("A")], own: { breakdowns: {}, withRef: false } };
     const x = ownOffers(ctx)[0];
     const html = renderToStaticMarkup(createElement(WorkProvider, { ctx, children: [createElement(OwnPinned, { key: "o", x, prices: priceWords(undefined),
-      withRef: false, updating: false, sample: false, problems: null, notes: [], firstUse: true, dispatch: () => {} })] }));
+      withRef: false, updating: false, problems: null, notes: [], firstUse: true, dispatch: () => {} })] }));
     expect(words(html)).toContain("Add a salary, a city and a start date to see A on its own.");
     expect(html).toContain('id="own-title"');
   });
