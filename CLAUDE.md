@@ -224,9 +224,10 @@ section 2's and the plan's in step):
     line 1, and a text cell starting with `=`, `+`, `-`, `@`, a tab or a CR gets a leading `'`. L-1's and L-2's table views have
     one, and every table in a breakdown (A-2's two, A-3, A-5, A-6, A-7's four), built from the rows the part draws.
   - Copy as document is one document model with two renderers (HTML with inline styles, text within 80 columns); every table foots
-    as displayed and every calculation it states is in `worked`, checked. With one offer it copies that offer's breakdown; with two
-    or more, a choice under the masthead (as Print…'s): the comparison, the breakdown shown, or both. The click writes a
-    `ClipboardItem` of promises at once, for Safari.
+    as displayed and every calculation it states is in `worked`, checked. Its choice, under the masthead as Print…'s: a breakdown in
+    summary (the default with one offer: the bottom line, where the money goes, pay by year, the key terms and the bad case, about
+    2 pages) or in full detail (every payment and cliff, leaving early, the benefits and tax by year); with two or more offers, the
+    comparison (their default) or both too. Copy writes a `ClipboardItem` of promises at once, for Safari.
 - **Saved state:** this browser's localStorage only. A session the page can't show gets the error boundary's way out (`Recovery.tsx`:
   download what's saved, start again, reload); a session from a newer schema is never saved over; an unreadable one is set aside
   under `offer-calc:backup`.

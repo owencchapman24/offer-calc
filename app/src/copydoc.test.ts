@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDoc, type Doc, type DocKind, type DocOptions, num, SAMPLE_LINE, SAMPLE_ONE, type Table, toHtml, toText, vestingText } from "./copyDoc";
+import { buildDoc, type Doc, type DocDetail, type DocKind, type DocOptions, num, SAMPLE_LINE, SAMPLE_ONE, type Table, toHtml, toText, vestingText } from "./copyDoc";
 import { firstLastDay, leaveAxis } from "./leaveModel";
 import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
@@ -15,16 +15,17 @@ import { verdictSentence } from "./verdict";
  * The document for a comparison, with L-3's ties and L-4's panel at its last day worked out, as the worker would; or with `kind`,
  * one offer's breakdown (A-4's cliffs and last day are the context's, as the page's breakdowns ask for them) or both.
  */
-function made(base: WorkContext, at?: string, kind: DocKind = "comparison", letter?: Letter) {
+function made(base: WorkContext, at?: string, kind: DocKind = "comparison", letter?: Letter, detail: DocDetail = "full") {
   if (kind === "breakdown" && !base.results) {
     const req = requestOf(base);
-    const doc = buildDoc(base, { offers: req.offers, at: base.own!.leave!.at, picked: false, kind, letter: letter ?? "A", letters: base.offers.map((o) => o.letter) });
+    const doc = buildDoc(base, { offers: req.offers, at: base.own!.leave!.at, picked: false, kind, letter: letter ?? "A", letters: base.offers.map((o) => o.letter),
+      detail });
     return { ctx: base, doc, html: toHtml(doc), text: toText(doc) };
   }
   const ctx = withLeave(withTies(base).ctx, at).ctx;
   const r = ctx.results!;
   const opts: DocOptions = { offers: compareOf(ctx).offers, at: at ?? firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years)), picked: !!at, kind,
-    letter, letters: r.letters };
+    letter, letters: r.letters, detail };
   const doc = buildDoc(ctx, opts);
   return { ctx, doc, html: toHtml(doc), text: toText(doc) };
 }
@@ -53,7 +54,7 @@ function flat(x: unknown): unknown {
 
 const later = () => context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2026-10-01" } } : o)),
   4, { otherWagesThisYear: 20_000 });
-const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?]> = [
+const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?, DocDetail?]> = [
   ["the samples", () => context()],
   ["a 5-year stay (a close call)", () => context("colAdjustedTotal", undefined, 5)],
   ["per hour", () => context("perHour")],
@@ -63,19 +64,21 @@ const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?]> = [
   ["two offers", () => context("colAdjustedTotal", (os) => os.filter((o) => o.letter !== "C"))],
   ["no ranges, not samples", () => context("colAdjustedTotal", (os) => os.map((o) => ({ ...o, sample: null, draft: flat(o.draft) as AppOffer["draft"] })))],
   // One offer's breakdown (stop 5C): each sample on its own, at its own prices; one at Charlotte's; one in a comparison; and both.
-  ["A on its own", () => alone("A"), "breakdown"],
+  ["A on its own, in full", () => alone("A"), "breakdown"],
+  ["A on its own, the summary", () => alone("A"), "breakdown", undefined, "summary"],
   ["B on its own, a 5-year stay", () => alone("B", undefined, { stayYears: 5 }), "breakdown"],
-  ["C on its own, prices in Charlotte", () => alone("C", undefined, { pricesIn: "16740" }), "breakdown"],
+  ["C on its own, prices in Charlotte, the summary", () => alone("C", undefined, { pricesIn: "16740" }), "breakdown", undefined, "summary"],
   ["no ranges, not a sample, on its own", () => alone("A", (o) => ({ ...o, sample: null, draft: flat(o.draft) as AppOffer["draft"] })), "breakdown"],
   ["C's breakdown, in a comparison", () => context(), "breakdown", "C"],
-  ["B's breakdown, starting later", later, "breakdown", "B"],
-  ["both", () => context(), "both"],
+  ["B's breakdown, starting later, the summary", later, "breakdown", "B", "summary"],
+  ["both, the breakdowns in summary", () => context(), "both", undefined, "summary"],
+  ["both, the breakdowns in full", () => context(), "both"],
 ];
 
 describe("Copy as document: every total adds up as displayed", () => {
-  for (const [name, make, kind, letter] of CONTEXTS) {
+  for (const [name, make, kind, letter, detail] of CONTEXTS) {
     it(`${name}: each table's totals are the lines above them, and each worked line works out, as shown`, () => {
-      const { doc, html, text } = made(make(), undefined, kind, letter);
+      const { doc, html, text } = made(make(), undefined, kind, letter, detail);
       const footed = tables(doc).filter((t) => t.foots);
       expect(footed.length).toBeGreaterThanOrEqual(2);
       for (const t of footed) {
@@ -116,11 +119,11 @@ describe("Copy as document: every total adds up as displayed", () => {
 });
 
 describe("Copy as document: the HTML and the plain text carry identical figures", () => {
-  for (const [name, make, kind, letter] of CONTEXTS) {
+  for (const [name, make, kind, letter, detail] of CONTEXTS) {
     it(name, () => {
-      const { html, text } = made(make(), undefined, kind, letter);
+      const { html, text } = made(make(), undefined, kind, letter, detail);
       const a = figures(textOf(html));
-      expect(a.length).toBeGreaterThan(150);
+      expect(a.length).toBeGreaterThan(kind === "breakdown" && detail === "summary" ? 60 : 150);
       expect(a).toEqual(figures(text));
     }, 30_000);
   }
@@ -209,8 +212,8 @@ describe("Copy as document: for a reader who has never seen the tool", () => {
   });
 
   it("plain-text tables fit in 80 columns", () => {
-    for (const [name, make, kind, letter] of CONTEXTS) {
-      const { doc } = made(make(), undefined, kind, letter);
+    for (const [name, make, kind, letter, detail] of CONTEXTS) {
+      const { doc } = made(make(), undefined, kind, letter, detail);
       for (const t of tables(doc)) {
         for (const line of toText({ blocks: [{ kind: "table", table: t }], worked: [] }).split("\n").slice(t.title ? 1 : 0)) {
           expect(line.length, `${name}: ${line}`).toBeLessThanOrEqual(80);
@@ -221,14 +224,28 @@ describe("Copy as document: for a reader who has never seen the tool", () => {
 });
 
 describe("Copy as document, for one offer: its breakdown, for someone who's never seen the tool", () => {
-  const a = made(alone("A"), undefined, "breakdown");
+  const a = made(alone("A"), undefined, "breakdown", "A", "full");
   const all = tables(a.doc);
 
-  it("has the plan's parts in order: the bottom line, where the money goes, pay by year, terms, benefits, tax, the offer, assumptions", () => {
+  it("the full detail has the plan's parts in order: the bottom line, where the money goes, pay by year, terms, benefits, tax, the offer, assumptions", () => {
     const headings = a.doc.blocks.flatMap((b) => (b.kind === "heading" ? [b.text] : []));
     expect(headings).toEqual(["1. The bottom line", "2. Where the money goes: year 1", "3. Pay by year, and when it arrives", "4. Terms that can bite",
       "5. What the benefits are worth", "6. Tax by year, and warnings", "7. The offer, as entered", "8. Assumptions"]);
     expect(a.text.split("\n")[0]).toBe("A, NYC BANK: ONE JOB OFFER, WORKED OUT");
+  });
+
+  it("the summary: the bottom line, where the money goes, pay by year, the key terms and the bad case; then the offer and assumptions", () => {
+    const s = made(alone("A"), undefined, "breakdown", "A", "summary");
+    expect(s.doc.blocks.flatMap((b) => (b.kind === "heading" ? [b.text] : []))).toEqual(["1. The bottom line", "2. Where the money goes: year 1",
+      "3. Pay by year", "4. The key terms, and the bad case", "5. The offer, as entered", "6. Assumptions"]);
+    // Its figures are the full detail's: the same bottom line, $100 and pay by year, the same terms and bad case.
+    expect(s.text).toContain("Left to spend, 55,762 ÷ 12, is $4,647 a month in year 1, after rent, in New York dollars.");
+    expect(s.text).toMatch(/Bad case, after rent, in New York dollars: \$6,245 a month over your stay, 17% under the base case/);
+    expect(s.text).toContain("The $10,000 sign-on is repaid in full if you leave before Jul 12, 2027.");
+    for (const left of ["From the offer letter to after rent", "Every other payment in your stay", "If your last day were", "Every cliff in its stay",
+      "What the benefits add", "Tax by calendar year"]) expect(s.text).not.toContain(left);
+    expect(s.text).toContain("The full detail adds year 1's bridge from the offer letter, every payment and every cliff by date");
+    expect(tables(s.doc)).toHaveLength(2);
   });
 
   it("its figures are the breakdown's: A-1's bottom line, A-2's $100 and bridge, A-6's rate (the plan's worked example)", () => {

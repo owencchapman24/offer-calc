@@ -247,11 +247,15 @@ test("Copy as document waits, and says why, while the inputs have a problem", as
   await expect(button).not.toHaveAttribute("aria-disabled");
 });
 
-test("Copy as document with one offer: a first visit copies sample A's breakdown at once; with three, each and the comparison", async ({ page, context }) => {
+test("Copy as document with one offer: its summary (the default) or its full detail; with three, each and the comparison", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openAlone(page);
   const own = (await page.locator("#own .own-hero [data-metric]").first().innerText()).replace("✓", "").trim();
-  await copyDocument(page);
+  // The choice, as Print…'s: Summary first and chosen.
+  await page.getByRole("button", { name: "Copy as document" }).click();
+  await expect(page.locator("#copy-choice").getByRole("radio", { name: /^Summary/ })).toBeFocused();
+  await expect(page.locator("#copy-choice").getByRole("radio")).toHaveCount(2);
+  await page.locator("#copy-choice").getByRole("button", { name: "Copy", exact: true }).click();
   await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
   let got = await clipboard(page);
   expect(got["text/plain"]).toMatch(/^A, NYC BANK: ONE JOB OFFER, WORKED OUT/);
@@ -259,8 +263,13 @@ test("Copy as document with one offer: a first visit copies sample A's breakdown
     expect(flavor).toContain(`A leaves you about ${own} a month over your stay, after rent, in New York dollars`);
     expect(flavor).toContain("A sample offer: illustrative inputs, not market data.");
     expect(flavor).toContain("Where each $100 of it goes");
-    expect(flavor).toContain("If your last day were");
+    expect(flavor).not.toContain("If your last day were");
   }
+  // The full detail: every payment and cliff, and leaving early.
+  await copyDocument(page, "full");
+  await expect(page.locator(".print-bar")).toContainText("Copied: paste it into a document or an email.", { timeout: 30_000 });
+  got = await clipboard(page);
+  for (const part of ["If your last day were", "Every cliff in its stay", "6. TAX BY YEAR, AND WARNINGS"]) expect(got["text/plain"]).toContain(part);
   // Three offers: "both" is each breakdown in turn, then the comparison.
   await page.getByRole("button", { name: "See a sample comparison" }).click();
   await settled(page);

@@ -69,12 +69,21 @@ export interface Doc { blocks: Block[]; worked: Worked[] }
 
 /** Which document: one offer's breakdown, the comparison (two or more offers), or each breakdown and then the comparison. */
 export type DocKind = "breakdown" | "comparison" | "both";
+/**
+ * How much of a breakdown, as Print… offers (2026-10-17): the summary (its bottom line, where the money goes, pay by year, the key
+ * terms and the bad case, about 2 pages), or the full detail (every payment and cliff, leaving early, the benefits and tax by year).
+ */
+export type DocDetail = "summary" | "full";
 
 /**
  * What the document needs beyond the page's context: the offers (every complete offer, in order, and their letters when there's no
  * comparison to read them from), and the last day for leaving early (L-4's, A-4's). `letter`: the breakdown's offer.
  */
-export interface DocOptions { offers: OfferInput[]; at: ISODate; picked: boolean; kind?: DocKind; letter?: Letter; letters?: Letter[] }
+export interface DocOptions {
+  offers: OfferInput[]; at: ISODate; picked: boolean; kind?: DocKind; letter?: Letter; letters?: Letter[];
+  /** A breakdown's (and "both"'s breakdowns'): the summary unless the full detail is asked for. */
+  detail?: DocDetail;
+}
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 const join = (xs: string[], and = "and") => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} ${and} ${xs[xs.length - 1]}`);
@@ -164,7 +173,8 @@ interface Scope {
   discountRate: number;
   lastYear: number;
   anyRange: boolean;
-  own: { place: string; withRef: boolean } | null;
+  /** `summary`: its warnings that change the numbers go in the assumptions, as the full detail's section 6 isn't there. */
+  own: { place: string; withRef: boolean; summary: boolean } | null;
 }
 
 function comparisonScope(ctx: WorkContext, opts: DocOptions): Scope {
@@ -716,8 +726,8 @@ function assumptions(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
   const savings = infos.find((x) => x)?.savingsRate ?? 0;
   items.push(`${cap(h.healthUsage ?? "medium")} health use${def("healthUsage")}; ${savings ? `${percent(savings)} of take-home pay saved` : "no savings beyond the 401(k)"}; `
     + `your 401(k) money counts at face value (no tax on withdrawal, no growth)${sc.offers.some((o) => o.equity) ? "; RSUs are sold as they vest" : ""}.`);
-  // One offer's breakdown lists its warnings in its own section (6).
-  if (!sc.own) {
+  // One offer's full detail lists its warnings in its own section (6); its summary, here.
+  if (!sc.own || sc.own.summary) {
     letters.forEach((l, i) => {
       for (const g of stayWarnings(ds[i].warnings, sc.lastYear)) {
         if (WARNING_KIND[g[0].code] === "changes") items.push(`This changes ${l}'s numbers: ${warningWords(g)}`);
@@ -746,12 +756,15 @@ function ownFor(ctx: WorkContext, opts: DocOptions, L: Letter): Own {
   return { L, o, b, d: b.detail, v: ownView(L, b, o, pricesOf(ctx), withRef), n: b.years, name: label ? `${L}, ${label}` : `Offer ${L}`, withRef };
 }
 
-function ownScope(x: Own): Scope {
+function ownScope(x: Own, summary: boolean): Scope {
   return { letters: [x.L], offers: [x.o], details: [x.d], years: x.n, discountRate: x.b.discountRate, lastYear: Number(dayBefore(x.b.window.end).slice(0, 4)),
-    anyRange: hasRanges(x.o), own: { place: x.v.place, withRef: x.withRef } };
+    anyRange: hasRanges(x.o), own: { place: x.v.place, withRef: x.withRef, summary } };
 }
 
-/** One offer's breakdown, on its own: about 3 pages (sample A: 3 and a few lines in Word). */
+/**
+ * One offer's breakdown, on its own: its summary, about 2 pages, or its full detail, about 3 (sample A in Word, 2026-10-17: see
+ * docs/ui-design.md §12).
+ */
 function ownDoc(ctx: WorkContext, opts: DocOptions, L: Letter): Doc {
   const x = ownFor(ctx, opts, L);
   const blocks: Block[] = [];
@@ -762,9 +775,10 @@ function ownDoc(ctx: WorkContext, opts: DocOptions, L: Letter): Doc {
   add({ kind: "meta", text: `Made with Offer Calc on ${longDate(ctx.today)}. Base case, if you stay ${years(x.n)}: ${longDate(x.b.window.start)}, `
     + `when it starts, to ${longDate(dayBefore(x.b.window.end))}.` });
   if (sample) add({ kind: "flag", text: SAMPLE_ONE });
+  const summary = (opts.detail ?? "summary") === "summary";
   ownSections(ctx, opts, x, add, worked);
-  offersSection(ctx, ownScope(x), add, "7. The offer, as entered");
-  assumptions(ctx, ownScope(x), add, "8. Assumptions");
+  offersSection(ctx, ownScope(x, summary), add, summary ? "5. The offer, as entered" : "7. The offer, as entered");
+  assumptions(ctx, ownScope(x, summary), add, summary ? "6. Assumptions" : "8. Assumptions");
   closing(add);
   if (sample) add({ kind: "flag", text: SAMPLE_ONE });
   return { blocks, worked };
@@ -779,6 +793,7 @@ function bothDoc(ctx: WorkContext, opts: DocOptions): Doc {
   const sample = ctx.offers.some((o) => o.sample !== null);
   const L = r.letters;
   add({ kind: "title", text: `${cap(COUNT[L.length] ?? String(L.length))} job offers, each on its own, then compared` });
+  // Each breakdown's sections, then the comparison's own "as entered" and assumptions for all of them.
   add({ kind: "meta", text: `Made with Offer Calc on ${longDate(ctx.today)}. Base case, if you stay ${years(r.view.row.years)}. Each offer on its own is over `
     + "its own stay, from its start, at its own city's prices; the comparison is over the same years for every offer, in the same dollars." });
   if (sample) add({ kind: "flag", text: SAMPLE_LINE });
@@ -794,14 +809,20 @@ function bothDoc(ctx: WorkContext, opts: DocOptions): Doc {
   return { blocks, worked };
 }
 
-/** A-1 to A-6, as sections 1 to 6. */
+/** The full detail: A-1 to A-6, as sections 1 to 6. The summary: A-1 to A-4 in short, as sections 1 to 4, and what the full adds. */
 function ownSections(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, worked: Worked[]) {
+  const full = opts.detail === "full";
   bottomLine(ctx, x, add, worked);
-  whereItGoes(ctx, x, add, worked);
-  payByYear(ctx, x, add, worked);
-  termsSection(ctx, opts, x, add, worked);
-  benefitsSection(ctx, x, add, worked);
-  taxSection(x, add, worked);
+  whereItGoes(ctx, x, add, worked, full);
+  payByYear(ctx, x, add, worked, full);
+  termsSection(ctx, opts, x, add, worked, full);
+  if (full) {
+    benefitsSection(ctx, x, add, worked);
+    taxSection(x, add, worked);
+  } else {
+    add({ kind: "note", runs: ["The full detail adds year 1's bridge from the offer letter, every payment and every cliff by date, what you'd keep if you "
+      + "left on a given day, the benefits by year, tax by calendar year, and the warnings."] });
+  }
 }
 
 // ---- 1. The bottom line (A-1)
@@ -840,7 +861,7 @@ function bottomLine(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
 
 // ---- 2. Where the money goes (A-2)
 
-function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
+function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full: boolean) {
   const { L, v, n } = x;
   add({ kind: "heading", text: "2. Where the money goes: year 1" });
   const h = hundredOf(x.d, 1);
@@ -871,6 +892,7 @@ function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   notes.push(adds.length ? `Outside the $100, the employer adds ${join(adds)} in year 1, on top.${vested}`
     : "The employer adds nothing on top in year 1: no 401(k) money, HSA money or perks entered.");
   add({ kind: "para", runs: [notes.join(" ")] });
+  if (!full) return;
 
   // Year 1's bridge (A-2's "Show the bridge"): from the offer letter to after rent at its own prices, then the prices picked.
   const br = bridge(ctx, L, 1);
@@ -892,9 +914,9 @@ function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
 
 // ---- 3. Pay by year, and when it arrives (A-3)
 
-function payByYear(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
+function payByYear(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full: boolean) {
   const { L, o, n } = x;
-  add({ kind: "heading", text: "3. Pay by year, and when it arrives" });
+  add({ kind: "heading", text: full ? "3. Pay by year, and when it arrives" : "3. Pay by year" });
   const t = yearTable(ctx, L);
   const pr = payRows(t);
   const kinds = pr.filter((r) => r.line !== "gross");
@@ -916,18 +938,18 @@ function payByYear(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   const month = dollars(o.salary.annual / 12);
   worked.push({ op: "÷", of: [dollars(o.salary.annual), "12"], is: month });
   const arrivals = arrivalsOf(x.d, n);
-  add({ kind: "para", runs: [`Salary is paid monthly: ${dollars(o.salary.annual)} ÷ 12 = ${month} a month at its starting salary.${arrivals.length
-    ? " Every other payment in your stay, by date:" : " Nothing else is paid in your stay: no bonus, cash award or RSU vest entered."}`] });
-  if (arrivals.length) {
+  add({ kind: "para", runs: [`Salary is paid monthly: ${dollars(o.salary.annual)} ÷ 12 = ${month} a month at its starting salary.${!arrivals.length
+    ? " Nothing else is paid in your stay: no bonus, cash award or RSU vest entered." : full ? " Every other payment in your stay, by date:" : ""}`] });
+  if (arrivals.length && full) {
     add({ kind: "list", items: arrivals.map((a) => `${longDate(a.date)}: ${a.label}, ${dollars(arrivalShown(a))}, in year ${a.ey}${a.note ? ` (${a.note})` : ""}.`) });
   }
 }
 
 // ---- 4. Terms that can bite (A-4)
 
-function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, worked: Worked[]) {
+function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, worked: Worked[], full: boolean) {
   const { L, o, d, v } = x;
-  add({ kind: "heading", text: "4. Terms that can bite" });
+  add({ kind: "heading", text: full ? "4. Terms that can bite" : "4. The key terms, and the bad case" });
   const facts = [...leaveTerms(o, d), ...bonusTerms(o)];
   if (facts.length) add({ kind: "list", items: facts.map((f) => `${cap(f)}.`) });
   else add({ kind: "para", runs: ["No bonus, cash award, RSU or 401(k) vesting entered: nothing in its terms to lose by leaving early."] });
@@ -955,23 +977,25 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
     }
   }
 
-  // If you left on a day: A-4's (and L-4's) last day, its panel for this offer.
-  const at = ctx.own?.leave?.at ?? opts.at;
-  const panel = ctx.own?.leave?.panels[L];
-  if (panel === undefined) paras.push("Leaving early: not worked out yet.");
-  else if (panel === null) paras.push(`If your last day were ${longDate(at)}, ${L} wouldn't have started by then.`);
-  else {
-    const w = timeWorked(o.startDate, panel.leaveDate);
-    const into = `${w.months} ${w.months === 1 ? "month" : "months"}${w.days ? ` and ${w.days} ${w.days === 1 ? "day" : "days"}` : ""} in`;
-    const lost = [panel.retirementForfeited >= 0.5 ? `${dollars(panel.retirementForfeited)} of 401(k) money` : "",
-      panel.unvestedRsuForfeited >= 0.5 ? `${dollars(panel.unvestedRsuForfeited)} of RSUs (at grant value)` : ""].filter(Boolean);
-    const bonuses = forfeits(panel.warnings, o.startDate).map((f) => {
-      const t = forfeitText(f);
-      return `; ${t.before}${dollars(f.earned)}${t.after} is forfeited`;
-    });
-    paras.push(`If your last day were ${longDate(panel.leaveDate)}, ${into}${opts.picked ? " (the day picked in Offer Calc)" : ""}: you'd keep `
-      + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
-      + `${lost.length ? `leave ${lost.join(" and ")} behind` : "leave nothing behind"}${bonuses.join("")}. Offer Calc shows any other last day.`);
+  // If you left on a day: A-4's (and L-4's) last day, its panel for this offer (the full detail's).
+  if (full) {
+    const at = ctx.own?.leave?.at ?? opts.at;
+    const panel = ctx.own?.leave?.panels[L];
+    if (panel === undefined) paras.push("Leaving early: not worked out yet.");
+    else if (panel === null) paras.push(`If your last day were ${longDate(at)}, ${L} wouldn't have started by then.`);
+    else {
+      const w = timeWorked(o.startDate, panel.leaveDate);
+      const into = `${w.months} ${w.months === 1 ? "month" : "months"}${w.days ? ` and ${w.days} ${w.days === 1 ? "day" : "days"}` : ""} in`;
+      const lost = [panel.retirementForfeited >= 0.5 ? `${dollars(panel.retirementForfeited)} of 401(k) money` : "",
+        panel.unvestedRsuForfeited >= 0.5 ? `${dollars(panel.unvestedRsuForfeited)} of RSUs (at grant value)` : ""].filter(Boolean);
+      const bonuses = forfeits(panel.warnings, o.startDate).map((f) => {
+        const t = forfeitText(f);
+        return `; ${t.before}${dollars(f.earned)}${t.after} is forfeited`;
+      });
+      paras.push(`If your last day were ${longDate(panel.leaveDate)}, ${into}${opts.picked ? " (the day picked in Offer Calc)" : ""}: you'd keep `
+        + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
+        + `${lost.length ? `leave ${lost.join(" and ")} behind` : "leave nothing behind"}${bonuses.join("")}. Offer Calc shows any other last day.`);
+    }
   }
 
   // The bad case: bear and bull, a month over its stay at its own prices, and what goes wrong in the bear case.
@@ -984,8 +1008,8 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
   }
   for (const t of paras) add({ kind: "para", runs: [t] });
 
-  // Every cliff inside its stay, dated.
-  const lines = terms ? cliffLines(terms.cliffs) : [];
+  // Every cliff inside its stay, dated (the full detail's).
+  const lines = terms && full ? cliffLines(terms.cliffs) : [];
   if (lines.length) {
     add({ kind: "para", runs: ["Every cliff in its stay, by date, and what leaving the day before it gives up:"] });
     add({ kind: "list", items: lines.map((c) => (c.kind === "steps"
@@ -1228,12 +1252,12 @@ const byLetter = <T,>(letters: Letter[], xs: T[]): Partial<Record<Letter, T>> =>
  * the comparison, L-3's ties and L-4's panel at its last day; for a breakdown, A-4's cliffs and its panel at A-4's last day ("both":
  * the comparison's last day for every part). Waits for them, then builds the document. `get` reads the page's latest state.
  */
-export async function prepare(get: () => Live, requestSlow: (job: SlowJob, key: string) => void, kind: DocKind = "comparison", letter?: Letter):
-  Promise<{ html: string; text: string }> {
+export async function prepare(get: () => Live, requestSlow: (job: SlowJob, key: string) => void, kind: DocKind = "comparison", letter?: Letter,
+  detail: DocDetail = "summary"): Promise<{ html: string; text: string }> {
   const until = Date.now() + PATIENCE_MS;
   for (;;) {
     const s = get();
-    const files = kind === "breakdown" ? ownFiles(s, requestSlow, letter) : comparisonFiles(s, requestSlow, kind, letter);
+    const files = kind === "breakdown" ? ownFiles(s, requestSlow, letter, detail) : comparisonFiles(s, requestSlow, kind, letter, detail);
     if (files) return files;
     if (Date.now() > until) throw new Error(kind === "breakdown" ? "The breakdown took too long to work out." : "The comparison took too long to work out.");
     await sleep(100);
@@ -1255,7 +1279,7 @@ function ownJobs(s: Live, requestSlow: (job: SlowJob, key: string) => void, at: 
   return { terms: byLetter(s.letters, s.terms.result), leave: { at, basis: "cash" as const, panels: byLetter(s.letters, s.cursor.result) } };
 }
 
-function ownFiles(s: Live, requestSlow: (job: SlowJob, key: string) => void, letter?: Letter) {
+function ownFiles(s: Live, requestSlow: (job: SlowJob, key: string) => void, letter: Letter | undefined, detail: DocDetail) {
   if (!s.request) return null;
   // A-4's last day: the one picked, or six months after the earliest start (L-4's first).
   const earliest = s.request.offers.map((o) => o.startDate).sort()[0];
@@ -1263,10 +1287,11 @@ function ownFiles(s: Live, requestSlow: (job: SlowJob, key: string) => void, let
   const jobs = ownJobs(s, requestSlow, at);
   if (!jobs || !s.work.own) return null;
   const ctx: WorkContext = { ...s.work, own: { ...s.work.own, ...jobs } };
-  return docFiles(ctx, { offers: s.request.offers, at, picked: s.leaveAt !== null, kind: "breakdown", letter: letter ?? s.letters[0], letters: s.letters });
+  return docFiles(ctx, { offers: s.request.offers, at, picked: s.leaveAt !== null, kind: "breakdown", letter: letter ?? s.letters[0], letters: s.letters,
+    detail });
 }
 
-function comparisonFiles(s: Live, requestSlow: (job: SlowJob, key: string) => void, kind: DocKind, letter?: Letter) {
+function comparisonFiles(s: Live, requestSlow: (job: SlowJob, key: string) => void, kind: DocKind, letter: Letter | undefined, detail: DocDetail) {
   const r = s.work.results;
   if (!(s.ready && s.compare && r)) return null;
   const basis: ValueBasis = r.view.basis === "perHour" ? r.view.perHourOf : r.view.basis;
@@ -1286,5 +1311,5 @@ function comparisonFiles(s: Live, requestSlow: (job: SlowJob, key: string) => vo
   if (!(tiesFresh && cursorFresh) || (kind === "both" && !(jobs && s.work.own))) return null;
   const ctx: WorkContext = { ...s.work, ...(jobs ? { own: { ...s.work.own!, ...jobs } } : {}), results: { ...r, ties: { ...r.ties, ...(ties ? { l3: s.breakeven.result! } : {}) },
     leave: { basis: "cash", stayEnd: axis.stayEnd, panels: s.cursor.result! } } };
-  return docFiles(ctx, { offers: s.compare.offers, at, picked: s.leaveAt !== null, kind, letter, letters: r.letters });
+  return docFiles(ctx, { offers: s.compare.offers, at, picked: s.leaveAt !== null, kind, letter, letters: r.letters, detail });
 }

@@ -368,8 +368,9 @@ function comparison(ctx0: WorkContext) {
   const opts = { offers: compareOf(ctx).offers, at, picked: false, letters: r.letters };
   const doc = buildDoc(ctx, opts);
   // Copy as document's other two (stop 5C): each offer's breakdown, and both.
-  const docs: Array<[Doc, Letter | undefined]> = [[doc, undefined], [buildDoc(ctx, { ...opts, kind: "both" }), undefined],
-    ...r.letters.map((l): [Doc, Letter] => [buildDoc(ctx, { ...opts, kind: "breakdown", letter: l }), l])];
+  const docs: Array<[Doc, Letter | undefined]> = [[doc, undefined], ...(["summary", "full"] as const).flatMap((detail) => [
+    [buildDoc(ctx, { ...opts, kind: "both", detail }), undefined] as [Doc, undefined],
+    ...r.letters.map((l): [Doc, Letter] => [buildDoc(ctx, { ...opts, kind: "breakdown", letter: l, detail }), l])])];
   return { ctx, html, csv: tables.map((t) => csvBuild(ctx, t)), doc, docs };
 }
 
@@ -387,8 +388,10 @@ describe("every figure names its dollars, and every rate or share its period (co
       const said = sentenceOf(x, priceWords(ctx.household.pricesIn))!;
       problems.push(...checkSentence(said, [`${shortCity(cityName(x.offer.draft.costOfLiving.area))} $`], unitsOf(ctx)).map((y) => `${where}: "${said}" ${y}`));
       // Its copied breakdown (stop 5C).
-      const doc = buildDoc(ctx, { offers: requestOf(ctx).offers, at: ctx.own!.leave!.at, picked: false, kind: "breakdown", letter: "A", letters: ["A"] });
-      problems.push(...checkDoc(ctx, doc, "A").map((y) => `${where}: ${y}`));
+      for (const detail of ["summary", "full"] as const) {
+        const doc = buildDoc(ctx, { offers: requestOf(ctx).offers, at: ctx.own!.leave!.at, picked: false, kind: "breakdown", letter: "A", letters: ["A"], detail });
+        problems.push(...checkDoc(ctx, doc, "A").map((y) => `${where}, ${detail}: ${y}`));
+      }
     }
     expect(problems).toEqual([]);
   }, 60_000);

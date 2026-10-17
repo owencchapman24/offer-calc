@@ -82,9 +82,11 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
 15. At A-6, press **B** until "Show tax by calendar year, button, collapsed", then **Enter** ("expanded"). Press **T**: NVDA
     should say a table, its caption "A's tax by calendar year: its pay, its tax by kind and its rate, $, as paid". **B** then
     reaches "Download CSV: A-6, tax by calendar year, button".
-16. **Copy as document, one offer:** **Ctrl+Home**, then **B** until "Copy as document, button" (with one offer it says no
-    "collapsed": it copies at once). **Enter.** NVDA should say "Getting the document ready…", then "Copied: paste it into a
-    document or an email." Focus stays on the button.
+16. **Copy as document, one offer:** **Ctrl+Home**, then **B** until "Copy as document, button, collapsed". **Enter.** NVDA
+    should say "What to copy, grouping" and "Summary, its bottom line, where the money goes, pay by year, the key terms and the bad
+    case: about 2 pages, radio button, checked, 1 of 2", in focus mode; **Down Arrow** reads "Full detail, …, 2 of 2", and **Up
+    Arrow** goes back. **Tab** to "Copy, button", then **Enter**: the choice closes, and NVDA should say "Copy as document, button,
+    collapsed", then "Getting the document ready…" and "Copied: paste it into a document or an email.
 
 ## Part 4 · The sample comparison, and hearing the verdict change (6 min)
 
@@ -166,9 +168,10 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
 ## Part 8 · Copy as document, with two or more offers (3 min)
 
 39. **Insert+F12. Ctrl+Home**, then **B** until "Copy as document, button, collapsed". **Enter.** NVDA should say "What to
-    copy, grouping" and "The comparison, the offers side by side: 2-3 pages, radio button, checked, 1 of 3", in focus mode.
-40. **Down Arrow** goes to "C's breakdown, the offer shown, on its own: about 3 pages, radio button, checked, 2 of 3" (the
-    offer whose breakdown is shown: C after step 38), and again to "Both, each offer's breakdown, then the comparison, 3 of 3".
+    copy, grouping" and "The comparison, the offers side by side: 2-3 pages, radio button, checked, 1 of 4", in focus mode.
+40. **Down Arrow** goes to "C's breakdown, summary, …: about 2 pages, radio button, checked, 2 of 4" (the offer whose breakdown is
+    shown: C after step 38), then to "C's breakdown, full detail, …, 3 of 4", and to "Both, each offer's breakdown in summary, then
+    the comparison, 4 of 4".
 41. **Tab** to "Copy, button", then **Enter**. The choice closes and NVDA should say "Copy as document, button, collapsed",
     then "Getting the document ready…" and "Copied: paste it into a document or an email."
 42. **Escape** from the choice instead of copying (open it again with **Enter**, then **Escape**) goes back to "Copy as

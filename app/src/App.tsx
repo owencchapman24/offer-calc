@@ -23,7 +23,7 @@ import { dayBefore, localToday, longDate } from "./text";
 import { Printing, type PrintScope, type Stale, TickSetting } from "./ui";
 import { WorkProvider } from "./Tickmarks";
 import { type Engine, useEngine } from "./useEngine";
-import type { DocKind, Live } from "./copyDoc";
+import type { DocDetail, DocKind, Live } from "./copyDoc";
 import { SECTIONS, type SectionId } from "./sections";
 import { verdict, verdictSentence } from "./verdict";
 import { changingWarnings } from "./warningKinds";
@@ -119,7 +119,8 @@ export function App() {
   const printToggle = useRef<HTMLButtonElement>(null);
   // "Copy as document" with two or more offers: which document (the breakdown shown, the comparison, or both).
   const [copyChoosing, setCopyChoosing] = useState(false);
-  const [copyKind, setCopyKind] = useState<DocKind>("comparison");
+  // Its choice: with one offer, its breakdown's summary or full detail; with more, the comparison too, or both (null: the first).
+  const [copyPick, setCopyPick] = useState<CopyPick | null>(null);
   const copyToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const before = () => {
@@ -331,14 +332,10 @@ export function App() {
               onClick={() => { setChoosing(!choosing); setCopyChoosing(false); }}>Print…</button>
             <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
             <button ref={copyToggle} type="button" className="link" aria-disabled={copyBlocked ? true : undefined}
-              aria-describedby={copyBlocked ? "copy-why" : undefined} aria-expanded={comparing ? copyChoosing : undefined}
-              aria-controls={comparing ? "copy-choice" : undefined} onClick={() => {
+              aria-describedby={copyBlocked ? "copy-why" : undefined} aria-expanded={copyChoosing} aria-controls="copy-choice" onClick={() => {
                 if (copyBlocked) return;
-                if (!comparing) copier.copy("breakdown", shownLetter);
-                else {
-                  setCopyChoosing(!copyChoosing);
-                  setChoosing(false);
-                }
+                setCopyChoosing(!copyChoosing);
+                setChoosing(false);
               }}>Copy as document</button>
             {copier.state === "again" && <button type="button" className="link" onClick={copier.copyNow}>Copy now</button>}
             <span className="print-status" role="status">{copier.state ? COPY_SAID[copier.state] : ""}</span>
@@ -349,14 +346,19 @@ export function App() {
           <Choice<PrintScope> id="print-choice" legend="What to print" name="print-scope" options={SCOPES} value={scope} onChange={setScope} action="Print"
             onAction={() => void print()} onCancel={() => { setChoosing(false); printToggle.current?.focus(); }} />
         )}
-        {route.page === "compare" && copyChoosing && comparing && shownLetter && (
-          <Choice<DocKind> id="copy-choice" legend="What to copy" name="copy-kind" options={copyKinds(shownLetter)} value={copyKind} onChange={setCopyKind}
-            action="Copy" onAction={() => {
-              setCopyChoosing(false);
-              copyToggle.current?.focus();
-              copier.copy(copyKind, shownLetter);
-            }} onCancel={() => { setCopyChoosing(false); copyToggle.current?.focus(); }} />
-        )}
+        {route.page === "compare" && copyChoosing && shownLetter && (() => {
+          const options = copyPicks(shownLetter, comparing);
+          const pick = options.some((o) => o.value === copyPick) ? copyPick! : options[0].value;
+          return (
+            <Choice<CopyPick> id="copy-choice" legend="What to copy" name="copy-kind" options={options} value={pick} onChange={setCopyPick}
+              action="Copy" onAction={() => {
+                setCopyChoosing(false);
+                copyToggle.current?.focus();
+                const [kind, detail] = PICKED[pick];
+                copier.copy(kind, shownLetter, detail);
+              }} onCancel={() => { setCopyChoosing(false); copyToggle.current?.focus(); }} />
+          );
+        })()}
       </header>
       {saved === "newer" && <NewerSave schema={loaded.newer} />}
       {/* The first visit is sample A on its own (docs/v2-plan.md, item 5, B5): your own offer and the sample comparison are each one
@@ -491,7 +493,7 @@ const COPY_SAID: Record<Exclude<CopyState, null>, string> = {
 };
 
 /**
- * "Copy as document": one offer's breakdown (about 3 pages), the comparison (2-3 pages) or both, on the clipboard, HTML with a
+ * "Copy as document": one offer's breakdown (its summary, about 2 pages, or full detail), the comparison or both, on the clipboard, HTML with a
  * plain-text fallback. The click writes to the clipboard at once, with the document as a promise its code (copyDoc.ts, loaded now)
  * keeps once the slow lane has what it needs, since Safari allows a write only inside the click. A browser that won't take that gets
  * "Copy now", which copies the ready document through a copy event. Disabled (aria-disabled, so it stays focusable and says why)
@@ -504,10 +506,10 @@ function useCopy(live: { current: Live | null }, requestSlow: Engine["requestSlo
     setState((s) => (s === "working" ? s : null));
     ready.current = null;
   }, [results, blocked]);
-  const copy = (kind: DocKind, letter: Letter | null) => {
+  const copy = (kind: DocKind, letter: Letter | null, detail: DocDetail) => {
     if (blocked || state === "working") return;
     setState("working");
-    const doc = import("./copyDoc").then((m) => m.prepare(() => live.current!, requestSlow, kind, letter ?? undefined));
+    const doc = import("./copyDoc").then((m) => m.prepare(() => live.current!, requestSlow, kind, letter ?? undefined, detail));
     const blob = (type: "text/html" | "text/plain") => doc.then((d) => new Blob([type === "text/html" ? d.html : d.text], { type }));
     let wrote: Promise<void>;
     try {
@@ -541,11 +543,21 @@ const SCOPES: Array<{ value: PrintScope; name: string; hint: string }> = [
   { value: "full", name: "Full workpaper", hint: "adds every payment, to the cent: many more pages" },
 ];
 
-/** What "Copy as document" offers with two or more offers (docs/v2-plan.md, item 5, B10): the comparison first, as before. */
-const copyKinds = (l: Letter): Array<{ value: DocKind; name: string; hint: string }> => [
-  { value: "comparison", name: "The comparison", hint: "the offers side by side: 2-3 pages" },
-  { value: "breakdown", name: `${l}'s breakdown`, hint: "the offer shown, on its own: about 3 pages" },
-  { value: "both", name: "Both", hint: "each offer's breakdown, then the comparison" },
+/**
+ * What "Copy as document" offers (docs/v2-plan.md, item 5, B10; the summary since 2026-10-17): an offer's breakdown in summary (the
+ * default with one offer) or in full detail, as Print… offers; with two or more, the comparison first, as before, and both.
+ */
+type CopyPick = "summary" | "full" | "comparison" | "both";
+const PICKED: Record<CopyPick, [DocKind, DocDetail]> = {
+  summary: ["breakdown", "summary"], full: ["breakdown", "full"], comparison: ["comparison", "summary"], both: ["both", "summary"],
+};
+const copyPicks = (l: Letter, comparing: boolean): Array<{ value: CopyPick; name: string; hint: string }> => [
+  ...(comparing ? [{ value: "comparison" as const, name: "The comparison", hint: "the offers side by side: 2-3 pages" }] : []),
+  { value: "summary", name: comparing ? `${l}'s breakdown, summary` : "Summary",
+    hint: "its bottom line, where the money goes, pay by year, the key terms and the bad case: about 2 pages" },
+  { value: "full", name: comparing ? `${l}'s breakdown, full detail` : "Full detail",
+    hint: "adds every payment and cliff, leaving early, the benefits and tax by year: about 3 pages" },
+  ...(comparing ? [{ value: "both" as const, name: "Both", hint: "each offer's breakdown in summary, then the comparison" }] : []),
 ];
 
 /**
