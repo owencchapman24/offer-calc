@@ -65,8 +65,9 @@ section 2's and the plan's in step):
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
 4. **The audit's "fix before going public" items** (its table): C6, C7, C16-C19, C24, C25, C27, C28, T6, T7, T9, S1, S2's
-   `npm audit` step, D9-D11, P5-P7.
-5. **Retake the README's screenshot** (D10), and check the README and M-4 against the oracle report, and the docs against the code.
+   `npm audit` step, D9, D11, P5-P7. (D10, the README's drift, was fixed 2026-10-17 with the README's refresh.)
+5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
+   `.claude/review/readme/shots.e2e.ts`), and check the README and M-4 against the oracle report, and the docs against the code.
 
 ## 4. Working agreements
 - **Pull requests:** one branch per slice or fix; every change reaches `main` through a pull request. Enforced since 2026-10-15 by
@@ -466,4 +467,4 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 | `docs/ui-slices-4-8-plan.md`, `docs/slice-3-plan.md`, `docs/copy-as-document-plan.md` | Plans, each built (the last with `copy-as-document-sample.html`) | Done; `slice-3-plan.md`'s public-repo settings (item 7) still apply |
 | `docs/nvda-walkthrough.md` | The screen-reader script | Updated for item 5 (2026-10-16); needs D11's other steps (Print…, the tickmark setting) before it's run |
 | `docs/history.md` | What CLAUDE.md recorded before 2026-10-15: each slice, the sizes and load times, dated rationale | Archive, not maintained |
-| `README.md` | The project for a visitor: what it does, sources, how to run it | Current, except the screenshot (D10) |
+| `README.md` | The project for a visitor: what it does with one offer and with more, how it's validated, sources, how it was built | Current (refreshed 2026-10-17, with its screenshot) |
