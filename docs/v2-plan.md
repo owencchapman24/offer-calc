@@ -5,7 +5,7 @@ pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next s
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
 built (pull request #31), and item 5, the offer breakdown, in three stops: 5A (pull request #62, 2026-10-15, started before the
 testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16); nothing else is. Item 4 gained 4h, commission
-(2026-10-16, from the owner's own use). **Proposed 2026-10-19, for the user's review:** 4a extended (sick days, unlimited vacation,
+(2026-10-16, from the owner's own use). **Proposed 2026-10-19 (pull request #69), for the user's review:** 4a extended (sick days, unlimited vacation,
 paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan) and 4j (other benefits), built next at
 the user's word, in that order (4a, 4i, 4j), a review stop each, ahead of item 2; their decisions are D16-D23. What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order

@@ -40,7 +40,7 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: the user's review of a design** (2026-10-19, `docs/v2-plan.md`, no code): 4a extended (sick days, unlimited vacation,
+**Next: the user's review of a design** (2026-10-19, pull request #69, `docs/v2-plan.md`, no code): 4a extended (sick days, unlimited vacation,
 unused vacation paid out on leaving, with the ten states that require it) and two new parts of item 4, 4i (an employee stock purchase
 plan, with capital gains in the tax engine) and 4j (other benefits), decisions D16-D23. On approval, at the user's word, they're built
 next, ahead of item 2, in the order 4a, 4i, 4j, a review stop each.
