@@ -1,5 +1,6 @@
 import { addMonths, fromDays, toDays } from "./dates";
 import { projectScenario } from "./project";
+import { weeksWorked } from "./timeOff";
 import type {
   Basis, BreakevenResult, Comparison, ExtraHours, HorizonRow, HorizonSweep, Household, ISODate, Lead, OfferInput, OfferProjection,
   RentFlipResult, Scenario, ScenarioResult, ValuedOptions, ValueBasis,
@@ -57,7 +58,7 @@ export const EXTRA_HOURS_MIN = 100;
 export function extraHours(
   offers: OfferInput[], nominal: Partial<Record<ValueBasis, number[]>>, hours: number[], years: number,
 ): ExtraHours[] {
-  const scheduled = offers.map((o) => (o.hours ? o.hours.weekly.base * (o.hours.weeksPerYear ?? 50) : 0));
+  const scheduled = offers.map((o) => (o.hours ? o.hours.weekly.base * weeksWorked(o) : 0));
   const out: ExtraHours[] = [];
   for (let i = 0; i < offers.length; i++) {
     for (let j = i + 1; j < offers.length; j++) {

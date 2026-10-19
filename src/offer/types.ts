@@ -38,6 +38,8 @@ export interface OfferInput {
   health?: Health;
   perks?: Perks;
   hours?: Hours;
+  /** Days off (they set the weeks worked) and the vacation policy (what's paid out when you leave). Defaults: timeOff.ts. */
+  timeOff?: TimeOff;
   /** Where you'd live, for cost-of-living comparisons (BEA Regional Price Parities). */
   costOfLiving?: OfferCostOfLiving;
 }
@@ -113,8 +115,36 @@ export interface Perks {
 export interface Hours {
   /** Hours worked per week, by scenario. */
   weekly: ByScenario;
-  /** Weeks worked per year. Default 50. */
+  /**
+   * Weeks worked per year, in place of the days off (callers of the engine only: the app enters days). Default: from
+   * `timeOff`, 52 - (vacation + holidays + sick days) / 5.
+   */
   weeksPerYear?: number;
+}
+
+/**
+ * Days off a year and the vacation policy (docs/v2-plan.md, 4a). Days are workdays: weeks worked = 52 - (vacation + holidays +
+ * sick days) / 5. Unused vacation banks at `gives` - `vacation` a year, accrued and used evenly, up to `cap`, and is paid when you
+ * leave where the state where you'd work requires it (`VACATION_PAYOUT_STATES`) or the offer's policy does (`payout: "always"`).
+ */
+export interface TimeOff {
+  /** Vacation days you'd take a year. Default 11 (BLS). */
+  vacation?: number;
+  /** Paid holidays a year. Default 8 (BLS). */
+  holidays?: number;
+  /** Sick days you'd take a year. Default 0. */
+  sick?: number;
+  /** "days" (default): the offer gives a number of vacation days a year, which accrue. "unlimited": nothing accrues. */
+  policy?: "days" | "unlimited";
+  /** Vacation days the offer gives a year (policy "days"). Default: the days you'd take, so nothing banks. */
+  gives?: number;
+  /** Most vacation days you can bank. Default: no cap. */
+  cap?: number;
+  /**
+   * When unused vacation is paid as you leave: "state" (default), where the law of the state where you'd work (the employer's)
+   * requires it; "always": the offer's policy pays it out anywhere.
+   */
+  payout?: "state" | "always";
 }
 
 export interface Equity {
@@ -296,7 +326,20 @@ export type EventDetail =
       priceFactor: number; nominalDate?: ISODate }
   /** -amount x fraction (after tax for a later-year repayment on a net basis). */
   | { kind: "clawback"; award: string; amount: number; fraction: number; basis: "gross" | "net"; sameYear: boolean;
-      paidYear: number; repaidYear: number };
+      paidYear: number; repaidYear: number }
+  /** Unused vacation paid on your last day (component "cash"): days x annual / workdays (the salary rate that day / 260). */
+  | { kind: "vacationPayout"; days: number; annual: number; workdays: number; rule: VacationPayoutRule };
+
+/** Why unused vacation is or isn't paid when you leave. */
+export type VacationPayoutRule =
+  /** The law of the state where you'd work requires it. */
+  | { paid: true; why: "state"; state: string }
+  /** The offer's policy pays it out (payout "always"). */
+  | { paid: true; why: "policy" }
+  /** Not paid: the state doesn't require it and the policy is left at the state's rule. */
+  | { paid: false; why: "notRequired"; state: string }
+  /** Not paid: a state that requires it only after a year's service (Rhode Island), before the first anniversary. */
+  | { paid: false; why: "underAYear"; state: string };
 
 /** How a benefit flow was worked out. */
 export type BenefitDetail =
@@ -322,7 +365,9 @@ export type OfferWarning =
   | { code: "section127Cap"; params: { year: number; limit: number } }
   | { code: "commuterCap"; params: { year: number; monthlyLimit: number } }
   | { code: "clawbackFica"; params: { award: string; paidYear: number; repaidYear: number } }
-  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean } };
+  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean } }
+  /** An unlimited vacation policy where the state requires paying out vacation: assumed to accrue nothing (McPherson, in CA). */
+  | { code: "unlimitedVacation"; params: { state: string } };
 
 /** A salary change's reasons; same-day changes multiply. */
 export type SalaryChangeReason = { kind: "merit"; rate: number } | { kind: "promotion"; stepUp: number };
@@ -347,7 +392,12 @@ export type Assumption =
       vestedShare: number; completedYears: number } }
   | { code: "health"; params: { usage: "low" | "medium" | "high" } }
   | { code: "perks"; params: NoParams }
-  | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number } }
+  /** `daysOff`: present when the weeks come from days off rather than `hours.weeksPerYear`. */
+  | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number;
+      daysOff?: { vacation: number; holidays: number; sick: number } } }
+  /** The vacation policy: what banks a year and whether it's paid when you leave (`required`: by the employer state's law). */
+  | { code: "vacation"; params: { policy: "days" | "unlimited"; gives: number; taken: number; cap?: number; payout: "state" | "always";
+      employerState: string; required: boolean; afterYears?: number } }
   | { code: "costOfLiving"; params: { rppVintage: { dataYear: number; release: string }; savingsRate: number; reference: string;
       referenceNonHousing: number; areaNonHousing: number; factor: number; nonHousingFormula: string } }
   | { code: "rent"; params: { monthlyRent: number; source: "input" | "fmr" | "derived"; estimate?: RentEstimate; growth: number;
@@ -557,9 +607,11 @@ export interface LeaveResult {
   clawbacks: ClawbackResult[];
   /** Employer 401(k) money not vested at the leave date. */
   retirementForfeited: number;
+  /** Unused vacation banked by the leave date (days), and what's paid for it, gross (0 when it isn't paid). */
+  vacation: { banked: number; paid: number; rule: VacationPayoutRule | null };
 }
 
-export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest";
+export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest" | "vacationPayout";
 
 /** A date where your last day starts to matter: leave on or after it to keep what it brings. */
 export interface Cliff {

@@ -8,10 +8,11 @@ import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rs
 import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
+import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
 import type {
   Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
-  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, ISODate, LeaveDayRow, LeaveSweepRow, OfferInput,
-  ProjectionOptions, ScenarioResult,
+  CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, ISODate, LeaveDayRow, LeaveResult, LeaveSweepRow,
+  OfferInput, ProjectionOptions, ScenarioResult,
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -102,6 +103,32 @@ export function projectScenario(offer: OfferInput, household: Household, options
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
   ];
   if (raw.some((e) => yearOfDay(e.day) < 2026)) throw new Error("Payments before 2026 aren't supported.");
+
+  // ---- unused vacation, paid on the last day (docs/v2-plan.md, 4a) ----------------------------
+  // It banks evenly over each employment year worked (the part of a year counting by its days), and is paid at the salary rate
+  // that day / 260 where the employer state's law or the offer's policy pays it. A supplemental wage payment, with FICA (Pub. 15
+  // section 7: "an annual lump-sum payment for unused leave"), as a cash payment of its own kind.
+  let vacation: LeaveResult["vacation"] | undefined;
+  if (leave !== undefined) {
+    let service = 0;
+    for (let n = 1; n < anniversaries.length && anniversaries[n - 1] <= leave; n++) {
+      service += (Math.min(leave + 1, anniversaries[n]) - anniversaries[n - 1]) / (anniversaries[n] - anniversaries[n - 1]);
+    }
+    const banked = vacationBanked(offer.timeOff, service);
+    const completed = anniversaries.filter((d, n) => n >= 1 && d <= leave + 1).length;
+    const rule = offer.timeOff?.policy === "unlimited" ? null : payoutRule(offer.timeOff, offer.employerState, completed);
+    let paid = 0;
+    if (rule?.paid && banked > 0 && leave < until) {
+      const annual = rateAt(path, leave);
+      paid = (banked * annual) / WORKDAYS_A_YEAR;
+      raw.push({ day: leave, component: "cash", gross: paid,
+        detail: { kind: "vacationPayout", days: banked, annual, workdays: WORKDAYS_A_YEAR, rule } });
+    }
+    vacation = { banked, paid, rule };
+  }
+  if (offer.timeOff?.policy === "unlimited" && offer.employerState === "CA") {
+    warnings.push({ code: "unlimitedVacation", params: { state: offer.employerState } });
+  }
 
   // ---- clawbacks, part 1: repayments in the year of the payment reverse those wages ----
   interface Pending { label: string; amount: number; paidDay: number; fraction: number; basis: "gross" | "net"; sameYear: boolean }
@@ -265,11 +292,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }));
 
   const hours = offer.hours;
+  const weeks = weeksWorked(offer);
   if (hours) {
     const weekly = hours.weekly[scenario];
-    const weeks = hours.weeksPerYear ?? 50;
     if (!(weekly > 0 && weekly <= 168)) throw new Error("Weekly hours must be between 0 and 168.");
-    if (!(weeks > 0 && weeks <= 52)) throw new Error("Weeks per year must be between 0 and 52.");
+    if (!(weeks > 0 && weeks <= 52)) throw new Error("Weeks worked a year must be between 0 and 52: days off must be under 260.");
   }
 
   // ---- benefit events --------------------------------------------------------------
@@ -277,7 +304,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // window's last day if you stay). The vested share applies to the whole employer balance.
   const vestingDay = leave ?? windowEnd - 1;
   const completedYears = serviceYears(offer.retirement?.vestingService ?? "elapsedTime",
-    hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) : undefined, start, workEnd, vestingDay, anniversaries);
+    hours ? hours.weekly[scenario] * weeks : undefined, start, workEnd, vestingDay, anniversaries);
   const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
   const isPerk = (k: string) => k === "section127" || k === "commuter";
   const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
@@ -425,7 +452,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // employed) counted only for its days in the window, so they tie to the employment-year figures.
   let windowHours = 0;
   if (hours) {
-    const perYear = hours.weekly[scenario] * (hours.weeksPerYear ?? 50);
+    const perYear = hours.weekly[scenario] * weeks;
     for (let n = 1; n < anniversaries.length && anniversaries[n - 1] < windowEnd; n++) {
       const from = Math.max(anniversaries[n - 1], windowStart);
       const to = Math.min(anniversaries[n], windowEnd, workEnd);
@@ -486,7 +513,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     // Hours: weekly x weeks, prorated by the share of the year you're employed.
     const yearDays = anniversaries[n] - anniversaries[n - 1];
     const employedDays = Math.max(0, Math.min(workEnd, anniversaries[n]) - anniversaries[n - 1]);
-    const worked = hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) * (employedDays / yearDays) : undefined;
+    const worked = hours ? hours.weekly[scenario] * weeks * (employedDays / yearDays) : undefined;
     const quoted = {
       salary: round2(rateAt(path, anniversaries[n - 1])), bonus: round2(bonusTarget(n)),
       cash: round2(quotedCash.get(n) ?? 0), rsu: round2(quotedRsu.get(n) ?? 0),
@@ -526,6 +553,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     leaveResult = {
       leaveDate: fromDays(leave), unvestedRsuForfeited: round2(unvested), clawbacks,
       retirementForfeited: round2(credited * (1 - vestedShare)),
+      vacation: { banked: vacation!.banked, paid: round2(vacation!.paid), rule: vacation!.rule },
     };
   }
 
@@ -561,7 +589,16 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (offer.health) assumptions.push({ code: "health", params: { usage: household.healthUsage ?? "medium" } });
   if (offer.perks) assumptions.push({ code: "perks", params: {} });
   if (hours) {
-    assumptions.push({ code: "hours", params: { scenario, weekly: hours.weekly[scenario], weeksPerYear: hours.weeksPerYear ?? 50 } });
+    assumptions.push({ code: "hours", params: { scenario, weekly: hours.weekly[scenario], weeksPerYear: weeks,
+      ...(hours.weeksPerYear === undefined ? { daysOff: daysOff(offer.timeOff) } : {}) } });
+  }
+  {
+    const t = offer.timeOff;
+    const taken = daysOff(t).vacation;
+    const law = VACATION_PAYOUT_STATES[offer.employerState];
+    assumptions.push({ code: "vacation", params: { policy: t?.policy ?? "days", gives: t?.policy === "unlimited" ? 0 : t?.gives ?? taken,
+      taken, ...(t?.cap !== undefined ? { cap: t.cap } : {}), payout: t?.payout ?? "state", employerState: offer.employerState,
+      required: !!law, ...(law?.afterYears ? { afterYears: law.afterYears } : {}) } });
   }
   if (col) {
     const c = col.info;

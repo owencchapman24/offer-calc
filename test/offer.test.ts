@@ -7,7 +7,7 @@ import {
   type Cliff, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
-import { describeSchedule, formatWarning } from "../src/format/index";
+import { describeSchedule, eventFormula, formatWarning } from "../src/format/index";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { areaStates, cityOptions, findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
@@ -632,7 +632,8 @@ describe("401(k), health, perks and hours", () => {
     // FICA on 98,800 (401(k) doesn't lower it; the premium does): 6,125.60 + 1,432.60 = 7,558.20. Tax 19,144.20.
     // After-tax comp = 100,000 - 19,144.20 - 1,200 premium = 79,655.80. Take-home = - 6,000 deferral = 73,655.80.
     // Total rewards = 79,655.80 + 3,000 match - 1,500 OOP + 500 employer HSA = 81,655.80.
-    // Hours 45 x 50 = 2,250: 79,655.80 / 2,250 = 35.40; 81,655.80 / 2,250 = 36.29.
+    // Hours 45 x 48.2 = 2,169 (the default days off: 52 - (11 vacation + 8 holidays + 0 sick days) / 5 = 48.2 weeks):
+    // 79,655.80 / 2,169 = 36.72; 81,655.80 / 2,169 = 37.65.
     const y = oneYear({
       ...jan, retirement: match50to6, hours: { weekly: all(45) },
       health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 },
@@ -643,8 +644,8 @@ describe("401(k), health, perks and hours", () => {
     expect(y.retirement).toEqual({ employee: 6_000, employerCredited: 3_000, employerVested: 3_000 });
     expect(y.health).toEqual({ premiums: 1_200, outOfPocket: 1_500, employerHsa: 500, employeeHsa: 0, net: 2_200 });
     expect(y.totalRewards).toBe(81_655.8);
-    expect(y.hours).toBe(2_250);
-    expect(y.hourly).toEqual({ afterTaxComp: 35.4, totalRewards: 36.29 });
+    expect(y.hours).toBe(2_169);
+    expect(y.hourly).toEqual({ afterTaxComp: 36.72, totalRewards: 37.65 });
   });
   it("expected out-of-pocket is capped at the out-of-pocket max", () => {
     const y = oneYear({ ...jan, health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 9_000 }, oopMax: 4_000 } });
@@ -715,10 +716,10 @@ describe("401(k), health, perks and hours", () => {
     expect(r.employmentYears[0].perks).toEqual({ face: 9_330, preTaxEquivalent: 13_262.26 });
     expect(r.warnings).toHaveLength(2);
   });
-  it("hours prorate when you leave mid-year: 45 x 50 x 181/365 = 1,115.75", () => {
+  it("hours prorate when you leave mid-year: 45 x 48.2 x 181/365 = 1,075.59", () => {
     const y = projectScenario({ ...jan, hours: { weekly: all(45) }, leaveDate: "2026-06-30" }, single, { years: 1 }).employmentYears[0];
-    expect(y.hours).toBe(1_115.75);
-    expect(y.hourly!.afterTaxComp).toBeCloseTo(y.afterTaxComp / 1_115.75, 2);
+    expect(y.hours).toBe(1_075.59);
+    expect(y.hourly!.afterTaxComp).toBeCloseTo(y.afterTaxComp / 1_075.59, 2);
   });
   it("breakeven on total rewards adds the match, grossed up, to the cash breakeven", () => {
     // A defers 6% pre-tax with a 3% match; B has no plan. Cash: B needs Delta x (1 - 29.65%) = 22% x 6,000
@@ -741,8 +742,8 @@ describe("401(k), health, perks and hours", () => {
     expect(y.takeHome).toBeCloseTo(y.afterTaxComp - 2_000, 2);
   });
 
-  // A at 80 hours a week, 50 weeks: 4,000 hours a year, accruing evenly.
-  const hoursA: OfferInput = { ...cliffA, hours: { weekly: all(80) } };
+  // A at 80 hours a week, 50 weeks (given as weeks, as an engine caller may): 4,000 hours a year, accruing evenly.
+  const hoursA: OfferInput = { ...cliffA, hours: { weekly: all(80), weeksPerYear: 50 } };
   const planYear: OfferInput = { ...hoursA, retirement: { ...hoursA.retirement!, vestingService: "planYearHours" } };
   it("plan-year hours: A vests on 2028-04-01, when 2028 reaches 1,000 hours (hand-checked)", () => {
     // 2026 (Jul 13-Dec 31): 4,000 x 172/365 = 1,885 hours. 2027: 4,000. 2028 is a leap year:
@@ -1099,10 +1100,10 @@ describe("cliffs and the next cliff (roadmap 7)", () => {
     expect(r.next!.valueOfStaying.afterTaxComp).toBeCloseTo(3_116.73, 1);
   });
   it("401(k) cliff vesting: 2029-07-12 under elapsed time, 2028-04-01 under plan-year hours", () => {
-    // Same plan as the vesting tests above: 3% of $110,000 a year, 3-year cliff.
+    // Same plan and hours as the vesting tests above: 3% of $110,000 a year, 3-year cliff, 80 hours a week for 50 weeks.
     const A: OfferInput = { label: "A", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13",
       salary: { annual: 110_000 }, retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }], vesting: { kind: "cliff", years: 3 } },
-      hours: { weekly: { bear: 80, base: 80, bull: 80 } } };
+      hours: { weekly: { bear: 80, base: 80, bull: 80 }, weeksPerYear: 50 } };
     const vest = (o: OfferInput) => cliffs(o, single).filter((c) => c.kind === "retirementVest");
     expect(vest(A)).toEqual([expect.objectContaining({ date: "2029-07-12", amount: expect.closeTo(9_900, 1) })]);
     const planYear = { ...A, retirement: { ...A.retirement!, vestingService: "planYearHours" as const } };
@@ -1187,17 +1188,17 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
     expect(monthlyEquivalent(12_000, { start: "2026-01-01", years: 2 }, "2026-01-01", 0)).toBeCloseTo(500, 9);
   });
   it("window hours tie to the employment years, prorated where the window cuts one (hand-checked)", () => {
-    // Same start: 45 x 50 = 2,250 hours; 79,655.80 / 2,250 = 35.40 an hour, as in the employment-year test.
+    // Same start: 45 x 48.2 = 2,169 hours; 79,655.80 / 2,169 = 36.72 an hour, as in the employment-year test.
     const everything = tx({ retirement: { contributionPct: 0.06, match: [{ upToPct: 0.06, rate: 0.5 }] }, hours: { weekly: all(45) },
       health: { premium: 1_200, outOfPocket: { low: 500, medium: 1_500, high: 4_000 }, oopMax: 4_000, employerHsa: 500 } });
     const w = projectScenario(everything, single, { years: 1 }).window;
-    expect(w.hours).toBe(2_250);
-    expect(w.perHour).toEqual({ afterTaxComp: 35.4, totalRewards: 36.29 });
+    expect(w.hours).toBe(2_169);
+    expect(w.perHour).toEqual({ afterTaxComp: 36.72, totalRewards: 37.65 });
     // A July start in a window from Jan 1, 2026 for 2 years: employment year 1 (365 days) is all inside,
-    // 2,000 hours; year 2 runs Jul 1, 2027 to Jul 1, 2028 (366 days) with 184 inside: 2,000 x 184/366.
+    // 40 x 48.2 = 1,928 hours; year 2 runs Jul 1, 2027 to Jul 1, 2028 (366 days) with 184 inside: 1,928 x 184/366.
     const late = projectScenario(tx({ startDate: "2026-07-01", hours: { weekly: all(40) } }), single,
       { window: { start: "2026-01-01", years: 2 } }).window;
-    expect(late.hours).toBeCloseTo(2_000 + (2_000 * 184) / 366, 2);
+    expect(late.hours).toBeCloseTo(1_928 + (1_928 * 184) / 366, 2);
   });
   it("the winner flips with the stay: a bigger sign-on wins short stays, a bigger salary wins from 3 years (hand-checked)", () => {
     // TX, 0% inflation (2027-28 law = 2026's), 0% discount (PV = nominal). A: $110,000. B: $100,000 + $25,000 sign-on.
@@ -1223,7 +1224,8 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
     expect(h.rows.map((r) => [r.leads.colAdjustedTotal!.winner, Math.round(r.leads.colAdjustedTotal!.perMonth!), r.leads.colAdjustedTotal!.closeCall]))
       .toEqual([[2, 722, false], [2, 665, false], [2, 487, false], [2, 155, true]]);
     expect(h.rows.map((r) => Math.round(r.leads.cash!.perMonth!))).toEqual([1_376, 1_177, 1_373, 1_733]);
-    expect(h.rows[2].values.perHour).toEqual([21.85, 21.66, 41.32]);
+    // At the default 48.2 weeks a year: 50 weeks' 21.85, 21.66 and 41.32, x 50 / 48.2 (hours fall in proportion), to the cent.
+    expect(h.rows[2].values.perHour).toEqual([22.66, 22.47, 42.86]);
   });
   it("each row carries the annuity factor its per-month figures divide by", () => {
     // The 1-year factor from the hand-checked per-month test; and margin / factor is perMonth, to the cent.
@@ -1243,37 +1245,112 @@ describe("stay length: window hours, per month, and the horizon sweep", () => {
   });
   it("pay per extra hour: the gap in nominal value over the gap in hours worked (hand-checked)", () => {
     // TX, 1-year stay from Jan 1, 2026, 0% inflation and discount. After tax (from the flip test above):
-    // $110,000 -> 86,215; $100,000 -> 79,180. Gap 7,035. Hours: 50 x 50 = 2,500 vs 45 x 50 = 2,250, 250 extra.
-    // 7,035 / 250 = 28.14 an extra hour. No benefits, so total rewards is the same.
+    // $110,000 -> 86,215; $100,000 -> 79,180. Gap 7,035. Hours at the default 48.2 weeks: 50 x 48.2 = 2,410 vs 45 x 48.2 = 2,169,
+    // 241 extra. 7,035 / 241 = 29.19 an extra hour. No benefits, so total rewards is the same.
     const opts = { valuationDate: "2026-01-01", inflation: 0, discountRate: 0 };
     const A = tx({ salary: { annual: 110_000 }, hours: { weekly: all(50) } });
     const B = tx({ hours: { weekly: all(45) } });
     const row = horizonSweep([A, B], single, [1], opts).rows[0];
     expect(row.nominal).toEqual({ cash: [86_215, 79_180], totalRewards: [86_215, 79_180] });
-    expect(row.hours).toEqual([2_500, 2_250]);
+    expect(row.hours).toEqual([2_410, 2_169]);
     expect(row.extraHours).toEqual([
-      { more: 0, fewer: 1, hoursPerYear: 250, gapPerYear: { cash: 7_035, totalRewards: 7_035 }, perExtraHour: { cash: 28.14, totalRewards: 28.14 } },
+      { more: 0, fewer: 1, hoursPerYear: 241, gapPerYear: { cash: 7_035, totalRewards: 7_035 }, perExtraHour: { cash: 29.19, totalRewards: 29.19 } },
     ]);
     // More hours for less pay: the gap is negative and there's no per-hour figure.
     const less = horizonSweep([tx({ hours: { weekly: all(50) } }), tx({ salary: { annual: 110_000 }, hours: { weekly: all(45) } })], single, [1], opts);
-    expect(less.rows[0].extraHours).toEqual([{ more: 0, fewer: 1, hoursPerYear: 250, gapPerYear: { cash: -7_035, totalRewards: -7_035 }, perExtraHour: {} }]);
-    // The threshold is 100 scheduled hours a year (2 a week over 50 weeks): 45 vs 43 shows; 45 vs 43.5 doesn't;
-    // equal weekly hours with 48 weeks vs 50 differ by 90 and don't.
+    expect(less.rows[0].extraHours).toEqual([{ more: 0, fewer: 1, hoursPerYear: 241, gapPerYear: { cash: -7_035, totalRewards: -7_035 }, perExtraHour: {} }]);
+    // The threshold is 100 scheduled hours a year: at 48.2 weeks, 45 vs 42.9 shows (2.1 x 48.2 = 101.22); 45 vs 43 doesn't
+    // (2 x 48.2 = 96.4); equal weekly hours with 46 weeks given vs the default 48.2 differ by 45 x 2.2 = 99 and don't, with 45
+    // weeks by 45 x 3.2 = 144 and do; 10 more vacation days, 45 x 10 / 5 = 90, don't.
     const pair = (a: Partial<OfferInput>, b: Partial<OfferInput>) => horizonSweep([tx(a), tx(b)], single, [1], opts).rows[0].extraHours.length;
-    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(43) } })).toBe(1);
-    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(43.5) } })).toBe(0);
-    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(45), weeksPerYear: 48 } })).toBe(0);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(42.9) } })).toBe(1);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(43) } })).toBe(0);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(45), weeksPerYear: 46 } })).toBe(0);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(45), weeksPerYear: 45 } })).toBe(1);
+    expect(pair({ hours: { weekly: all(45) } }, { hours: { weekly: all(45) }, timeOff: { vacation: 21 } })).toBe(0);
     expect(horizonSweep([A, tx({})], single, [1], opts).rows[0].extraHours).toEqual([]); // hours only on one offer
   });
   it("sample offers (illustrative): A's extra hours don't pay after rent against C, but do after tax (docs/ui-design.md §4.2)", () => {
     const row = horizonSweep(SAMPLE_OFFERS, SAMPLE_HOUSEHOLD, [4], { inflation: 0.025, valuationDate: "2026-07-13" }).rows[0];
     expect(row.annuityFactor).toBeCloseTo(43.52, 2);
     const ac = row.extraHours.find((x) => x.more === 0 && x.fewer === 2)!;
-    expect(ac.hoursPerYear).toBe(1_750); // (80 - 45) x 50
+    expect(ac.hoursPerYear).toBe(1_687); // (80 - 45) x 48.2
     expect(Math.round(ac.gapPerYear.colAdjustedTotal!)).toBe(-5_577);
-    expect(ac.perExtraHour).toEqual({ cash: 9.59, totalRewards: 6.33 });
+    // The same gap over 1,687 extra hours a year, not 1,750: 50 weeks' 9.59 and 6.33 x 1,750 / 1,687.
+    expect(ac.perExtraHour).toEqual({ cash: 9.95, totalRewards: 6.56 });
     const ab = row.extraHours.find((x) => x.more === 0 && x.fewer === 1)!;
-    expect([ab.hoursPerYear, ab.perExtraHour.colAdjustedTotal]).toEqual([1_500, 22.15]);
+    // (80 - 50) x 48.2 = 1,446 extra hours a year; 50 weeks' 22.15 x 1,500 / 1,446 = 22.98.
+    expect([ab.hoursPerYear, ab.perExtraHour.colAdjustedTotal]).toEqual([1_446, 22.98]);
+  });
+});
+
+describe("days off, and unused vacation paid when you leave (v2 4a)", () => {
+  // California: $120,000, no raise, starting Jul 13, 2026; the offer gives 15 vacation days a year and you'd take 11 (the default).
+  const ca: OfferInput = { label: "CA", residence: { state: "CA" }, employerState: "CA", startDate: "2026-07-13",
+    salary: { annual: 120_000 }, timeOff: { gives: 15 } };
+  const kept = (o: OfferInput, last: string) => keptIfLeaving(o, single, toDays(last)).result;
+  const all = (x: number) => ({ bear: x, base: x, bull: x });
+
+  it("days off set the weeks worked: 52 - (11 + 8 + 0) / 5 = 48.2 by default; entered days; weeks given win", () => {
+    const hrs = (o: Partial<OfferInput>) =>
+      projectScenario({ ...ca, timeOff: undefined, hours: { weekly: all(40) }, ...o }, single, { years: 1 }).employmentYears[0].hours;
+    expect(hrs({})).toBe(1_928); // 40 x 48.2
+    // 15 vacation + 10 holidays + 5 sick days = 30: 52 - 30 / 5 = 46 weeks, 40 x 46 = 1,840 hours.
+    expect(hrs({ timeOff: { vacation: 15, holidays: 10, sick: 5 } })).toBe(1_840);
+    expect(hrs({ hours: { weekly: all(40), weeksPerYear: 50 }, timeOff: { vacation: 15 } })).toBe(2_000);
+  });
+  it("California, giving 15 days and taking 11: 8 banked the day before the 2nd anniversary, paid at $120,000 / 260 a day", () => {
+    // 15 - 11 = 4 days bank a year. Two employment years worked in full: 8 days, x 120,000 / 260 = 3,692.31 before tax.
+    const before = kept(ca, "2028-07-12");
+    expect(before.leave!.vacation).toEqual({ banked: 8, paid: 3_692.31, rule: { paid: true, why: "state", state: "CA" } });
+    const e = before.events.find((x) => x.detail.kind === "vacationPayout")!;
+    expect(e).toMatchObject({ date: "2028-07-12", component: "cash", gross: 3_692.31 });
+    expect(eventFormula(e.detail)).toBe("8 days x $120,000 / 260 workdays");
+    // The anniversary itself is a day into year 3 (365 days): 4 x (2 + 1/365) = 8.010959 days, x 120,000 / 260 = 3,697.37.
+    expect(kept(ca, "2028-07-13").leave!.vacation.paid).toBe(3_697.37);
+    // A stay isn't a leave date: no payout over it.
+    expect(projectScenario(ca, single, { years: 4 }).events.some((x) => x.detail.kind === "vacationPayout")).toBe(false);
+  });
+  it("a cap stops the bank: at most 5 days, 5 x 120,000 / 260 = 2,307.69", () => {
+    expect(kept({ ...ca, timeOff: { gives: 15, cap: 5 } }, "2028-07-12").leave!.vacation).toMatchObject({ banked: 5, paid: 2_307.69 });
+  });
+  it("nothing banks at the defaults, or with an unlimited policy (which California's case law warns about)", () => {
+    expect(kept({ ...ca, timeOff: undefined }, "2028-07-12").leave!.vacation)
+      .toEqual({ banked: 0, paid: 0, rule: { paid: true, why: "state", state: "CA" } });
+    const u = kept({ ...ca, timeOff: { policy: "unlimited", gives: 30 } }, "2028-07-12");
+    expect(u.leave!.vacation).toEqual({ banked: 0, paid: 0, rule: null });
+    expect(formatWarning(u.warnings.find((w) => w.code === "unlimitedVacation")!)).toMatch(/McPherson/);
+    const tx: OfferInput = { ...ca, residence: { state: "TX" }, employerState: "TX", timeOff: { policy: "unlimited" } };
+    expect(projectScenario(tx, single, { years: 1 }).warnings.map((w) => w.code)).not.toContain("unlimitedVacation");
+  });
+  it("Texas doesn't require it; the offer's policy can pay it anyway, a supplemental wage withheld at 22%", () => {
+    const tx: OfferInput = { ...ca, residence: { state: "TX" }, employerState: "TX" };
+    expect(kept(tx, "2028-07-12").leave!.vacation).toEqual({ banked: 8, paid: 0, rule: { paid: false, why: "notRequired", state: "TX" } });
+    const always: OfferInput = { ...tx, timeOff: { gives: 15, payout: "always" } };
+    expect(kept(always, "2028-07-12").leave!.vacation).toEqual({ banked: 8, paid: 3_692.31, rule: { paid: true, why: "policy" } });
+    // No other supplemental pay, so 2028's supplemental withholding is 22% of the payout: 0.22 x 3,692.31 = 812.31.
+    const w = withholdingShortfall({ ...always, leaveDate: "2028-07-12" }, single, { years: 3 }).years.find((y) => y.year === 2028)!;
+    expect(w.withheld.supplemental).toBeCloseTo(812.31, 2);
+  });
+  it("Rhode Island pays it only after a year's service: nothing the day before the first anniversary's eve, then 4 days", () => {
+    const ri: OfferInput = { ...ca, residence: { state: "RI" }, employerState: "RI" };
+    expect(kept(ri, "2027-07-11").leave!.vacation).toMatchObject({ banked: expect.closeTo(4 * 364 / 365, 9), paid: 0,
+      rule: { paid: false, why: "underAYear", state: "RI" } });
+    // Working through Jul 12, 2027 completes the first year: 4 days, x 120,000 / 260 = 1,846.15. It's a cliff.
+    expect(kept(ri, "2027-07-12").leave!.vacation).toMatchObject({ banked: 4, paid: 1_846.15 });
+    expect(cliffs(ri, single).filter((c) => c.kind === "vacationPayout"))
+      .toEqual([expect.objectContaining({ date: "2027-07-12", amount: 1_846.15 })]);
+    // With the offer's own policy paying it out, there's no cliff: it's paid from the first day.
+    expect(cliffs({ ...ri, timeOff: { gives: 15, payout: "always" } }, single).some((c) => c.kind === "vacationPayout")).toBe(false);
+  });
+  it("vacation paid on another cliff's day isn't that cliff's own value", () => {
+    // A sign-on paid Aug 12, 2026, 30 days after the start; leaving that day also pays the vacation banked by then.
+    const o: OfferInput = { ...ca, cashAwards: [{ label: "Sign-on", amount: 10_000, paidOn: { daysAfterStart: 30 } }] };
+    const n = nextCliff(o, single, "2026-07-13").next!;
+    expect(n.date).toBe("2026-08-12");
+    const then = kept(o, "2026-08-12").events;
+    expect(then.some((e) => e.detail.kind === "vacationPayout")).toBe(true);
+    expect(n.cliffValue).toBe(then.find((e) => e.detail.kind === "cash")!.afterTax);
   });
 });
 
