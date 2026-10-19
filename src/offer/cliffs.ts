@@ -3,6 +3,7 @@ import { clawbackFraction } from "./clawback";
 import { addMonths, fromDays, toDays } from "./dates";
 import { keptIfLeaving, projectScenario } from "./project";
 import { cashEvents } from "./streams";
+import { VACATION_PAYOUT_STATES, weeksWorked } from "./timeOff";
 import type { Cliff, Household, NextCliffResult, OfferInput, ProjectionOptions } from "./types";
 
 // Cliffs: dates where your last day starts to matter (roadmap 7). Each cliff's date is the first
@@ -17,7 +18,9 @@ const round2 = (x: number) => Math.round(x * 100) / 100;
  * - cashAward: a sign-on or other award is paid on its date;
  * - clawbackStep / clawbackCleared: what you'd repay steps down, or reaches zero, once you work
  *   through the day before a window month ends (per-day proration shrinks daily: no cliffs);
- * - retirementVest: employer 401(k) money vests as service years complete.
+ * - retirementVest: employer 401(k) money vests as service years complete;
+ * - vacationPayout: unused vacation starts being paid when you leave, in a state that requires it only after a year's service
+ *   (Rhode Island), once you work through the day before that anniversary.
  * `amount` is gross: the payment or vest, the repayment no longer owed, or the employer money that vests.
  */
 export function cliffs(offer: OfferInput, household: Household, options: ProjectionOptions = {}): Cliff[] {
@@ -65,7 +68,7 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
   const r = offer.retirement;
   if (r && r.vesting && r.vesting.kind !== "immediate") {
     const hours = offer.hours;
-    const perYear = hours ? hours.weekly[scenario] * (hours.weeksPerYear ?? 50) : undefined;
+    const perYear = hours ? hours.weekly[scenario] * weeksWorked(offer) : undefined;
     const horizon = addMonths(start, 12 * (options.years ?? 5));
     const anniversaries = Array.from({ length: (options.years ?? 5) + 3 }, (_, n) => addMonths(start, 12 * n));
     let years = 0;
@@ -82,6 +85,17 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
         kind: "retirementVest", detail: { kind: "retirementVest", vestedShare: after, serviceYears: now },
         amount: credited * (after - before),
       });
+    }
+  }
+
+  // Unused vacation, where the law pays it only after some service and the offer's policy doesn't pay it anyway.
+  const law = VACATION_PAYOUT_STATES[offer.employerState];
+  if (law?.afterYears && offer.timeOff?.policy !== "unlimited" && offer.timeOff?.payout !== "always") {
+    const day = addMonths(start, 12 * law.afterYears) - 1;
+    if (day < addMonths(start, 12 * (options.years ?? 5))) {
+      const k = keptIfLeaving(offer, household, day, { ...options, scenario });
+      const payout = k.result.events.find((e) => e.detail.kind === "vacationPayout");
+      if (payout) push(day, { kind: "vacationPayout", detail: payout.detail, amount: payout.gross });
     }
   }
 
@@ -108,8 +122,11 @@ export function nextCliff(
   const onDate = upcoming.filter((c) => c.date === date);
   const now = keptIfLeaving(offer, household, leave, options);
   const then = keptIfLeaving(offer, household, day, options);
+  // Unused vacation paid on a last day isn't the cliff's own, unless the cliff is the day it starts being paid.
+  const payoutCliff = onDate.some((c) => c.kind === "vacationPayout");
   const payments = then.result.events
-    .filter((e) => e.date === date && (e.component === "bonus" || e.component === "rsu" || e.component === "cash"))
+    .filter((e) => e.date === date && (e.component === "bonus" || e.component === "rsu" || e.component === "cash")
+      && (e.detail.kind !== "vacationPayout" || payoutCliff))
     .reduce((s, e) => s + e.afterTax, 0);
   const clawbackSaved = onDate.some((c) => c.kind === "clawbackStep" || c.kind === "clawbackCleared")
     ? keptIfLeaving(offer, household, day - 1, options).clawbackNetCost - then.clawbackNetCost : 0;

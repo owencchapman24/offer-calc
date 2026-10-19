@@ -4,7 +4,7 @@ import type { OfferInput } from "../../src/offer/types";
 import { VESTING_PRESETS } from "../../src/offer/vesting";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import {
-  type AppOffer, blankOffer, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
+  type AppOffer, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
   toOfferInput, withBase,
 } from "./model";
 import { copyBlock } from "./App";
@@ -189,6 +189,14 @@ describe("recovery: nothing saved is lost (audit C22, C23)", () => {
   const s0 = reducer(initialSession(TODAY), { type: "loadSamples", today: TODAY });
   const newer = JSON.stringify({ schemaVersion: 4, household: { filingStatus: "joint" }, offers: [{ id: "x", letter: "A", future: true }], ui: {} });
 
+  it("a save this version reads but can't show (an empty draft) loads as it is, for the recovery screen, not set aside", () => {
+    const broken = JSON.stringify({ schemaVersion: 3, household: s0.household, offers: [{ id: "mine", letter: "A", sample: null, draft: {} }], ui: s0.ui });
+    const { mem, store } = memory([[STORAGE_KEY, broken]]);
+    // Days off' migration (2026-10-19) once threw on it, so the save was set aside and the recovery screen never came.
+    expect(load(store, TODAY).session.offers[0].draft).toEqual({});
+    expect(mem.has(BACKUP_KEY)).toBe(false);
+  });
+
   it("a newer version's save loads as a first visit, says so, and is never saved over", () => {
     const { mem, store } = memory([[STORAGE_KEY, newer]]);
     const loaded = load(store, TODAY);
@@ -327,6 +335,20 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
     expect(load(clt).household.pricesIn).toBe("16740");
     // A place the city list no longer has (BEA recodes metros now and then) falls back rather than failing.
     expect(load({ ...clt, household: { ...clt.household, pricesIn: "99999" } }).household.pricesIn).toBe("00000");
+  });
+  it("a save from before days off (2026-10-19): its weeks a year become days off that give the same weeks", () => {
+    const s0 = initialSession(TODAY);
+    const old = (weeks: number | null) => ({ ...s0, offers: s0.offers.map((o) => {
+      const { timeOff: _, ...draft } = o.draft;
+      return { ...o, draft: { ...draft, hours: { ...draft.hours, weeksPerYear: weeks } } };
+    }) });
+    const read = (x: unknown) => loadSession({ getItem: () => JSON.stringify(x), setItem: () => {} }, TODAY).offers[0].draft;
+    // 48 weeks entered: 52 − 48 = 4 weeks off, 20 vacation days with no holidays or sick days, so 52 − 20 ÷ 5 = 48 weeks still.
+    expect(read(old(48)).timeOff).toEqual({ ...blankTimeOff(), vacation: 20, holidays: 0, sick: 0 });
+    expect(read(old(48)).hours).toEqual({ weekly: s0.offers[0].draft.hours.weekly });
+    expect(toOfferInput({ ...s0.offers[0], draft: read(old(48)) })).toMatchObject({ offer: { timeOff: { vacation: 20, holidays: 0, sick: 0 } } });
+    // None entered: every default.
+    expect(read(old(null)).timeOff).toEqual(blankTimeOff());
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)

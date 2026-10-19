@@ -139,7 +139,8 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
         {v.hour && (
           <>Per hour worked over your stay, after tax and rent, in {v.place} dollars:{" "}
             <Fig id={`own.${L}.hour`} label={`${v.place} ${cents(v.hour.value)} an hour worked over your stay, after tax and rent`}>
-              {cents(v.hour.value)}</Fig></>
+              {cents(v.hour.value)}</Fig>{" "}
+            <span className="own-weeks">({v.hour.weekly} hours a week for {v.hour.weeks} weeks a year, after {v.hour.days})</span></>
         )}
       </p>
       <p className="own-bear">

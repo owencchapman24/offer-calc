@@ -89,16 +89,17 @@ describe("show the work: an offer's totals", () => {
 });
 
 describe("pay per extra hour (docs/ui-design.md §4.2)", () => {
-  it("A asks 1,750 more hours a year than C for $5,577 a year less after rent; after tax they pay $9.59 each", () => {
+  it("A asks 1,687 more hours a year than C for $5,577 a year less after rent; after tax they pay $9.95 each", () => {
     const ctx = context();
     const lines = extraHoursView(ctx.results!.view, LETTERS);
     const ac = lines.find((x) => x.more === "A" && x.fewer === "C")!;
-    expect(ac).toMatchObject({ hoursPerYear: 1_750, basis: "colAdjustedTotal", perExtraHour: null });
+    // (80 − 45) × 48.2 weeks, from the default days off.
+    expect(ac).toMatchObject({ hoursPerYear: 1_687, basis: "colAdjustedTotal", perExtraHour: null });
     expect(Math.round(ac.gapPerYear)).toBe(-5_577);
     expect(ac.lower!.basis).toBe("cash");
-    expect(ac.lower!.perExtraHour).toBe(9.59);
-    // A's average after tax: its 4-year after-tax pay as paid / 16,000 hours (80 a week x 50 weeks x 4 years).
-    expect(ac.lower!.average).toBeCloseTo(ctx.results!.view.row.nominal.cash![0] / 16_000, 9);
+    expect(ac.lower!.perExtraHour).toBe(9.95);
+    // A's average after tax: its 4-year after-tax pay as paid / 15,424 hours (80 a week x 48.2 weeks x 4 years).
+    expect(ac.lower!.average).toBeCloseTo(ctx.results!.view.row.nominal.cash![0] / 15_424, 9);
     const d = derive("extra.AC.colAdjustedTotal", ctx);
     // The two 4-year totals as shown, subtracted: −22,308 (−5,576.87 × 4 = −22,307.48 before rounding them); ÷ 4 = −5,577.
     expect(d.lines.find((l) => l.label === "A pays less")!.value).toBe("−22,308");
@@ -179,12 +180,18 @@ describe("show the work reaches every detailed input (step 0.4)", () => {
     expect(metricKind("in.A.bonus.periodStart", ctx)).toBe("default");
     expect(metricKind("in.A.bonus.payOn", ctx)).toBe("traced");
   });
-  it("per hour points to weekly hours, and weeks a year shows its default and why", () => {
+  it("per hour points to weekly hours and the days off, and each day off shows its default and why", () => {
     const c = context("perHour");
-    expect(refs("ph.A", c)).toEqual(["in.A.hours.weekly = 80 hours a week", "in.A.hours.weeksPerYear = 50"]);
-    const weeks = derive("in.A.hours.weeksPerYear", c);
-    expect([weeks.kind, weeks.lines[0].value, weeks.notes[0]]).toEqual(["default", "50", "A default, not something you entered. Two weeks off a year."]);
-    expect(weeks.edit).toEqual({ letter: "A", path: "hours.weeksPerYear" });
+    expect(refs("ph.A", c)).toEqual(["in.A.hours.weekly = 80 hours a week", "in.A.timeOff.vacation = 11 days", "in.A.timeOff.holidays = 8 days",
+      "in.A.timeOff.sick = None"]);
+    const vacation = derive("in.A.timeOff.vacation", c);
+    expect([vacation.kind, vacation.lines[0].value, vacation.notes[0]]).toEqual(["default", "11 days", "A default, not something you entered. "
+      + "BLS's average for private-industry workers with paid vacation, after a year's service (National Compensation Survey, March 2026)."]);
+    expect(vacation.edit).toEqual({ letter: "A", path: "timeOff.vacation" });
+    // The weeks: 52 − (11 + 8 + 0) ÷ 5 = 48.2, and 80 × 48.2 = 3,856 hours a year.
+    const hours = derive("l6y.A.hours.1", c);
+    expect(hours.lines.map((l) => [l.label, l.value])).toEqual([["Hours a week", "80"], ["Weeks worked a year", "48.2"], ["Hours worked", "3,856"]]);
+    expect(hours.lines[1].note).toBe("52 − (11 vacation days + 8 holidays + 0 sick days) ÷ 5");
   });
   it("a range reads bear / base / bull; a promotion that isn't certain says so", () => {
     expect(derive("in.B.bonus.amount", ctx).lines.map((l) => [l.label, l.value])).toEqual([

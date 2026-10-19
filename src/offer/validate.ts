@@ -1,6 +1,7 @@
 import { STATES_2026 } from "../tax/index";
 import { RPP } from "../col/index";
 import { addMonths, toDays } from "./dates";
+import { daysOff } from "./timeOff";
 import { snapToVestDate } from "./vesting";
 import type { ByScenario, Household, ISODate, MonthDay, OfferInput, VestingSchedule } from "./types";
 
@@ -31,6 +32,8 @@ export type OfferIssue = { path: string } & (
   | { code: "share"; params: NoParams }
   | { code: "hours"; params: { min: number; max: number } }
   | { code: "weeks"; params: { min: number; max: number } }
+  /** Vacation, holidays and sick days that come to a whole year of workdays or more (260). */
+  | { code: "daysOff"; params: { max: number } }
   | { code: "wholeMonths"; params: { min: number } }
   | { code: "wholeYears"; params: { min: number } }
   | { code: "wholeDays"; params: { min: number } }
@@ -258,6 +261,24 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     const weeks = offer.hours.weeksPerYear;
     if (weeks !== undefined && amount("hours.weeksPerYear", weeks, "number") && !(weeks >= 1 && weeks <= 52)) {
       add("hours.weeksPerYear", "weeks", { min: 1, max: 52 });
+    }
+  }
+
+  // ---- days off and the vacation policy (4a) ---------------------------------------------------
+  const t = offer.timeOff;
+  if (t) {
+    const valid = (k: "vacation" | "holidays" | "sick" | "gives" | "cap") => {
+      const v = t[k];
+      if (v === undefined || !amount(`timeOff.${k}`, v, "number")) return false;
+      if (!(v >= 0)) { add(`timeOff.${k}`, "negative", {}); return false; }
+      return true;
+    };
+    const ok = (["vacation", "holidays", "sick", "gives", "cap"] as const).filter(valid);
+    // Weeks worked must stay above 0: the days off a year (entered, or at their defaults) under 260, 52 weeks of 5 days.
+    const off = (["vacation", "holidays", "sick"] as const).filter((k) => t[k] !== undefined);
+    const d = daysOff(t);
+    if (off.length && off.every((k) => ok.includes(k)) && d.vacation + d.holidays + d.sick >= 260) {
+      add(`timeOff.${off[0]}`, "daysOff", { max: 260 });
     }
   }
 

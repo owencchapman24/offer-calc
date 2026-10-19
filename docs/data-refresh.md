@@ -124,3 +124,13 @@ v2's plan adds datasets as their items are built (`docs/v2-plan.md`, "On approva
 figures (yearly, September, with D14's defaults), the IRS mileage rates (each December, and mid-year when the IRS changes them),
 each convenience rule's and cross-state pair's sources (each January), and, if 4f is built, the repayment plans' rules. Each gets a
 section here when its item lands.
+
+**Days off and unused vacation (4a, built 2026-10-19):**
+- **The vacation-payout states, each January:** re-read the ten in `src/offer/timeOff.ts` (`VACATION_PAYOUT_STATES`: CA, CO, IL, LA, ME,
+  MA, MT, NE, ND, RI, each with its source) from the statute or the state's labor agency, and look for states that have added or
+  dropped a payout rule (the plan's table, `docs/v2-plan.md` 4a, has what was read on 2026-10-19). A change is a data edit with a
+  hand-checked test (`test/offer.test.ts`, "days off, and unused vacation paid when you leave"), the help (`helpText.ts`,
+  `timeOff.payout`) and M-9's list.
+- **BLS's days-off defaults, each September** (the National Compensation Survey's March release): 11 vacation days after a year's
+  service and 8 paid holidays (`DEFAULT_DAYS_OFF` in `timeOff.ts`, the reasons in `app/src/detailedDefaults.ts`, M-5.4 and M-11). A new
+  figure moves every default per-hour figure: the hand-checked per-hour tests and `npm run offers` move with it.

@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import type { ByScenario } from "../../src/offer/types";
 import { fromDays, toDays } from "../../src/offer/dates";
-import { type AppHousehold, type AppOffer, blankDraft, type Letter, type OfferDraft, type RetirementDraft } from "./model";
+import { type AppHousehold, type AppOffer, blankDraft, blankTimeOff, type Letter, type OfferDraft, type RetirementDraft } from "./model";
 import { US_PRICES } from "./prices";
 
 // Generated inputs for the property tests (properties.test.ts, display.test.ts): offers and households as a person could enter
@@ -93,6 +93,14 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       premium: dollars(0, 6_000, 100), oop: dollars(0, 3_000, 100), employerHsa: maybe(dollars(0, 1_500, 100)),
     })),
     hours: maybe(ordered(fc.integer({ min: 35, max: 80 })), 1),
+    // Days off and the vacation policy (4a): any days, a policy that banks (gives more than you take) or doesn't, a cap, unlimited,
+    // a policy that pays out anywhere; the places include states that require a payout (CA, CO, IL, MA) and some that don't.
+    timeOff: maybe(fc.record({
+      vacation: maybe(fc.integer({ min: 0, max: 30 }), 1), holidays: maybe(fc.integer({ min: 0, max: 15 }), 1),
+      sick: maybe(fc.integer({ min: 0, max: 12 }), 1), policy: fc.constantFrom(null, "days" as const, "unlimited" as const),
+      gives: maybe(fc.integer({ min: 0, max: 35 }), 1), cap: maybe(fc.integer({ min: 0, max: 40 })),
+      payout: fc.constantFrom(null, "state" as const, "always" as const),
+    }), 1),
     rent: fc.oneof(fc.constant(null), fc.constant(0), dollars(800, 6_000, 50)),
     rentGrowth: maybe(pct(0.06)),
   }).map((g): OfferDraft => {
@@ -120,7 +128,8 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
         premium: g.health.premium, outOfPocket: { low: g.health.oop / 2, medium: g.health.oop, high: g.health.oop * 2 }, oopMax: null,
         employeeHsa: null, employerHsa: g.health.employerHsa, coverage: null,
       },
-      hours: { weekly: g.hours, weeksPerYear: null },
+      hours: { weekly: g.hours },
+      timeOff: g.timeOff ?? blankTimeOff(),
       costOfLiving: { area: place.area, monthlyRent: g.rent, rentGrowth: g.rentGrowth },
     };
   });

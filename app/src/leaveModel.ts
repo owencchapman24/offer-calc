@@ -4,6 +4,7 @@ import type { StayFigures } from "./footing";
 import type { Letter } from "./model";
 import type { LeaveCurve, LeavePanel, OfferDetail } from "./protocol";
 import { dayBefore, dollars, longDate, percent } from "./text";
+import { daysText, vacationTerm } from "./timeOffWords";
 
 // L-4 · Leaving early (docs/ui-design.md §4.5), the view model: the axis (calendar dates, so offers with
 // different start dates line up), each offer's curve with its markers and prorated-clawback segments, the
@@ -74,7 +75,7 @@ export const isProratedStep = (c: Cliff) => c.detail.kind === "clawbackStep" && 
 
 function markKind(c: Cliff): MarkKind | null {
   switch (c.kind) {
-    case "bonus": case "cashAward": return "payment";
+    case "bonus": case "cashAward": case "vacationPayout": return "payment";
     case "rsuVest": return "vest";
     case "retirementVest": return "retirement";
     case "clawbackCleared": return "clawbackEnds";
@@ -149,6 +150,7 @@ export function cliffText(c: Cliff): string {
     return `your ${calendar ? `${year} ` : ""}bonus${calendar ? "" : ` for ${longDate(d.periodFrom)} – ${longDate(d.periodTo)}`} (${gross} before tax)`;
   }
   if (d.kind === "cash") return `the ${inSentence(d.award)} (${gross} before tax)`;
+  if (d.kind === "vacationPayout") return `unused vacation paid when you leave (${daysText(d.days)}, ${gross} before tax)`;
   if (d.kind === "rsu") return `an RSU vest of ${gross} (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vesting to ${percent(d.vestedShare)} (${gross})`;
   if (d.kind === "clawbackStep") {
@@ -239,7 +241,7 @@ function vestingText(v: NonNullable<NonNullable<OfferInput["retirement"]>["vesti
 
 /**
  * What leaving early would cost under an offer's terms, in words (M-9 and the document): the first bonus and its payout rule,
- * each cash award's clawback window, the first RSU vest, and the employer 401(k) money's vesting.
+ * each cash award's clawback window, the first RSU vest, the employer 401(k) money's vesting, and unused vacation (4a).
  */
 export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   const facts: string[] = [];
@@ -262,6 +264,8 @@ export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   const v = o.retirement?.vesting;
   const vests = v && vestingText(v);
   if (vests) facts.push(`its employer 401(k) money ${vests}`);
+  const vacation = vacationTerm(o);
+  if (vacation) facts.push(vacation);
   return facts;
 }
 

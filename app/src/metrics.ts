@@ -71,6 +71,7 @@ export type MetricId =
   | `repay.${L}` // L-4: clawbacks owed on that last day
   | `forgone.${L}.${number}` // L-4: what was earned toward a bonus that leaving forfeits (the offer's nth)
   | `forfeit.${L}.${"rsu" | "k401"}` // L-4: RSUs or employer 401(k) money not vested by then
+  | `vac.${L}` // L-4 and A-4: unused vacation paid on the last day picked (4a)
   | `next.${L}` // L-4: what staying until the next cliff is worth
   | `nextown.${L}` // L-4: the next cliff's own part of that
   | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
@@ -94,6 +95,7 @@ export type MetricId =
   | `cliff.${L}.${number}` // A-4: a cliff inside the stay, by its place in the list: what leaving the day before gives up
   | `nextup.${L}` // A-4: what staying until the next cliff from the start (or today) is worth after tax
   | `a5.${L}.${"credited" | "added" | "month"}.${number | "sum"}` // A-5: employer 401(k) money credited; total rewards less after-tax pay
+  | `a5.${L}.pto` // A-5: what its starting salary pays a year for paid days off (4a)
   | `a6.${L}.${number}.${A6Line}`; // A-6: a calendar year's pay, tax, rate and tax by kind
 // L-5 and L-6 retired at stop 5B (docs/v2-plan.md, item 5, B8): each offer's warnings are in its A-6, and the `l6*` ids are A-7's
 // figures, each offer's tables over its own stay. The ids kept their names; the page calls the tables A-7.
@@ -212,7 +214,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "alone": return "crossFooted";
     case "a2": return c === "tax" || c === "rent" || c === "credited" ? "crossFooted" : c === "hundred" || c === "health" || c === "saved" || c === "spend" ? "footed"
       : "recomputed";
-    case "a5": return b === "month" || (b === "credited" && c !== "sum") ? "recomputed" : "footed";
+    case "a5": return b === "month" || b === "pto" || (b === "credited" && c !== "sum") ? "recomputed" : "footed";
     case "a6": return c === "tax" || c === "federal" || c === "rate" ? "footed" : "recomputed";
     case "l6y":
       if (c === "sum") return "footed";

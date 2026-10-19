@@ -2,7 +2,7 @@ import type {
   Assumption, BenefitDetail, BenefitKind, Cliff, ClawbackResult, EventDetail, RsuGrantRef, SalaryChangeReason,
 } from "../offer/types";
 import type { RentEstimate } from "../col/rent";
-import { pct, round2, usd } from "./numbers";
+import { pct, PLAIN, round2, usd } from "./numbers";
 
 // Words for the engine's numbers and codes. The engine (src/tax, src/offer, src/col) never formats
 // text; this module does, for the UI and the scripts. English, U.S. conventions. Its parts are their own
@@ -26,6 +26,7 @@ export function eventLabel(d: EventDetail): string {
     case "cash": return d.award;
     case "rsu": return `RSU: ${grantLabel(d.grant)}, tranche ${d.tranche} of ${d.tranches}${d.nominalDate ? ` (nominal ${d.nominalDate})` : ""}`;
     case "clawback": return d.sameYear ? `${d.award} clawback (reverses ${d.repaidYear} wages)` : `${d.award} clawback (repays ${d.paidYear} pay)`;
+    case "vacationPayout": return `Unused vacation paid out (${PLAIN.format(round2(d.days))} days)`;
   }
 }
 
@@ -41,6 +42,7 @@ export function eventFormula(d: EventDetail): string {
     case "cash": return usd(d.amount);
     case "rsu": return `${usd(d.grantValue)} x ${pct(d.fraction)} x ${d.priceFactor.toFixed(4)} price factor`;
     case "clawback": return `-${usd(d.amount)} x ${pct(d.fraction)}${!d.sameYear && d.basis === "net" ? " after tax" : ""}`;
+    case "vacationPayout": return `${PLAIN.format(round2(d.days))} days x ${usd(round2(d.annual))} / ${d.workdays} workdays`;
   }
 }
 
@@ -135,8 +137,21 @@ export function formatAssumption(a: Assumption): string {
         + `out-of-pocket (${a.params.usage} usage, capped at the out-of-pocket max) - employer HSA. Held flat each year.`;
     case "perks":
       return "Perks are tax-free and counted at face value; the pre-tax equivalent is face / (1 - that year's marginal rate).";
-    case "hours":
-      return `Hours: ${a.params.weekly} a week x ${a.params.weeksPerYear} weeks a year (${a.params.scenario} scenario).`;
+    case "hours": {
+      const d = a.params.daysOff;
+      return `Hours: ${a.params.weekly} a week x ${PLAIN.format(round2(a.params.weeksPerYear))} weeks a year${d
+        ? ` (52 - (${d.vacation} vacation + ${d.holidays} holidays + ${d.sick} sick days) / 5)` : ""} (${a.params.scenario} scenario).`;
+    }
+    case "vacation": {
+      const p = a.params;
+      const law = p.required ? `${p.employerState} requires unused vacation be paid when you leave${p.afterYears ? ` after ${p.afterYears} year of service` : ""}`
+        : `${p.employerState} leaves it to the employer's policy`;
+      if (p.policy === "unlimited") return `Vacation: unlimited, so nothing accrues and nothing is paid when you leave (${law}).`;
+      const banks = p.gives - p.taken;
+      return `Vacation: ${p.gives} days a year, ${p.taken} taken: ${banks > 0 ? `${banks} a year bank, accrued and used evenly${p.cap !== undefined
+        ? `, up to ${p.cap}` : ""}` : "nothing banks"}. ${law}${p.payout === "always" ? "; the offer's policy pays it out" : ""}; paid at the salary rate `
+        + "on the last day / 260, as supplemental wages.";
+    }
     case "costOfLiving": {
       const p = a.params;
       return `Cost of living (${rppVintage(p.rppVintage)}): gross pay is never adjusted. Take-home - ${pct(p.savingsRate, 2)} `

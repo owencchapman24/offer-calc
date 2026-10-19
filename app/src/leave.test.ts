@@ -83,6 +83,18 @@ describe("L-4's panel (W6)", () => {
     expect(text).toContain("C 6 months worked · keep $47,506 after tax, and repay $5,000 of the sign-on");
     expect(text).toContain("Left behind: $120,000 of RSUs not yet vested (at grant value).");
   });
+  it("unused vacation paid on the last day picked (4a): A in California, giving 15 days, banks 4 a year", () => {
+    const ca = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "A"
+      ? { ...o, draft: { ...o.draft, employerState: "CA", timeOff: { ...o.draft.timeOff, gives: 15 } } } : o)));
+    // Six months in, Jan 12, 2027: 4 × 184 ÷ 365 = 2.016438 days, × 110,000 ÷ 260 = 853.11 before tax, in what A keeps.
+    const text = page(ca);
+    expect(text).toMatch(/A 6 months worked · keep \$[\d,]+ after tax, with \$853 before tax for 2\.02 days of unused vacation, and repay \$10,000 of the sign-on/);
+    const kept = derive("kept.A", withLeave(ca).ctx);
+    footsAsDisplayed("kept.A", kept);
+    expect(kept.lines.map((l) => l.label)).toContain("Unused vacation paid out");
+    // B, in North Carolina, banks nothing at its defaults, and says nothing.
+    expect(text.split("\n").find((l) => l.startsWith("B 6 months worked"))).not.toMatch(/vacation/);
+  }, 30_000);
   it("the next real cliff: A's bonus 19 days away (+$29,970, $26,057 of it the bonus); B skips its clawback steps to its bonus", () => {
     expect(text).toContain("Next cliff: your 2026 bonus ($32,986 before tax) on Jan 31, 2027, 19 days later. Staying until then is worth +$29,970 "
       + "after tax, $26,057 of it the cliff itself.");

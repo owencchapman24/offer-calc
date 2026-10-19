@@ -1,4 +1,5 @@
 import type { Cliff, ISODate, OfferInput } from "../../src/offer/types";
+import { daysOff, WORKDAYS_A_YEAR } from "../../src/offer/timeOff";
 import { inSentence } from "./breakevenModel";
 import { workedFrom } from "./byYearModel";
 import { shownYears } from "./footing";
@@ -141,6 +142,7 @@ export function cliffCost(c: Cliff): string {
     case "rsuVest": case "retirementVest": return "leave the day before and it's left behind";
     case "clawbackCleared": return "work through this day and it's yours; leave before and you repay it";
     case "clawbackStep": return "the clawback shrinks";
+    case "vacationPayout": return "leave before and unused vacation isn't paid";
   }
 }
 
@@ -149,10 +151,18 @@ export function cliffName(c: Cliff): string {
   const d = c.detail;
   if (d.kind === "bonus") return `the bonus for ${periodText(d.periodFrom, d.periodTo)}`;
   if (d.kind === "cash") return `the ${inSentence(d.award.trim() || "cash award")}`;
+  if (d.kind === "vacationPayout") return "unused vacation starts being paid when you leave";
   if (d.kind === "rsu") return `an RSU vest (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vests to ${Math.round(d.vestedShare * 100)}%`;
   if (d.kind === "clawbackStep") return `the ${inSentence(d.award.trim() || "award")}'s clawback ends`;
   return "a payment";
+}
+
+/** Paid days off a year (vacation, holidays and sick days) and what the starting salary pays for them: days × salary ÷ 260. */
+export function paidTimeOff(o: Pick<OfferInput, "salary" | "timeOff">): { days: number; annual: number; value: number } {
+  const d = daysOff(o.timeOff);
+  const days = d.vacation + d.holidays + d.sick;
+  return { days, annual: o.salary.annual, value: (days * o.salary.annual) / WORKDAYS_A_YEAR };
 }
 
 /** The terms in an offer's inputs that leaving early or starting late can cost, beyond leaveTerms (M-9): the bonus cutoff and guarantee. */

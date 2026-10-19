@@ -169,9 +169,22 @@ Default: none.
 - **Perks:** Section 127 (up to $5,250 a year) and 132(f) commuter (up to $340 a month),
   both tax-free. They're shown at face value and as a pre-tax cash equivalent, face ÷
   (1 − that year's marginal rate). Total rewards uses face value.
-- **Hours:** weekly hours by scenario × weeks a year (default 50), prorated for a
-  partial year. The hourly rate is after-tax dollars per hour, on cash only and on total
-  rewards.
+- **Hours:** weekly hours by scenario × weeks worked, prorated for a partial year. The
+  hourly rate is after-tax dollars per hour, on cash only and on total rewards. (Built
+  2026-10-19, v2's 4a:) the weeks come from `timeOff`'s days off, in workdays: 52 −
+  (vacation + holidays + sick days) ÷ 5, at 11, 8 and 0 by default (BLS; 48.2 weeks);
+  `hours.weeksPerYear`, if a caller gives it, is used instead (`timeOff.ts`, `weeksWorked`).
+  The weeks used to default to 50.
+- **Unused vacation, paid on leaving** (v2's 4a): `timeOff.policy` "days" (default) banks
+  `gives` − `vacation` days a year (`gives` defaults to the days taken, so nothing banks),
+  accrued and used evenly over each employment year, up to `cap`; "unlimited" banks
+  nothing. A leave date pays the days banked × the salary rate that day ÷ 260, as a cash
+  payment (detail `vacationPayout`; supplemental wages, with FICA) on the last day, where
+  the employer state's law requires it (`VACATION_PAYOUT_STATES`: CA, CO, IL, LA, ME, MA,
+  MT, NE, ND, and RI after a year's service) or `timeOff.payout` is "always". The leave
+  result says what banked, what's paid and why (`leave.vacation`); Rhode Island's first
+  anniversary is a cliff (`vacationPayout`). A stay isn't a leave date, so nothing is paid
+  over it. An unlimited policy with a California employer warns (`unlimitedVacation`).
 - **Cash measures (revised after slice 5):**
   - **After-tax comp** (the cash-only basis) = gross − tax − your health premiums.
     Premiums are a cost of the plan, not compensation.

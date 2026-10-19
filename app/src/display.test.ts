@@ -12,7 +12,7 @@ import { firstLastDay, leaveAxis } from "./leaveModel";
 import type { Derivation, MetricId, WorkContext } from "./metrics";
 import { compareOf, contextOf, footsAsDisplayed, half, parseShown, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork } from "./testing";
 import { ownView } from "./breakdownModel";
-import { toOfferInput } from "./model";
+import { blankTimeOff, toOfferInput } from "./model";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { marginText, verdict } from "./verdict";
@@ -238,7 +238,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         ],
         equity: { grants: [{ label: "New-hire RSUs", value: 5_000, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }],
           priceGrowth: null, refreshers: null },
-        retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },
+        retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "37980", monthlyRent: 800, rentGrowth: null },
       } },
       { place: { area: "35620", state: "NY", city: "nyc" }, draft: {
@@ -248,7 +248,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
           mustBeEmployedOnPayDate: null },
         cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: "none",
         health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null },
-        perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },
+        perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "35620", monthlyRent: null, rentGrowth: null },
       } },
     ],

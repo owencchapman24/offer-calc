@@ -20,8 +20,9 @@ behind every figure.
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
   A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test),
   stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
-  offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table). How each differs from
-  the design: `docs/ui-design.md` §12.
+  offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table); v2's 4a (days off:
+  vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
+  2026-10-19). How each differs from the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
@@ -40,10 +41,10 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: build 4a, then 4i, then 4j** (`docs/v2-plan.md`, approved 2026-10-19 at the user's review of pull request #69), a review
-stop each, ahead of item 2, at the user's word: 4a extended (sick days, unlimited vacation, unused vacation paid out on leaving, with the
-ten states that require it), 4i (an employee stock purchase plan, each lot sold at purchase: no "hold", no capital gains) and 4j (other
-benefits; tax-free ones on their own line, not in "saved"). Decisions D16-D23 are recorded in the plan.
+**Next: the user's review of stop 4a** (days off, pull request #70, 2026-10-19), then 4i, then 4j (`docs/v2-plan.md`, approved
+2026-10-19 at the user's review of pull request #69), a review stop each, ahead of item 2, at the user's word: 4i (an employee stock
+purchase plan, each lot sold at purchase: no "hold", no capital gains) and 4j (other benefits; tax-free ones on their own line, not in
+"saved"). Decisions D16-D23 are recorded in the plan.
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
 actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
@@ -160,7 +161,9 @@ section 2's and the plan's in step):
     reaches neither `react-dom` nor `metrics.ts` at run time; `help.ts` reaches no React; a component that a lazy chunk and the
     main chunk would both import goes in an existing main-thread module (as `CsvButton` lives in `figures.tsx`).
   - New code loads on first use (`app/src/lazy.ts`, or a schedule's `useLoadNear`); new data loads where it's used (the worker, or a
-    same-origin fetch), never in a JavaScript chunk. v2's rule: at most 0.5 kB gzip more on the main thread per item.
+    same-origin fetch), never in a JavaScript chunk. v2's rule: at most 0.5 kB gzip more on the main thread per item. A detailed-mode
+    input's default registers when detailed mode or the derivations load (`detailedDefaults.ts`, as `helpText.ts` adds its help), not
+    in `defaults.ts`, unless the main thread reads it first.
   - What can't show before the worker's first answer loads beside it, once the first contentful paint is recorded
     (`useLoadAfterPaint`, `lazy.ts`): the breakdowns (`Breakdown.tsx`, A-1, the "On its own" row, the one-offer bars; `ownSlots`
     places them, so `App.tsx` stays light) and the lead's verdict (`LeadVerdict.tsx`).
@@ -283,6 +286,10 @@ section 2's and the plan's in step):
   deferrals count at face value.
 - **Leave date:** the last day worked, inclusive; it cuts off every stream. Bonuses unpaid by then are forfeited
   (`mustBeEmployedOnPayDate`, default true; false prorates).
+- **Days off** (v2's 4a, D14 and D16-D19): weeks worked = 52 − (vacation + holidays + sick days) ÷ 5, at 11, 8 and 0 by default (BLS).
+  Vacation given beyond what you'd take banks, accrued and used evenly, up to a cap; a leave date pays it at the salary that day ÷
+  260, as supplemental wages on the last day, where the employer's state's law requires it (`VACATION_PAYOUT_STATES`) or the offer's
+  policy does. Unlimited banks nothing. A stay's end pays nothing.
 - **Clawbacks:** cleared once the last day is the day before clock start + months; prorated by completed months by default
   (`per: "day"` optional); gross repaid by default. In the same calendar year the wages are reversed, exactly; in a later year, an
   IRC 1341 credit, federal only, over $3,000, and FICA isn't refunded.
@@ -346,8 +353,8 @@ section 2's and the plan's in step):
   `keptIfLeaving`); `compare.ts` (`compareOffers`, `comparisonWindow`, `breakeven`/`breakevenSteps`, `rentFlip`/`rentFlipFrom`,
   `horizonSweep`, annuity terms); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
   as codes and paths); `streams.ts` (salary, bonus, cash); `vesting.ts`; `presets.ts` (the vesting presets, main-thread safe);
-  `clawback.ts`; `benefits.ts` (401(k), health, perks); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as
-  UTC day numbers).
+  `clawback.ts`; `benefits.ts` (401(k), health, perks); `timeOff.ts` (days off and weeks worked, the vacation-payout states, the
+  payout rule); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
 - `col/`: `index.ts` (BEA RPPs, `rpp.json`), `rent.ts` (HUD FMRs, `fmr.json`, and the fallback), `cities.ts` (the slim city list,
   `cities.json`, for the main thread).
 - `format/`: the words for the engine's numbers and codes (`numbers`, `issues`, `schedule`, `warnings`). Not part of the engine.
@@ -373,7 +380,8 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   breakdowns and the verdict, loaded once the page has first painted; L-1 to L-4, each loaded as you scroll toward it), `Methodology.tsx` (`#/method`, M-1
   to M-13), `Data.tsx` (`#/data`: export, import, delete).
 - **Inputs:** `fields.tsx`, `rows.tsx` (quick mode), `Detailed.tsx`, `editors.tsx`, `controls.tsx` (detailed mode); `help.ts`,
-  `quickHelp.ts`, `helpText.ts` (each field's name and help); `defaults.ts` (the defaults registry); `summary.ts`; `presets.ts`;
+  `quickHelp.ts`, `helpText.ts` (each field's name and help); `defaults.ts` (the defaults registry), `detailedDefaults.ts` (the
+  defaults only detailed mode and the derivations read); `timeOffWords.ts` (days off and unused vacation in words); `summary.ts`; `presets.ts`;
   `comparability.ts` (a cost counted for some offers but not others).
 - **State:** `model.ts` (the offer draft ↔ `OfferInput`, the samples), `session.ts` (the session, schema 3, in localStorage under
   `offer-calc:v1`), `exchange.ts` (JSON export and import).
@@ -451,6 +459,9 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 - One 132(f) input, capped at $340 a month, though transit and parking each have a limit (v2 item 4b splits them).
 - Breakeven can overstate the change needed where tax jumps at a cliff (audit C8).
 - Layoffs, severance and waived clawbacks aren't modeled; a leave date is a voluntary exit.
+- Unused vacation follows the employer's state as where you work (a remote job's is where you live: not asked yet); it banks and is
+  used evenly (no front-loaded grants or year-end forfeiture); North Dakota's withholding exception and Maine's for small employers
+  aren't applied; an unlimited policy banks nothing (McPherson, in California, warns).
 
 **Cost of living**
 - Relative prices are held at the 2024 RPPs; one national housing weight. RPPs are metro-wide (the NYC metro averages Manhattan with

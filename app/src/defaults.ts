@@ -58,7 +58,6 @@ export const DEFAULTS: Record<string, DefaultSpec> = {
   "equity.refreshers.everyMonths": { value: 12, shown: () => "12 months", reason: "Refreshers usually come once a year." },
   "equity.refreshers.schedule": schedule("refresher"),
   "equity.refreshers.schedule.vestDates": noVestDates,
-  "hours.weeksPerYear": { value: 50, shown: () => "50", reason: "Two weeks off a year." },
   "cashAwards.paidOn": { shown: () => "30 days after you start", reason: "Sign-ons usually come with the first paycheck or two." },
   "cashAwards.clawback.months": { value: 12, shown: () => "12 months", reason: "The most common sign-on clawback window." },
   "cashAwards.clawback.kind": { value: "prorated", shown: () => "Prorated", reason: "Many sign-on clawbacks owe back only the share of the window you didn't work." },
@@ -90,6 +89,14 @@ export const DEFAULTS: Record<string, DefaultSpec> = {
     value: ASSUMPTIONS.inflation, shown: () => `${percent(ASSUMPTIONS.inflation)} (inflation)`, reason: "Rent rises with inflation unless you know your city's rents rise faster or slower.",
   },
 };
+
+/**
+ * Defaults that only detailed mode and the derivations read, registered when they load (detailedDefaults.ts), as helpText.ts adds
+ * detailed mode's help: v2's items keep the main thread lean (at most 0.5 kB gzip each).
+ */
+export function addDefaults(more: Record<string, DefaultSpec>): void {
+  Object.assign(DEFAULTS, more);
+}
 
 /** The default for an input path, if it has one. */
 export const defaultFor = (path: string): DefaultSpec | undefined => DEFAULTS[helpKey(path)];

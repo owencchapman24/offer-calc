@@ -1785,6 +1785,37 @@ Print…, under the masthead, with one offer too (the button no longer copies at
 - **Measured in Word** (sample A on a first visit, as pasted, Letter, 2026-10-17): the summary 2 pages with 2 tables; the full detail
   3 pages and its closing lines on a 4th, with 5 tables.
 
+**v2's item 4, stop 4a: days off** (2026-10-19; `docs/v2-plan.md`, 4a, approved at the user's review of pull request #69): detailed
+mode's Hours section ("Hours and days off") asks vacation days you'd take, paid holidays and sick days you'd take (11, 8 and none by
+default, each with its `D`), then the vacation policy (days a year, or unlimited), the days it gives (default: the days you'd take),
+the most you can bank, and when unused vacation is paid as you leave (where the state requires it, or always). Weeks worked are
+52 − days off ÷ 5, so per hour and pay per extra hour move once, about 4%, as D14 approved (sample A: $22.96 to $23.82 an hour).
+- **A-1** says where per hour's hours come from: "(80 hours a week for 48.2 weeks a year, after 11 vacation days, 8 holidays and no
+  sick days)".
+- **A-4** lists the policy among the terms when days bank or it's unlimited; "if you left on" adds the payout ("with $853 before tax
+  for 2.02 days of unused vacation paid out") or says why days banked aren't paid; Rhode Island's first anniversary is a cliff.
+- **A-5** gives the paid time off and what the starting salary pays for it a year (days × salary ÷ 260), in no total.
+- **A-6** warns about an unlimited policy with a California employer (McPherson). **A-7**'s hours line shows the weeks worked and the
+  days off behind them.
+- **L-4's panel** and **the copied document** (the offer as entered, A-5's paid time off, the terms, leaving on a given day, and the
+  comparison's leaving table) carry the same; what you'd keep shows the payout on a line of its own in its work (`vac.X`).
+- **Quick mode's "Also counted"** names days off once any is entered.
+- **Old saves and exports** (weeks a year) load as days off that give the same weeks.
+- **Measured** (2026-10-19, side by side with `main`): the main thread 111.41 to 111.89 kB gzip (+0.48, within v2's 0.5 kB), the worker
+  68.58 to 69.92 kB (budget 75); LCP 1.95 s on both, CLS 0 (the fonts on time and late), TBT 53 ms (60 on `main`), the first answer
+  0.52 s (0.51); `npm run bench` within noise; the scan without violations, the Hours section and the recovery screen included.
+- **Found on the way** (the property tests' new inputs moved their random cases): L-1's year derivation took its lines from A-2's
+  bridge (the offer's own projection) and its total from the comparison's projection, which for a later-starting offer cuts pay into
+  other pieces, so a figure on a half dollar could round a dollar apart and the work didn't foot. It now takes every line from the
+  comparison's projection and opens A-2's figures only where they read the same (`yearWork`, `derive.ts`); its per-hour branch
+  likewise, which the fuzz found next (FUZZ_SEED=1822257924: 50,151 against A-2's 50,152). Neither came from 4a: each fails on `main`'s
+  code with its counterexample.
+
+**Stop 4a versus the plan:** the engine's fields are one `timeOff` (the plan named `hours.vacationDays` and the rest); the payout choice
+has two options, not three ("no" could only mean the default where the state's law pays it anyway); the payout is a cash payment with
+its own detail, not a pay component, since it comes only with a leave date; the days-off defaults register with detailed mode and the
+derivations (`detailedDefaults.ts`), as detailed mode's help does, to keep the main thread within 0.5 kB.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

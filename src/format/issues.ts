@@ -30,6 +30,7 @@ export function formatIssue(i: OfferIssue): string {
     case "share": return "Enter a percent from 0 to 100.";
     case "hours": return `Weekly hours must be between ${i.params.min} and ${i.params.max}.`;
     case "weeks": return `Weeks a year must be between ${i.params.min} and ${i.params.max}.`;
+    case "daysOff": return `Vacation, holidays and sick days together must be under ${i.params.max}, a year's workdays.`;
     case "wholeMonths":
       return /clawback/.test(i.path) ? `A clawback window is a whole number of months, at least ${i.params.min}.`
         : `Enter a whole number of months, ${i.params.min} or more.`;

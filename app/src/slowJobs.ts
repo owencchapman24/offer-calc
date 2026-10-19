@@ -100,6 +100,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
   const sum = (kinds: string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
   const paid = gross(false);
   const repaid = -gross(true);
+  const payout = r.events.find((e) => e.detail.kind === "vacationPayout");
   const premiums = sum(["premium"]);
   return {
     leaveDate: req.leaveDate,
@@ -119,6 +120,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
     next: nextCliff(o, req.household, req.leaveDate, options, { skip: proratedStep }).next,
     warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica"),
+    vacation: { ...r.leave!.vacation, annual: payout?.detail.kind === "vacationPayout" ? payout.detail.annual : null },
   };
 }
 

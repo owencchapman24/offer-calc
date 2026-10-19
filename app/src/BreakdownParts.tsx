@@ -6,10 +6,11 @@ import { bridge, notesOf } from "./byYearModel";
 import { caseChanges, changeText, hasRanges } from "./cases";
 import { CsvButton, Fig, useApi, useRovingTicks } from "./figures";
 import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms } from "./leaveModel";
+import { daysOffWords, daysText, unpaidVacationText } from "./timeOffWords";
 import type { A2Part, MetricId, WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, payRows, rateText,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, paidTimeOff, payRows, rateText,
   taxYearsOf,
 } from "./partsModel";
 import type { PriceWords } from "./prices";
@@ -426,10 +427,16 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
     lost.push(<span key="r"><Fig id={`forfeit.${L}.rsu`} label={`${dollars(panel.unvestedRsuForfeited)} of RSUs not vested, at grant value`}>{dollars(panel.unvestedRsuForfeited)}</Fig> of RSUs (at grant value)</span>);
   }
   const bonuses = forfeits(panel.warnings, start);
+  const v = panel.vacation;
+  const unpaid = unpaidVacationText(v);
   return (
     <>
       you'd keep <Fig id={`kept.${L}`} label={`${dollars(kept)} kept ${basis === "cash" ? "after tax" : "in total rewards"}, as paid, if your last day is ${longDate(panel.leaveDate)}`}>
         {dollars(kept)}</Fig> {basis === "cash" ? "after tax" : "in total rewards"}, as paid,{" "}
+      {v.paid >= 0.5 && (
+        <>with <Fig id={`vac.${L}`} label={`${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out`}>{dollars(v.paid)}</Fig> before
+          tax for {daysText(v.banked)} of unused vacation paid out,{" "}</>
+      )}
       {panel.clawbackOwed >= 0.5
         ? <>repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</> : "repay nothing,"}{" "}
       {lost.length ? <>and leave {lost.map((l, k) => <span key={k}>{k ? " and " : ""}{l}</span>)} behind</> : "and leave nothing behind"}
@@ -439,7 +446,7 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
           <span key={f.index}>; {t.before}<Fig id={`forgone.${L}.${f.index}`} label={`${dollars(f.earned)} earned toward the ${f.period} bonus, forfeited`}>{dollars(f.earned)}</Fig>{t.after}
             {" "}is forfeited</span>
         );
-      })}.
+      })}{unpaid && <>; {unpaid}</>}.
     </>
   );
 }
@@ -486,6 +493,18 @@ function CliffList({ L, terms }: { L: Letter; terms: OfferTerms }) {
 
 // ---- A-5: what the benefits are worth -----------------------------------------------------------------------------------------
 
+/** Paid days off a year and what its starting salary pays for them (days × salary ÷ 260): context, in no total (4a). */
+function PaidTimeOff({ L, o }: { L: Letter; o: NonNullable<OwnOffer["input"]> }) {
+  const { days, value } = paidTimeOff(o);
+  return (
+    <p className="part-note pto">
+      Paid time off: {daysOffWords(o)}, {days} {days === 1 ? "day" : "days"} a year.{" "}
+      <Fig id={`a5.${L}.pto`} label={`${dollars(value)} of its starting salary a year is for ${days} paid days off, as paid`}>{dollars(value)}</Fig> of
+      its starting salary a year is for those days, as paid: salary already counts it, so it adds to nothing here.
+    </p>
+  );
+}
+
 function Benefits({ ctx, x, open, show }: Part) {
   const L = x.offer.letter;
   const b = x.breakdown!;
@@ -507,6 +526,7 @@ function Benefits({ ctx, x, open, show }: Part) {
           employer 401(k) money credited</> : ""}.
       </p>
       {missing.map((m) => <p key={m} className="part-note">{m} Add it in detailed mode.</p>)}
+      <PaidTimeOff L={L} o={o} />
       {o.health?.oopMax ? (
         <p className="part-note">
           A bad health year costs up to the plan's out-of-pocket maximum,{" "}

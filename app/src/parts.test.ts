@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, renderAlone, renderBreakdowns, renderPage } from "./testing";
+import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage } from "./testing";
 import { yearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B), against the plan's worked example: sample A at the samples'
@@ -93,6 +93,48 @@ describe("A-4: the terms that can bite", () => {
     expect(text).toMatch(/Bad case, in New York dollars: \$6,245 a month over your stay, 17% under the base case; in the bull case, \$[\d,]+ a month over your stay\./);
     expect(text).toContain("In the bear case, bonuses 20% under target; no promotion in 2029.");
   }, 30_000);
+});
+
+describe("4a: days off, and unused vacation paid when you leave", () => {
+  // Sample A with its employer in California, giving 15 vacation days a year; you'd take the default 11, so 4 bank a year.
+  const ca = alone("A", (o) => ({ ...o, draft: { ...o.draft, employerState: "CA", timeOff: { ...o.draft.timeOff, gives: 15 } } }));
+  it("A-1 says where its hours come from: 80 a week for 48.2 weeks, after the default days off", () => {
+    expect(words(renderAlone(alone("A")))).toContain("$23.82 (80 hours a week for 48.2 weeks a year, after 11 vacation days, 8 holidays and no "
+      + "sick days)");
+  });
+  it("A-4 names the policy, and leaving on the day picked pays the days banked, at the salary ÷ 260", () => {
+    const text = words(renderAlone(ca));
+    expect(text).toContain("It gives 15 vacation days a year and you'd take 11, so 4 bank each year; California requires unused vacation be paid "
+      + "when you leave.");
+    // A-4's first last day, Jan 12, 2027: 184 of year 1's 365 days worked, 4 × 184 ÷ 365 = 2.016438 days, × 110,000 ÷ 260 = 853.11.
+    const p = ca.own!.leave!.panels.A!;
+    expect(p.vacation).toMatchObject({ banked: expect.closeTo((4 * 184) / 365, 9), paid: 853.11, annual: 110_000 });
+    expect(text).toContain("with $853 before tax for 2.02 days of unused vacation paid out,");
+    const vac = derive("vac.A", ca);
+    footsAsDisplayed("vac.A", vac);
+    expect(vac.lines.map((l) => l.value)).toEqual(["110,000", "2.016438", "260", "853"]);
+    // What you'd keep shows it on a line of its own, and still foots.
+    const kept = derive("kept.A", ca);
+    footsAsDisplayed("kept.A", kept);
+    expect(kept.lines.find((l) => l.label === "Unused vacation paid out")?.value).toBe("853");
+  });
+  it("where the state doesn't require it, the days banked are named but not paid; unlimited banks nothing", () => {
+    const nc = alone("A", (o) => ({ ...o, draft: { ...o.draft, employerState: "NC", timeOff: { ...o.draft.timeOff, gives: 15 } } }));
+    expect(nc.own!.leave!.panels.A!.vacation.paid).toBe(0);
+    expect(words(renderAlone(nc))).toContain("2.02 days of unused vacation aren't paid out (NC doesn't require it).");
+    const unlimited = alone("A", (o) => ({ ...o, draft: { ...o.draft, employerState: "CA", timeOff: { ...o.draft.timeOff, policy: "unlimited" } } }));
+    const text = words(renderAlone(unlimited));
+    expect(text).toContain("Its vacation is unlimited: nothing builds up, so nothing is paid when you leave.");
+    expect(text).toMatch(/McPherson/);
+  });
+  it("A-5: paid time off, 19 days a year, is 19 × 110,000 ÷ 260 = 8,038.46 of its starting salary, in no total", () => {
+    const ctx = alone("A");
+    expect(words(renderAlone(ctx))).toContain("Paid time off: 11 vacation days, 8 holidays and no sick days, 19 days a year. $8,038 of its starting salary a "
+      + "year is for those days, as paid");
+    const d = derive("a5.A.pto", ctx);
+    footsAsDisplayed("a5.A.pto", d);
+    expect(d.lines.map((l) => l.value)).toEqual(["110,000", "19", "260", "8,038"]);
+  });
 });
 
 describe("A-6: tax by calendar year", () => {
