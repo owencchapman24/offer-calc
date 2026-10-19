@@ -5,16 +5,17 @@ pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next s
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
 built (pull request #31), and item 5, the offer breakdown, in three stops: 5A (pull request #62, 2026-10-15, started before the
 testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16); nothing else is. Item 4 gained 4h, commission
-(2026-10-16, from the owner's own use). **Proposed 2026-10-19 (pull request #69), for the user's review:** 4a extended (sick days, unlimited vacation,
-paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan) and 4j (other benefits), built next at
-the user's word, in that order (4a, 4i, 4j), a review stop each, ahead of item 2; their decisions are D16-D23. What to build after v1
+(2026-10-16, from the owner's own use). **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22:** 4a
+extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
+each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
+ahead of item 2; their decisions are D16-D23. What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
    appears with two or more offers. Quick mode starts from one offer.
 2. **Item 2, market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
    (OEWS, May 2025), as a part of that offer's breakdown.
-3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs. **Proposed 2026-10-19:** 4a (extended), 4i
+3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs. **Approved 2026-10-19:** 4a (extended), 4i
    (the ESPP) and 4j (other benefits) move ahead of item 2, at the user's word; 4b and 4c keep their place.
 4. **Item 3, negotiation help:** what each lever (salary, sign-on) is worth to you, from one offer; L-3's ties once there are two;
    the published wages; an optional draft email. Facts, not advice.
@@ -379,7 +380,7 @@ one projection, so a later-starting offer's own stay and the comparison's window
   group shows with two or more offers; values entered stay saved if an offer is removed.
 - **Accuracy (item 4) feeds the breakdown with no new layout:** days off and commuting time into per hour (A-1); commuting's cost into
   A-2 (a "getting to work" share of the $100); relocation into year 1 (A-2, A-3); startup options into A-3 and A-4's bad case; Public
-  Service Loan Forgiveness beside A-1; vacation paid out on leaving into A-4 (proposed 2026-10-19); an ESPP into A-3's pay and
+  Service Loan Forgiveness beside A-1; vacation paid out on leaving into A-4 (approved 2026-10-19); an ESPP into A-3's pay and
   payments, A-4's cliffs and A-5 (4i); other benefits into A-2's $100 or beside it, and A-5 (4j). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
   for each) partly cancels out, but in one offer's bottom line nothing cancels. Hence 4a-4c move up.
 
@@ -389,7 +390,7 @@ Item numbers are stable IDs; the order is separate.
 1. **Item 5, the offer breakdown** (this section), with quick mode from one offer and §1's new wording.
 2. **Item 2, market benchmarks,** as A-8: the context a one-offer evaluator lacks (finding 2), still context only.
 3. **Items 4a-4c, days off, commuting and relocation:** small, and a standalone bottom line has nothing to cancel their errors.
-   (Proposed 2026-10-19, at the user's word: 4a, 4i and 4j move ahead of item 2.)
+   (Approved 2026-10-19, at the user's word: 4a, 4i and 4j move ahead of item 2.)
 4. **Item 3, negotiation help,** as A-9: lever values from one offer, ties from two.
 5. **Item 1, beyond the money:** comparison-only, so it waits for the comparison's users.
 6. **Items 4d-4f:** large, and each still set by the testers' answers (D10).
@@ -922,14 +923,14 @@ the clipboard in the smoke tests, the scan.
 
 ## 4. Accuracy
 
-Ten parts, each its own pull request (4d, 4e and 4i two), in this order (D10): the two small ones that feed "per hour of your life"
+Ten parts, each its own pull request (4d and 4e two), in this order (D10): the two small ones that feed "per hour of your life"
 first, then relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for
 commuters, was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4)
 place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked.
 
-**Proposed 2026-10-19, for the user's review:** 4a gains sick days, an "unlimited" vacation policy and paying out unused vacation on
-leaving; two parts are new, 4i (an employee stock purchase plan) and 4j (other benefits: stipends, wellness money, employer-paid
-insurance and the like). At the user's word they're built next, before item 2 and before the testers' answers to item 4's questions,
+**Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22 (D21 moot):** 4a gains sick days, an "unlimited"
+vacation policy and paying out unused vacation on leaving; two parts are new, 4i (an employee stock purchase plan, each lot sold at
+purchase) and 4j (other benefits: stipends, wellness money, employer-paid insurance and the like). At the user's word they're built next, before item 2 and before the testers' answers to item 4's questions,
 in the order 4a, 4i, 4j, a review stop each. The usual rules hold at each: every figure adds up as displayed, the property tests
 generate the new inputs, the labels test covers every new figure, and the bundle and Lighthouse budgets hold. Each new input reaches
 the breakdown (A-1 to A-7, where it applies: each part's table says where and why not), the comparison and the copied document.
@@ -944,14 +945,14 @@ the breakdown (A-1 to A-7, where it applies: each part's table says where and wh
 | 4f Public Service Loan Forgiveness | Large, volatile | loans, payment plans, AGI by year | under 0.3 kB (a closed About-you row) |
 | 4g Philadelphia's wage tax for commuters | Small | none: the nonresident rate is in (`resident: false`) | 0 (detailed mode) |
 | 4h Commission | Small-medium | a pay stream: an expected annual amount with a range, paid monthly or quarterly | 0 (detailed mode) |
-| 4i Employee stock purchase plan | Medium-large | an ESPP stream (contributions, purchases, the $25,000 limit, sales); tax engine: income that isn't FICA wages, capital gains | 0 (detailed mode) |
+| 4i Employee stock purchase plan | Medium | an ESPP stream (contributions, purchases, the $25,000 limit, each lot sold at purchase); tax engine: income that isn't FICA wages | 0 (detailed mode) |
 | 4j Other benefits | Small | named benefits, each a yearly amount, taxable (a pay stream) or tax-free (a benefit flow) | 0 (detailed mode) |
 
 Every part's inputs live in detailed mode (a lazy chunk, 14 kB gzip today), or for 4f behind a closed row in About you that loads its
 inputs on first use, so none adds more than an entry point to the main thread. Each grows the worker and may grow the fast lane's
 per-edit time, so each stop reports `npm run bench` side by side with `main` and the time to the first verdict.
 
-### 4a. Days off (extended 2026-10-19, proposed: sick days, unlimited vacation, payout on leaving)
+### 4a. Days off (extended 2026-10-19, approved: sick days, unlimited vacation, payout on leaving)
 
 - **Today:** "weeks a year", default 50 (`D`, "two weeks off"), feeds hours and per hour. Offer letters and people count time off in
   days, and two weeks is short of what's typical: BLS's National Compensation Survey (March 2026, USDL-26-1534) has private-industry
@@ -1227,7 +1228,11 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Risk:** small to medium: commission plans vary (draws against commission, accelerators, quotas), and those stay out of scope;
   the help says so.
 
-### 4i. Employee stock purchase plan (proposed 2026-10-19)
+### 4i. Employee stock purchase plan (approved 2026-10-19: sold at each purchase)
+
+**At the user's review of pull request #69 (D20, D21):** every lot counts as sold on its purchase date; there's no "hold" choice and no
+capital gains in the tax engine. The help and M-3 say so in the user's words: **"Holding shares after purchase is an investment decision
+and isn't modeled."** One pull request and one review stop.
 
 - **Today:** there's no ESPP. A public company's plan typically lets you buy its shares at 15% off through payroll deductions, so a
   plan worth about a sixth of what you put in can't be entered, except as a guess at a cash award, untimed and taxed with FICA it doesn't
@@ -1243,8 +1248,8 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
     flat price, at most $21,250 of contributions a year buy shares (25,000 × 0.85).
   - **Employment:** you must be an employee from the offering's start until three months before the purchase (§423(a)(2)); plans
     usually refund what you've put in when you leave before a purchase.
-  - **Holding periods:** a sale more than 2 years after the offering's start and more than 1 year after the purchase is a qualifying
-    disposition; any earlier sale is disqualifying (§423(a)(1), §421(b)).
+  - **A sale at purchase is disqualifying:** a qualifying disposition needs the shares held more than 2 years from the offering's start
+    and more than 1 year from the purchase (§423(a)(1)); a same-day sale is neither (§421(b)).
 - **Inputs,** per offer, an ESPP section in detailed mode (not entered, none, or entered, as the 401(k) is):
   - "Contribution": a percentage, with no default (it's your choice, and the part counts once you enter it), of eligible pay: salary
     (`D`) or salary and bonus, as the 401(k)'s choice. Contributions are after tax: they don't lower taxable wages.
@@ -1253,100 +1258,89 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
     you can first join: the first offering starting on or after your start date, or a later "Eligible from" date for a plan with a wait).
     The proposed defaults, 15%, a lookback, six-month offerings and one purchase at each end, are each a `D` only once stop 4i cites a
     published survey of plans for it; a term with no source stays blank and required.
-  - "After each purchase": "Sell at once" (`D`: it locks in the discount, and holding is an investment choice) or "Hold until it
-    qualifies, then sell" (D20).
   - The share price's path is the equity section's share-price growth, by scenario (`D` 0%, flat: no one knows a price's path),
-    shared by the ESPP and shown beside it when the offer has no RSUs. Only ratios of prices matter (the lookback, the $25,000 limit,
-    a held lot's gain), so there's no share price to enter.
+    shared by the ESPP and shown beside it when the offer has no RSUs. Only ratios of prices matter (the lookback and the $25,000
+    limit), so there's no share price to enter.
+  - Under the inputs, the note: "Holding shares after purchase is an investment decision and isn't modeled."
 - **How it counts:**
   - Each eligible paycheck in an offering puts its percentage aside, after tax and without interest. At each purchase the price is
     (1 − discount) × the FMV at the purchase, or with a lookback × the lower of the FMV at the offering's start and at the purchase;
     shares = contributions ÷ price (fractional shares, as many plans buy them; a plan that carries the remainder to the next offering
     differs by cents, said). Contributions over the $25,000 limit come back in cash at the purchase, with a warning (`esppCap`, as
     `k401Cap`).
-  - **Sold at once,** the gain is the shares' value less the contributions. At a 15% discount that's at least 17.6% of the
-    contributions (1 ÷ 0.85 − 1) whatever the price does, since the price is at most 85% of the purchase-day value; a lookback adds more
-    when the price rose over the offering.
-  - **Held,** each lot sells on its first qualifying day if that's inside your stay; a lot that wouldn't qualify by your stay's end counts
-    there at its value, at face value and untaxed, as your 401(k) does (D20).
-  - **Example,** sold at once (stop 4i checks it in the engine): $120,000 of salary, 10% into six-month offerings (January to June, July
-    to December) with a purchase at each end, 15% off with a lookback, so $6,000 an offering:
+  - **Sold at purchase,** the gain is the shares' value less the contributions, cash on the purchase date. At a 15% discount that's at
+    least 17.6% of the contributions (1 ÷ 0.85 − 1) whatever the price does, since the price is at most 85% of the purchase-day value; a
+    lookback adds more when the price rose over the offering.
+  - **Example** (stop 4i checks it in the engine): $120,000 of salary, 10% into six-month offerings (January to June, July to December)
+    with a purchase at each end, 15% off with a lookback, so $6,000 an offering:
     - a flat price: $6,000 ÷ 0.85 = $7,058.82 of shares, a gain of $1,058.82 an offering; valued at the offering's first-day price, also
       $7,058.82, under the $25,000 limit with the year's other offering ($14,117.64);
     - the price rising 10% a year (the bull case): half a year on, the purchase-day value is 1.1^0.5 = 1.048809 of the first day's
-      (the engine counts days), so $6,000 ×
-      1.048809 ÷ 0.85 = $7,403.36 of shares, a gain of $1,403.36;
+      (the engine counts days), so $6,000 × 1.048809 ÷ 0.85 = $7,403.36 of shares, a gain of $1,403.36;
     - the price falling 20% a year (the bear case): the lookback buys at the lower, purchase-day price, so the gain is the floor's,
       $1,058.82;
     - the limit, at $250,000 of salary (10%, $12,500 an offering, a flat price): the first purchase is $14,705.88 of shares at their
       offering's first-day price; the second has $25,000 − $14,705.88 = $10,294.12 of room, which $8,750.00 of contributions buy
       ($10,294.12 × 0.85), and $3,750.00 comes back in cash ($12,500 − $8,750).
-- **The tax,** sold at once or held (IRS Pub. 525 (2025), "Employee Stock Purchase Plan"; stop 4i re-reads the 2026 edition):
+- **The tax of a sale at purchase,** a disqualifying disposition (IRS Pub. 525 (2025), "Employee Stock Purchase Plan"; stop 4i re-reads
+  the 2026 edition):
 
-  | | Sold at once: a disqualifying disposition | Held until it qualifies: a qualifying disposition |
-  |---|---|---|
-  | When | The purchase date | The first day more than 2 years after the offering's start and more than 1 year after the purchase (§423(a)(1); stop 4i checks the day count against Pub. 525's examples) |
-  | Ordinary income | The spread at purchase: (FMV − the price paid) × shares, in the year of the sale, not limited to the gain (Pub. 525, "Holding period requirement not satisfied") | The lesser of the gain (the sale price − the price paid) and the discount at the offering's start (its FMV × the discount: the price as though bought that day) (§423(c); Pub. 525, "Option granted at a discount"); none if sold below the price paid |
-  | Capital gain or loss | None: a same-day sale at the FMV, whose basis is the price paid plus the ordinary income | The rest, long-term: 0, 15 or 20% federal, stacked over ordinary income (IRC 1(h)); 2026's bands from Rev. Proc. 2025-32 §4.03: 0% to $49,450 of taxable income single, $98,900 joint, $66,200 head of household; 15% to $545,500, $613,700, $579,600. Plus the 3.8% net investment income tax over $200,000 of modified AGI single, $250,000 joint (IRC 1411, not indexed). A loss offsets gains, then up to $3,000 a year of other income, the rest carried forward (IRC 1211(b), 1212(b)) |
-  | FICA | None: not FICA wages (IRC 3121(a)(22)) | None (IRC 3121(a)(22)) |
-  | Withholding | None required (IRC 421(b), its last sentence), so A-6's cash-timing warning names it | None |
-  | Reported | Form W-2 box 1, as wages (stop 4i confirms it in Pub. 15-B's "Employee Stock Options"); Form 3922 for the purchase | You report the ordinary part as wages (Pub. 525); Form 3922 |
-  | States | Most follow the federal treatment. Pennsylvania doesn't: its personal income tax guide ("Gross Compensation") taxes the spread when an option is exercised and has no provision for an ESPP's, so the spread is compensation at purchase, held or not, and the rest a gain or loss at the sale. Stop 4i checks each state's instructions, and each state's payroll taxes on it (California's SDI, New Jersey's, New York's paid family leave and the others in `states2026.ts`); until a state is checked it follows the federal treatment and FICA's rule, and M-10 names it | Most tax gains as they tax wages; about a dozen don't (an exclusion or a lower rate for long-term gains; Washington taxes only gains, RCW 82.87). Each is data with its statute and a hand-checked test, added at stop 4i or listed in M-10 until it is |
-
-  Example, illustrative, a share: an offering starts at $100 and buys at its end, 15% off with a lookback. In the bull case (10% a year)
-  the purchase-day value is $104.88 and the price paid $85.00: sold at once, $19.88 is ordinary income. Held to about two years after the
-  offering's start, at $121.00, the gain is $36.00, of which $15.00 is ordinary income (the lesser of $36.00 and $100 × 15%) and $21.00
-  a long-term gain. In the bear case (−20% a year) the price paid is $76.02 (85% of $89.44): sold at once, $13.42 is ordinary income;
-  held, it sells at $64.00, a $12.02 capital loss and no ordinary income. Holding turns a sure discount into a bet on one share.
+  | | Sold at purchase |
+  |---|---|
+  | When | The purchase date, in that calendar year |
+  | Ordinary income | The spread at purchase: (FMV − the price paid) × shares, not limited to the gain (Pub. 525, "Holding period requirement not satisfied") |
+  | Capital gain or loss | None: a same-day sale at the FMV, whose basis is the price paid plus the ordinary income (selling costs aren't modeled, said) |
+  | FICA | None: not FICA wages (IRC 3121(a)(22)) |
+  | Withholding | None required (IRC 421(b), its last sentence), so A-6's cash-timing warning names it |
+  | Reported | Form W-2 box 1, as wages (stop 4i confirms it in Pub. 15-B's "Employee Stock Options"); Form 3922 for the purchase |
+  | States | Most follow the federal treatment. Pennsylvania taxes the spread as compensation when an option is exercised and has no provision for an ESPP's (its personal income tax guide, "Gross Compensation"), which for a sale at purchase comes to the same year and amount. Stop 4i checks each state's instructions, each state's payroll taxes on it (California's SDI, New Jersey's, New York's paid family leave and the others in `states2026.ts`) and the local taxes (Philadelphia's, NYC's); until a state is checked it follows the federal treatment and FICA's rule, and M-10 names it |
 - **Leaving and your stay:**
   - **Leaving** (A-4, L-4): what you've put toward a purchase not yet made comes back on your last day, in cash, with no gain and no tax
-    (plans usually refund; one that lets you buy within the three months §423(a)(2) allows isn't modeled, and the help says check). Held
-    lots stay yours, and sell or count at the window's end as they would have. Each purchase date is a cliff: leave the day before and
-    that offering's money comes back without its discount ("worth $x after tax to stay through Jun 30").
+    (plans usually refund; one that lets you buy within the three months §423(a)(2) allows isn't modeled, and the help says check). Each
+    purchase date is a cliff: leave the day before and that offering's money comes back without its discount ("worth $x after tax to
+    stay through Jun 30").
   - **Your stay's end** (not a leave date): an offering running past it counts its contributions inside your stay at face value (they're
     yours, bought or refunded after it); its purchase, after your stay, isn't counted (the stay rule).
 - **Where it shows:**
 
   | Where | What |
   |---|---|
-  | A-1 | The gain sold at once is spending money, in "to spend"; held lots at face value in "saved"; year 1 as paid likewise |
-  | A-2 | The gain is pay (W-2 wages), inside the $100, its tax in tax; money set aside for a purchase after the year's end is a share of its own ("in the ESPP"), so the $100 still adds up; held lots under saved. The bridge: "plus the ESPP's gain" in pay, "less ESPP money not yet used" |
+  | A-1 | The gain is spending money, in "to spend"; year 1 as paid likewise |
+  | A-2 | The gain is pay (W-2 wages), inside the $100, its tax in tax; money set aside for a purchase after the year's end is a share of its own ("in the ESPP"), so the $100 still adds up. The bridge: "plus the ESPP's gain" in pay, "less ESPP money not yet used" |
   | A-3 | "ESPP" as a component of gross pay by year (the gain); "when it arrives": each purchase, dated, with its offering, its price, its spread, and the limit where it bites |
-  | A-4 | The terms (discount, lookback, offering dates, sell or hold, the refund on leaving); each purchase among the cliffs; "if you left on": the refund and held lots; the bad case (a bear price path: the lookback's extra gone, held lots worth less) |
-  | A-5 | What the ESPP adds: contributions, the gain, held shares' value at your stay's end, a year and over your stay |
-  | A-6 | Tax by year with it (income tax, no FICA; Pennsylvania's at purchase); warnings: no withholding on the gain (cash timing), the $25,000 limit, and not modeled: resets, overlapping offerings, fees, a plan outside 423 |
-  | A-7 | Every purchase in the payments table with its arithmetic (contributions ÷ price = shares; × FMV = value; − contributions = the spread; its tax), and each held lot's sale (ordinary and capital parts) |
+  | A-4 | The terms (discount, lookback, offering dates, the refund on leaving, the note on holding); each purchase among the cliffs; "if you left on": the refund; the bad case (a bear price path: the lookback's extra gone) |
+  | A-5 | What the ESPP adds: contributions and the gain, a year and over your stay |
+  | A-6 | Tax by year with it (income tax, no FICA); warnings: no withholding on the gain (cash timing), the $25,000 limit, and not modeled: holding shares after purchase, resets, overlapping offerings, fees, a plan outside 423 |
+  | A-7 | Every purchase in the payments table with its arithmetic (contributions ÷ price = shares; × FMV = value; − contributions = the spread; its tax) |
   | The comparison | L and L-1 through the totals; L-2's scenarios (the price paths); L-4's refunds and cliffs; the comparability warning when one offer has an ESPP entered and another has it not entered (as the 401(k)) |
-  | The copied document | The offer as entered (the plan's terms), A-2's, A-3's, A-5's and A-6's lines, leaving early |
+  | The copied document | The offer as entered (the plan's terms, the note on holding), A-2's, A-3's, A-5's and A-6's lines, leaving early |
 - **Engine:**
   - **The offer model:** `espp?: { contributionPct; eligiblePay?: "salary" | "salaryAndBonus"; discount; lookback; offeringMonths;
-    purchasesPerOffering?; offeringsStart: MonthDay; eligibleFrom?: ISODate; disposition: "sellAtPurchase" | "holdToQualify" }`, a
-    stream in `src/offer/espp.ts` (contributions by paycheck, purchases, the limit, refunds, sales), events with details for Show the
-    work, validated (`validateOffer`), in `docs/offer-model.md`.
-  - **The tax engine** (its own branch, under the tax-engine rules): `TaxInput.statutoryOptionIncome`, wages for income tax but not
-    FICA (each state's payroll taxes per its data), and `TaxInput.capitalGains: { shortTerm; longTerm }`; the federal 1(h) bands as
-    parameters, indexed like the brackets (1(j)(5)(B)), 2026's from Rev. Proc. 2025-32 §4.03, and the NIIT's unindexed thresholds;
-    states tax gains as wages unless their `special` says otherwise; a loss's carryforward runs year to year in the projection. No
-    withholding on either (`withholding.ts`). 4e's ISO sold the same day, when it's built, reuses `statutoryOptionIncome`.
-  - **Validation:** the grid stays byte-identical (wages alone), and so does the 2026 oracle report's wage part; the oracle gains a
-    capital-gains case (PolicyEngine-US models long-term gains federally and by state), reported beside it, so each state's treatment
-    is checked rather than assumed.
+    purchasesPerOffering?; offeringsStart: MonthDay; eligibleFrom?: ISODate }`, a stream in `src/offer/espp.ts` (contributions by
+    paycheck, purchases, the limit, refunds), events with details for Show the work, validated (`validateOffer`), in
+    `docs/offer-model.md`.
+  - **The tax engine:** `TaxInput.statutoryOptionIncome`, wages for income tax (federal, state, local) but not FICA, each state's payroll
+    taxes per its data; no withholding on it (`withholding.ts`). No capital gains. In 4i's one pull request, in commits of its own under
+    the tax-engine rules: tests pass and the grid and the 2026 oracle report stay byte-identical after each (no wage input moves). 4e's ISO
+    sold the same day, when it's built, reuses it.
 - **Hand-checked tests,** at the edges: the example's purchases (flat, rising, falling); the limit biting in the second purchase of a
   year, and an offering across two calendar years (two years' accrual); joining the day before and the day of an offering's start;
-  leaving the day before and the day of a purchase (a refund, or the purchase); a held lot sold on the day it qualifies and the day
-  before (qualifying, or not); a sale below the price paid (no ordinary income, a loss, the $3,000 limit and its carryforward);
-  Pennsylvania; the NIIT's threshold crossed. The property tests generate ESPPs (terms, sell or hold, price paths), and every figure
-  foots as displayed.
-- **Bundle:** detailed mode (the ESPP section, an estimated 1-1.5 kB gzip in its chunk); the worker an estimated 2-3 kB gzip (the stream,
-  capital gains, the NIIT), from 68.6 kB toward its 75 kB budget, reported at the stop; nothing on the main thread.
-- **Risks:** capital gains are a new kind of tax for the engine (hence its own branch and the oracle's new case); plans vary (resets,
-  overlapping 24-month offerings, a cap on shares an offering, fees), each out of scope and said; a held lot's value is a guess at a
-  share price, defaulting to flat; state treatment needs checking state by state.
-- **Stops** (D21): one review stop, after two pull requests: 4i-A, the tax engine (statutory option income, capital gains, the NIIT,
-  the oracle's case), which no input reaches yet, so nothing on the page moves; then 4i-B, the offer model, the inputs, every part
-  above, the document, M-3's new part and M-10.
+  leaving the day before and the day of a purchase (a refund, or the purchase); the spread's income tax with no FICA, above and below
+  the Social Security wage base; Pennsylvania. The property tests generate ESPPs (terms, price paths), and every figure foots as
+  displayed.
+- **Bundle:** detailed mode (the ESPP section, an estimated 1-1.5 kB gzip in its chunk); the worker an estimated 1-2 kB gzip (the
+  stream, the income type), from 68.6 kB toward its 75 kB budget, reported at the stop; nothing on the main thread.
+- **Risks:** plans vary (resets, overlapping 24-month offerings, a cap on shares an offering, fees), each out of scope and said; a sale at
+  purchase is what the figures assume, so someone who holds sees the discount, not what holding then does; state treatment needs
+  checking state by state.
+- **Stop** (D21, moot at the user's review): one pull request, one review stop: the tax engine's change, the offer model, the inputs,
+  every part above, the document, M-3's new part and M-10.
 
-### 4j. Other benefits (proposed 2026-10-19)
+### 4j. Other benefits (approved 2026-10-19)
+
+**At the user's review of pull request #69 (D22):** tax-free benefits count at face value on a line of their own in A-1 and through the
+breakdown ("+ $x … in tax-free benefits"), not inside "saved", which stays for actual savings (planned savings, your 401(k) and HSA, and
+the employer's 401(k) and HSA money). Taxable benefits are pay.
 
 - **Today:** perks are two inputs, education assistance (IRC 127) and transit or parking (IRC 132(f)), each capped at its limit; with the
   401(k), the HSA and the health plan, that's every benefit. A wellness stipend, a phone allowance, employer-paid life or disability
@@ -1357,8 +1351,12 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Taxable:** wages, paid with salary: income tax (federal, state, local) and FICA. The withholding estimate treats them as part of
   each paycheck, one of the methods IRS Pub. 15 §7 allows for supplemental wages paid with regular wages. Inside A-2's $100, as pay. Not
   401(k)-eligible pay, and not a bonus's basis.
-- **Tax-free:** not wages. Counted at face value with the perks (D22), in total rewards, outside A-2's $100 ("your employer adds"), in
-  A-1's "saved, at face value" with a line naming them, and its pre-tax equivalent shown as the perks' is.
+- **Tax-free:** not wages. Counted at face value (D22), in total rewards, outside A-2's $100 ("your employer adds"), and on their own
+  line in A-1: to spend + saved + tax-free benefits = the after-rent total, each a month over your stay (B13: "+ $x a month in tax-free
+  benefits over your stay"; year 1's "+ $x in tax-free benefits in year 1"), and the pre-tax equivalent shown as the perks' is. Not
+  priced through the non-housing factor (face value, as the perks are). **Today's perks** (education, transit and parking) are tax-free
+  benefits too, and by the same rule would leave "saved" for this line: that moves A-1's split, not its total, for an offer with perks
+  (the samples' education assistance among them), so stop 4j asks before moving them.
 - **The tool takes your word on "tax-free":** it can't check an exclusion. Any fringe benefit is wages unless the law excludes it, at its
   fair market value (IRS Pub. 15-B (2026), "Fringe Benefits"). The help's table gives the common ones, from Pub. 15-B's Table 2-1 for
   2026:
@@ -1382,7 +1380,7 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 
   | Where | What |
   |---|---|
-  | A-1 | Taxable benefits are pay, so in "to spend" after tax; tax-free ones in "saved, at face value", named ("including $x of tax-free benefits") |
+  | A-1 | Taxable benefits are pay, so in "to spend" after tax; tax-free ones on their own line, "+ $x a month in tax-free benefits over your stay", between saved and the total; year 1 likewise |
   | A-2 | Taxable inside the $100 (the bridge: "plus taxable benefits" in pay); tax-free outside it, "your employer adds", by name |
   | A-3 | Taxable benefits as a component of gross pay by year, monthly with salary in "when it arrives" |
   | A-4 | They stop on your last day, said once in the terms; "if you left on" counts them to that day |
@@ -1393,10 +1391,11 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
   | The copied document | The offer as entered (each benefit's name, amount and treatment); A-2's, A-3's and A-5's lines |
 - **Engine:** `otherBenefits?: Array<{ label: string; annual: number; taxable: boolean }>` beside `perks`. Taxable ones are a pay stream
   (component `benefit`, accrued like salary, regular wages for withholding); tax-free ones are benefit flows (kind `otherBenefit`, with
-  the perks at face value, and a pre-tax equivalent as the perks have). No tax-engine change: the grid and the oracle report stay
+  their own face-value total beside the window's `faceValue`, so A-1 can show them apart, and a pre-tax equivalent as the perks have). No
+  tax-engine change: the grid and the oracle report stay
   byte-identical. In `docs/offer-model.md`; JSON exports carry them.
 - **Validation:** hand-checked: a start and a last day mid-month; a taxable stipend's FICA and its share of the $100; a taxable benefit
-  that crosses the Social Security wage base; a tax-free one in A-1's saved; comparability (entered for A, none for B, not entered for
+  that crosses the Social Security wage base; a tax-free one on A-1's own line, with to spend + saved + tax-free = the total as displayed; comparability (entered for A, none for B, not entered for
   C). The property tests generate lists of benefits (empty, taxable, tax-free, both), and every figure foots as displayed.
 - **Methodology:** M-5.3 (perks and other benefits: the two treatments, the help's table), M-10 (tax-free as entered).
 - **Bundle:** detailed mode; a few lines in the worker.
@@ -1405,8 +1404,7 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Stop:** one, after 4i.
 
 **Review stops:** one per part, except 4d and 4e (two each: the engine with its hand-checked tests, then the UI); 4f starts with a spike
-(a short written finding, no code merged) and you decide from it; 4i is one stop after two pull requests, the tax engine's and then the
-rest (D21).
+(a short written finding, no code merged) and you decide from it.
 
 ## Questions for testers
 
@@ -1456,13 +1454,14 @@ used it, how many offers did you actually have?", before anything else.
 8. Which other benefits does each offer list (stipends, wellness money, insurance, dependent care)? Do you know which are taxed?
 - **Would change it:** the answers set item 4's order (D10); a part no tester needs waits. 4a, 4i and 4j are built first at the user's
   word (2026-10-19), so for them the answers check the design rather than set the order: testers who'd hold their ESPP shares (then 4i's
-  help leads with holding's tax), or benefits the help's table lacks (then it gains rows).
+  note on holding says more), or benefits the help's table lacks (then it gains rows).
 
 ## Decisions for you
 
 Recorded 2026-10-13: **D1 and D14 approved.** D2-D13 and D15 stand as recommended unless the user comments on pull request #29;
 a comment there that disagrees replaces the row. Item 5's decisions, B1-B13, are in its section: approved 2026-10-15, with conditions
-on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4a's extension, 4i and 4j, wait for the user's review.**
+on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4a's extension, 4i and 4j, decided at the user's review
+of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 changed (their rows say how); D21 moot.
 
 | # | Decision | Recommended | The alternative |
 |---|---|---|---|
@@ -1475,7 +1474,7 @@ on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4
 | D7 | What L-7's range compares | Base salary against May 2025 wages as published | Wages aged to the offer's start by the ECI |
 | D8 | Where OEWS data lives | One file per occupation under `app/public/oews/<vintage>/`, committed | One compact file, split at build |
 | D9 | Item 3 without item 2 | Only if testers want negotiation help before market data | Always after 2B |
-| D10 | Item 4's order | 4a, 4b, 4c, 4d, 4e, then 4f's spike, reset by testers' answers (proposed 2026-10-19, at the user's word: 4a, 4i, 4j first, ahead of item 2) | By tester demand alone |
+| D10 | Item 4's order | 4a, 4b, 4c, 4d, 4e, then 4f's spike, reset by testers' answers (approved 2026-10-19, at the user's word: 4a, 4i, 4j first, ahead of item 2) | By tester demand alone |
 | D11 | Options vested at your stay's end | Shown beside the verdict, per scenario; not counted | Counted at the exit's value (an exception to the stay rule) |
 | D12 | Cross-state pairs (4d) | The multi-state metros' pairs first, each with sources and tests | Every state at once |
 | D13 | Public Service Loan Forgiveness | A spike first; forgiveness beside the verdict, never in it | Drop it from v2 |
@@ -1485,15 +1484,15 @@ on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4
 | D17 | Unlimited vacation (4a) | The days you expect to take, defaulting to BLS's 11 (`D`), as for a fixed policy; nothing accrues | No default: the days must be entered |
 | D18 | Paying out unused vacation (4a) | As the state where you'd work requires (the ten states above), with "yes" or "no" for the offer's own policy | Asked, with no default |
 | D19 | The balance paid out (4a) | Worked out: the days given less the days taken, accruing evenly, up to a cap; nothing banks at the defaults | A balance you enter, the same whenever you leave |
-| D20 | Holding ESPP shares (4i) | Counted: each lot sells on its first qualifying day inside your stay, taxed as above, with capital gains in the tax engine; a lot not qualifying by your stay's end counts at face value, untaxed, as your 401(k) does | Every lot counted as sold at once; "hold" changes the words (when each lot would qualify, how it would be taxed) but no figure, and the engine gains no capital gains |
-| D21 | 4i's stops | One review stop after two pull requests: the tax engine's (on its own branch, merged on green CI with its oracle report; no input reaches it), then the rest | Two stops, as 4d and 4e: the engine, then the UI |
-| D22 | Where tax-free benefits count (4j) | At face value with the perks (in "saved, at face value"), as the settled rule for perks has it; the line names them | As spending in kind, priced through the non-housing factor (in "to spend"), which would then apply to the perks too: a change to a settled decision |
+| D20 | Holding ESPP shares (4i) | **Decided (the user's review, 2026-10-19): every lot sold at purchase; no "hold" choice, no capital gains in the tax engine; the note "Holding shares after purchase is an investment decision and isn't modeled."** (Recommended was holding counted, with capital gains in the engine) | — |
+| D21 | 4i's stops | **Moot (the user's review):** with no capital gains, 4i is one pull request and one review stop, the tax engine's change in its own commits | — |
+| D22 | Where tax-free benefits count (4j) | **Decided (the user's review): at face value on their own line in A-1 and the breakdown ("+ $x … in tax-free benefits"), not in "saved", which stays for actual savings; taxable benefits are pay.** Whether today's perks move to that line is asked at stop 4j (Recommended was with the perks, in "saved, at face value") | — |
 | D23 | Other benefits' tax choices (4j) | Two, taxable or tax-free, as asked, with the help's table | Three, adding "free of income tax, not of FICA" (adoption assistance); or named kinds with the law's limits applied |
 
 ## Order and stops
 
 In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f), with 4a, 4i and 4j moved ahead of item 2 as
-proposed on 2026-10-19, at the user's word.
+approved on 2026-10-19, at the user's word.
 
 | Stop | What | Needs first |
 |---|---|---|
@@ -1501,8 +1500,8 @@ proposed on 2026-10-19, at the user's word.
 | 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules. **Done** (pull request #62) | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
 | 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
-| 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving (proposed 2026-10-19: next, at the user's word) | D14, D16-D19, the user's approval of this design |
-| 4i | The ESPP: 4i-A the tax engine (statutory option income, capital gains, the NIIT, the oracle's case), 4i-B the plan, its inputs, every part, the document; one stop | 4a, D20, D21 |
+| 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving (approved 2026-10-19: next, at the user's word) | D14, D16-D19 (approved), the secondary state sources re-read |
+| 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document | 4i, D22, D23 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
@@ -1517,9 +1516,8 @@ CLAUDE.md (Now, the docs index); `docs/offer-model.md` for each engine change; `
 control, before launch. The data refresh calendar (`docs/data-refresh.md`) gains each dataset as its item is built: OEWS (yearly,
 spring), BLS's paid-leave figures (yearly, September, if D14's defaults use them), the IRS mileage rates (each December, and mid-year
 when the IRS changes them, as in 2026), each convenience rule and cross-state pair's sources (each January), and, if 4f is built, the
-repayment plans' rules; with 4a, 4i and 4j: the ten vacation-payout states' rules (each January), the capital-gains bands (with each
-year's inflation revenue procedure; the NIIT's thresholds aren't indexed), each state's treatment of capital gains and of ESPP income
-(each January), and Pub. 15-B's limits for the help's table (each January).
+repayment plans' rules; with 4a, 4i and 4j: the ten vacation-payout states' rules (each January), each state's treatment of ESPP
+income (each January), and Pub. 15-B's limits for the help's table (each January).
 
 ## Backlog beyond v2
 
