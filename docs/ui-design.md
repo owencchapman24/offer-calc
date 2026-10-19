@@ -1801,6 +1801,9 @@ the most you can bank, and when unused vacation is paid as you leave (where the 
   comparison's leaving table) carry the same; what you'd keep shows the payout on a line of its own in its work (`vac.X`).
 - **Quick mode's "Also counted"** names days off once any is entered.
 - **Old saves and exports** (weeks a year) load as days off that give the same weeks.
+- **Measured** (2026-10-19, side by side with `main`): the main thread 111.41 to 111.89 kB gzip (+0.48, within v2's 0.5 kB), the worker
+  68.58 to 69.92 kB (budget 75); LCP 1.95 s on both, CLS 0 (the fonts on time and late), TBT 53 ms (60 on `main`), the first answer
+  0.52 s (0.51); `npm run bench` within noise; the scan without violations, the Hours section and the recovery screen included.
 - **Found on the way** (the property tests' new inputs moved their random cases): L-1's year derivation took its lines from A-2's
   bridge (the offer's own projection) and its total from the comparison's projection, which for a later-starting offer cuts pay into
   other pieces, so a figure on a half dollar could round a dollar apart and the work didn't foot. It now takes every line from the
