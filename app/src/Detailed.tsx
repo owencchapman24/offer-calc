@@ -8,7 +8,7 @@ import {
   BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
   PromotionsEditor, RefreshersEditor, VestingStepsEditor,
 } from "./editors";
-import { ChoiceField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, Warnings } from "./controls";
+import { ChoiceField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings } from "./controls";
 import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
 import { type AppOffer, bonusBasis, type HealthDraft, type RetirementDraft } from "./model";
 import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
@@ -150,7 +150,8 @@ function Hours() {
       </FieldRow>
       <FieldRow k="timeOff.gives">
         {(o) => o.draft.timeOff.policy === "unlimited" ? <span className="sub">—</span>
-          : <NumberField o={o} path="timeOff.gives" kind="number" unit="days" label="vacation days it gives a year" />}
+          : <NumberField o={o} path="timeOff.gives" kind="number" unit="days" label="vacation days it gives a year"
+            fallback={shownValue<number>(o, "timeOff.vacation")} />}
       </FieldRow>
       <FieldRow k="timeOff.cap">
         {(o) => o.draft.timeOff.policy === "unlimited" ? <span className="sub">—</span>

@@ -8,6 +8,7 @@ import "./detailedDefaults";
 import { US_STATES } from "./Detailed";
 import { type AppOffer, all, ASSUMPTIONS, getPath, type HealthDraft, type OfferDraft, type RetirementDraft, sampleOffers, setPath, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
+import { context, renderAllInputs } from "./testing";
 
 // The defaults registry (what a D tickmark says) and the engine's defaults (what a null field gives the
 // engine, model.ts) can't disagree: for every default, an offer with the field at its default projects
@@ -140,6 +141,16 @@ describe("a plan entered as none", () => {
     const r = toOfferInput({ ...B, draft: { ...B.draft, health: h, retirement: B.draft.retirement as RetirementDraft } });
     expect("offer" in r && r.offer.health).toEqual({ premium: 1_200, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: 0 });
   });
+});
+
+describe("a default that depends on the offer", () => {
+  // CLAUDE.md: every default shows as a real value with its D. The vacation days it gives default to the days you'd take.
+  const field = (html: string) => /<input[^>]*id="in-A-timeOff-gives"[^>]*>/.exec(html)?.[0] ?? "";
+  it("shows its value: the days it gives are the days you'd take (11 by default, or as entered)", () => {
+    expect(field(renderAllInputs(context()))).toMatch(/value="11"/);
+    const ctx = context("colAdjustedTotal", (os) => os.map((o) => ({ ...o, draft: { ...o.draft, timeOff: { ...o.draft.timeOff, vacation: 15 } } })));
+    expect(field(renderAllInputs(ctx))).toMatch(/value="15"/);
+  }, 30_000);
 });
 
 describe("employer state", () => {

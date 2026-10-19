@@ -22,14 +22,16 @@ const unitOf = (kind: NumberKind) => (kind === "percent" ? (x: number) => toPerc
 const fromUnit = (kind: NumberKind) => (kind === "percent" ? (x: number) => x / 100 : (x: number) => x);
 
 /** A plain number field over a draft path (percents are fractions in the draft). */
-export function NumberField({ o, path, kind, label, unit, placeholder, k = helpKey(path), hint = k, blank }: {
+export function NumberField({ o, path, kind, label, unit, placeholder, k = helpKey(path), hint = k, blank, fallback }: {
   o: AppOffer; path: string; kind: NumberKind; label: string; unit?: string; placeholder?: string;
   /** Its help, when its path isn't its help key (health.outOfPocket.low is health.outOfPocket's). */ k?: string;
   /** The hint it points at, when its own isn't shown (a clawback's window: the clawback's). */ hint?: string;
   /** Said when it's blank: "Not counted". */ blank?: string;
+  /** Its default's value when it depends on the offer (the vacation days it gives: the days you'd take), shown with its D. */
+  fallback?: number | null;
 }) {
   const api = useLedger();
-  const v = shownValue<number>(o, path);
+  const v = shownValue<number>(o, path) ?? fallback ?? null;
   return (
     <span className="field">
       <NumberInput id={fieldId(o.letter, path)} kind={kind} label={`Offer ${o.letter} ${label}`} unit={unit} placeholder={placeholder}
