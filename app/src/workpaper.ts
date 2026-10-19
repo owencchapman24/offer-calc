@@ -321,6 +321,7 @@ export function exactPay(p: WorkPayment): number {
     case "cash": return d.amount;
     case "rsu": return d.fraction * d.grantValue * d.priceFactor;
     case "clawback": return p.gross;
+    case "vacationPayout": return (d.days * d.annual) / d.workdays;
   }
 }
 
@@ -341,6 +342,7 @@ export function paymentLabel(p: WorkPayment): string {
     case "cash": return d.award;
     case "rsu": return `${d.grant.kind === "grant" ? d.grant.label : `${d.grant.label ?? "Refresher"} ${d.grant.number}`}, tranche ${d.tranche} of ${d.tranches}`;
     case "clawback": return `${d.award} repaid`;
+    case "vacationPayout": return "Unused vacation paid out";
   }
 }
 
@@ -363,6 +365,7 @@ export function paymentFormula(p: WorkPayment): string {
     case "rsu": return `${amount(d.grantValue)} × ${+(d.fraction * 100).toFixed(4)}%${Math.abs(d.priceFactor - 1) > 1e-9 ? ` × ${d.priceFactor.toFixed(4)} share-price growth` : ""}`
       + `${d.nominalDate ? `; due ${longDate(d.nominalDate)}, vests on the company's next date` : ""}`;
     case "clawback": return `${toCent(d.amount)} × ${percent(d.fraction)}`;
+    case "vacationPayout": return `${+d.days.toFixed(2)} days × ${amount(d.annual)} a year ÷ ${d.workdays} workdays`;
   }
 }
 

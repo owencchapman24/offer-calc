@@ -24,6 +24,8 @@ import { withholdingParts } from "./warningAt";
 import { stayWarnings, WARNING_KIND } from "./warningKinds";
 import { KIND_TITLE, warningWords } from "./warningWords";
 import { yearTable } from "./workpaper";
+import { daysOffWords, daysText, unpaidVacationText, weeksText } from "./timeOffWords";
+import { paidTimeOff } from "./partsModel";
 
 // "Copy as document" (docs/copy-as-document-plan.md): the comparison as a 2-3 page summary someone who has never seen the tool can
 // read, for the clipboard as HTML with a plain-text fallback, so it pastes into Google Docs, Word and email with its tables. Since
@@ -377,7 +379,7 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     if (o.bonus) parts.push(bonusText(o.bonus, n));
     for (const a of o.cashAwards ?? []) parts.push(`${dollars(a.amount)} ${inSentence(a.label.trim() || "cash award")}`);
     if (o.equity && (o.equity.grants.length || (o.equity.refreshers?.value.base ?? 0) > 0)) parts.push(equityText(o.equity));
-    if (o.hours) parts.push(`${o.hours.weekly.base} hours a week${o.hours.weeksPerYear && o.hours.weeksPerYear !== 50 ? `, ${o.hours.weeksPerYear} weeks a year` : ""}`);
+    parts.push(o.hours ? `${o.hours.weekly.base} hours a week for ${weeksText(o)} weeks a year, after ${daysOffWords(o)}` : `${daysOffWords(o)} a year`);
     const info = d.costOfLiving;
     const city = draft ? cityTax(draft) : null;
     const where = city ? CITY_TAX[city].place : info ? `${shortCity(info.area.name)}, ${o.residence.state}` : o.residence.state;
@@ -658,6 +660,7 @@ function leavingSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Wo
     { label: "Bonus earned but not paid", cells: bonusCells },
     { label: "RSUs not yet vested, at grant value", cells: cell((x) => some(x.unvestedRsuForfeited)) },
     { label: "Employer 401(k) not yet vested", cells: cell((x) => some(x.retirementForfeited)) },
+    { label: "Unused vacation paid out, before tax (in what you'd keep)", cells: cell((x) => some(x.vacation.paid)) },
     { label: "The next payout or vest", cells: cell((x) => (x.next ? longDate(x.next.date) : "none")) },
     { label: "Staying until then adds (after tax, that included)", cells: cell((x) => (x.next ? `+${dollars(x.next.valueOfStaying.afterTaxComp)}` : DASH)) },
   ];
@@ -992,9 +995,13 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
         const t = forfeitText(f);
         return `; ${t.before}${dollars(f.earned)}${t.after} is forfeited`;
       });
+      const v = panel.vacation;
+      const vacation = v.paid >= 0.5 ? `with ${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out, ` : "";
+      const unpaid = unpaidVacationText(v);
       paras.push(`If your last day were ${longDate(panel.leaveDate)}, ${into}${opts.picked ? " (the day picked in Offer Calc)" : ""}: you'd keep `
-        + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
-        + `${lost.length ? `leave ${lost.join(" and ")} behind` : "leave nothing behind"}${bonuses.join("")}. Offer Calc shows any other last day.`);
+        + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${vacation}${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
+        + `${lost.length ? `leave ${lost.join(" and ")} behind` : "leave nothing behind"}${bonuses.join("")}${unpaid ? `; ${unpaid}` : ""}. Offer Calc shows `
+        + "any other last day.");
     }
   }
 
@@ -1035,6 +1042,9 @@ function benefitsSection(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   if (!o.health) notes.push("No health plan entered: premiums and out-of-pocket costs aren't counted.");
   if (o.health?.oopMax) notes.push(`A bad health year costs up to the plan's out-of-pocket maximum, ${dollars(o.health.oopMax)}, in any year of your stay, `
     + "on top of the premiums.");
+  const pto = paidTimeOff(o);
+  notes.push(`Paid time off: ${daysOffWords(o)}, ${pto.days} ${pto.days === 1 ? "day" : "days"} a year; ${dollars(pto.value)} of its starting salary a year `
+    + "is for those days, which salary already counts.");
   add({ kind: "para", runs: [notes.join(" ")] });
   const cols = bx.rows.filter((r) => BENEFIT_HEAD[r.line]);
   if (!cols.length) return;

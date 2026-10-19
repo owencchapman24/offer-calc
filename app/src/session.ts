@@ -2,7 +2,7 @@ import { cityByCode } from "../../src/col/cities";
 import type { Basis, OfferInput } from "../../src/offer/types";
 import {
   all, type AppHousehold, type AppOffer, blankDraft, blankOffer, completeSample, DEFAULT_HOUSEHOLD, fromOfferInput, type Letter, LETTERS,
-  type OfferDraft, sampleOffers, setPath,
+  type OfferDraft, sampleOffers, setPath, withTimeOff,
 } from "./model";
 import { US_PRICES } from "./prices";
 
@@ -243,13 +243,18 @@ export interface V2Session { schemaVersion: 2; household: V2Household; offers: A
 export function migrate(s: unknown): Session | null {
   const x = s as Partial<Session> | Partial<V2Session> | Partial<V1Session> | null;
   if (!x || !Array.isArray(x.offers) || !x.household || !x.ui) return null;
-  if (x.schemaVersion === 3) return { ...(x as Session), household: migrateHousehold(x.household), offers: uniqueIds((x as Session).offers) };
-  if (x.schemaVersion === 2) return { ...(x as V2Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: uniqueIds((x as V2Session).offers) };
+  if (x.schemaVersion === 3) return { ...(x as Session), household: migrateHousehold(x.household), offers: drafts(uniqueIds((x as Session).offers)) };
+  if (x.schemaVersion === 2) {
+    return { ...(x as V2Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: drafts(uniqueIds((x as V2Session).offers)) };
+  }
   if (x.schemaVersion === 1) {
-    return { ...(x as V1Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: uniqueIds((x as V1Session).offers.map(migrateOffer)) };
+    return { ...(x as V1Session), schemaVersion: 3, household: migrateHousehold(x.household), offers: drafts(uniqueIds((x as V1Session).offers.map(migrateOffer))) };
   }
   return null;
 }
+
+/** Each offer's draft in today's shape: days off arrived on 2026-10-19, in place of weeks a year (`withTimeOff`). */
+const drafts = (offers: AppOffer[]): AppOffer[] => offers.map((o) => ({ ...o, draft: withTimeOff(o.draft) }));
 
 /**
  * Offers are edited and removed by id: two with one id would change together (an import could once save them; it's

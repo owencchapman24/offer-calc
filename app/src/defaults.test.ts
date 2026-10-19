@@ -4,6 +4,7 @@ import { leaveDaySweep } from "../../src/offer/project";
 import { STATES_2026 } from "../../src/tax/index";
 import { asymmetries } from "./comparability";
 import { DEFAULTS } from "./defaults";
+import "./detailedDefaults";
 import { US_STATES } from "./Detailed";
 import { type AppOffer, all, ASSUMPTIONS, getPath, type HealthDraft, type OfferDraft, type RetirementDraft, sampleOffers, setPath, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
@@ -23,6 +24,10 @@ const WITH_CLAWBACK = fresh(C, (d) => ({ ...d, cashAwards: [{ ...d.cashAwards[0]
 const GROWING = fresh(C, (d) => ({ ...d, equity: { ...d.equity, priceGrowth: all(0.05) } }));
 /** B with a 3-year cliff on the employer's 401(k) money, so how service is counted moves what vests in a 2-year stay. */
 const CLIFF = fresh(B, (d) => ({ ...d, retirement: { ...(d.retirement as RetirementDraft), vesting: { kind: "cliff", years: 3 } } }));
+/** B with its employer in California, where unused vacation is paid when you leave; and giving 15 vacation days, 4 more than taken. */
+const IN_CA = fresh(B, (d) => ({ ...d, employerState: "CA" }));
+const BANKS = fresh(B, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
+const BANKS_IN_CA = fresh(IN_CA, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
 /** B putting $5,000 a year in an HSA: over self-only coverage's limit, under family coverage's. */
 const BIG_HSA = fresh(B, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employeeHsa: 5_000 } }));
 
@@ -55,7 +60,13 @@ function setup(key: string): { o: AppOffer; path: string; value: unknown; other:
     case "equity.refreshers.everyMonths": return on(C, key, 6);
     case "equity.refreshers.schedule": return on(C, "equity.refreshers.schedule.tranches", shortSchedule, PRESETS[DEFAULT_PRESET].tranches);
     case "equity.refreshers.schedule.vestDates": return on(C, key, otherDates);
-    case "hours.weeksPerYear": return on(B, key, 48);
+    case "timeOff.vacation": return on(B, key, 15); // B has weekly hours: the weeks worked move
+    case "timeOff.holidays": return on(B, key, 10);
+    case "timeOff.sick": return on(B, key, 5);
+    case "timeOff.policy": return on(BANKS_IN_CA, key, "unlimited"); // nothing banks, so nothing's paid on leaving
+    case "timeOff.gives": return on(IN_CA, key, 15, 11); // the days you'd take, 11, give nothing to bank
+    case "timeOff.cap": return on(BANKS_IN_CA, key, 1);
+    case "timeOff.payout": return on(BANKS, key, "always"); // B's employer is in North Carolina, which doesn't require it
     case "cashAwards.paidOn": return on(C, "cashAwards.0.paidOn", { daysAfterStart: 90 }, { daysAfterStart: 30 });
     case "cashAwards.clawback.months": return on(WITH_CLAWBACK, "cashAwards.0.clawback.months", 24);
     case "cashAwards.clawback.kind": return on(WITH_CLAWBACK, "cashAwards.0.clawback.kind", "full");

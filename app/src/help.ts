@@ -125,7 +125,13 @@ const META: Record<string, FieldMeta> = {
   "perks.commuterMonthly": { label: "Commuter, a month", section: "M-5.3", group: "perks" },
   // ---- hours ----
   "hours.weekly": { label: "Weekly hours", section: "M-5.4", group: "hours" },
-  "hours.weeksPerYear": { label: "Weeks a year", section: "M-5.4", group: "hours" },
+  "timeOff.vacation": { label: "Vacation days you'd take, a year", section: "M-5.4", group: "hours" },
+  "timeOff.holidays": { label: "Paid holidays, a year", section: "M-5.4", group: "hours" },
+  "timeOff.sick": { label: "Sick days you'd take, a year", section: "M-5.4", group: "hours" },
+  "timeOff.policy": { label: "Vacation policy", section: "M-9", group: "hours" },
+  "timeOff.gives": { label: "Vacation days it gives, a year", section: "M-9", group: "hours" },
+  "timeOff.cap": { label: "Most days you can bank", section: "M-9", group: "hours" },
+  "timeOff.payout": { label: "Unused vacation when you leave", section: "M-9", group: "hours" },
   // ---- where you'd live ----
   employerState: { label: "Employer state", section: "M-4", group: "where" },
   "costOfLiving.rentGrowth": { label: "Rent growth", section: "M-6.2", group: "where" },
@@ -174,6 +180,6 @@ export const LEDGER_SECTIONS: Array<{ id: LedgerSection; title: string; holds: s
   { id: "retirement", title: "401(k)", holds: "your deferral, the match, vesting" },
   { id: "health", title: "Health", holds: "premium, out-of-pocket, HSA" },
   { id: "perks", title: "Perks", holds: "education, commuter" },
-  { id: "hours", title: "Hours", holds: "per week, weeks a year" },
+  { id: "hours", title: "Hours and days off", holds: "per week, vacation, holidays, sick days" },
   { id: "where", title: "Where you'd live", holds: "city, rent, employer state" },
 ];

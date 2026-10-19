@@ -50,12 +50,13 @@ describe("A-1, the bottom line: sample A on its own, as the plan works it out (v
       + "promotion (Jul 13, 2029, base case), bonuses grow each year and rent rises at each anniversary.");
   });
 
-  it("tax 32.4% of its pay over your stay; New York $22.96 an hour; bear case New York $6,245, 17% under the base case", () => {
-    // 265,889 ÷ 821,486 = 0.32367. After rent at New York prices as paid, 367,398 ÷ 16,000 hours = 22.96. Bear: 271,770 ÷ 43.5191 = 6,244.95;
+  it("tax 32.4% of its pay over your stay; New York $23.82 an hour; bear case New York $6,245, 17% under the base case", () => {
+    // 265,889 ÷ 821,486 = 0.32367. After rent at New York prices as paid, 367,398 ÷ 15,424 hours (80 a week × 48.2 weeks, from the default
+    // days off, 52 − (11 + 8 + 0) ÷ 5, × 4 years) = 23.82. Bear: 271,770 ÷ 43.5191 = 6,244.95;
     // (7,563 − 6,245) ÷ 7,563 = 0.1743, shown 17%.
     expect(v.tax).toEqual({ tax: 265_889, gross: 821_486, rate: 265_889 / 821_486 });
-    expect(v.hour!.hours).toBe(16_000);
-    expect(Math.round(v.hour!.value * 100) / 100).toBe(22.96);
+    expect(v.hour!.hours).toBe(15_424);
+    expect(Math.round(v.hour!.value * 100) / 100).toBe(23.82);
     expect(v.bear).toEqual({ pv: 271_770, month: 6_245, drop: (7_563 - 6_245) / 7_563 });
   });
 
@@ -67,7 +68,7 @@ describe("A-1, the bottom line: sample A on its own, as the plan works it out (v
     expect(text).toContain("Your 4-year stay (Jul 13, 2026 – Jul 12, 2030), a month, in today's dollars at New York prices: $7,563 a month over your stay "
       + "= $6,671 to spend after rent + $892 saved");
     expect(text).toContain("Year 1, as paid, in New York dollars: $4,647 a month to spend after rent + $825 a month saved.");
-    expect(text).toContain("Tax: 32.4% of its pay over your stay · Per hour worked over your stay, after tax and rent, in New York dollars: $22.96");
+    expect(text).toContain("Tax: 32.4% of its pay over your stay · Per hour worked over your stay, after tax and rent, in New York dollars: $23.82");
     expect(text).toContain("Bear case, in New York dollars: $6,245 a month over your stay, 17% under the base case over your stay.");
     expect(text).not.toContain("U.S.-avg");
     expect(text).not.toMatch(/New York \$\d/);

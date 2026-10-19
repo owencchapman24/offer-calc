@@ -48,7 +48,7 @@ describe("export", () => {
 describe("import", () => {
   it("a round trip gives the same offers, About you and results", () => {
     let s = samples(TODAY);
-    s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "hours.weeksPerYear": 48 } });
+    s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "timeOff.vacation": 15, "timeOff.gives": 20, "timeOff.payout": "always" } });
     s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
     expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
     // A spouse's wages (2026-10-14) round-trip; exports from before them import as none.
@@ -63,6 +63,23 @@ describe("import", () => {
     const back = reducer(samples(TODAY), { type: "replace", household: r.household, offers: r.offers, ui: r.ui });
     expect(results(back)).toEqual(results(s));
     expect(back.ui.basis).toBe(s.ui.basis);
+  });
+
+  it("an export from before days off (2026-10-19) imports its weeks a year as days off that give the same weeks", () => {
+    const file = JSON.parse(exportSession(samples(TODAY), TODAY, NOW).text);
+    for (const o of file.offers) { delete o.draft.timeOff; o.draft.hours.weeksPerYear = 50; }
+    const r = readImport(JSON.stringify(file));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 52 − 50 = 2 weeks off: 10 vacation days and no holidays or sick days, so 52 − 10 ÷ 5 = 50 weeks still.
+    for (const o of r.offers) {
+      expect(o.draft.timeOff).toMatchObject({ vacation: 10, holidays: 0, sick: 0, policy: null, gives: null, cap: null, payout: null });
+      expect(o.draft.hours).not.toHaveProperty("weeksPerYear");
+    }
+    // An export with neither weeks nor days off: every default.
+    for (const o of file.offers) delete o.draft.hours.weeksPerYear;
+    const none = readImport(JSON.stringify(file));
+    expect(none.ok && none.offers.map((o) => o.draft.timeOff.vacation)).toEqual([null, null, null]);
   });
 
   it("an invalid file lists its problems and changes nothing", () => {

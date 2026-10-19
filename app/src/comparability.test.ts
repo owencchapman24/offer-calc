@@ -28,7 +28,7 @@ describe("the comparability warning", () => {
         "Employer HSA money is counted for A but not for B. If B's plan puts money in an HSA, add it: otherwise the comparison favors A."],
       ["perks", [edit(a, (d) => ({ ...d, perks: { section127: null, commuterMonthly: null } })), c],
         "Perks are counted for C but not for A. If A offers education or commuter benefits, add them: otherwise the comparison favors C."],
-      ["hours", [a, edit(b, (d) => ({ ...d, hours: { weekly: null, weeksPerYear: null } }))],
+      ["hours", [a, edit(b, (d) => ({ ...d, hours: { weekly: null } }))],
         "Weekly hours are entered for A but not for B, so nothing is compared per hour. Add B's hours to compare per hour."],
     ];
     for (const [category, offers, text] of cases) {
@@ -65,7 +65,7 @@ describe("the comparability warning", () => {
 describe("per hour only when every offer has hours", () => {
   // Two offers, B without hours, on the per-hour basis as chosen: it can't be shown, so the verdict falls back.
   const ctx = context("perHour", (os) => os.filter((o) => o.letter !== "C").map((o) => (o.letter !== "B" ? o
-    : edit(o, (d) => ({ ...d, hours: { weekly: null, weeksPerYear: null } })))));
+    : edit(o, (d) => ({ ...d, hours: { weekly: null } })))));
   const html = renderPage(ctx) + renderPage(ctx, { running: true, bridgeOf: "B" });
 
   it("no per-hour figure for one offer shows alone: not in the rank list, L-1, pay per extra hour or the bridge", () => {

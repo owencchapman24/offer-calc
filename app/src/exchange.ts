@@ -1,5 +1,5 @@
 import { cityByCode } from "../../src/col/cities";
-import { type AppHousehold, type AppOffer, type Letter, LETTERS, type OfferDraft } from "./model";
+import { type AppHousehold, type AppOffer, type Letter, LETTERS, type OfferDraft, withTimeOff } from "./model";
 import { US_PRICES } from "./prices";
 import { migrateHousehold, migrateOffer, type Session, type UiState, type V1Offer, type V2Household } from "./session";
 
@@ -86,7 +86,7 @@ export function readImport(text: string): ImportResult {
     } else {
       const before = problems.length;
       check(x.draft, DRAFT, `${where}.draft`, problems);
-      if (problems.length === before) offers.push({ id: x.id!, letter: x.letter as Letter, sample: x.sample!, draft: x.draft as OfferDraft });
+      if (problems.length === before) offers.push({ id: x.id!, letter: x.letter as Letter, sample: x.sample!, draft: withTimeOff(x.draft as OfferDraft) });
     }
   });
   if (problems.length || !household) return { ok: false, problems };
@@ -162,7 +162,19 @@ const schedule = obj({
 });
 const none = oneOf("none");
 
-const DRAFT: Shape = obj({
+const TIME_OFF: Shape = obj({
+  vacation: nullable(num), holidays: nullable(num), sick: nullable(num), policy: nullable(oneOf("days", "unlimited")), gives: nullable(num),
+  cap: nullable(num), payout: nullable(oneOf("state", "always")),
+});
+
+const DRAFT: Shape = (v, p, ps) => {
+  DRAFT_FIELDS(v, p, ps);
+  // Days off arrived on 2026-10-19: optional, so earlier exports still import (their weeks a year become days off).
+  const t = (v as { timeOff?: unknown } | null)?.timeOff;
+  if (v && typeof v === "object" && t !== undefined) TIME_OFF(t, `${p}.timeOff`, ps);
+};
+
+const DRAFT_FIELDS: Shape = obj({
   label: str,
   residence: (v, p, ps) => {
     obj({ state: nullable(str), nyc: bool })(v, p, ps);
@@ -210,7 +222,12 @@ const DRAFT: Shape = obj({
     employeeHsa: nullable(num), employerHsa: nullable(num), coverage: nullable(oneOf("self", "family")),
   }), "\"none\" or a health plan")),
   perks: obj({ section127: nullable(num), commuterMonthly: nullable(num) }),
-  hours: obj({ weekly: nullable(scenarios), weeksPerYear: nullable(num) }),
+  hours: (v, p, ps) => {
+    obj({ weekly: nullable(scenarios) })(v, p, ps);
+    // Weeks a year, before 2026-10-19's days off.
+    const w = (v as { weeksPerYear?: unknown } | null)?.weeksPerYear;
+    if (v && typeof v === "object" && w !== undefined) nullable(num)(w, `${p}.weeksPerYear`, ps);
+  },
   costOfLiving: obj({ area: nullable(str), monthlyRent: nullable(num), rentGrowth: nullable(num) }),
 });
 

@@ -1,7 +1,8 @@
 import type { RentEstimate } from "../../src/col/rent";
 import type {
   Assumption, BreakevenResult, ClawbackResult, Cliff, Component, CostOfLivingInfo, EmploymentYearResult, EventDetail, HorizonSweep, Household,
-  ISODate, LeaveDayRow, NextCliffResult, OfferInput, OfferWarning, RentFlipResult, ValueBasis, WindowTotals, WithholdingYear,
+  ISODate, LeaveDayRow, NextCliffResult, OfferInput, OfferWarning, RentFlipResult, VacationPayoutRule, ValueBasis, WindowTotals,
+  WithholdingYear,
 } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
 
@@ -156,6 +157,11 @@ export interface LeavePanel {
   next: NextCliffResult["next"];
   /** What leaving that day sets off: a bonus forfeited, FICA on a later-year clawback. */
   warnings: OfferWarning[];
+  /**
+   * Unused vacation banked by then (days), what's paid for it before tax (part of `paid`), the salary rate it's paid at (a year,
+   * the last day's), and why it is or isn't paid (4a).
+   */
+  vacation: { banked: number; paid: number; annual: number | null; rule: VacationPayoutRule | null };
 }
 
 /** L-4's panel at a last day for a comparison: L-4 and the document ask alike, so they share the result. */

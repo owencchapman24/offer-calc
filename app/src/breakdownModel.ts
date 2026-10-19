@@ -7,6 +7,7 @@ import { type PriceWords, shortCity } from "./prices";
 import type { Breakdown, OfferDetail } from "./protocol";
 import { dayBefore, dollars, longDate } from "./text";
 import { shownFactor } from "./verdict";
+import { daysOffWords, weeksText } from "./timeOffWords";
 
 // An offer's breakdown, the view model (docs/v2-plan.md, item 5): A-1, its bottom line, worked out from the offer's own stay (B3),
 // in its own city's dollars (B4). Shared by the breakdown (Breakdown.tsx), its derivations (derive.ts) and the methodology. Pure:
@@ -52,8 +53,12 @@ export interface OwnView {
   differs: string;
   /** Its tax over its stay ÷ its pay, as paid (the years as shown, less what runs past the stay). */
   tax: { tax: number; gross: number; rate: number } | null;
-  /** Per hour worked over its stay: the after-rent total at its own prices, as paid, ÷ the hours worked in it. */
-  hour: { total: number; hours: number; value: number } | null;
+  /**
+   * Per hour worked over its stay: the after-rent total at its own prices, as paid, ÷ the hours worked in it; and where the hours come
+   * from, in words: the weekly hours (base case), the weeks worked and the days off that set them ("11 vacation days, 8 holidays and
+   * no sick days").
+   */
+  hour: { total: number; hours: number; value: number; weekly: number; weeks: string; days: string } | null;
   /** The bear case a month over its stay, at its own prices, and how far under the base case (a share of it); null with no range. */
   bear: { pv: number; month: number; drop: number | null } | null;
   /** The bull case a month over its stay, at its own prices (A-4); null with no range. */
@@ -92,7 +97,9 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   const tax = stay.gross > 0 ? { tax: stay.tax, gross: stay.gross, rate: stay.tax / stay.gross } : null;
   const hoursIn = w.hours;
   const nominal = w.totalRewards.nominal - col.nominal.rent;
-  const hour = hoursIn ? { total: nominal, hours: hoursIn, value: nominal / hoursIn } : null;
+  const hour = hoursIn && offer.hours
+    ? { total: nominal, hours: hoursIn, value: nominal / hoursIn, weekly: offer.hours.weekly.base, weeks: weeksText(offer), days: daysOffWords(offer) }
+    : null;
 
   // A case's after-rent total at its own prices, as shown: total rewards − rent, each a present value; and a month, rounded once.
   const caseOf = (s: "bear" | "bull") => {

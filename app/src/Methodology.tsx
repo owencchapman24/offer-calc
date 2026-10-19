@@ -263,15 +263,19 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         </Section>
         <Section id="M-5.4">
           <p>
-            Hours are weekly hours times weeks a year (50 unless entered), prorated for a partial year and counted only inside
-            your stay. Per hour is the step-4 total, after rent, as paid, divided by those hours: in an offer's breakdown at its own
+            Hours are weekly hours times the weeks worked, prorated for a partial year and counted only inside your stay. The weeks
+            come from the days off you enter, in workdays: 52 − (vacation days you'd take + paid holidays + sick days you'd take) ÷ 5.
+            The defaults are BLS's averages for private industry, 11 vacation days after a year's service and 8 paid holidays, and
+            no sick days, since how many you'd take is personal: 52 − 19 ÷ 5 = 48.2 weeks. With an unlimited vacation policy, enter
+            the days you expect to take. A-5 shows what the starting salary pays a year for those days (days × salary ÷ 260), as
+            context: salary already counts it. Per hour is the step-4 total, after rent, as paid, divided by those hours: in an offer's breakdown at its own
             prices, and in the comparison {p.phrase} (<Ref id="M-6.3" />). It isn't discounted, and it's a lens rather than the
             verdict: hours are the softest input, and people trade hours for experience on purpose.
           </p>
         </Section>
         <Section id="M-5.5">
           <p>
-            When two offers' hours differ by at least 2 a week (100 hours a year), the lead schedule says what the extra hours
+            When two offers' hours differ by at least 100 hours a year (about 2 a week), the lead schedule says what the extra hours
             pay: the gap in the selected basis, as paid, divided by the gap in hours worked. If the offer with more hours also pays
             more, that's a dollar figure per extra hour. If it pays less, the line says "more hours for less pay" with the yearly
             gap, then names the first step of the pipeline where the extra hours do pay, against that offer's average per hour on
@@ -461,10 +465,19 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit.
           </p>
           <p>
+            <strong>Unused vacation.</strong> Where the offer gives more vacation days than you'd take, the difference banks, accrued
+            and used evenly through each year, up to any cap you enter; an unlimited policy banks nothing. Leaving pays what's banked
+            at the salary on your last day ÷ 260 (52 weeks of 5 days), as wages with Social Security and Medicare, on that day: where
+            the law of the employer's state requires it (California, Colorado, Illinois, Louisiana, Maine, Massachusetts, Montana,
+            Nebraska, North Dakota, and Rhode Island after a year's service), or where you say the offer's policy pays it. Elsewhere the
+            employer's policy decides, so it isn't counted unless you say. A stay isn't a leave date, so it moves only what you'd
+            keep on a last day (A-4, L-4). In Rhode Island the first anniversary is a cliff.
+          </p>
+          <p>
             <strong>An offer's terms (A-4).</strong> Each offer's A-4 lists, in words, what leaving early or starting late can cost under
             its terms: when its first bonus is paid and whether you must be employed on the payout date, a start on or after a bonus
-            cutoff, a guaranteed first payout, each cash award's clawback window, the first RSU vest and the employer 401(k) money's
-            vesting. Then every cliff inside its stay, dated by the first last day that keeps it, with what leaving the day before
+            cutoff, a guaranteed first payout, each cash award's clawback window, the first RSU vest, the employer 401(k) money's
+            vesting, and unused vacation. Then every cliff inside its stay, dated by the first last day that keeps it, with what leaving the day before
             gives up, before tax; and the next cliff from its start (from today, once it has started), with what staying until it is
             worth after tax, as paid: what you'd keep leaving on the cliff's day, less what you'd keep leaving on its start. "If you
             left on" is L-4's panel for that offer, the same last day as L-4's.
@@ -517,6 +530,12 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <li>Prices stay at 2024 levels; rent grows at one rate per offer.</li>
             <li>Rent estimates are metro-wide 40th-percentile rents; ZIP-level estimates are planned.</li>
             <li>Layoffs, severance and waived clawbacks aren't modeled.</li>
+            <li>Unused vacation follows the employer's state's law, taken as where you'd work (a fully remote job's is where you live,
+              which isn't asked yet). It banks and is used evenly through the year; a policy that grants the year's days at once, or
+              loses them at a year's end, isn't modeled. North Dakota lets an employer withhold it from someone who quits within a
+              year with under five days' notice, if it said so at hire, and Maine exempts employers of 10 or fewer: neither is
+              applied. An unlimited policy is taken to bank nothing, though in
+              California one capped in practice has owed a payout (McPherson v. EF Intercultural Foundation, 2020).</li>
           </ul>
         </Section>
 
@@ -526,6 +545,12 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <tbody>
               <tr><th scope="row">IRS Rev. Proc. 2025-32</th><td>Federal brackets, standard deductions and inflation adjustments, including
                 the One Big Beautiful Bill Act's changes (Pub. L. 119-21); the commuter limit</td><td>Tax year 2026</td></tr>
+              <tr><th scope="row">BLS, National Compensation Survey: Employee Benefits in the United States, March 2026 (USDL-26-1534)</th>
+                <td>The days-off defaults: 11 vacation days after a year's service; 8 paid holidays (2025)</td><td>March 2026</td></tr>
+              <tr><th scope="row">State wage payment laws: Cal. Lab. Code §227.3; C.R.S. §8-4-101(14)(a)(III); 820 ILCS 115/5; La. R.S.
+                23:631(D); 26 M.R.S. §626; M.G.L. c. 149 §148; Langager v. Crazy Creek Products, 1998 MT 44; Neb. Rev. Stat. §48-1229(6);
+                N.D.C.C. §34-14-09.2; R.I. Gen. Laws §28-14-4(b)</th>
+                <td>Which states require unused vacation to be paid when you leave</td><td>Read Oct 19, 2026</td></tr>
               <tr><th scope="row">IRC 164(b)(7), as added by Pub. L. 119-21 §70120</th><td>The SALT cap: $40,400 in 2026, phased down above
                 $505,000, $10,000 from 2030</td><td>Statute</td></tr>
               <tr><th scope="row">IRS Notice 2025-67; Rev. Proc. 2025-19</th><td>401(k) deferral limit ($24,500); HSA limits</td><td>2026</td></tr>

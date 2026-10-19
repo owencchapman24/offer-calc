@@ -3,6 +3,7 @@ import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
 import "./quickHelp"; // and the ⓘ help of quick mode's fields, which detailed mode shows too
+import "./detailedDefaults"; // and the defaults only detailed mode and the derivations read
 import {
   BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
   PromotionsEditor, RefreshersEditor, VestingStepsEditor,
@@ -141,7 +142,25 @@ function Hours() {
   return (
     <>
       <FieldRow k="hours.weekly">{(o) => <RangeField o={o} path="hours.weekly" kind="number" unit="hrs" label="weekly hours" blank="Not counted" />}</FieldRow>
-      <FieldRow k="hours.weeksPerYear">{(o) => <NumberField o={o} path="hours.weeksPerYear" kind="number" unit="weeks" label="weeks a year" />}</FieldRow>
+      <FieldRow k="timeOff.vacation">{(o) => <NumberField o={o} path="timeOff.vacation" kind="number" unit="days" label="vacation days you'd take a year" />}</FieldRow>
+      <FieldRow k="timeOff.holidays">{(o) => <NumberField o={o} path="timeOff.holidays" kind="number" unit="days" label="paid holidays a year" />}</FieldRow>
+      <FieldRow k="timeOff.sick">{(o) => <NumberField o={o} path="timeOff.sick" kind="number" unit="days" label="sick days you'd take a year" />}</FieldRow>
+      <FieldRow k="timeOff.policy">
+        {(o) => <ChoiceField o={o} path="timeOff.policy" label="vacation policy" options={[["days", "Days a year"], ["unlimited", "Unlimited"]]} />}
+      </FieldRow>
+      <FieldRow k="timeOff.gives">
+        {(o) => o.draft.timeOff.policy === "unlimited" ? <span className="sub">—</span>
+          : <NumberField o={o} path="timeOff.gives" kind="number" unit="days" label="vacation days it gives a year" />}
+      </FieldRow>
+      <FieldRow k="timeOff.cap">
+        {(o) => o.draft.timeOff.policy === "unlimited" ? <span className="sub">—</span>
+          : <NumberField o={o} path="timeOff.cap" kind="number" unit="days" label="most vacation days you can bank" />}
+      </FieldRow>
+      <FieldRow k="timeOff.payout">
+        {(o) => o.draft.timeOff.policy === "unlimited" ? <span className="sub">—</span>
+          : <ChoiceField o={o} path="timeOff.payout" label="unused vacation when you leave"
+            options={[["state", "Where the state requires it"], ["always", "Always: the offer's policy pays it"]]} />}
+      </FieldRow>
     </>
   );
 }

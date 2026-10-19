@@ -1,6 +1,6 @@
 import { statesOf } from "../../src/col/cities";
 import type {
-  AnnualBonus, ByScenario, CashAward, Clawback, Household, MonthDay, OfferInput, Retirement, Scenario, VestingSchedule,
+  AnnualBonus, ByScenario, CashAward, Clawback, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
 } from "../../src/offer/types";
 import type { FilingStatus } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
@@ -61,9 +61,9 @@ export interface OfferDraft {
   hours: {
     /** Null: not counted. */
     weekly: ByScenario | null;
-    /** Null: 50. */
-    weeksPerYear: number | null;
   };
+  /** Days off and the vacation policy (docs/v2-plan.md, 4a). Each null: its default (timeOff.ts, defaults.ts). */
+  timeOff: TimeOffDraft;
   costOfLiving: {
     /** BEA area code: a metro, or a state's area outside metros. */
     area: string | null;
@@ -72,6 +72,37 @@ export interface OfferDraft {
     /** Null: the inflation rate. */
     rentGrowth: number | null;
   };
+}
+
+export interface TimeOffDraft {
+  /** Null: 11 (BLS). */
+  vacation: number | null;
+  /** Null: 8 (BLS). */
+  holidays: number | null;
+  /** Null: none. */
+  sick: number | null;
+  /** Null: a number of days a year. */
+  policy: "days" | "unlimited" | null;
+  /** Null: the days you'd take, so nothing banks. */
+  gives: number | null;
+  /** Null: no cap. */
+  cap: number | null;
+  /** Null: paid out where the state requires it. */
+  payout: "state" | "always" | null;
+}
+
+export const blankTimeOff = (): TimeOffDraft => ({ vacation: null, holidays: null, sick: null, policy: null, gives: null, cap: null, payout: null });
+
+/**
+ * A draft as saved before days off (2026-10-19), or after: weeks a year entered become days off that give the same weeks (52 -
+ * weeks, x 5 days, as vacation; no holidays or sick days), so a saved per hour doesn't move; no days off saved is every default.
+ */
+export function withTimeOff(d: OfferDraft): OfferDraft {
+  // A draft it can't read is left as it is: the page's recovery screen offers the way out (Recovery.tsx).
+  if (!d?.hours) return d;
+  const { weeksPerYear: w, ...hours } = d.hours as OfferDraft["hours"] & { weeksPerYear?: number | null };
+  if (w === undefined && d.timeOff) return d;
+  return { ...d, hours, timeOff: w == null ? d.timeOff ?? blankTimeOff() : { ...blankTimeOff(), vacation: Math.round((52 - w) * 500) / 100, holidays: 0, sick: 0 } };
 }
 
 export interface PromotionDraft {
@@ -317,8 +348,17 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   if (health) offer.health = health;
   const perks = { ...(d.perks.section127 ? { section127: d.perks.section127 } : {}), ...(d.perks.commuterMonthly ? { commuterMonthly: d.perks.commuterMonthly } : {}) };
   if (Object.keys(perks).length) offer.perks = perks;
-  if (d.hours.weekly) offer.hours = { weekly: d.hours.weekly, ...(d.hours.weeksPerYear !== null ? { weeksPerYear: d.hours.weeksPerYear } : {}) };
+  if (d.hours.weekly) offer.hours = { weekly: d.hours.weekly };
+  const timeOff = timeOffInput(d.timeOff);
+  if (timeOff) offer.timeOff = timeOff;
   return { offer };
+}
+
+/** Days off and the vacation policy as entered; a field at its default is left out (the engine has the same default). */
+export function timeOffInput(t: TimeOffDraft): TimeOff | undefined {
+  // An unlimited policy gives no days, so nothing to cap.
+  const out = Object.fromEntries(Object.entries(t).filter(([k, v]) => v !== null && !(t.policy === "unlimited" && (k === "gives" || k === "cap"))));
+  return Object.keys(out).length ? (out as TimeOff) : undefined;
 }
 
 function bonusInput(b: BonusDraft): AnnualBonus | undefined {
@@ -464,7 +504,8 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
       coverage: or(h.coverage),
     } : null,
     perks: { section127: or(o.perks?.section127), commuterMonthly: or(o.perks?.commuterMonthly) },
-    hours: { weekly: o.hours?.weekly ?? null, weeksPerYear: or(o.hours?.weeksPerYear) },
+    hours: { weekly: o.hours?.weekly ?? null },
+    timeOff: withTimeOff({ hours: { weekly: null, weeksPerYear: o.hours?.weeksPerYear }, timeOff: { ...blankTimeOff(), ...o.timeOff } } as unknown as OfferDraft).timeOff,
     costOfLiving: { area: o.costOfLiving?.area ?? null, monthlyRent: or(o.costOfLiving?.monthlyRent), rentGrowth: or(o.costOfLiving?.rentGrowth) },
   };
 }
@@ -476,7 +517,7 @@ export function blankDraft(): OfferDraft {
     bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
     cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: null, health: null,
-    perks: { section127: null, commuterMonthly: null }, hours: { weekly: null, weeksPerYear: null },
+    perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
     costOfLiving: { area: null, monthlyRent: null, rentGrowth: null },
   };
 }
@@ -618,6 +659,7 @@ export function alsoCounted(d: OfferDraft): string[] {
   if (d.health && d.health !== "none") out.push("health");
   if (d.perks.section127 || d.perks.commuterMonthly) out.push("perks");
   if (d.hours.weekly) out.push(`${d.hours.weekly.base} hrs/week`);
+  if (Object.values(d.timeOff).some((v) => v !== null)) out.push("days off");
   return out;
 }
 

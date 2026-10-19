@@ -139,7 +139,8 @@ describe("Copy as document: its figures are the page's", () => {
     expect(text).toContain(verdictSentence(r.view));
     expect(rowOf("Your stay, in today's dollars").cells).toEqual(r.letters.map((_, i) => figure(r.view.row.values.colAdjustedTotal![i])));
     expect(rowOf("After rent, at U.S. prices").cells.slice(0, 3)).toEqual(r.letters.map((_, i) => figure(r.view.row.values.colAdjustedTotal![i])));
-    expect(rowOf("After rent, at U.S. prices, per hour worked").cells[3]).toBe("C, $19.47 an hour");
+    // C's per hour at the default 48.2 weeks a year: 50 weeks' $19.47 × 50 ÷ 48.2.
+    expect(rowOf("After rent, at U.S. prices, per hour worked").cells[3]).toBe("C, $20.20 an hour");
     expect(text).toContain("A pays more; C wins once rent and prices are counted.");
   });
 
@@ -280,6 +281,19 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
     expect(a.text).toContain("Jan 31, 2027: the bonus for 2026");
     expect(a.text).toMatch(/If your last day were Jan 12, 2027, 6 months in: you'd keep \$[\d,]+ after tax, as paid, repay \$10,000,/);
     expect(a.text).toMatch(/Bad case, after rent, in New York dollars: \$6,245 a month over your stay, 17% under the base case/);
+  });
+
+  it("days off and unused vacation (4a): the offer as entered, A-5's paid time off, the terms and the last day", () => {
+    expect(a.text).toContain("80 hours a week for 48.2 weeks a year, after 11 vacation days, 8 holidays and no sick days");
+    // 19 days × 110,000 ÷ 260 = 8,038.46.
+    expect(a.text).toContain("Paid time off: 11 vacation days, 8 holidays and no sick days, 19 days a year; $8,038 of its starting salary a year is for "
+      + "those days, which salary already counts.");
+    // In California, giving 15 days: 4 bank a year, and A-4's first last day, Jan 12, 2027, pays 4 × 184 ÷ 365 days × 110,000 ÷ 260 = $853.
+    const ca = made(alone("A", (o) => ({ ...o, draft: { ...o.draft, employerState: "CA", timeOff: { ...o.draft.timeOff, gives: 15 } } })),
+      undefined, "breakdown", "A", "full");
+    expect(ca.text).toContain("It gives 15 vacation days a year and you'd take 11, so 4 bank each year; California requires unused vacation be paid "
+      + "when you leave.");
+    expect(ca.text).toMatch(/you'd keep \$[\d,]+ after tax, as paid, with \$853 before tax for 2\.02 days of unused vacation paid out, repay \$10,000,/);
   });
 
   it("in a comparison, a breakdown stays in its own city's dollars, and says what the comparison counts it as", () => {

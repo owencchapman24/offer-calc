@@ -153,9 +153,44 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
     help: "Enter the hours you expect, such as 50, or 80 in banking; add a range if they vary. Left blank, hours aren't counted, and "
       + "per-hour figures appear only when every offer has hours. We don't guess one: 40 and 80 are both common.",
   },
-  "hours.weeksPerYear": {
-    hint: "Weeks worked; 50 allows two weeks off.",
-    help: "The weeks you work in a year, after vacation and holidays. 50 is the default: two weeks off. It multiplies weekly hours.",
+  "timeOff.vacation": {
+    hint: "Workdays of vacation you'd actually take.",
+    help: "The vacation days you expect to take each year, in workdays. With weekly hours, weeks worked = 52 − (vacation + holidays + "
+      + "sick days) ÷ 5. The default, 11, is BLS's average after a year's service. With an unlimited policy, enter what you'd expect to take.",
+  },
+  "timeOff.holidays": {
+    hint: "Paid holidays a year, in workdays.",
+    help: "The paid holidays the offer lists, such as New Year's Day and Thanksgiving. The default, 8, is BLS's average for private "
+      + "industry. Holidays only change the weeks you work.",
+  },
+  "timeOff.sick": {
+    hint: "Sick days you expect to take; none by default.",
+    help: "The sick days you'd expect to take in a year: they lower the weeks you work, so per hour rises. None count by default, since "
+      + "how many you take is personal. Sick leave isn't paid out when you leave; one bank for vacation and sickness (PTO) goes in "
+      + "vacation, with sick days at 0.",
+  },
+  "timeOff.policy": {
+    hint: "A number of days a year, or unlimited.",
+    help: "Most offers give a number of vacation days a year, which build up as you work. Unlimited means no set number: nothing builds "
+      + "up, so nothing is paid when you leave. In California, a policy that's unlimited in name but capped in practice has owed a "
+      + "payout (McPherson, a 2020 appeals case): if yours caps what you can take, enter it as days a year.",
+  },
+  "timeOff.gives": {
+    hint: "The days it gives; extra days you don't take bank.",
+    help: "The vacation days the offer gives each year. Days you don't take bank, evenly through the year, and leaving pays them out "
+      + "where that's required. The default is the days you'd take, so nothing banks. Example: it gives 15 and you take 11, so 4 bank "
+      + "a year.",
+  },
+  "timeOff.cap": {
+    hint: "The most banked days the policy allows; blank: none.",
+    help: "Many policies stop days banking once you have a set number, often one or two years' worth. Blank means no cap. It matters "
+      + "only when the offer gives more days than you'd take.",
+  },
+  "timeOff.payout": {
+    hint: "Paid out where the state requires it, or always.",
+    help: "California, Colorado, Illinois, Louisiana, Maine, Massachusetts, Montana, Nebraska, North Dakota and Rhode Island (after a "
+      + "year) require unused vacation to be paid when you leave; the state is the employer's. Elsewhere it's the employer's policy: "
+      + "pick Always if the offer's pays it. It's paid at your salary on the last day ÷ 260 a day, taxed as wages.",
   },
   ...tranches("equity.grants"),
   ...tranches("equity.refreshers"),

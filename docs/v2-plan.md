@@ -8,7 +8,7 @@ testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16
 (2026-10-16, from the owner's own use). **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22:** 4a
 extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
-ahead of item 2; their decisions are D16-D23. What to build after v1
+ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70). What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
@@ -954,6 +954,19 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 
 ### 4a. Days off (extended 2026-10-19, approved: sick days, unlimited vacation, payout on leaving)
 
+**Built: stop 4a** (2026-10-19, pull request #70), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
+- **The engine's fields** are one `timeOff` on the offer (`vacation`, `holidays`, `sick`, `policy`, `gives`, `cap`, `payout`), not
+  `hours.vacationDays` and the rest: the payout needs the days you'd take even when weekly hours aren't entered. `hours.weeksPerYear`
+  stays for the engine's callers and wins when given.
+- **The payout choice has two options,** where the state requires it (the default) or always (the offer's policy), not three: a state's
+  law pays it whatever the policy says, so "no" could only mean the default.
+- **The payout is a cash payment with its own detail** (`vacationPayout`), not a pay component: it comes only with a leave date, and
+  the leave-date views (A-4's "if you left on", L-4, their work and the document) name it on a line of its own.
+- **Saves and exports from before** carry weeks a year: they load as days off that give the same weeks (vacation (52 − weeks) × 5, no
+  holidays or sick days), so their per hour doesn't move. With none entered, the defaults apply, and per hour moves as D14 says.
+- **The days-off defaults register with detailed mode and the derivations** (`detailedDefaults.ts`), so the main thread grows 0.48 kB
+  gzip, within v2's 0.5 kB.
+
 - **Today:** "weeks a year", default 50 (`D`, "two weeks off"), feeds hours and per hour. Offer letters and people count time off in
   days, and two weeks is short of what's typical: BLS's National Compensation Survey (March 2026, USDL-26-1534) has private-industry
   workers with paid vacation averaging 11 days after a year's service (16 after five), and paid holidays averaged 8 days in 2025.
@@ -963,6 +976,7 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
   - the vacation policy: "Days a year", with "Vacation days it gives a year" (blank: the days you'd take) and "Most days you can bank"
     (an accrual cap; blank: none), or "Unlimited", where the days you'd take are what you expect to take (D17) and nothing accrues;
   - "Pays out unused vacation when you leave": as the state requires (the default, D18), yes (the offer's policy says so), or no.
+    (Built with the first two: "Where the state requires it" and "Always: the offer's policy pays it".)
 
   Weeks worked = 52 − (vacation taken + sick days + holidays) ÷ 5. One bank for vacation and sickness (PTO): enter it as vacation,
   the days it gives and the days you'd take with sickness counted in them, and sick days as 0. California treats such a bank as
@@ -987,21 +1001,21 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
   - **Which states require it,** where the employer gives paid vacation that accrues. The state is where you'd work: the employer's
     state, until 4b and 4d know your office days (then a fully remote job's is where you live), and the help says so.
 
-    | State | The rule | Source | Read for this design |
+    | State | The rule | Source | Read (the design, then stop 4a) |
     |---|---|---|---|
-    | California | Vacation vests as it's earned and is paid at the final rate; no forfeiture; a reasonable cap is allowed | Lab. Code §227.3; Suastez v. Plastic Dress-Up Co., 31 Cal. 3d 774 (1982) | The Labor Commissioner's vacation FAQ |
-    | Colorado | All vacation pay earned and determinable is paid at separation; a forfeiture term is void | C.R.S. §8-4-101(14)(a)(III); Nieto v. Clark's Market, 2021 CO 48 | Secondary summaries |
-    | Illinois | Earned vacation is paid at the final rate; no forfeiture at separation | 820 ILCS 115/5 | Secondary summaries |
-    | Louisiana | Vacation earned and accrued under the employer's policy is an amount due; earned vacation can't be forfeited | La. R.S. 23:631(D), 23:634 | The statute as quoted in court opinions' summaries |
+    | California | Vacation vests as it's earned and is paid at the final rate; no forfeiture; a reasonable cap is allowed | Lab. Code §227.3; Suastez v. Plastic Dress-Up Co., 31 Cal. 3d 774 (1982) | The Labor Commissioner's vacation FAQ (dir.ca.gov) |
+    | Colorado | All vacation pay earned and determinable is paid at separation; a forfeiture term is void | C.R.S. §8-4-101(14)(a)(III); Nieto v. Clark's Market, 2021 CO 48 | The statute (C.R.S. 2023, title 8, the General Assembly's text); its paid sick leave isn't paid out (§8-13.3-403(5)(a)) |
+    | Illinois | Earned vacation is paid at the final rate; no forfeiture at separation | 820 ILCS 115/5 | The statute's text (FindLaw's copy of the ILCS: ilga.gov's certificate didn't verify) |
+    | Louisiana | Vacation earned and accrued under the employer's policy is an amount due; earned vacation can't be forfeited | La. R.S. 23:631(D), 23:634 | The statute (legis.la.gov), §23:631(D)(1)-(2) |
     | Maine | Employers with 11 or more employees pay unused accrued vacation on the last day, for vacation accrued from Jan 1, 2023 | 26 M.R.S. §626 | Maine's Bureau of Labor Standards, Interpretive Guidance 22-01 |
-    | Massachusetts | Vacation pay due under an agreement is wages, due at separation | M.G.L. c. 149 §148 | Secondary summaries |
-    | Montana | Accrued vacation is wages, and a later condition can't divest it | Langager v. Crazy Creek Products, 1998 MT 44; MCA §39-3-205 (when it's due) | The Department of Labor and Industry's wage decisions citing Langager |
+    | Massachusetts | Vacation pay due under an agreement is wages, due at separation | M.G.L. c. 149 §148 | The statute (malegislature.gov): vacation payments due under an agreement are wages |
+    | Montana | Accrued vacation is wages, and a later condition can't divest it | Langager v. Crazy Creek Products, 1998 MT 44; MCA §§39-3-201(6), 39-3-205 | The Department of Labor and Industry's wage decision Herden (2020), citing Langager ¶¶25, 31 |
     | Nebraska | Earned, unused vacation is wages due at separation (other paid leave isn't, unless agreed) | Neb. Rev. Stat. §48-1229(6) | The statute |
-    | North Dakota | Accrued paid time off is paid at separation; on a voluntary quit it may be withheld only with written notice at hire, under a year's service and under five days' notice | N.D.C.C. §34-14-09.2 | Copies of the state's labor-law poster |
+    | North Dakota | Accrued paid time off is paid at separation; on a voluntary quit it may be withheld only with written notice at hire, under a year's service and under five days' notice | N.D.C.C. §34-14-09.2 | The statute (the Legislative Council's chapter 34-14) |
     | Rhode Island | After a year's service, accrued vacation is wages, paid with the next regular pay | R.I. Gen. Laws §28-14-4(b) | The statute |
 
-    Stop 4a re-reads each from the statute or the state's labor agency (five rest on secondary summaries here, Montana's on decisions
-    citing its case), and the data refresh calendar rechecks them each January. Maine's size threshold and North Dakota's notice rule
+    Stop 4a re-read each from the statute or the state's labor agency (2026-10-19), and the data refresh calendar rechecks them each
+    January (`docs/data-refresh.md`). Maine's size threshold and North Dakota's notice rule
     are assumed met (an employer of 11 or more; you give at least five days' notice), and the help says so; Rhode Island pays nothing
     before your first anniversary.
   - **Everywhere else** the employer's policy decides: "yes" or "no" as you set it. The default counts nothing there, and the help
@@ -1500,7 +1514,7 @@ approved on 2026-10-19, at the user's word.
 | 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules. **Done** (pull request #62) | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
 | 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
-| 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving (approved 2026-10-19: next, at the user's word) | D14, D16-D19 (approved), the secondary state sources re-read |
+| 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
 | 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document | 4i, D22, D23 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |

@@ -13,6 +13,7 @@ import type { WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, cursorJobFor, type LeaveCurve, type LeavePanel } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
+import { daysText, unpaidVacationText } from "./timeOffWords";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
 import type { Engine, SlowJob, SlowState } from "./useEngine";
 
@@ -294,6 +295,11 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
       <p className="leave-line">
         <Who l={letter} /> <span className="leave-worked">{w.months} {w.months === 1 ? "month" : "months"}{w.days ? ` and ${w.days} ${w.days === 1 ? "day" : "days"}` : ""} worked</span>
         {" · "}keep <Fig id={`kept.${letter}`} label={`${dollars(kept)} kept ${COUNTED[basis]}`}>{dollars(kept)}</Fig> {COUNTED[basis]}
+        {panel.vacation.paid >= 0.5 && (
+          <>, with <Fig id={`vac.${letter}`} label={`${dollars(panel.vacation.paid)} before tax for ${daysText(panel.vacation.banked)} of unused vacation paid out`}>
+            {dollars(panel.vacation.paid)}</Fig> before tax for {daysText(panel.vacation.banked)} of unused vacation</>
+        )}
+        {unpaidVacationText(panel.vacation) && <> ({unpaidVacationText(panel.vacation)})</>}
         {owed.length > 0 && (
           <>
             , and repay <Fig id={`repay.${letter}`} label={`${dollars(panel.clawbackOwed)} of clawbacks`}>{dollars(panel.clawbackOwed)}</Fig>{" "}

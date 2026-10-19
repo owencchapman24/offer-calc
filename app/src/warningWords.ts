@@ -52,6 +52,10 @@ export function warningWords(group: OfferWarning[]): string {
       return `You'd live in ${r} and work for an employer in ${e}. ${e}'s convenience-of-employer rule may tax your remote days there too, and ${r}'s `
         + `credit may not offset it fully. This projection taxes ${r} residence only.`;
     }
+    case "unlimitedVacation":
+      return "Its vacation is unlimited, so nothing is counted as building up or paid when you leave. In California, a policy that's unlimited "
+        + "in name but capped in practice has owed a payout (McPherson v. EF Intercultural Foundation, 2020): if yours limits the days you can "
+        + "take, enter it as days a year.";
     default: return "";
   }
 }
