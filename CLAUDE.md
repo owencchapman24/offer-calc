@@ -40,8 +40,13 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: ask.** v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many
-offers did you actually have?"), at the user's word; record the answer when it comes. The plan's order puts item 2 (market
+**Next: build 4a, then 4i, then 4j** (`docs/v2-plan.md`, approved 2026-10-19 at the user's review of pull request #69), a review
+stop each, ahead of item 2, at the user's word: 4a extended (sick days, unlimited vacation, unused vacation paid out on leaving, with the
+ten states that require it), 4i (an employee stock purchase plan, each lot sold at purchase: no "hold", no capital gains) and 4j (other
+benefits; tax-free ones on their own line, not in "saved"). Decisions D16-D23 are recorded in the plan.
+
+v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
+actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
 benchmarks, as A-8) next, after the testers' answers to its questions (`docs/v2-plan.md`, "Questions for testers"). Item 4 gained 4h,
 commission (the owner's own use, finding 3), unranked and not built.
 
@@ -305,7 +310,8 @@ section 2's and the plan's in step):
   sentence.)
 - **Budgets:** the main thread 120 kB gzip, with Lighthouse holding LCP at 2.5 s (kilobytes are the proxy, LCP the outcome);
   Lighthouse from the `lighthouse` package, not `@lhci/cli` (which pins Lighthouse 12.6, with npm advisories).
-- **v2's decisions** (D1-D15, B1-B13) are in `docs/v2-plan.md`; D1, D14 and B1-B13 are approved, the rest stand as recommended.
+- **v2's decisions** (D1-D23, B1-B13) are in `docs/v2-plan.md`; D1, D14, D16-D23 (2026-10-19: D20 and D22 as the user changed them,
+  D21 moot) and B1-B13 are approved, the rest stand as recommended.
 
 ## 8. The validation gate (after any tax change)
 1. `npm test`: hand-checked values, and the frozen-law tests unchanged.
@@ -458,7 +464,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D15, B1-B13 | Current. Step 0 and item 5 (stops 5A-5C) built; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0 and item 5 (stops 5A-5C) built; 4a's extension, 4i and 4j approved (2026-10-19), next; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |

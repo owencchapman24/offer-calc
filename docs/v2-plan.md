@@ -5,14 +5,18 @@ pull request #29 (below, "Decisions"). **Item 5, the offer breakdown (the next s
 recommended, with conditions on B4, B5 and B8 and a rule for labels (B13).** It makes the tool evaluator-first and goes first. Step 0 is
 built (pull request #31), and item 5, the offer breakdown, in three stops: 5A (pull request #62, 2026-10-15, started before the
 testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16); nothing else is. Item 4 gained 4h, commission
-(2026-10-16, from the owner's own use). What to build after v1
+(2026-10-16, from the owner's own use). **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22:** 4a
+extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
+each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
+ahead of item 2; their decisions are D16-D23. What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
    appears with two or more offers. Quick mode starts from one offer.
 2. **Item 2, market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
    (OEWS, May 2025), as a part of that offer's breakdown.
-3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs.
+3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs. **Approved 2026-10-19:** 4a (extended), 4i
+   (the ESPP) and 4j (other benefits) move ahead of item 2, at the user's word; 4b and 4c keep their place.
 4. **Item 3, negotiation help:** what each lever (salary, sign-on) is worth to you, from one offer; L-3's ties once there are two;
    the published wages; an optional draft email. Facts, not advice.
 5. **Item 1, beyond the money:** what else each offer is worth to you, in dollars you name, and whether (and at what figure) that flips
@@ -376,7 +380,8 @@ one projection, so a later-starting offer's own stay and the comparison's window
   group shows with two or more offers; values entered stay saved if an offer is removed.
 - **Accuracy (item 4) feeds the breakdown with no new layout:** days off and commuting time into per hour (A-1); commuting's cost into
   A-2 (a "getting to work" share of the $100); relocation into year 1 (A-2, A-3); startup options into A-3 and A-4's bad case; Public
-  Service Loan Forgiveness beside A-1. It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
+  Service Loan Forgiveness beside A-1; vacation paid out on leaving into A-4 (approved 2026-10-19); an ESPP into A-3's pay and
+  payments, A-4's cliffs and A-5 (4i); other benefits into A-2's $100 or beside it, and A-5 (4j). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
   for each) partly cancels out, but in one offer's bottom line nothing cancels. Hence 4a-4c move up.
 
 ### Re-ranked priority (approved 2026-10-15)
@@ -385,6 +390,7 @@ Item numbers are stable IDs; the order is separate.
 1. **Item 5, the offer breakdown** (this section), with quick mode from one offer and §1's new wording.
 2. **Item 2, market benchmarks,** as A-8: the context a one-offer evaluator lacks (finding 2), still context only.
 3. **Items 4a-4c, days off, commuting and relocation:** small, and a standalone bottom line has nothing to cancel their errors.
+   (Approved 2026-10-19, at the user's word: 4a, 4i and 4j move ahead of item 2.)
 4. **Item 3, negotiation help,** as A-9: lever values from one offer, ties from two.
 5. **Item 1, beyond the money:** comparison-only, so it waits for the comparison's users.
 6. **Items 4d-4f:** large, and each still set by the testers' answers (D10).
@@ -917,14 +923,21 @@ the clipboard in the smoke tests, the scan.
 
 ## 4. Accuracy
 
-Seven parts, each its own pull request, in this order (D10): the two small ones that feed "per hour of your life" first, then
-relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for commuters,
-was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4) place it.
-4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked.
+Ten parts, each its own pull request (4d and 4e two), in this order (D10): the two small ones that feed "per hour of your life"
+first, then relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for
+commuters, was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4)
+place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked.
+
+**Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22 (D21 moot):** 4a gains sick days, an "unlimited"
+vacation policy and paying out unused vacation on leaving; two parts are new, 4i (an employee stock purchase plan, each lot sold at
+purchase) and 4j (other benefits: stipends, wellness money, employer-paid insurance and the like). At the user's word they're built next, before item 2 and before the testers' answers to item 4's questions,
+in the order 4a, 4i, 4j, a review stop each. The usual rules hold at each: every figure adds up as displayed, the property tests
+generate the new inputs, the labels test covers every new figure, and the bundle and Lighthouse budgets hold. Each new input reaches
+the breakdown (A-1 to A-7, where it applies: each part's table says where and why not), the comparison and the copied document.
 
 | Part | Size | Engine | Main thread |
 |---|---|---|---|
-| 4a Days off | Small | `hours`: vacation and holidays in place of weeks | 0 (detailed mode) |
+| 4a Days off | Small-medium | `hours`: vacation, holidays and sick days in place of weeks; a vacation balance and its payout on leaving | 0 (detailed mode) |
 | 4b Commuting | Small-medium | a monthly cost, and hours | 0 (detailed mode) |
 | 4c Relocation | Small | a dated cost; reimbursements as wages | 0 (detailed mode) |
 | 4d Remote work and working across a state line | Large | tax engine: nonresident tax, credits, sourcing | 0 (detailed mode) |
@@ -932,29 +945,98 @@ was added to the backlog on 2026-10-15, unranked: it's small and its engine is b
 | 4f Public Service Loan Forgiveness | Large, volatile | loans, payment plans, AGI by year | under 0.3 kB (a closed About-you row) |
 | 4g Philadelphia's wage tax for commuters | Small | none: the nonresident rate is in (`resident: false`) | 0 (detailed mode) |
 | 4h Commission | Small-medium | a pay stream: an expected annual amount with a range, paid monthly or quarterly | 0 (detailed mode) |
+| 4i Employee stock purchase plan | Medium | an ESPP stream (contributions, purchases, the $25,000 limit, each lot sold at purchase); tax engine: income that isn't FICA wages | 0 (detailed mode) |
+| 4j Other benefits | Small | named benefits, each a yearly amount, taxable (a pay stream) or tax-free (a benefit flow) | 0 (detailed mode) |
 
 Every part's inputs live in detailed mode (a lazy chunk, 14 kB gzip today), or for 4f behind a closed row in About you that loads its
 inputs on first use, so none adds more than an entry point to the main thread. Each grows the worker and may grow the fast lane's
 per-edit time, so each stop reports `npm run bench` side by side with `main` and the time to the first verdict.
 
-### 4a. Days off
+### 4a. Days off (extended 2026-10-19, approved: sick days, unlimited vacation, payout on leaving)
 
 - **Today:** "weeks a year", default 50 (`D`, "two weeks off"), feeds hours and per hour. Offer letters and people count time off in
   days, and two weeks is short of what's typical: BLS's National Compensation Survey (March 2026, USDL-26-1534) has private-industry
   workers with paid vacation averaging 11 days after a year's service (16 after five), and paid holidays averaged 8 days in 2025.
-- **Scope:** per offer, in the Hours section, in place of weeks: "Vacation days you'd take" and "Paid holidays". Weeks worked = 52 −
-  (vacation + holidays) ÷ 5. "Unlimited" PTO: the days you expect to take, and the help says so.
+  Nothing pays out unused vacation when you leave, though ten states require it.
+- **Scope:** per offer, in the Hours section of detailed mode, in place of weeks:
+  - "Vacation days you'd take a year" and "Paid holidays" (as approved, D14), and "Sick days you'd take a year" (D16);
+  - the vacation policy: "Days a year", with "Vacation days it gives a year" (blank: the days you'd take) and "Most days you can bank"
+    (an accrual cap; blank: none), or "Unlimited", where the days you'd take are what you expect to take (D17) and nothing accrues;
+  - "Pays out unused vacation when you leave": as the state requires (the default, D18), yes (the offer's policy says so), or no.
+
+  Weeks worked = 52 − (vacation taken + sick days + holidays) ÷ 5. One bank for vacation and sickness (PTO): enter it as vacation,
+  the days it gives and the days you'd take with sickness counted in them, and sick days as 0. California treats such a bank as
+  vacation for payout (the Labor Commissioner's vacation FAQ, dir.ca.gov); stop 4a checks the other payout states.
 - **Defaults** (D14, approved): BLS's figures, 11 and 8 (`D`, each with its source, editable), so 48.2 weeks. That's honest but moves every default per-hour
   figure about 4% (and pay per extra hour), once, explained in the stop's notes; `npm run offers`' hours and the hand-checked per-hour
   tests move with it; the grid doesn't. The alternative keeps one "days off" input at 10, today's 50 weeks, and moves nothing.
-- **Not in scope:** sick days (BLS: 7 a year on average in private industry; usage is personal), and paying out unused vacation when
-  you leave. Payout is required in some states where the employer offers vacation (California, Lab. Code §227.3; Massachusetts; Illinois;
-  Louisiana; Rhode Island after a year; Nebraska; North Dakota; Maine, for vacation accrued from 2023; Colorado and Montana, by case law
-  and guidance). L-4 names it as "not modeled" for an employer in those states, rather than guess an accrual.
-- **Engine:** `hours.vacationDays` and `hours.holidays` beside `weeksPerYear` (one or the other), validated, in `docs/offer-model.md`.
-  JSON exports carry them; older files keep their weeks.
-- **Bundle:** detailed mode's chunk; a few lines in the worker.
-- **Risk:** small, apart from the one-time move in per-hour figures (D14).
+  The extension's defaults leave that move as approved: sick days 0 (D16: 52 − (11 + 8 + 0) ÷ 5 = 48.2 weeks still), unlimited at the
+  same 11 (D17), and payout as the state requires (D18), which with the days given blank banks nothing.
+- **Unused vacation, paid out on leaving:**
+  - **Only on leaving.** A stay isn't a leave date (M-7: its end isn't a last day worked), so a payout moves A-4's "if you left on",
+    L-4's chart and panel, and the cliffs' figures, never a figure over your stay.
+  - **The balance** (D19): vacation accrues evenly over each employment year at the days it gives, and is used evenly at the days you'd
+    take; the difference banks, up to the cap. With the defaults (gives = takes) nothing banks. An unlimited policy accrues nothing.
+  - **Paid** at the salary rate on the last day ÷ 260 a day (52 weeks of 5 days; a yearly salary is ÷ 52 a week under 29 CFR
+    778.113(b)); California's rule is the final rate of pay (Lab. Code §227.3). Example: a California offer at $120,000 giving 15 days,
+    you taking 11, banks 4 a year; leave the day before your second anniversary and 8 are paid: $120,000 × 8 ÷ 260 = $3,692.31 before
+    tax (the daily rate isn't rounded first, so the line shows the salary, not $461.54 a day).
+  - **Dated** the last day (final pay is due within days in most states; in California on the last day, or within 72 hours of a quit
+    without notice, Lab. Code §§201-202), and taxed as supplemental wages with FICA (IRS Pub. 15 §7: vacation pay paid on top of
+    regular wages), its own pay component (`vacationPayout`), so A-3's kinds, the CSVs and the copied document name it.
+  - **Which states require it,** where the employer gives paid vacation that accrues. The state is where you'd work: the employer's
+    state, until 4b and 4d know your office days (then a fully remote job's is where you live), and the help says so.
+
+    | State | The rule | Source | Read for this design |
+    |---|---|---|---|
+    | California | Vacation vests as it's earned and is paid at the final rate; no forfeiture; a reasonable cap is allowed | Lab. Code §227.3; Suastez v. Plastic Dress-Up Co., 31 Cal. 3d 774 (1982) | The Labor Commissioner's vacation FAQ |
+    | Colorado | All vacation pay earned and determinable is paid at separation; a forfeiture term is void | C.R.S. §8-4-101(14)(a)(III); Nieto v. Clark's Market, 2021 CO 48 | Secondary summaries |
+    | Illinois | Earned vacation is paid at the final rate; no forfeiture at separation | 820 ILCS 115/5 | Secondary summaries |
+    | Louisiana | Vacation earned and accrued under the employer's policy is an amount due; earned vacation can't be forfeited | La. R.S. 23:631(D), 23:634 | The statute as quoted in court opinions' summaries |
+    | Maine | Employers with 11 or more employees pay unused accrued vacation on the last day, for vacation accrued from Jan 1, 2023 | 26 M.R.S. §626 | Maine's Bureau of Labor Standards, Interpretive Guidance 22-01 |
+    | Massachusetts | Vacation pay due under an agreement is wages, due at separation | M.G.L. c. 149 §148 | Secondary summaries |
+    | Montana | Accrued vacation is wages, and a later condition can't divest it | Langager v. Crazy Creek Products, 1998 MT 44; MCA §39-3-205 (when it's due) | The Department of Labor and Industry's wage decisions citing Langager |
+    | Nebraska | Earned, unused vacation is wages due at separation (other paid leave isn't, unless agreed) | Neb. Rev. Stat. §48-1229(6) | The statute |
+    | North Dakota | Accrued paid time off is paid at separation; on a voluntary quit it may be withheld only with written notice at hire, under a year's service and under five days' notice | N.D.C.C. §34-14-09.2 | Copies of the state's labor-law poster |
+    | Rhode Island | After a year's service, accrued vacation is wages, paid with the next regular pay | R.I. Gen. Laws §28-14-4(b) | The statute |
+
+    Stop 4a re-reads each from the statute or the state's labor agency (five rest on secondary summaries here, Montana's on decisions
+    citing its case), and the data refresh calendar rechecks them each January. Maine's size threshold and North Dakota's notice rule
+    are assumed met (an employer of 11 or more; you give at least five days' notice), and the help says so; Rhode Island pays nothing
+    before your first anniversary.
+  - **Everywhere else** the employer's policy decides: "yes" or "no" as you set it. The default counts nothing there, and the help
+    says to check the policy.
+  - **Unlimited:** nothing accrues, so nothing is paid. In California a policy unlimited in name but capped in practice has owed a
+    payout (McPherson v. EF Intercultural Foundation, 47 Cal. App. 5th 243 (2020)); the help names the case, and the tool assumes a
+    true unlimited policy.
+  - **Sick days are never paid out:** sick leave isn't wages due at separation (Neb. Rev. Stat. §48-1229(6); California's paid sick
+    leave law, Lab. Code §246, to be re-read at the stop), unless it shares a bank with vacation (above).
+- **Where it shows:**
+
+  | Where | What |
+  |---|---|
+  | A-1 | Per hour worked, over hours from the days off; under it, in words: "after 11 vacation days, 8 holidays and no sick days: 48.2 weeks a year" |
+  | A-2, A-3 | Nothing: salary pays for days off, and a payout comes only on leaving, which a stay isn't |
+  | A-4 | The terms: the policy ("15 days a year, accruing; California requires unused days be paid when you leave", or "Unlimited: nothing accrues, so nothing is paid out"); "if you left on": the days banked and their payout after tax; L-4's cliffs' figures include it |
+  | A-5 | Paid time off: the days a year and what the salary pays for them (days × the daily rate), context that adds to no total, since salary already counts it |
+  | A-6 | The payout's tax by year in a leave-date view (supplemental, with FICA); McPherson's note for an unlimited policy in California. The "not modeled" line this part replaced is gone |
+  | A-7 | The employment-years table's hours (its weeks from the days off) |
+  | The comparison | L's per hour and pay per extra hour; L-4's chart and panel (each last day's payout) |
+  | The copied document | The offer as entered (days off, the policy, the payout rule), per hour's line, leaving early |
+- **Engine:** `hours.vacationDays`, `hours.holidays` and `hours.sickDays` beside `weeksPerYear` (one or the other); `vacation: { policy:
+  "days"; days?: number; cap?: number } | { policy: "unlimited" }`; `vacationPayout: "state" | "yes" | "no"`; the payout states as data
+  with their sources, as `CONVENIENCE_RULE_STATES` is (`src/offer/location.ts`); a payout event in the leave-date projection, kept by
+  `keptIfLeaving` and the cliffs. Validated (days taken and holidays under 260 together; days given at least 0), in
+  `docs/offer-model.md`. JSON exports carry them; older files keep their weeks. No tax-engine change: the grid and the oracle report
+  stay byte-identical.
+- **Validation:** hand-checked at the edges: the defaults' 48.2 weeks; the California example above, leaving the day before and the
+  day of an anniversary and at the cap; Rhode Island the day before and the day of the first anniversary; unlimited in California
+  (nothing); a payout's withholding at 22%; a policy set to "yes" in a state that doesn't require it. The property tests generate the
+  days, the policy and the rule, and every leave-date figure still foots as displayed.
+- **Methodology:** M-5.4 (hours from days off), M-9 (the payout on leaving, with the states' table), M-10 (what's assumed: the
+  employer's state as where you work, even accrual and use, a true unlimited policy).
+- **Bundle:** detailed mode's chunk; under 1 kB gzip in the worker (the rule, the states, the balance).
+- **Risk:** small to medium: the one-time move in per-hour figures (D14), and state law read as data (ten states, a January recheck).
 
 ### 4b. Commuting
 
@@ -1146,6 +1228,181 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Risk:** small to medium: commission plans vary (draws against commission, accelerators, quotas), and those stay out of scope;
   the help says so.
 
+### 4i. Employee stock purchase plan (approved 2026-10-19: sold at each purchase)
+
+**At the user's review of pull request #69 (D20, D21):** every lot counts as sold on its purchase date; there's no "hold" choice and no
+capital gains in the tax engine. The help and M-3 say so in the user's words: **"Holding shares after purchase is an investment decision
+and isn't modeled."** One pull request and one review stop.
+
+- **Today:** there's no ESPP. A public company's plan typically lets you buy its shares at 15% off through payroll deductions, so a
+  plan worth about a sixth of what you put in can't be entered, except as a guess at a cash award, untimed and taxed with FICA it doesn't
+  owe.
+- **The law** (a plan under IRC 423, which is what offer letters mean by an ESPP; a plan outside 423 is out of scope, and the help says
+  so):
+  - **The price:** at least 85% of the share's fair market value (FMV) at the offering's start or at the purchase, whichever is lower if
+    the plan says so: the "lookback" (§423(b)(6)). So the discount is at most 15%.
+  - **The offering:** at most 27 months, or 5 years where the price is set only from the purchase-day value (§423(b)(7)).
+  - **The $25,000 limit** (§423(b)(8); Treas. Reg. §1.423-2(i)): shares bought in a calendar year, valued at the FMV on their offering's
+    first day (the grant date, §1.423-2(h)(3), when the plan fixes the most shares you can buy), at most $25,000; an offering outstanding
+    in more than one calendar year accrues $25,000 for each, and nothing carries from one offering to another. With a 15% discount and a
+    flat price, at most $21,250 of contributions a year buy shares (25,000 × 0.85).
+  - **Employment:** you must be an employee from the offering's start until three months before the purchase (§423(a)(2)); plans
+    usually refund what you've put in when you leave before a purchase.
+  - **A sale at purchase is disqualifying:** a qualifying disposition needs the shares held more than 2 years from the offering's start
+    and more than 1 year from the purchase (§423(a)(1)); a same-day sale is neither (§421(b)).
+- **Inputs,** per offer, an ESPP section in detailed mode (not entered, none, or entered, as the 401(k) is):
+  - "Contribution": a percentage, with no default (it's your choice, and the part counts once you enter it), of eligible pay: salary
+    (`D`) or salary and bonus, as the 401(k)'s choice. Contributions are after tax: they don't lower taxable wages.
+  - "Discount" (0-15%) and "Lookback" (yes or no); "Offering" (months, at most 27) and "Purchases" (every so many months within it;
+    one, at its end, by default); "Offerings start on", a date that recurs each offering, from the plan's documents, required (it sets when
+    you can first join: the first offering starting on or after your start date, or a later "Eligible from" date for a plan with a wait).
+    The proposed defaults, 15%, a lookback, six-month offerings and one purchase at each end, are each a `D` only once stop 4i cites a
+    published survey of plans for it; a term with no source stays blank and required.
+  - The share price's path is the equity section's share-price growth, by scenario (`D` 0%, flat: no one knows a price's path),
+    shared by the ESPP and shown beside it when the offer has no RSUs. Only ratios of prices matter (the lookback and the $25,000
+    limit), so there's no share price to enter.
+  - Under the inputs, the note: "Holding shares after purchase is an investment decision and isn't modeled."
+- **How it counts:**
+  - Each eligible paycheck in an offering puts its percentage aside, after tax and without interest. At each purchase the price is
+    (1 − discount) × the FMV at the purchase, or with a lookback × the lower of the FMV at the offering's start and at the purchase;
+    shares = contributions ÷ price (fractional shares, as many plans buy them; a plan that carries the remainder to the next offering
+    differs by cents, said). Contributions over the $25,000 limit come back in cash at the purchase, with a warning (`esppCap`, as
+    `k401Cap`).
+  - **Sold at purchase,** the gain is the shares' value less the contributions, cash on the purchase date. At a 15% discount that's at
+    least 17.6% of the contributions (1 ÷ 0.85 − 1) whatever the price does, since the price is at most 85% of the purchase-day value; a
+    lookback adds more when the price rose over the offering.
+  - **Example** (stop 4i checks it in the engine): $120,000 of salary, 10% into six-month offerings (January to June, July to December)
+    with a purchase at each end, 15% off with a lookback, so $6,000 an offering:
+    - a flat price: $6,000 ÷ 0.85 = $7,058.82 of shares, a gain of $1,058.82 an offering; valued at the offering's first-day price, also
+      $7,058.82, under the $25,000 limit with the year's other offering ($14,117.64);
+    - the price rising 10% a year (the bull case): half a year on, the purchase-day value is 1.1^0.5 = 1.048809 of the first day's
+      (the engine counts days), so $6,000 × 1.048809 ÷ 0.85 = $7,403.36 of shares, a gain of $1,403.36;
+    - the price falling 20% a year (the bear case): the lookback buys at the lower, purchase-day price, so the gain is the floor's,
+      $1,058.82;
+    - the limit, at $250,000 of salary (10%, $12,500 an offering, a flat price): the first purchase is $14,705.88 of shares at their
+      offering's first-day price; the second has $25,000 − $14,705.88 = $10,294.12 of room, which $8,750.00 of contributions buy
+      ($10,294.12 × 0.85), and $3,750.00 comes back in cash ($12,500 − $8,750).
+- **The tax of a sale at purchase,** a disqualifying disposition (IRS Pub. 525 (2025), "Employee Stock Purchase Plan"; stop 4i re-reads
+  the 2026 edition):
+
+  | | Sold at purchase |
+  |---|---|
+  | When | The purchase date, in that calendar year |
+  | Ordinary income | The spread at purchase: (FMV − the price paid) × shares, not limited to the gain (Pub. 525, "Holding period requirement not satisfied") |
+  | Capital gain or loss | None: a same-day sale at the FMV, whose basis is the price paid plus the ordinary income (selling costs aren't modeled, said) |
+  | FICA | None: not FICA wages (IRC 3121(a)(22)) |
+  | Withholding | None required (IRC 421(b), its last sentence), so A-6's cash-timing warning names it |
+  | Reported | Form W-2 box 1, as wages (stop 4i confirms it in Pub. 15-B's "Employee Stock Options"); Form 3922 for the purchase |
+  | States | Most follow the federal treatment. Pennsylvania taxes the spread as compensation when an option is exercised and has no provision for an ESPP's (its personal income tax guide, "Gross Compensation"), which for a sale at purchase comes to the same year and amount. Stop 4i checks each state's instructions, each state's payroll taxes on it (California's SDI, New Jersey's, New York's paid family leave and the others in `states2026.ts`) and the local taxes (Philadelphia's, NYC's); until a state is checked it follows the federal treatment and FICA's rule, and M-10 names it |
+- **Leaving and your stay:**
+  - **Leaving** (A-4, L-4): what you've put toward a purchase not yet made comes back on your last day, in cash, with no gain and no tax
+    (plans usually refund; one that lets you buy within the three months §423(a)(2) allows isn't modeled, and the help says check). Each
+    purchase date is a cliff: leave the day before and that offering's money comes back without its discount ("worth $x after tax to
+    stay through Jun 30").
+  - **Your stay's end** (not a leave date): an offering running past it counts its contributions inside your stay at face value (they're
+    yours, bought or refunded after it); its purchase, after your stay, isn't counted (the stay rule).
+- **Where it shows:**
+
+  | Where | What |
+  |---|---|
+  | A-1 | The gain is spending money, in "to spend"; year 1 as paid likewise |
+  | A-2 | The gain is pay (W-2 wages), inside the $100, its tax in tax; money set aside for a purchase after the year's end is a share of its own ("in the ESPP"), so the $100 still adds up. The bridge: "plus the ESPP's gain" in pay, "less ESPP money not yet used" |
+  | A-3 | "ESPP" as a component of gross pay by year (the gain); "when it arrives": each purchase, dated, with its offering, its price, its spread, and the limit where it bites |
+  | A-4 | The terms (discount, lookback, offering dates, the refund on leaving, the note on holding); each purchase among the cliffs; "if you left on": the refund; the bad case (a bear price path: the lookback's extra gone) |
+  | A-5 | What the ESPP adds: contributions and the gain, a year and over your stay |
+  | A-6 | Tax by year with it (income tax, no FICA); warnings: no withholding on the gain (cash timing), the $25,000 limit, and not modeled: holding shares after purchase, resets, overlapping offerings, fees, a plan outside 423 |
+  | A-7 | Every purchase in the payments table with its arithmetic (contributions ÷ price = shares; × FMV = value; − contributions = the spread; its tax) |
+  | The comparison | L and L-1 through the totals; L-2's scenarios (the price paths); L-4's refunds and cliffs; the comparability warning when one offer has an ESPP entered and another has it not entered (as the 401(k)) |
+  | The copied document | The offer as entered (the plan's terms, the note on holding), A-2's, A-3's, A-5's and A-6's lines, leaving early |
+- **Engine:**
+  - **The offer model:** `espp?: { contributionPct; eligiblePay?: "salary" | "salaryAndBonus"; discount; lookback; offeringMonths;
+    purchasesPerOffering?; offeringsStart: MonthDay; eligibleFrom?: ISODate }`, a stream in `src/offer/espp.ts` (contributions by
+    paycheck, purchases, the limit, refunds), events with details for Show the work, validated (`validateOffer`), in
+    `docs/offer-model.md`.
+  - **The tax engine:** `TaxInput.statutoryOptionIncome`, wages for income tax (federal, state, local) but not FICA, each state's payroll
+    taxes per its data; no withholding on it (`withholding.ts`). No capital gains. In 4i's one pull request, in commits of its own under
+    the tax-engine rules: tests pass and the grid and the 2026 oracle report stay byte-identical after each (no wage input moves). 4e's ISO
+    sold the same day, when it's built, reuses it.
+- **Hand-checked tests,** at the edges: the example's purchases (flat, rising, falling); the limit biting in the second purchase of a
+  year, and an offering across two calendar years (two years' accrual); joining the day before and the day of an offering's start;
+  leaving the day before and the day of a purchase (a refund, or the purchase); the spread's income tax with no FICA, above and below
+  the Social Security wage base; Pennsylvania. The property tests generate ESPPs (terms, price paths), and every figure foots as
+  displayed.
+- **Bundle:** detailed mode (the ESPP section, an estimated 1-1.5 kB gzip in its chunk); the worker an estimated 1-2 kB gzip (the
+  stream, the income type), from 68.6 kB toward its 75 kB budget, reported at the stop; nothing on the main thread.
+- **Risks:** plans vary (resets, overlapping 24-month offerings, a cap on shares an offering, fees), each out of scope and said; a sale at
+  purchase is what the figures assume, so someone who holds sees the discount, not what holding then does; state treatment needs
+  checking state by state.
+- **Stop** (D21, moot at the user's review): one pull request, one review stop: the tax engine's change, the offer model, the inputs,
+  every part above, the document, M-3's new part and M-10.
+
+### 4j. Other benefits (approved 2026-10-19)
+
+**At the user's review of pull request #69 (D22):** tax-free benefits count at face value on a line of their own in A-1 and through the
+breakdown ("+ $x … in tax-free benefits"), not inside "saved", which stays for actual savings (planned savings, your 401(k) and HSA, and
+the employer's 401(k) and HSA money). Taxable benefits are pay.
+
+- **Today:** perks are two inputs, education assistance (IRC 127) and transit or parking (IRC 132(f)), each capped at its limit; with the
+  401(k), the HSA and the health plan, that's every benefit. A wellness stipend, a phone allowance, employer-paid life or disability
+  insurance, dependent care money can't be entered, except as salary (which raises bonuses and the 401(k) with it) or as a cash award.
+- **Scope:** per offer, in detailed mode beside the perks, a list, "+ Add a benefit" (up to eight; "None" marks the list entered with
+  nothing): each a name (required, up to 40 characters), a yearly amount, and "Taxable" or "Tax-free" (D23). Each accrues monthly while
+  you're employed (1/12 a month, a partial month by its days, as the perks do), flat in dollars, and stops on your last day.
+- **Taxable:** wages, paid with salary: income tax (federal, state, local) and FICA. The withholding estimate treats them as part of
+  each paycheck, one of the methods IRS Pub. 15 §7 allows for supplemental wages paid with regular wages. Inside A-2's $100, as pay. Not
+  401(k)-eligible pay, and not a bonus's basis.
+- **Tax-free:** not wages. Counted at face value (D22), in total rewards, outside A-2's $100 ("your employer adds"), and on their own
+  line in A-1: to spend + saved + tax-free benefits = the after-rent total, each a month over your stay (B13: "+ $x a month in tax-free
+  benefits over your stay"; year 1's "+ $x in tax-free benefits in year 1"), and the pre-tax equivalent shown as the perks' is. Not
+  priced through the non-housing factor (face value, as the perks are). **Today's perks** (education, transit and parking) are tax-free
+  benefits too, and by the same rule would leave "saved" for this line: that moves A-1's split, not its total, for an offer with perks
+  (the samples' education assistance among them), so stop 4j asks before moving them.
+- **The tool takes your word on "tax-free":** it can't check an exclusion. Any fringe benefit is wages unless the law excludes it, at its
+  fair market value (IRS Pub. 15-B (2026), "Fringe Benefits"). The help's table gives the common ones, from Pub. 15-B's Table 2-1 for
+  2026:
+
+  | Benefit | Usually |
+  |---|---|
+  | Cash stipends paid with pay (wellness, phone, internet, home office, meals) | Taxable: a flat allowance isn't an accountable plan (Treas. Reg. §1.62-2) |
+  | Reimbursements of business costs, with receipts | Tax-free, and not a benefit to you: they repay a cost, so don't enter them |
+  | Gym memberships, wellness rewards in cash | Taxable; an athletic facility on the employer's premises is tax-free (IRC 132(j)(4)) |
+  | Employer-paid group-term life insurance | Tax-free for coverage up to $50,000 (IRC 79); the cost of more is wages, which the tool doesn't work out |
+  | Employer-paid disability, dental, vision, accident insurance | Tax-free (IRC 106). Not the employer's share of your health plan: the tool counts health plans by your cost (M-5.2), so entering it would count one side's main cost |
+  | Dependent care assistance | Tax-free up to $7,500 a year from 2026 ($3,750 married filing separately), raised from $5,000 by Pub. L. 119-21, not indexed (IRC 129) |
+  | Adoption assistance | Free of income tax up to $17,670 in 2026, phasing out from $265,080 of modified AGI (Rev. Proc. 2025-32 §4.18), but not of FICA (Pub. 15-B, Table 2-1): neither choice fits (D23) |
+  | Achievement awards | Tax-free up to $1,600 a year for qualified plan awards, $400 otherwise (IRC 74(c), 274(j)) |
+  | Meals on the premises for the employer's convenience; occasional small gifts (never cash or gift cards) | Tax-free (IRC 119; 132(e)) |
+  | Education assistance, transit and parking | Their own fields, which apply the limits |
+
+  The help also says what to enter: what the benefit saves you, for something you'd buy anyway; less, or nothing, for something you
+  wouldn't. The tool counts what you enter at face value.
+- **Where it shows:**
+
+  | Where | What |
+  |---|---|
+  | A-1 | Taxable benefits are pay, so in "to spend" after tax; tax-free ones on their own line, "+ $x a month in tax-free benefits over your stay", between saved and the total; year 1 likewise |
+  | A-2 | Taxable inside the $100 (the bridge: "plus taxable benefits" in pay); tax-free outside it, "your employer adds", by name |
+  | A-3 | Taxable benefits as a component of gross pay by year, monthly with salary in "when it arrives" |
+  | A-4 | They stop on your last day, said once in the terms; "if you left on" counts them to that day |
+  | A-5 | Each benefit by name, taxable or tax-free, a year and over your stay, a taxable one's after-tax value beside it |
+  | A-6 | Tax by year includes the taxable ones (FICA too); each tax-free one is named "tax-free, as entered" |
+  | A-7 | The employment-years table's columns; the taxable ones' monthly payments with their tax |
+  | The comparison | L and L-1 through the totals; no range, so L-2's scenarios carry them unchanged; the comparability warning when the list is entered for some offers and not others |
+  | The copied document | The offer as entered (each benefit's name, amount and treatment); A-2's, A-3's and A-5's lines |
+- **Engine:** `otherBenefits?: Array<{ label: string; annual: number; taxable: boolean }>` beside `perks`. Taxable ones are a pay stream
+  (component `benefit`, accrued like salary, regular wages for withholding); tax-free ones are benefit flows (kind `otherBenefit`, with
+  their own face-value total beside the window's `faceValue`, so A-1 can show them apart, and a pre-tax equivalent as the perks have). No
+  tax-engine change: the grid and the oracle report stay
+  byte-identical. In `docs/offer-model.md`; JSON exports carry them.
+- **Validation:** hand-checked: a start and a last day mid-month; a taxable stipend's FICA and its share of the $100; a taxable benefit
+  that crosses the Social Security wage base; a tax-free one on A-1's own line, with to spend + saved + tax-free = the total as displayed; comparability (entered for A, none for B, not entered for
+  C). The property tests generate lists of benefits (empty, taxable, tax-free, both), and every figure foots as displayed.
+- **Methodology:** M-5.3 (perks and other benefits: the two treatments, the help's table), M-10 (tax-free as entered).
+- **Bundle:** detailed mode; a few lines in the worker.
+- **Risk:** small. A benefit marked tax-free that the law doesn't exclude flatters the offer: the help's table, and A-6 names each
+  tax-free benefit as entered.
+- **Stop:** one, after 4i.
+
 **Review stops:** one per part, except 4d and 4e (two each: the engine with its hand-checked tests, then the UI); 4f starts with a spike
 (a short written finding, no code merged) and you decide from it.
 
@@ -1184,20 +1441,27 @@ used it, how many offers did you actually have?", before anything else.
   before building).
 
 **Item 4, Accuracy** (one question each, to size them)
-1. How many days off do you expect at each offer, holidays included? Is any "unlimited"?
+1. How many days off do you expect at each offer, holidays included, and how many sick days would you take? Is any "unlimited"? Does
+   any offer say what happens to unused vacation when you leave?
 2. How would you get to work, how long would it take, and what would it cost?
 3. Do any offers pay for the move, and what will moving cost you?
 4. Would you live in one state and work for an employer in another, in the office or remotely? Which states? Would you live outside
    a city that taxes commuters (Philadelphia) and work in it?
 5. Does any offer include stock options or private-company RSUs? Do you know the strike price and the number of shares?
 6. Do you have federal student loans? Is any offer from a government employer or a nonprofit?
-- **Would change it:** the answers set item 4's order (D10); a part no tester needs waits.
+7. Does any offer include an employee stock purchase plan? Do you know its discount, whether it has a lookback, and when its offerings
+   start? Would you sell the shares as soon as you bought them, or hold them?
+8. Which other benefits does each offer list (stipends, wellness money, insurance, dependent care)? Do you know which are taxed?
+- **Would change it:** the answers set item 4's order (D10); a part no tester needs waits. 4a, 4i and 4j are built first at the user's
+  word (2026-10-19), so for them the answers check the design rather than set the order: testers who'd hold their ESPP shares (then 4i's
+  note on holding says more), or benefits the help's table lacks (then it gains rows).
 
 ## Decisions for you
 
 Recorded 2026-10-13: **D1 and D14 approved.** D2-D13 and D15 stand as recommended unless the user comments on pull request #29;
 a comment there that disagrees replaces the row. Item 5's decisions, B1-B13, are in its section: approved 2026-10-15, with conditions
-on B4, B5 and B8, and B13 added at review.
+on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4a's extension, 4i and 4j, decided at the user's review
+of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 changed (their rows say how); D21 moot.
 
 | # | Decision | Recommended | The alternative |
 |---|---|---|---|
@@ -1210,16 +1474,25 @@ on B4, B5 and B8, and B13 added at review.
 | D7 | What L-7's range compares | Base salary against May 2025 wages as published | Wages aged to the offer's start by the ECI |
 | D8 | Where OEWS data lives | One file per occupation under `app/public/oews/<vintage>/`, committed | One compact file, split at build |
 | D9 | Item 3 without item 2 | Only if testers want negotiation help before market data | Always after 2B |
-| D10 | Item 4's order | 4a, 4b, 4c, 4d, 4e, then 4f's spike, reset by testers' answers | By tester demand alone |
+| D10 | Item 4's order | 4a, 4b, 4c, 4d, 4e, then 4f's spike, reset by testers' answers (approved 2026-10-19, at the user's word: 4a, 4i, 4j first, ahead of item 2) | By tester demand alone |
 | D11 | Options vested at your stay's end | Shown beside the verdict, per scenario; not counted | Counted at the exit's value (an exception to the stay rule) |
 | D12 | Cross-state pairs (4d) | The multi-state metros' pairs first, each with sources and tests | Every state at once |
 | D13 | Public Service Loan Forgiveness | A spike first; forgiveness beside the verdict, never in it | Drop it from v2 |
 | D14 | Days off (4a) | **Approved:** vacation and holidays apart, at BLS's 11 and 8, each a sourced default with its `D` tickmark, editable (per-hour figures move about 4%, once) | One "days off" input at 10, today's 50 weeks: nothing moves |
 | D15 | Commute time in per hour (4b) | Counted once every offer has a commute, labeled | Never; per hour stays hours worked |
+| D16 | Sick days' default (4a) | 0 (`D`, "how many you take is personal"), so D14's 48.2 weeks stand | BLS's 7 days a year (days given, not taken): 46.8 weeks, per hour about 3% more again |
+| D17 | Unlimited vacation (4a) | The days you expect to take, defaulting to BLS's 11 (`D`), as for a fixed policy; nothing accrues | No default: the days must be entered |
+| D18 | Paying out unused vacation (4a) | As the state where you'd work requires (the ten states above), with "yes" or "no" for the offer's own policy | Asked, with no default |
+| D19 | The balance paid out (4a) | Worked out: the days given less the days taken, accruing evenly, up to a cap; nothing banks at the defaults | A balance you enter, the same whenever you leave |
+| D20 | Holding ESPP shares (4i) | **Decided (the user's review, 2026-10-19): every lot sold at purchase; no "hold" choice, no capital gains in the tax engine; the note "Holding shares after purchase is an investment decision and isn't modeled."** (Recommended was holding counted, with capital gains in the engine) | — |
+| D21 | 4i's stops | **Moot (the user's review):** with no capital gains, 4i is one pull request and one review stop, the tax engine's change in its own commits | — |
+| D22 | Where tax-free benefits count (4j) | **Decided (the user's review): at face value on their own line in A-1 and the breakdown ("+ $x … in tax-free benefits"), not in "saved", which stays for actual savings; taxable benefits are pay.** Whether today's perks move to that line is asked at stop 4j (Recommended was with the perks, in "saved, at face value") | — |
+| D23 | Other benefits' tax choices (4j) | Two, taxable or tax-free, as asked, with the help's table | Three, adding "free of income tax, not of FICA" (adoption assistance); or named kinds with the law's limits applied |
 
 ## Order and stops
 
-In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f).
+In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f), with 4a, 4i and 4j moved ahead of item 2 as
+approved on 2026-10-19, at the user's word.
 
 | Stop | What | Needs first |
 |---|---|---|
@@ -1227,9 +1500,12 @@ In the order approved with item 5 (before it: 0, 1A, 1B, 2A, 2B, 3A, then 4a-4f)
 | 5A | Offer breakdown: one offer works, A-1, the comparison as a layer, §1's new wording, the label rules. **Done** (pull request #62) | B1-B13 (approved), testers (item 5), the audit's items listed in item 5 |
 | 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
+| 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving (approved 2026-10-19: next, at the user's word) | D14, D16-D19 (approved), the secondary state sources re-read |
+| 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop | 4a, D20 |
+| 4j | Other benefits: named, taxable or tax-free, in every part and the document | 4i, D22, D23 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
-| 4a-4c | Accuracy, the small parts: days off, commuting, relocation, a stop each | testers (item 4), D10, D14, D15 |
+| 4b-4c | Accuracy, the small parts: commuting, relocation, a stop each | testers (item 4), D10, D15 |
 | 3A | Negotiation help, A-9 (with the levers' values): the summary, the draft email, the wording test | 2B (or 5B alone, D9), testers (item 3) |
 | 1A | Beyond the money: engine, lead block, ledger rows, M-14, session and export | testers (item 1), D3, D5, 5A |
 | 1B | Beyond the money: the copied document, print, the scan; L-3's switch if chosen | 1A, D4 |
@@ -1240,7 +1516,8 @@ CLAUDE.md (Now, the docs index); `docs/offer-model.md` for each engine change; `
 control, before launch. The data refresh calendar (`docs/data-refresh.md`) gains each dataset as its item is built: OEWS (yearly,
 spring), BLS's paid-leave figures (yearly, September, if D14's defaults use them), the IRS mileage rates (each December, and mid-year
 when the IRS changes them, as in 2026), each convenience rule and cross-state pair's sources (each January), and, if 4f is built, the
-repayment plans' rules.
+repayment plans' rules; with 4a, 4i and 4j: the ten vacation-payout states' rules (each January), each state's treatment of ESPP
+income (each January), and Pub. 15-B's limits for the help's table (each January).
 
 ## Backlog beyond v2
 
