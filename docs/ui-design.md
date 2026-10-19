@@ -1807,7 +1807,9 @@ the most you can bank, and when unused vacation is paid as you leave (where the 
 - **Found on the way** (the property tests' new inputs moved their random cases): L-1's year derivation took its lines from A-2's
   bridge (the offer's own projection) and its total from the comparison's projection, which for a later-starting offer cuts pay into
   other pieces, so a figure on a half dollar could round a dollar apart and the work didn't foot. It now takes every line from the
-  comparison's projection and opens A-2's figures only where they read the same (`yearWork`, `derive.ts`).
+  comparison's projection and opens A-2's figures only where they read the same (`yearWork`, `derive.ts`); its per-hour branch
+  likewise, which the fuzz found next (FUZZ_SEED=1822257924: 50,151 against A-2's 50,152). Neither came from 4a: each fails on `main`'s
+  code with its counterexample.
 
 **Stop 4a versus the plan:** the engine's fields are one `timeOff` (the plan named `hours.vacationDays` and the rest); the payout choice
 has two options, not three ("no" could only mean the default where the state's law pays it anyway); the payout is a cash payment with
