@@ -1504,15 +1504,18 @@ function yearWork(ctx: WorkContext, letter: L, n: number): Work {
     const of = r.sweep.perHourOf;
     const total = of === "colAdjustedTotal" ? y.col?.total : y.totalRewards;
     if (total === undefined || !y.hours) throw new Error("Needs hours and a city for this offer.");
+    // As the dollar bases' lines: it opens A-2's total, and ties to A-7's per hour, only where they read the same (FUZZ_SEED=1822257924:
+    // a later start's year 1 read 50,151 here and 50,152 in A-2).
+    const same = own.rows.some((x) => x.line === BASIS_TOTAL_LINE[of] && Math.round(x.value) === Math.round(total));
     return {
       title: `${letter} · year ${n} · ${phrase(ctx, "perHour")}`, scope,
       lines: [
-        { label: `Year ${n} ${phrase(ctx, of)}`, value: figure(total), ref: br(BASIS_TOTAL_LINE[of]) },
+        { label: `Year ${n} ${phrase(ctx, of)}`, value: figure(total), ...(same ? { ref: br(BASIS_TOTAL_LINE[of]) } : {}) },
         { op: "÷", label: "Hours worked in the year", value: figure(y.hours), ref: `l6y.${letter}.hours.${n}` },
         { op: "=", label: "Per hour worked", value: cents(total / y.hours), rule: "double" },
       ],
       notes: ["Each year is in that year's dollars; the verdict's figures are for the whole stay."],
-      ties: [`l6y.${letter}.${of === "colAdjustedTotal" ? "totalHour" : "totalRewardsHour"}.${n}`], ...fromInputs(ctx, letter, HOURS_INPUTS),
+      ties: same ? [`l6y.${letter}.${of === "colAdjustedTotal" ? "totalHour" : "totalRewardsHour"}.${n}`] : [], ...fromInputs(ctx, letter, HOURS_INPUTS),
     };
   }
   const value = yearValue(y, basis, r.sweep.perHourOf)!;
