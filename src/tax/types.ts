@@ -24,6 +24,12 @@ export interface TaxInput {
   section125?: number;
   /** Pre-tax transit/parking under IRC 132(f). */
   commuterPretax?: number;
+  /**
+   * Ordinary income from a statutory option or an employee stock purchase plan's shares (IRC 421(b), 423): an ESPP lot sold the
+   * day it's bought. It's part of `wages` (W-2 box 1, so income tax) but not FICA wages (IRC 3121(a)(22)), nor the state payroll
+   * or local wage bases that follow them, except where a state's payroll component says it reaches it.
+   */
+  statutoryOptionIncome?: number;
   /** Real estate taxes paid (counts toward the SALT cap if itemizing). */
   propertyTax?: number;
   /** Mortgage interest, charitable gifts, etc. Used only if itemizing beats the standard deduction. */

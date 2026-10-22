@@ -20,6 +20,16 @@ describe("federal", () => {
     expect(k.federalAGI).toBe(90_000);
     expect(k.socialSecurity).toBe(base.socialSecurity);
   });
+  it("taxes statutory option income (an ESPP lot's spread) as wages for income tax, not FICA (IRC 3121(a)(22))", () => {
+    // $100,000 of wages, $1,058.82 of it an ESPP purchase's spread: income tax on all of it ($13,170, the published example);
+    // Social Security and Medicare on $98,941.18: 6.2% = 6,134.35 and 1.45% = 1,434.65, 7.65% x 1,058.82 = 81.00 less.
+    const base = single(100_000, "TX");
+    const espp = single(100_000, "TX", { statutoryOptionIncome: 1_058.82 });
+    expect(espp.federalAGI).toBe(100_000);
+    expect(espp.federalIncomeTax).toBe(13_170);
+    expect([espp.socialSecurity, espp.medicare]).toEqual([6_134.35, 1_434.65]);
+    expect(base.totalTax - espp.totalTax).toBeCloseTo(81, 2);
+  });
 });
 
 describe("state", () => {
