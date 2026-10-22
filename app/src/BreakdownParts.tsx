@@ -444,7 +444,7 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
           toward an ESPP purchase,{" "}</>
       )}
       {panel.clawbackOwed >= 0.5
-        ? <>repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</> : "repay nothing,"}{" "}
+        ? <span className="one-line">repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</span> : "repay nothing,"}{" "}
       {lost.length ? <>and leave {lost.map((l, k) => <span key={k}>{k ? " and " : ""}{l}</span>)} behind</> : "and leave nothing behind"}
       {bonuses.map((f) => {
         const t = forfeitText(f);
