@@ -1816,6 +1816,40 @@ has two options, not three ("no" could only mean the default where the state's l
 its own detail, not a pay component, since it comes only with a leave date; the days-off defaults register with detailed mode and the
 derivations (`detailedDefaults.ts`), as detailed mode's help does, to keep the main thread within 0.5 kB.
 
+**v2's item 4, stop 4i: an employee stock purchase plan** (2026-10-22; `docs/v2-plan.md`, 4i, approved at the user's review of pull
+request #69 with D20: every lot sold the day it's bought): detailed mode's Equity section asks, under the RSUs and the share-price
+growth, whether the offer has an ESPP (not entered, none, or entered), then its terms: the contribution (a percent of salary, or salary
+and bonus), the discount (15% by default), the lookback (yes), the offering's length (6 months), the purchases in each (one) and the
+day offerings start, and when you can join (your start date). The plan's cell says, in the user's words, "Holding shares after purchase
+is an investment decision and isn't modeled."
+- **A-1**: its gain is in the totals; year 1 adds what's held in the plan at its end ("+ $30 a month held in the ESPP"); over the stay,
+  "saved" leaves the plan's money out and "to spend" has it (it comes back).
+- **A-2**: the money in the plan at the year's end is a share of its own, "in the ESPP", beside saved; the bridge has the gain as a
+  line of pay ("plus ESPP shares bought at a discount, sold at once", with the purchase dates), and its month the money held.
+- **A-3**: "ESPP gain" in the pay table and its columns (horizontal hatching); each purchase by date, with its offering.
+- **A-4**: the first purchase among the terms, each purchase among the cliffs, and "if you left on" gives back what's been put toward a
+  purchase not yet made.
+- **A-5**: what goes into the plan over the stay and its purchases' gain, in no total, and the holding note.
+- **A-6**: the $25,000 limit's warning where it bites (changes the numbers), the holding note (not modeled), and the withholding line
+  says the gain isn't withheld. **A-7**: "ESPP gain" and "Held in the ESPP" lines, each purchase with its formula (put in × value ÷
+  price − put in), and the tax table's "Of which, ESPP gain" (income tax, not Social Security or Medicare).
+- **The comparison** takes it through every total; L-4's panel gives the money back; the comparability note names an ESPP entered for
+  some offers but not others, as the 401(k). **The copied document**: the offer as entered, A-2's share, A-3's purchases, A-4's
+  terms, A-5's note, A-6's lines and leaving early, and in the comparison's leaving table a row for the money given back.
+- **The methodology**: M-3 (how it counts), M-10 (what it leaves out, the payroll taxes included) and M-11 (the code sections, IRS
+  publications and the surveys).
+- **Old saves and exports** have no ESPP: they load as not entered.
+- **Measured** (2026-10-22, side by side with `main`): the main thread 111.89 to 112.34 kB gzip (+0.45, within v2's 0.5
+  kB), the worker 69.92 to 71.34 kB (budget 75), the stylesheet 11.45 to 11.48 kB; LCP 1.95 s (1.96 on `main`), CLS 0 (the fonts on
+  time and late), TBT 45 ms (48), the first answer 0.49 s (0.49); `npm run bench` within noise; the tax grid identical and the 2026
+  oracle report byte-identical after the tax engine's commit; the scan without violations, the Equity section with an ESPP included.
+
+**Stop 4i versus the plan:** the inputs are in the Equity section rather than a section of their own (they share its price growth);
+money held at a year's end is the bridge month's third part, not a bridge line ("less ESPP money not yet used"), since the bridge runs
+to after rent, where it counts at face value; A-3's dates carry the offering and gain, the price and limit being A-7's and A-6's; the
+ESPP terms' names register with detailed mode and the derivations (`detailedDefaults.ts`), as the days off did, to keep the main thread
+within 0.5 kB.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

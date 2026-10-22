@@ -8,7 +8,8 @@ testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16
 (2026-10-16, from the owner's own use). **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22:** 4a
 extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
-ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70). What to build after v1
+ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22) and 4i (stop 4i, #71).
+What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
 1. **Item 5, the offer breakdown:** every offer's own standalone breakdown is the primary view, and the comparison is a layer that
@@ -1248,6 +1249,27 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 capital gains in the tax engine. The help and M-3 say so in the user's words: **"Holding shares after purchase is an investment decision
 and isn't modeled."** One pull request and one review stop.
 
+**Built: stop 4i** (2026-10-22, pull request #71), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
+- **The inputs** are in detailed mode's Equity section, under the RSUs and the share-price growth they share, not a section of their
+  own: the plan (not entered, none, or entered, as the 401(k)), then its terms. The contribution has no default (blank is "Not
+  counted") and the offerings' first day none (a problem at the field until it's entered). 15% off, a lookback, 6-month offerings and
+  one purchase an offering are `D`s with their sources: NASPP and Deloitte Tax's 2023 survey (85%, 83% and 57% of 209 plans) and
+  Fidelity Stock Plan Services' 2025 data (most plans' purchase period is the offering).
+- **The bridge** has the gain as a line of pay ("plus ESPP shares bought at a discount, sold at once"). Money held at a year's end
+  isn't a bridge line: the bridge runs to after rent, where it counts at face value, so its month says it ("+ $30 a month held in the
+  ESPP"), as A-1's year 1 does. Over the stay, A-1's "to spend" holds the ESPP's money (it comes back to you) and "saved" leaves it out,
+  as D22 has saved; the engine reports it apart (`esppHeld`, part of `faceValue`).
+- **A-3's dates** give each purchase's offering and gain; the price, the spread's arithmetic and the limit are in A-7's payment line
+  and A-6's warning.
+- **A-4's "if you left on"** gives back what's been put toward a purchase not yet made ("get back $355 put toward an ESPP purchase"),
+  as L-4's panel and the documents do; the bad case is the equity's bear price path, as for RSUs.
+- **The states' payroll taxes and the local wage taxes,** read for this stop: the gain is left out of every state payroll tax and
+  Philadelphia's wage tax, as it is out of FICA. California's SDI and Delaware's paid leave leave it out too (EDD DE 231SK; 19 Del. C.
+  3701(24)); Oregon's transit tax (on income-tax wages) reaches it, and Washington's PFML and WA Cares, Rhode Island's TDI and
+  Minnesota's paid leave likely do: up to about $14 a $1,000 of gain, a known gap (CLAUDE.md section 10). New York City's tax and
+  Pennsylvania's income tax include it, as the engine does; Philadelphia's code exempts options' income (Bill 000354), which reads as
+  covering it.
+
 - **Today:** there's no ESPP. A public company's plan typically lets you buy its shares at 15% off through payroll deductions, so a
   plan worth about a sixth of what you put in can't be entered, except as a guess at a cash award, untimed and taxed with FICA it doesn't
   owe.
@@ -1515,7 +1537,7 @@ approved on 2026-10-19, at the user's word.
 | 5B | Offer breakdown: A-2 to A-7, L-5 and L-6 folded in, the bridge moved. **Done** (pull request #65) | 5A |
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
 | 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
-| 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop | 4a, D20 |
+| 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop. **Done** (pull request #71, 2026-10-22) | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document | 4i, D22, D23 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |

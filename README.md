@@ -21,7 +21,7 @@ breakdown fills in, over its own stay and at its own city's prices:
   money saved, in today's dollars; year 1 as paid; its tax rate; per hour worked; and the bad case.
 - **A-2, where the money goes:** each $100 of a year's pay as tax, rent, health costs, savings and spending, and the bridge
   from the offer letter to what you'd have.
-- **A-3, pay by year,** and when each bonus, cash award and RSU vest arrives.
+- **A-3, pay by year,** and when each bonus, cash award, RSU vest and ESPP purchase arrives.
 - **A-4, the terms that can bite:** bonus rules, clawbacks and vesting cliffs, what staying until the next cliff is worth, and
   what you'd keep if you left on a given day.
 - **A-5, what the benefits are worth:** the employer 401(k), HSA money and perks, against health costs.
@@ -44,7 +44,8 @@ same dollars, priced as in an average U.S. city or in a city you pick; each offe
 
 Every figure carries an audit tickmark: click it to see its derivation with your values, the figures it uses, and its section of
 the [methodology](https://offer-calc.vercel.app/#/method). Detailed mode covers raises, promotions, bonus timing, RSU vesting and
-refreshers, the 401(k), health, perks, cash awards with clawbacks, and hours. Copy as document puts an offer's breakdown (a summary
+refreshers, an employee stock purchase plan (each lot sold the day it's bought), the 401(k), health, perks, cash awards with
+clawbacks, and hours and days off. Copy as document puts an offer's breakdown (a summary
 or the full detail), the comparison, or both on the clipboard, tables and all, for a document or an email; every table downloads
 as a CSV; and Print… gives a summary or the full workpaper.
 
