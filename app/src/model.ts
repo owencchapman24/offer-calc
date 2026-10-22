@@ -1,6 +1,6 @@
 import { statesOf } from "../../src/col/cities";
 import type {
-  AnnualBonus, ByScenario, CashAward, Clawback, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
+  AnnualBonus, ByScenario, CashAward, Clawback, Espp, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
 } from "../../src/offer/types";
 import type { FilingStatus } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
@@ -53,6 +53,11 @@ export interface OfferDraft {
     /** Null: none. */
     refreshers: RefresherDraft | null;
   };
+  /**
+   * An employee stock purchase plan (docs/v2-plan.md, 4i). Null: not entered (not counted). "none": the offer has none (entered, as
+   * none). Absent in drafts saved before 2026-10-22: not entered.
+   */
+  espp: EsppDraft | null | "none";
   /** Null: not entered. "none": the offer has no 401(k) (entered, as none). */
   retirement: RetirementDraft | null | "none";
   /** Null: not entered. "none": no health plan from this job, such as staying on a parent's plan (entered, as none). */
@@ -91,6 +96,26 @@ export interface TimeOffDraft {
   payout: "state" | "always" | null;
 }
 
+/** An employee stock purchase plan as entered (4i): each lot sold the day it's bought. */
+export interface EsppDraft {
+  /** A fraction of eligible pay. Null: blank, not counted (no default: it's your choice). */
+  contributionPct: number | null;
+  /** Null: salary only. */
+  eligiblePay: "salary" | "salaryAndBonus" | null;
+  /** Null: 15% (most plans: NASPP and Deloitte, 2023). */
+  discount: number | null;
+  /** Null: yes (most plans). */
+  lookback: boolean | null;
+  /** Null: 6 months (the most common). */
+  offeringMonths: number | null;
+  /** Null: one, at the offering's end. */
+  purchasesPerOffering: number | null;
+  /** From the plan's documents; no default. Null: blank, a problem at the field. */
+  offeringsStart: MonthDay | null;
+  /** Null: from your start date. */
+  eligibleFrom: string | null;
+}
+
 export const blankTimeOff = (): TimeOffDraft => ({ vacation: null, holidays: null, sick: null, policy: null, gives: null, cap: null, payout: null });
 
 /**
@@ -103,6 +128,12 @@ export function withTimeOff(d: OfferDraft): OfferDraft {
   const { weeksPerYear: w, ...hours } = d.hours as OfferDraft["hours"] & { weeksPerYear?: number | null };
   if (w === undefined && d.timeOff) return d;
   return { ...d, hours, timeOff: w == null ? d.timeOff ?? blankTimeOff() : { ...blankTimeOff(), vacation: Math.round((52 - w) * 500) / 100, holidays: 0, sick: 0 } };
+}
+
+/** A saved draft in today's shape: days off (`withTimeOff`), and no ESPP where it was saved before one could be entered (2026-10-22). */
+export function draftNow(d: OfferDraft): OfferDraft {
+  const t = withTimeOff(d);
+  return !t?.hours || t.espp !== undefined ? t : { ...t, espp: null };
 }
 
 export interface PromotionDraft {
@@ -341,8 +372,10 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   if (bonus) offer.bonus = bonus;
   const cash = dropTrailing(d.cashAwards, blankCash);
   if (cash.length) offer.cashAwards = cash.map(cashInput);
-  const equity = equityInput(d.equity);
+  const espp = hasEspp(d) ? d.espp : null;
+  const equity = equityInput(d.equity, espp !== null);
   if (equity) offer.equity = equity;
+  if (espp) offer.espp = esppInput(espp);
   if (d.retirement && d.retirement !== "none") offer.retirement = retirementInput(d.retirement);
   const health = healthInput(d.health);
   if (health) offer.health = health;
@@ -403,9 +436,10 @@ function scheduleInput(s: ScheduleDraft): VestingSchedule {
   };
 }
 
-function equityInput(e: OfferDraft["equity"]): OfferInput["equity"] {
+/** The equity as entered. With an ESPP and no RSUs, only the share price's growth (its purchases are priced by it). */
+function equityInput(e: OfferDraft["equity"], espp = false): OfferInput["equity"] {
   const grants = dropTrailing(e.grants, blankGrant);
-  if (!grants.length && !e.refreshers) return undefined;
+  if (!grants.length && !e.refreshers && !(espp && e.priceGrowth)) return undefined;
   const r = e.refreshers;
   return {
     ...(e.priceGrowth ? { priceGrowth: e.priceGrowth } : {}),
@@ -419,6 +453,19 @@ function equityInput(e: OfferDraft["equity"]): OfferInput["equity"] {
       everyMonths: r.everyMonths ?? DRAFT_DEFAULTS.refresherEveryMonths, schedule: scheduleInput(r.schedule),
     } } : {}),
   };
+}
+
+/** The offer has an ESPP entered (not "not entered", not none). */
+export const hasEspp = (d: Pick<OfferDraft, "espp">): d is { espp: EsppDraft } => d.espp !== null && d.espp !== "none";
+
+/**
+ * An ESPP as entered: a blank contribution puts nothing in, the terms with a default left blank are at it, and a blank offering date
+ * is a problem at its field (the validator's).
+ */
+function esppInput(p: EsppDraft): Espp {
+  // The defaults: 15% off with a lookback, 6-month offerings (detailedDefaults.ts has their sources); the engine's own for the rest.
+  return { discount: 0.15, lookback: true, offeringMonths: 6, ...Object.fromEntries(Object.entries(p).filter(([, v]) => v !== null)),
+    contributionPct: p.contributionPct ?? 0, offeringsStart: p.offeringsStart ?? { month: Number.NaN, day: Number.NaN } };
 }
 
 function retirementInput(r: RetirementDraft): Retirement {
@@ -465,6 +512,7 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
   const e = o.equity;
   const r = o.retirement;
   const h = o.health;
+  const p = o.espp;
   return {
     label,
     residence: { state: o.residence.state, nyc: o.residence.locality?.kind === "nyc",
@@ -494,6 +542,7 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
       refreshers: e?.refreshers ? { value: e.refreshers.value, firstAfterMonths: e.refreshers.firstAfterMonths, everyMonths: e.refreshers.everyMonths,
         schedule: scheduleDraft(e.refreshers.schedule) } : null,
     },
+    espp: p ? { eligiblePay: null, purchasesPerOffering: null, eligibleFrom: null, ...p, offeringsStart: { ...p.offeringsStart } } : null,
     retirement: r ? {
       contributionPct: r.contributionPct, type: or(r.type), eligiblePay: or(r.eligiblePay),
       match: (r.match ?? []).map((t) => ({ ...t })), nonElectivePct: or(r.nonElectivePct),
@@ -516,7 +565,7 @@ export function blankDraft(): OfferDraft {
     salary: { annual: null, raise: null, raiseOn: null, promotions: [] },
     bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
-    cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: null, health: null,
+    cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: null, health: null,
     perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
     costOfLiving: { area: null, monthlyRent: null, rentGrowth: null },
   };
@@ -655,6 +704,7 @@ export function alsoCounted(d: OfferDraft): string[] {
     || (b.payOn && (b.payOn.month !== DRAFT_DEFAULTS.bonusPayOn.month || b.payOn.day !== DRAFT_DEFAULTS.bonusPayOn.day))) out.push("bonus timing");
   if (d.cashAwards.length) out.push(d.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards");
   if (d.equity.grants.length || d.equity.refreshers) out.push("RSUs");
+  if (hasEspp(d)) out.push("ESPP");
   if (d.retirement && d.retirement !== "none") out.push("401(k)");
   if (d.health && d.health !== "none") out.push("health");
   if (d.perks.section127 || d.perks.commuterMonthly) out.push("perks");

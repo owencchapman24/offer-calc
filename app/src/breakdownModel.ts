@@ -47,8 +47,12 @@ export interface OwnView {
    * prices, or once there's a comparison to tie to. `step` is the total less this, at the offer's own prices.
    */
   ref: { pv: number; month: number; step: number; place: string } | null;
-  /** Year 1, as paid, at its own prices: to spend after rent and saved, the year and a month (÷ 12, each rounded once). */
-  year1: { start: string; end: string; spend: number; saved: number; spendMonth: number; savedMonth: number; y: ShownYear } | null;
+  /**
+   * Year 1, as paid, at its own prices: to spend after rent, saved, and held in an ESPP at its end (4i), the year and a month (÷ 12, each
+   * rounded once).
+   */
+  year1: { start: string; end: string; spend: number; saved: number; held: number; spendMonth: number; savedMonth: number; heldMonth: number;
+    y: ShownYear } | null;
   /** Why the stay's figure differs from year 1's, in words. */
   differs: string;
   /** Its tax over its stay ÷ its pay, as paid (the years as shown, less what runs past the stay). */
@@ -76,7 +80,8 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   // Own prices: a price factor of 1, so the after-rent total is total rewards − rent (M-6.3's identity).
   const totalRewards = R(w.totalRewards.presentValue);
   const total = R(w.totalRewards.presentValue - col.presentValue.rent);
-  const saved = R(col.presentValue.faceValue);
+  // Saved: money at face value but an ESPP's, which comes back to spend (4i).
+  const saved = R(col.presentValue.faceValue - (col.presentValue.esppHeld ?? 0));
   const month = { total: R(total / factor), saved: R(saved / factor), spend: 0 };
   month.spend = month.total - month.saved;
   const place = shortCity(info.area.name);
@@ -89,8 +94,8 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   const y = ys[0];
   const year1 = y?.col ? {
     start: y.start, end: y.end, y,
-    spend: y.col.local - y.oop, saved: y.col.face,
-    spendMonth: R((y.col.local - y.oop) / 12), savedMonth: R(y.col.face / 12),
+    spend: y.col.local - y.oop, saved: y.col.face - y.esppHeld, held: y.esppHeld,
+    spendMonth: R((y.col.local - y.oop) / 12), savedMonth: R((y.col.face - y.esppHeld) / 12), heldMonth: R(y.esppHeld / 12),
   } : null;
 
   const stay = shownStay(d, b.years).stay;

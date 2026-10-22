@@ -44,11 +44,11 @@ export function NumberField({ o, path, kind, label, unit, placeholder, k = helpK
 }
 
 /**
- * Whether an offer has a plan (401(k), health): not entered (not counted), entered, or none (entered,
+ * Whether an offer has a plan (401(k), health, ESPP): not entered (not counted), entered, or none (entered,
  * as none). Entering one starts it blank, at its defaults.
  */
 export function PlanField<T>({ o, path, label, has, none, start }: {
-  o: AppOffer; path: "retirement" | "health"; label: string; /** "Has a 401(k)" */ has: string; /** "No 401(k)" */ none: string; start: () => T;
+  o: AppOffer; path: "retirement" | "health" | "espp"; label: string; /** "Has a 401(k)" */ has: string; /** "No 401(k)" */ none: string; start: () => T;
 }) {
   const api = useLedger();
   const v = getPath(o.draft, path);

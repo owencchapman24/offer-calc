@@ -58,7 +58,7 @@ export interface OfferDetail {
    * Each employment year's payments as posted: each to the cent, as the engine rounds it, added exactly, by component, and their tax.
    * L-6 lists the payments; the year figures (footing.ts) round these sums, so a year's lines tie to its payments.
    */
-  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; tax: number }>;
+  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; espp: number; tax: number }>;
   /** Bonus payments: when, how much, for which stretch of work. */
   bonuses: Array<{ ey: number; date: ISODate; gross: number; periodFrom: ISODate; periodTo: ISODate }>;
   /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
@@ -66,6 +66,8 @@ export interface OfferDetail {
     priceFactor: number; nominalDate?: ISODate }>;
   /** Cash awards (a sign-on, a relocation payment): when, how much, which award (A-3's dates). */
   cash: Array<{ ey: number; date: ISODate; gross: number; award: string }>;
+  /** ESPP purchases, each sold the same day (4i): when, the gain, and which offering's purchase. */
+  espps: Array<{ ey: number; date: ISODate; gross: number; offeringStart: ISODate; purchase: number; purchases: number }>;
 }
 
 export interface AnnuityTerm { date: ISODate; days: number; factor: number }
@@ -135,7 +137,7 @@ export interface CursorRequest extends SlowBase { lane: "cursor"; leaveDate: ISO
 /** One offer if `leaveDate` is your last day, nominal. Null in the response for an offer that hasn't started by then. */
 export interface LeavePanel {
   leaveDate: ISODate;
-  /** Pay received (salary, bonuses, cash awards, vested RSUs) and clawbacks repaid, before tax. */
+  /** Pay received (salary, bonuses, cash awards, vested RSUs, ESPP gains) and clawbacks repaid, before tax. */
   paid: number;
   repaid: number;
   /** The offer's tax, net of any relief on clawbacks repaid, and your health premiums. */
@@ -162,6 +164,8 @@ export interface LeavePanel {
    * the last day's), and why it is or isn't paid (4a).
    */
   vacation: { banked: number; paid: number; annual: number | null; rule: VacationPayoutRule | null };
+  /** ESPP money put toward a purchase after `leaveDate`, refunded that day without a gain (4i). */
+  esppRefund: number;
 }
 
 /** L-4's panel at a last day for a comparison: L-4 and the document ask alike, so they share the result. */
@@ -221,6 +225,8 @@ export interface WorkPayment { date: ISODate; component: Component; detail: Even
 /** One run of the tax engine for a calendar year (with the offer, or without it): what went in and what came out, unrounded. */
 export interface TaxRun {
   wages: number; spouseWages: number; pretax401k: number; section125: number;
+  /** ESPP gain in `wages`: income tax, not FICA (4i). */
+  statutory: number;
   taxableIncome: number; federal: number; ss: number;
   /** Medicare, the additional 0.9% included. */
   medicare: number;

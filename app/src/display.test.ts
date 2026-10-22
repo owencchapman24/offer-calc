@@ -201,7 +201,7 @@ describe("one offer on its own, for any offer", () => {
       expect(v.month.spend + v.month.saved).toBe(v.month.total);
       expect(v.pv.totalRewards - v.pv.rent).toBe(v.pv.total);
       if (v.ref) expect(v.month.total - v.ref.step).toBe(v.ref.month);
-      if (v.year1) expect(v.year1.spend + v.year1.saved).toBe(v.year1.y.totalRewards - v.year1.y.col!.rent);
+      if (v.year1) expect(v.year1.spend + v.year1.saved + v.year1.held).toBe(v.year1.y.totalRewards - v.year1.y.col!.rent);
     }), runs(20));
   }, 600_000);
 
@@ -238,7 +238,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         ],
         equity: { grants: [{ label: "New-hire RSUs", value: 5_000, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }],
           priceGrowth: null, refreshers: null },
-        retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
+        espp: null, retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "37980", monthlyRent: 800, rentGrowth: null },
       } },
       { place: { area: "35620", state: "NY", city: "nyc" }, draft: {
@@ -246,7 +246,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         salary: { annual: 30_000, raise: null, raiseOn: null, promotions: [] },
         bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
           mustBeEmployedOnPayDate: null },
-        cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: "none",
+        cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: "none",
         health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null },
         perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "35620", monthlyRent: null, rentGrowth: null },

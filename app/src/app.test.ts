@@ -7,6 +7,7 @@ import {
   type AppOffer, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
   toOfferInput, withBase,
 } from "./model";
+import { newEspp } from "./editors";
 import { copyBlock } from "./App";
 import { readImport } from "./exchange";
 import { PRESETS, presetOf } from "./presets";
@@ -349,6 +350,22 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
     expect(toOfferInput({ ...s0.offers[0], draft: read(old(48)) })).toMatchObject({ offer: { timeOff: { vacation: 20, holidays: 0, sick: 0 } } });
     // None entered: every default.
     expect(read(old(null)).timeOff).toEqual(blankTimeOff());
+  });
+  it("a save from before the ESPP (2026-10-22) has none; one saved with it reads back", () => {
+    const s0 = initialSession(TODAY);
+    const read = (x: unknown) => loadSession({ getItem: () => JSON.stringify(x), setItem: () => {} }, TODAY).offers[0].draft;
+    const old = { ...s0, offers: s0.offers.map((o) => { const { espp: _, ...draft } = o.draft; return { ...o, draft }; }) };
+    expect(read(old).espp).toBeNull();
+    const espp = { ...newEspp(), contributionPct: 0.1, offeringsStart: { month: 2, day: 1 } };
+    const now = { ...s0, offers: s0.offers.map((o) => ({ ...o, draft: { ...o.draft, espp } })) };
+    expect(read(now).espp).toEqual(espp);
+    // None, entered: the engine gets no plan, as not entered does.
+    const none = { ...s0, offers: s0.offers.map((o) => ({ ...o, draft: { ...o.draft, espp: "none" } })) };
+    expect(read(none).espp).toBe("none");
+    expect(toOfferInput({ ...s0.offers[0], draft: read(none) })).not.toHaveProperty("offer.espp");
+    // Its terms left blank are the plan's defaults: 15% off with a lookback, 6-month offerings, here from Feb 1.
+    expect(toOfferInput({ ...s0.offers[0], draft: read(now) })).toMatchObject({ offer: { espp: { contributionPct: 0.1, discount: 0.15, lookback: true,
+      offeringMonths: 6, offeringsStart: { month: 2, day: 1 } } } });
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)

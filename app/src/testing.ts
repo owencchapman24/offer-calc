@@ -14,6 +14,7 @@ import { firstLastDay, leaveAxis, type LeaveBasis } from "./leaveModel";
 import { Risk } from "./Risk";
 import { breakevenJob, cursorJob, leaveJob, paymentsJob, termsJob as runTerms } from "./slowJobs";
 import { TheWork, type TheWorkProps } from "./TheWork";
+import { newEspp } from "./editors";
 import {
   type Breakdown, type CompareRequest, cursorJobFor, type LeaveCurve, type LeavePanel, type OfferTerms, type SlowResponse, termsJob, tieJob, type Ties,
   workJob, type WorkOffer,
@@ -27,7 +28,8 @@ import * as VerdictCode from "./LeadVerdict";
 import { verdictModule } from "./Later";
 import { detailedModule, Ledger } from "./Ledger";
 import {
-  type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, firstYear, type Letter, type Missing, sampleOffers, toHousehold, toOfferInput,
+  type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type EsppDraft, firstYear, type Letter, type Missing, sampleOffers,
+  toHousehold, toOfferInput,
 } from "./model";
 import { type Derivation, type MetricId, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
@@ -47,6 +49,19 @@ partsModule.provide(Parts);
 
 /** The samples valued on their own start date, as in docs/ui-design.md §4.1-4.2, so the numbers are the design doc's. */
 export const VALUATION = "2026-07-13";
+
+/** An offer with an ESPP (4i): 10% of salary at the plan's defaults, offerings from Jan 1, and any terms given. */
+export const withEspp = (o: AppOffer, terms: Partial<EsppDraft> = {}): AppOffer =>
+  ({ ...o, draft: { ...o.draft, espp: { ...newEspp(), contributionPct: 0.1, offeringsStart: { month: 1, day: 1 }, ...terms } } });
+
+/**
+ * The samples with ESPPs: B's offerings from Feb 1, so it joins Aug 1 and money is held at each year's end (Feb 1 to Jul 12); C's on
+ * salary and bonus with its share price rising 10% a year, so the lookback pays, and two purchases a 12-month offering.
+ */
+export const ESPPS = (os: AppOffer[]) => os.map((o) => (o.letter === "B" ? withEspp(o, { offeringsStart: { month: 2, day: 1 } })
+  : o.letter === "C" ? withEspp({ ...o, draft: { ...o.draft, equity: { ...o.draft.equity, priceGrowth: { bear: 0.1, base: 0.1, bull: 0.1 } } } },
+    { eligiblePay: "salaryAndBonus", offeringMonths: 12, purchasesPerOffering: 2 })
+  : o));
 
 /** The offers compared, by letter, and the comparison's work context. `about` changes About you (Prices in, say). */
 export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4,

@@ -300,6 +300,10 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
             {dollars(panel.vacation.paid)}</Fig> before tax for {daysText(panel.vacation.banked)} of unused vacation</>
         )}
         {unpaidVacationText(panel.vacation) && <> ({unpaidVacationText(panel.vacation)})</>}
+        {panel.esppRefund >= 0.5 && (
+          <>, get back <Fig id={`refund.${letter}`} label={`${dollars(panel.esppRefund)} put toward an ESPP purchase, given back`}>{dollars(panel.esppRefund)}</Fig> put
+            toward an ESPP purchase</>
+        )}
         {owed.length > 0 && (
           <>
             , and repay <Fig id={`repay.${letter}`} label={`${dollars(panel.clawbackOwed)} of clawbacks`}>{dollars(panel.clawbackOwed)}</Fig>{" "}

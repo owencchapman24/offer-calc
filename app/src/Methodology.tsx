@@ -157,6 +157,20 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             the next of those dates, sometimes into the next employment year. Refresher grants, when entered, stack on top.
           </p>
           <p>
+            <strong>An employee stock purchase plan</strong> (ESPP, under IRC 423) puts a percent of each eligible paycheck aside,
+            after tax and without interest, and buys company stock with it at the end of each offering: at a discount off the
+            purchase day's share price, or with a lookback off the lower of the offering's first day's and the purchase day's (at
+            most 15% off, IRC 423(b)(6)). Offerings run back to back from the plan's date, and you join the first that starts on
+            or after your start date. A plan can't buy more than $25,000 of stock a year, valued at each offering's first day
+            (IRC 423(b)(8)); what's over it comes back in cash at the purchase. Each lot is counted as sold the day it's bought:
+            holding shares after purchase is an investment decision and isn't modeled. So its gain, the shares' value less what
+            bought them, is pay that day: wages for income tax (W-2 box 1) but not for Social Security, Medicare or the state
+            payroll taxes that follow them (IRC 3121(a)(22)), and nothing is withheld on it (IRC 421(b)). The share price moves
+            at the growth you enter for RSUs. Money in the plan is yours: it's out of take-home pay and counts at face value until it
+            buys shares, a share of each $100 of its own ("in the ESPP"), not saved; if you leave before a purchase, it comes back that
+            day, without a gain.
+          </p>
+          <p>
             Options and private-company equity (including double-trigger RSUs) aren't modeled yet and count as $0.
           </p>
         </Section>
@@ -520,6 +534,13 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <h3 className="method-sub">Pay and benefits</h3>
           <ul>
             <li>RSUs are assumed sold at vest; options and private-company equity count as $0.</li>
+            <li>An ESPP's shares are taken as sold the day they're bought, so there's no holding period or capital gain. Offerings run
+              one after another, with no reset when the price falls, no overlapping offerings, no cap on shares an offering and no
+              fees; a plan outside section 423 isn't modeled. Its gain is left out of every state payroll tax and Philadelphia's wage
+              tax, as from Social Security and Medicare: California's and Delaware's follow that, but Oregon's transit tax, and
+              likely Washington's paid leave and long-term care, Rhode Island's disability insurance and Minnesota's paid leave,
+              reach it, up to about $14 a $1,000 of gain. Pennsylvania's local earned income tax, if you enter it as a flat rate,
+              leaves it out too, though it reaches it.</li>
             <li>Totals are tax owed; withholding (what's taken from each paycheck) is estimated for federal income tax only.</li>
             <li>The 401(k) has no catch-up contributions, growth or tax on withdrawal.</li>
             <li>Health costs are held flat; the HSA limit isn't prorated for a partial year.</li>
@@ -551,6 +572,12 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
                 23:631(D); 26 M.R.S. §626; M.G.L. c. 149 §148; Langager v. Crazy Creek Products, 1998 MT 44; Neb. Rev. Stat. §48-1229(6);
                 N.D.C.C. §34-14-09.2; R.I. Gen. Laws §28-14-4(b)</th>
                 <td>Which states require unused vacation to be paid when you leave</td><td>Read Oct 19, 2026</td></tr>
+              <tr><th scope="row">IRC 421, 423 and 3121(a)(22); Treas. Reg. §1.423-2; IRS Pub. 525 and Pub. 15-B</th>
+                <td>An ESPP: the discount and lookback, the 27-month offering, the $25,000 limit, the ordinary income on a sale at
+                  purchase, and no FICA or withholding on it</td><td>Read Oct 2026</td></tr>
+              <tr><th scope="row">NASPP and Deloitte Tax, 2023 Employee Stock Purchase Plan Survey; Fidelity Stock Plan Services, ESPP Data
+                Analysis (2025)</th><td>An ESPP's defaults: 15% off (85% of plans), a lookback (83%), 6-month offerings (57%), one purchase
+                  an offering</td><td>2023, 2025</td></tr>
               <tr><th scope="row">IRC 164(b)(7), as added by Pub. L. 119-21 §70120</th><td>The SALT cap: $40,400 in 2026, phased down above
                 $505,000, $10,000 from 2030</td><td>Statute</td></tr>
               <tr><th scope="row">IRS Notice 2025-67; Rev. Proc. 2025-19</th><td>401(k) deferral limit ($24,500); HSA limits</td><td>2026</td></tr>

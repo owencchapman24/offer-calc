@@ -121,6 +121,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     next: nextCliff(o, req.household, req.leaveDate, options, { skip: proratedStep }).next,
     warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica"),
     vacation: { ...r.leave!.vacation, annual: payout?.detail.kind === "vacationPayout" ? payout.detail.annual : null },
+    esppRefund: r.leave!.esppRefund,
   };
 }
 
@@ -163,6 +164,7 @@ export function* termsJob(req: TermsRequest, post: (r: SlowResponse) => void, no
 function taxRun(input: TaxInput, r: TaxResult): TaxRun {
   return {
     wages: input.wages, spouseWages: input.spouseWages ?? 0, pretax401k: input.pretax401k ?? 0, section125: input.section125 ?? 0,
+    statutory: input.statutoryOptionIncome ?? 0,
     taxableIncome: r.federalTaxableIncome, federal: r.federalIncomeTax, ss: r.socialSecurity, medicare: r.medicare + r.additionalMedicare,
     stateIncome: r.stateIncomeTax, statePayroll: r.statePayrollTax, local: r.localIncomeTax, total: r.totalTax,
   };

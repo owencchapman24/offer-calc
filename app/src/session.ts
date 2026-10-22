@@ -1,8 +1,8 @@
 import { cityByCode } from "../../src/col/cities";
 import type { Basis, OfferInput } from "../../src/offer/types";
 import {
-  all, type AppHousehold, type AppOffer, blankDraft, blankOffer, completeSample, DEFAULT_HOUSEHOLD, fromOfferInput, type Letter, LETTERS,
-  type OfferDraft, sampleOffers, setPath, withTimeOff,
+  all, type AppHousehold, type AppOffer, blankDraft, blankOffer, completeSample, DEFAULT_HOUSEHOLD, draftNow, fromOfferInput, type Letter, LETTERS,
+  type OfferDraft, sampleOffers, setPath,
 } from "./model";
 import { US_PRICES } from "./prices";
 
@@ -253,8 +253,8 @@ export function migrate(s: unknown): Session | null {
   return null;
 }
 
-/** Each offer's draft in today's shape: days off arrived on 2026-10-19, in place of weeks a year (`withTimeOff`). */
-const drafts = (offers: AppOffer[]): AppOffer[] => offers.map((o) => ({ ...o, draft: withTimeOff(o.draft) }));
+/** Each offer's draft in today's shape: days off arrived on 2026-10-19, in place of weeks a year, and the ESPP on 2026-10-22 (`draftNow`). */
+const drafts = (offers: AppOffer[]): AppOffer[] => offers.map((o) => ({ ...o, draft: draftNow(o.draft) }));
 
 /**
  * Offers are edited and removed by id: two with one id would change together (an import could once save them; it's

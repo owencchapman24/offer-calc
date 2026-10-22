@@ -56,6 +56,12 @@ export function warningWords(group: OfferWarning[]): string {
       return "Its vacation is unlimited, so nothing is counted as building up or paid when you leave. In California, a policy that's unlimited "
         + "in name but capped in practice has owed a payout (McPherson v. EF Intercultural Foundation, 2020): if yours limits the days you can "
         + "take, enter it as days a year.";
+    case "esppCap":
+      return `Its ESPP contributions would buy more than section 423's ${dollars(w.params.limit)} a year of stock, valued at each offering's first `
+        + `day, in ${years}: what's over it comes back in cash at the purchase, without a gain.`;
+    case "esppSoldAtPurchase":
+      return "Holding shares after purchase is an investment decision and isn't modeled: each ESPP lot counts as sold the day it's bought. "
+        + "Resets, overlapping offerings, a cap on shares an offering, fees and plans outside section 423 aren't modeled either.";
     default: return "";
   }
 }

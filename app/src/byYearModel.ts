@@ -114,6 +114,8 @@ export interface Bridge {
    */
   spend?: number;
   saved?: number;
+  /** ESPP money held at the year's end, a month (4i): present when it isn't zero. */
+  inEspp?: number;
   /** The offer's city, its bridge's own-price line names ("New York"); present with a city. */
   city?: string;
 }
@@ -174,6 +176,12 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
   ];
   change("rsu", reasons.length ? join(reasons) : "RSUs vest on a different schedule",
     vests.length ? `vests ${join([...new Set(vests.map((v) => shortDate(v.date)))])}` : undefined);
+  // An ESPP isn't in the offer letter: each purchase's gain, sold the same day, is pay on top of it (4i).
+  const buys = d.espps.filter((p) => p.ey === n);
+  if (y.espp) {
+    rows.push({ id: id("espp"), line: "espp", kind: "change", label: "ESPP shares bought at a discount, sold at once", value: y.espp,
+      ...(buys.length ? { gloss: `bought ${join([...new Set(buys.map((p) => shortDate(p.date)))])}` } : {}) });
+  }
   if (y.clawback) rows.push({ id: id("clawback"), line: "clawback", kind: "less", label: "clawback repaid", value: y.clawback });
   rows.push({ id: id("paid"), line: "paid", kind: "subtotal", label: `Paid in year ${n}`, value: y.gross });
 
@@ -214,13 +222,14 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
   if (of === "own") {
     const last = same || !ctx.own?.withRef;
     rows.push({ id: id("own"), line: "own", kind: last ? "total" : "subtotal", label: `After rent, at ${place} prices`, value: own });
-    const month = { spend: (col.local - y.oop) / 12, saved: col.face / 12, city: place };
+    const month = { spend: (col.local - y.oop) / 12, saved: (col.face - y.esppHeld) / 12, ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}), city: place };
     if (last) return { letter, year: n, start: y.start, end: y.end, rows, ...month };
     rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
     return { letter, year: n, start: y.start, end: y.end, rows, ...month };
   }
   rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
-  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: col.face / 12, city: place };
+  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: (col.face - y.esppHeld) / 12,
+    ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}), city: place };
 }
 
 /**

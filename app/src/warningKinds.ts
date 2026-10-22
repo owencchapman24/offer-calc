@@ -9,8 +9,9 @@ import type { OfferWarning } from "../../src/offer/types";
 export type WarningKind = "changes" | "notModeled" | "cash";
 
 export const WARNING_KIND: Record<OfferWarning["code"], WarningKind | null> = {
-  k401Cap: "changes", hsaCap: "changes", section127Cap: "changes", commuterCap: "changes", bonusCutoff: "changes",
-  convenienceRule: "notModeled", unlimitedVacation: "notModeled", withholdingShortfall: "cash", bonusForfeited: null, clawbackFica: null,
+  k401Cap: "changes", hsaCap: "changes", section127Cap: "changes", commuterCap: "changes", bonusCutoff: "changes", esppCap: "changes",
+  convenienceRule: "notModeled", unlimitedVacation: "notModeled", esppSoldAtPurchase: "notModeled", withholdingShortfall: "cash", bonusForfeited: null,
+  clawbackFica: null,
 };
 
 /** A calendar year a warning is about, if it's about one (a limit reached that year, a shortfall on its pay). */

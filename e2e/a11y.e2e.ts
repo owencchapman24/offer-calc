@@ -254,6 +254,15 @@ test.describe("detailed mode", () => {
       await scan(page, `detailed: ${section}`);
     });
   }
+  // An ESPP's terms show once an offer has one (4i): A's, with its holding note.
+  test("section: equity, with an ESPP", async ({ page }) => {
+    await openCompare(page);
+    await openSection(page, "equity");
+    await page.locator("#in-A-espp").selectOption("plan");
+    await expect(page.locator("#in-A-espp-contributionPct")).toBeVisible();
+    await settled(page);
+    await scan(page, "detailed: equity, with an ESPP");
+  });
   for (const e of EDITORS) {
     test(`row editor: ${e.title}`, async ({ page }) => {
       await openCompare(page);

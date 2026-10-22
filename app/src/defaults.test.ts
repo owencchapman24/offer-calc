@@ -8,7 +8,7 @@ import "./detailedDefaults";
 import { US_STATES } from "./Detailed";
 import { type AppOffer, all, ASSUMPTIONS, getPath, type HealthDraft, type OfferDraft, type RetirementDraft, sampleOffers, setPath, toHousehold, toOfferInput, DEFAULT_HOUSEHOLD } from "./model";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
-import { context, renderAllInputs } from "./testing";
+import { context, renderAllInputs, withEspp } from "./testing";
 
 // The defaults registry (what a D tickmark says) and the engine's defaults (what a null field gives the
 // engine, model.ts) can't disagree: for every default, an offer with the field at its default projects
@@ -29,6 +29,9 @@ const CLIFF = fresh(B, (d) => ({ ...d, retirement: { ...(d.retirement as Retirem
 const IN_CA = fresh(B, (d) => ({ ...d, employerState: "CA" }));
 const BANKS = fresh(B, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
 const BANKS_IN_CA = fresh(IN_CA, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
+/** B with an ESPP: 10% of salary at the plan's defaults; C's, with its share price rising, so the lookback pays. */
+const ESPP_B = withEspp(B);
+const ESPP_C = withEspp(GROWING);
 /** B putting $5,000 a year in an HSA: over self-only coverage's limit, under family coverage's. */
 const BIG_HSA = fresh(B, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employeeHsa: 5_000 } }));
 
@@ -87,6 +90,12 @@ function setup(key: string): { o: AppOffer; path: string; value: unknown; other:
     case "perks.commuterMonthly": return on(B, key, 100);
     case "employerState": return on(B, key, "NY", B.draft.residence.state); // NY's convenience rule: a warning
     case "costOfLiving.rentGrowth": return on(B, key, 0.05);
+    case "espp.eligiblePay": return on(ESPP_B, key, "salaryAndBonus"); // B's bonus puts money in too
+    case "espp.discount": return on(ESPP_B, key, 0.1);
+    case "espp.lookback": return on(ESPP_C, key, false); // a rising price: without one, the purchase day's price
+    case "espp.offeringMonths": return on(ESPP_B, key, 3);
+    case "espp.purchasesPerOffering": return on(ESPP_B, key, 2);
+    case "espp.eligibleFrom": return on(ESPP_B, key, "2027-03-01", null); // B starts Jul 13, 2026: it joins a year later
   }
   throw new Error(`No setup for the default ${key}: add one, on an offer where the default matters.`);
 }

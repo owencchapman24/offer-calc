@@ -216,7 +216,7 @@ function SectionHead({ id, title, holds, open, issues, toggle }: {
 
 const SECTION_OF_HEAD: Record<string, LedgerSection> = {
   salary: "pay", startDate: "pay", bonus: "bonus", cashAwards: "cash", equity: "equity", retirement: "retirement", health: "health",
-  perks: "perks", hours: "hours", costOfLiving: "where", residence: "where", employerState: "where", leaveDate: "pay",
+  perks: "perks", hours: "hours", costOfLiving: "where", residence: "where", employerState: "where", leaveDate: "pay", espp: "equity",
 };
 
 /** The detailed-mode section an input path belongs to. */

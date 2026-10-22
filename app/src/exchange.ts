@@ -1,5 +1,5 @@
 import { cityByCode } from "../../src/col/cities";
-import { type AppHousehold, type AppOffer, type Letter, LETTERS, type OfferDraft, withTimeOff } from "./model";
+import { type AppHousehold, type AppOffer, draftNow, type Letter, LETTERS, type OfferDraft } from "./model";
 import { US_PRICES } from "./prices";
 import { migrateHousehold, migrateOffer, type Session, type UiState, type V1Offer, type V2Household } from "./session";
 
@@ -86,7 +86,7 @@ export function readImport(text: string): ImportResult {
     } else {
       const before = problems.length;
       check(x.draft, DRAFT, `${where}.draft`, problems);
-      if (problems.length === before) offers.push({ id: x.id!, letter: x.letter as Letter, sample: x.sample!, draft: withTimeOff(x.draft as OfferDraft) });
+      if (problems.length === before) offers.push({ id: x.id!, letter: x.letter as Letter, sample: x.sample!, draft: draftNow(x.draft as OfferDraft) });
     }
   });
   if (problems.length || !household) return { ok: false, problems };
@@ -172,7 +172,15 @@ const DRAFT: Shape = (v, p, ps) => {
   // Days off arrived on 2026-10-19: optional, so earlier exports still import (their weeks a year become days off).
   const t = (v as { timeOff?: unknown } | null)?.timeOff;
   if (v && typeof v === "object" && t !== undefined) TIME_OFF(t, `${p}.timeOff`, ps);
+  // The ESPP arrived on 2026-10-22: optional likewise.
+  const e = (v as { espp?: unknown } | null)?.espp;
+  if (v && typeof v === "object" && e !== undefined) nullable(either(none, ESPP, "\"none\" or an ESPP"))(e, `${p}.espp`, ps);
 };
+
+const ESPP: Shape = obj({
+  contributionPct: nullable(num), eligiblePay: nullable(oneOf("salary", "salaryAndBonus")), discount: nullable(num), lookback: nullable(bool),
+  offeringMonths: nullable(num), purchasesPerOffering: nullable(num), offeringsStart: nullable(monthDay), eligibleFrom: nullable(date),
+});
 
 const DRAFT_FIELDS: Shape = obj({
   label: str,

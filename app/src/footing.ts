@@ -76,7 +76,7 @@ export interface ShownCol {
   atRef: number;
   /** Out-of-pocket health costs at the prices picked, likewise. */
   oopRef: number;
-  /** Saved, at face value: savings + your 401(k) and HSA + vested employer 401(k) + employer HSA + perks. */
+  /** Saved, at face value: savings + your 401(k) and HSA + ESPP money held + vested employer 401(k) + employer HSA + perks. */
   face: number;
   /** atRef − oopRef + face. */
   total: number;
@@ -93,7 +93,9 @@ export interface ShownYear {
   rsu: number;
   /** Clawbacks repaid: zero or less. */
   clawback: number;
-  /** salary + bonus + cash + rsu + clawback. */
+  /** ESPP purchases' gain, each lot sold the day it's bought (4i). */
+  espp: number;
+  /** salary + bonus + cash + rsu + clawback + espp. */
   gross: number;
   tax: number;
   premiums: number;
@@ -101,7 +103,9 @@ export interface ShownYear {
   afterTax: number;
   /** Your own 401(k) and HSA contributions. */
   yours: number;
-  /** afterTax − yours. */
+  /** ESPP money held: put into the plan in the year, less what bought shares or came back (negative when the plan pays out more). */
+  esppHeld: number;
+  /** afterTax − yours − esppHeld. */
   takeHome: number;
   /** Employer 401(k) money credited in the year, and the part vested by the end of your stay. */
   credited: number;
@@ -133,18 +137,20 @@ export function shownYears(d: OfferDetail): ShownYear[] {
 }
 
 function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof shownIndexes> | null): ShownYear {
-  const p = d.posted.find((q) => q.ey === y.year) ?? { ey: y.year, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, tax: 0 };
+  const p = d.posted.find((q) => q.ey === y.year) ?? { ey: y.year, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, tax: 0 };
   const salary = R(p.salary);
   const bonus = R(p.bonus);
   const cash = R(p.cash);
   const rsu = R(p.rsu);
   const clawback = R(p.clawback);
-  const gross = salary + bonus + cash + rsu + clawback;
+  const espp = R(p.espp);
+  const gross = salary + bonus + cash + rsu + clawback + espp;
   const tax = R(p.tax);
   const premiums = R(y.health.premiums);
   const afterTax = gross - tax - premiums;
   const yours = R(y.retirement.employee + y.health.employeeHsa);
-  const takeHome = afterTax - yours;
+  const esppHeld = R(y.espp.held);
+  const takeHome = afterTax - yours - esppHeld;
   // Vested: the credited money as shown × the vested share, so its work multiplies out (audit C15).
   const credited = R(y.retirement.employerCredited);
   const employer = y.retirement.employerCredited ? R(credited * (y.retirement.employerVested / y.retirement.employerCredited)) : 0;
@@ -160,12 +166,12 @@ function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof
     const local = takeHome - savings - rent;
     const atRef = R((local * x.refValue) / x.areaValue);
     const oopRef = R((oop * x.refValue) / x.areaValue);
-    const face = savings + yours + employer + hsa + perks;
+    const face = savings + yours + esppHeld + employer + hsa + perks;
     col = { savings, rent, local, atRef, oopRef, face, total: atRef - oopRef + face };
   }
   const q = { salary: R(y.quoted.salary), bonus: R(y.quoted.bonus), cash: R(y.quoted.cash), rsu: R(y.quoted.rsu) };
   return {
-    n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, gross, tax, premiums, afterTax, yours, takeHome,
+    n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, espp, gross, tax, premiums, afterTax, yours, esppHeld, takeHome,
     credited, employer, oop, hsa, perks, totalRewards, hours: y.hours === undefined ? null : R(y.hours), col,
     quoted: { ...q, letter: q.salary + q.bonus + q.cash + q.rsu }, posted: p,
   };

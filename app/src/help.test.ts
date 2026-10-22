@@ -7,7 +7,7 @@ import type { AppOffer, RetirementDraft } from "./model";
 import { DEFAULTS } from "./defaults";
 import { HELP, helpKey } from "./help";
 import { SECTIONS } from "./sections";
-import { context, renderAllInputs } from "./testing";
+import { context, renderAllInputs, withEspp } from "./testing";
 
 // Help on every input (docs/ui-design.md §3.5): a hint of 12 words or fewer, 2-4 sentences behind the ⓘ,
 // and a methodology section. This renders every view of the inputs (About you, quick mode, each detailed
@@ -18,10 +18,10 @@ const words = (s: string) => s.trim().split(/\s+/).length;
 const sentences = (s: string) => (s.replace(/U\.S\./g, "US").match(/[.!?](?=\s+[A-Z"(]|\s*$)/g) ?? []).length;
 
 describe("help on every input", () => {
-  // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, and B's 401(k) vesting in graded
-  // steps, so every editor's fields render.
+  // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, B's 401(k) vesting in graded
+  // steps and A with an ESPP, so every editor's and plan's fields render.
   const graded = { kind: "graded" as const, steps: [{ years: 2, pct: 0.5 }, { years: 3, pct: 1 }] };
-  const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft,
+  const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "A" ? withEspp(o) : o.letter === "B" ? { ...o, draft: { ...o.draft,
     retirement: { ...(o.draft.retirement as RetirementDraft), vesting: graded } } } : o.letter !== "C" ? o : { ...o, draft: { ...o.draft, equity: {
     ...o.draft.equity,
     grants: o.draft.equity.grants.map((g) => ({ ...g, schedule: { ...g.schedule, tranches: [{ month: 12, fraction: 0.5 }, { month: 24, fraction: 0.5 }] } })),

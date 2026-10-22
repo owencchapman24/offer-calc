@@ -6,7 +6,7 @@ import { shownYears } from "./footing";
 import { isProratedStep, periodText } from "./leaveModel";
 import type { A2Part, A6Line } from "./metrics";
 import type { OfferDetail } from "./protocol";
-import { dayBefore } from "./text";
+import { dayBefore, longDate } from "./text";
 import type { YearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-6 (docs/v2-plan.md, item 5, "What a breakdown holds"), the view model: where a year's pay goes,
@@ -19,8 +19,10 @@ const R = (x: number) => Math.round(x) + 0;
 
 // ---- A-2: where the money goes --------------------------------------------------------------------------------------------
 
-export const A2_PARTS: A2Part[] = ["tax", "rent", "health", "saved", "spend"];
-export const A2_LABEL: Record<A2Part, string> = { tax: "tax", rent: "rent", health: "health costs", saved: "saved", spend: "left to spend" };
+export const A2_PARTS: A2Part[] = ["tax", "rent", "health", "saved", "espp", "spend"];
+export const A2_LABEL: Record<A2Part, string> = {
+  tax: "tax", rent: "rent", health: "health costs", saved: "saved", espp: "in the ESPP", spend: "left to spend",
+};
 
 export interface HundredPart {
   part: A2Part;
@@ -50,18 +52,21 @@ export const centsText = (c: number) => (c < 0 ? `($${(-c / 100).toFixed(2)})` :
 
 /**
  * Where employment year `n`'s pay goes, of each $100 (M-1.1): tax, rent, health costs (premiums and expected out-of-pocket),
- * saved (your 401(k) and HSA, planned savings) and left to spend, each the year's figure as shown ÷ its pay as shown, to the cent;
- * left to spend takes the rounding, so the five add to $100.00. Null without a city or pay.
+ * saved (your 401(k) and HSA, planned savings), with an ESPP the money in it at the year's end (4i), and left to spend, each the year's figure as shown ÷ its pay as shown, to the cent;
+ * left to spend takes the rounding, so the parts add to $100.00. Null without a city or pay.
  */
 export function hundredOf(d: OfferDetail, n: number): Hundred | null {
   const y = shownYears(d)[n - 1];
   if (!y?.col || y.gross <= 0) return null;
   const dollars: Record<Exclude<A2Part, "spend">, number> = {
-    tax: y.tax, rent: y.col.rent, health: y.premiums + y.oop, saved: y.yours + y.col.savings,
+    tax: y.tax, rent: y.col.rent, health: y.premiums + y.oop, saved: y.yours + y.col.savings, espp: y.esppHeld,
   };
-  const spend = y.gross - dollars.tax - dollars.rent - dollars.health - dollars.saved;
+  // The ESPP's share: what's put in during the year, less what bought shares or came back (below zero in a year it pays out more).
+  const espp = d.assumptions.some((a) => a.code === "espp");
+  const shares = (["tax", "rent", "health", "saved", ...(espp ? ["espp"] as const : [])] as const);
+  const spend = y.gross - shares.reduce((s, p) => s + dollars[p], 0);
   const of = (x: number) => Math.round((x / y.gross) * 10_000);
-  const parts: HundredPart[] = (["tax", "rent", "health", "saved"] as const).map((part) => ({ part, dollars: dollars[part], cents: of(dollars[part]) }));
+  const parts: HundredPart[] = shares.map((part) => ({ part, dollars: dollars[part], cents: of(dollars[part]) }));
   parts.push({ part: "spend", dollars: spend, cents: 10_000 - parts.reduce((s, p) => s + p.cents, 0) });
   const ret = d.assumptions.find((a) => a.code === "retirement");
   return {
@@ -77,7 +82,7 @@ export interface Arrival {
   i: number;
   date: ISODate;
   ey: number;
-  kind: "bonus" | "cash" | "rsu";
+  kind: "bonus" | "cash" | "rsu" | "espp";
   label: string;
   /** To the cent, as the engine posts it. */
   gross: number;
@@ -85,7 +90,7 @@ export interface Arrival {
   note?: string;
 }
 
-/** Every payment that isn't salary in the offer's own stay's employment years, by date: each bonus, cash award and RSU vest. */
+/** Every payment that isn't salary in the offer's own stay's employment years, by date: each bonus, cash award, RSU vest and ESPP purchase's gain. */
 export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
   const list: Array<Omit<Arrival, "i">> = [
     ...d.bonuses.filter((b) => b.ey <= years).map((b) => {
@@ -99,16 +104,22 @@ export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
       date: v.date, ey: v.ey, kind: "rsu" as const, label: `RSU vest, ${v.refresher ? "a refresher" : "the new-hire grant"}, ${v.tranche} of ${v.tranches}`,
       gross: v.gross, ...(v.nominalDate ? { note: `due ${v.nominalDate}, on the company's next vest date` } : {}),
     })),
+    ...d.espps.filter((p) => p.ey <= years).map((p) => ({ date: p.date, ey: p.ey, kind: "espp" as const, label: esppName(p), gross: p.gross,
+      note: "its gain, sold at once" })),
   ];
-  const order = { bonus: 0, cash: 1, rsu: 2 };
+  const order = { bonus: 0, cash: 1, rsu: 2, espp: 3 };
   return list.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind]).map((x, i) => ({ ...x, i }));
 }
+
+/** "ESPP purchase, the offering from Jan 1, 2027", "ESPP purchase 2 of 4, ...". */
+export const esppName = (p: { offeringStart: ISODate; purchase: number; purchases: number }) =>
+  `ESPP purchase${p.purchases > 1 ? ` ${p.purchase} of ${p.purchases}` : ""}, the offering from ${longDate(p.offeringStart)}`;
 
 /** An arrival's figure, as shown: to the dollar. */
 export const arrivalShown = (a: Arrival) => R(a.gross);
 
 /** A-3's lines: pay by kind, footed into pay each year. A-7's lines, the same figures and ids. */
-export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "clawback", "gross"] as const;
+export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "espp", "clawback", "gross"] as const;
 export const payRows = (t: YearTable) => t.rows.filter((r) => (PAY_LINES as readonly string[]).includes(r.line) && r.section === "cash");
 
 // ---- A-4: terms that can bite -----------------------------------------------------------------------------------------------
@@ -143,6 +154,7 @@ export function cliffCost(c: Cliff): string {
     case "clawbackCleared": return "work through this day and it's yours; leave before and you repay it";
     case "clawbackStep": return "the clawback shrinks";
     case "vacationPayout": return "leave before and unused vacation isn't paid";
+    case "esppPurchase": return "leave the day before and what you put toward it comes back without the gain";
   }
 }
 
@@ -152,6 +164,7 @@ export function cliffName(c: Cliff): string {
   if (d.kind === "bonus") return `the bonus for ${periodText(d.periodFrom, d.periodTo)}`;
   if (d.kind === "cash") return `the ${inSentence(d.award.trim() || "cash award")}`;
   if (d.kind === "vacationPayout") return "unused vacation starts being paid when you leave";
+  if (d.kind === "espp") return `an ESPP purchase (the offering from ${longDate(d.offeringStart)})`;
   if (d.kind === "rsu") return `an RSU vest (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vests to ${Math.round(d.vestedShare * 100)}%`;
   if (d.kind === "clawbackStep") return `the ${inSentence(d.award.trim() || "award")}'s clawback ends`;
@@ -182,6 +195,12 @@ export const lastDayOf = (window: { end: ISODate }) => dayBefore(window.end);
 // ---- A-5: what the benefits are worth -------------------------------------------------------------------------------------
 
 const BENEFIT_LINES = ["employer", "hsa", "perks", "premiums", "oop", "yours"] as const;
+
+/** What goes into an ESPP each year of its stay, as shown (each rounded once), and the years added (A-5's context: it's in after-tax pay). */
+export function esppPutIn(d: OfferDetail, years: number): { years: number[]; sum: number } {
+  const ys = d.employmentYears.slice(0, years).map((y) => R(y.espp.putIn));
+  return { years: ys, sum: ys.reduce((s, v) => s + v, 0) };
+}
 
 /**
  * A-5's table: the employer 401(k) money credited each year, the benefit and health-cost lines (A-7's), and what they add to after-tax
