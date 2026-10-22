@@ -1,6 +1,6 @@
 import { DATA_YEARS } from "../../src/col/cities";
 import { describeSchedule } from "../../src/format/schedule";
-import type { AnnualBonus, Equity, ISODate, OfferInput, OfferWarning, ValueBasis, VestingSchedule } from "../../src/offer/types";
+import type { AnnualBonus, Equity, Espp, ISODate, OfferInput, OfferWarning, ValueBasis, VestingSchedule } from "../../src/offer/types";
 import { inSentence, rentTie, scalesText, tieView } from "./breakevenModel";
 import { ownView, type OwnView, shareText, taxRateText } from "./breakdownModel";
 import { CASES, caseChanges, changeText, dropText, hasRanges, riskCarriers, riskView } from "./cases";
@@ -12,10 +12,10 @@ import {
 } from "./metrics";
 import { bridge, cashName as cashNameOf, notesOf, ownShownYear, shownYearOf, yearNotes, yearValue } from "./byYearModel";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, payRows, rateText,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, payRows, rateText,
   taxYearsOf,
 } from "./partsModel";
-import { ASSUMPTIONS, CITY_TAX, cityTax, type Letter } from "./model";
+import { ASSUMPTIONS, CITY_TAX, cityTax, hasEspp, type Letter } from "./model";
 import { type Breakdown, type CompareRequest, cursorJobFor, type LeavePanel, type OfferDetail, type OfferTerms, termsJob, tieJob, type Ties } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import type { SlowJob, SlowState } from "./useEngine";
@@ -342,6 +342,14 @@ export function vestingText(s: VestingSchedule): string {
   return `${ys.join("/")}${shape ? ` (${shape})` : ""}${cadence ? `, ${cadence}` : ""}`;
 }
 
+/** "an ESPP: 10% of salary, 15% off with a lookback, 6-month offerings, each lot sold the day it's bought" (4i). */
+function esppDocText(p: Espp): string {
+  const per = p.purchasesPerOffering ?? 1;
+  return `an ESPP: ${percent(p.contributionPct)} of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, ${percent(p.discount)} off`
+    + `${p.lookback ? " with a lookback" : ", no lookback"}, ${p.offeringMonths}-month offerings${per > 1 ? ` with ${per} purchases each` : ""}, `
+    + "each lot sold the day it's bought";
+}
+
 function equityText(e: Equity): string {
   const grants = e.grants.map((g) => {
     const name = inSentence(g.label.trim().replace(/\s*RSUs?$/i, ""));
@@ -379,6 +387,7 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     if (o.bonus) parts.push(bonusText(o.bonus, n));
     for (const a of o.cashAwards ?? []) parts.push(`${dollars(a.amount)} ${inSentence(a.label.trim() || "cash award")}`);
     if (o.equity && (o.equity.grants.length || (o.equity.refreshers?.value.base ?? 0) > 0)) parts.push(equityText(o.equity));
+    if (o.espp) parts.push(esppDocText(o.espp));
     parts.push(o.hours ? `${o.hours.weekly.base} hours a week for ${weeksText(o)} weeks a year, after ${daysOffWords(o)}` : `${daysOffWords(o)} a year`);
     const info = d.costOfLiving;
     const city = draft ? cityTax(draft) : null;
@@ -392,7 +401,7 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
 
 // ---- 3. The bridge, year 1 ------------------------------------------------------------------------------------------
 
-const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "cash", "rsu", "clawback", "paid", "tax", "premiums", "afterTax", "retirement", "perks", "hsa", "oop",
+const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "cash", "rsu", "espp", "clawback", "paid", "tax", "premiums", "afterTax", "retirement", "perks", "hsa", "oop",
   "totalRewards", "rent", "prices", "total"];
 /** A line's label when the offers' own reasons differ: theirs go in the notes. */
 const GENERAL: Partial<Record<BridgeLine, string>> = {
@@ -455,8 +464,9 @@ function bridgeSection(ctx: WorkContext, add: Add, worked: Worked[]) {
       const above = 1 / info.nonHousingFactor - 1;
       return `${percent(Math.abs(above))} ${above >= 0 ? "above" : "below"} ${p.average} in ${shortCity(info.area.name)} (${l})`;
     });
-    notes.push(`Prices other than rent run ${join(runs)}. Spending is restated at those prices; savings (your 401(k), the employer's money, HSA money `
-      + "and perks) count at face value.");
+    const espp = r.letters.some((l) => { const o = offerByLetter(ctx, l); return !!o && hasEspp(o.draft); });
+    notes.push(`Prices other than rent run ${join(runs)}. Spending is restated at those prices; savings (your 401(k), the employer's money, HSA money`
+      + `${espp ? ", perks and ESPP money held" : " and perks"}) count at face value.`);
   }
   add({ kind: "table", table: { title: `${same ? `${longDate(bs[0].start)} – ${longDate(dayBefore(bs[0].end))}` : "Each offer's first year"}, as paid; each `
     + "total adds the lines above it", head: ["", ...r.letters], rows, foots: true } });
@@ -661,6 +671,8 @@ function leavingSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Wo
     { label: "RSUs not yet vested, at grant value", cells: cell((x) => some(x.unvestedRsuForfeited)) },
     { label: "Employer 401(k) not yet vested", cells: cell((x) => some(x.retirementForfeited)) },
     { label: "Unused vacation paid out, before tax (in what you'd keep)", cells: cell((x) => some(x.vacation.paid)) },
+    ...(panels.some((x) => x && x.esppRefund >= 0.5)
+      ? [{ label: "ESPP money given back (your own pay)", cells: cell((x) => some(x.esppRefund)) }] : []),
     { label: "The next payout or vest", cells: cell((x) => (x.next ? longDate(x.next.date) : "none")) },
     { label: "Staying until then adds (after tax, that included)", cells: cell((x) => (x.next ? `+${dollars(x.next.valueOfStaying.afterTaxComp)}` : DASH)) },
   ];
@@ -851,8 +863,8 @@ function bottomLine(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   }
   const facts: string[] = [];
   if (v.year1) {
-    facts.push(`In year 1, as paid, in ${v.place} dollars: ${dollars(v.year1.spendMonth)} a month to spend after rent and ${dollars(v.year1.savedMonth)} `
-      + `a month saved. ${v.differs}`);
+    facts.push(`In year 1, as paid, in ${v.place} dollars: ${dollars(v.year1.spendMonth)} a month to spend after rent${v.year1.held ? "," : " and"} `
+      + `${dollars(v.year1.savedMonth)} a month saved${v.year1.held ? ` and ${dollars(v.year1.heldMonth)} a month held in the ESPP` : ""}. ${v.differs}`);
   }
   if (v.hour) {
     worked.push({ op: "÷", of: [figure(v.hour.total), figure(v.hour.hours)], is: cents(v.hour.value) });
@@ -884,7 +896,7 @@ function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full:
   const spend = h.parts.find((q) => q.part === "spend")!.dollars;
   worked.push({ op: "÷", of: [figure(spend), "12"], is: dollars(spend / 12) });
   const notes = [`Tax is your household's tax with the offer less without it; health costs are your premiums and expected out-of-pocket costs; saved is `
-    + `your 401(k) and HSA and any planned savings. Left to spend, ${figure(spend)} ÷ 12, is ${dollars(spend / 12)} a month in year 1, after rent, in `
+    + `your 401(k) and HSA and any planned savings${x.o.espp ? "; in the ESPP is what's been put into it and not yet spent on shares or given back" : ""}. Left to spend, ${figure(spend)} ÷ 12, is ${dollars(spend / 12)} a month in year 1, after rent, in `
     + `${v.place} dollars.`];
   const adds = [h.credited ? `${dollars(h.credited)} of 401(k) money` : "", h.hsa ? `${dollars(h.hsa)} of HSA money` : "", h.perks ? `${dollars(h.perks)} of perks` : ""]
     .filter(Boolean);
@@ -996,7 +1008,8 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
         return `; ${t.before}${dollars(f.earned)}${t.after} is forfeited`;
       });
       const v = panel.vacation;
-      const vacation = v.paid >= 0.5 ? `with ${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out, ` : "";
+      const vacation = `${v.paid >= 0.5 ? `with ${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out, ` : ""}`
+        + `${panel.esppRefund >= 0.5 ? `get back ${dollars(panel.esppRefund)} put toward an ESPP purchase, ` : ""}`;
       const unpaid = unpaidVacationText(v);
       paras.push(`If your last day were ${longDate(panel.leaveDate)}, ${into}${opts.picked ? " (the day picked in Offer Calc)" : ""}: you'd keep `
         + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${vacation}${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
@@ -1042,6 +1055,13 @@ function benefitsSection(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   if (!o.health) notes.push("No health plan entered: premiums and out-of-pocket costs aren't counted.");
   if (o.health?.oopMax) notes.push(`A bad health year costs up to the plan's out-of-pocket maximum, ${dollars(o.health.oopMax)}, in any year of your stay, `
     + "on top of the premiums.");
+  if (o.espp) {
+    const putIn = esppPutIn(x.d, n).sum;
+    const gain = t.rows.find((r) => r.line === "espp");
+    notes.push(`Its ESPP puts ${dollars(putIn)} toward company stock over the stay${gain ? `; its purchases' gain, ${dollars(gain.sum)} before tax, is pay `
+      + "(section 3), each lot counted as sold the day it's bought" : ", and buys nothing in it"}. Holding shares after purchase is an investment decision `
+      + "and isn't modeled.");
+  }
   const pto = paidTimeOff(o);
   notes.push(`Paid time off: ${daysOffWords(o)}, ${pto.days} ${pto.days === 1 ? "day" : "days"} a year; ${dollars(pto.value)} of its starting salary a year `
     + "is for those days, which salary already counts.");
@@ -1074,7 +1094,8 @@ function shortfallText(d: OfferDetail, warnings: OfferWarning[]): string {
   });
   return `Federal withholding falls short of the federal income tax on its pay by ${join(shorts)}, owed ${ys.length > 1 ? "each following April"
     : `in April ${ys[0].year + 1}`}${ys.some((y) => y.supplemental) ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real "
-    + "rate on them" : ""}. Raising your withholding on Form W-4 spreads it out.`;
+    + "rate on them" : ""}${ys.some((y) => y.espp) ? `${ys.some((y) => y.supplemental) ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}`
+    + ". Raising your withholding on Form W-4 spreads it out.";
 }
 
 function taxSection(x: Own, add: Add, worked: Worked[]) {

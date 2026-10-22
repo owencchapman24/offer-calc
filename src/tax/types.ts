@@ -24,6 +24,14 @@ export interface TaxInput {
   section125?: number;
   /** Pre-tax transit/parking under IRC 132(f). */
   commuterPretax?: number;
+  /**
+   * Ordinary income from a statutory option or an employee stock purchase plan's shares (IRC 421(b), 423): an ESPP lot sold the
+   * day it's bought. It's part of `wages` (W-2 box 1, so income tax) but not FICA wages (IRC 3121(a)(22)), nor the state payroll
+   * or local wage bases that follow them here. CA SDI and DE's paid leave exclude it, as FICA does (EDD DE 231SK; 19 Del. C.
+   * 3701(24)); OR's transit tax (on income-tax wages), and likely WA's PFML and WA Cares, RI's TDI and MN's paid leave, reach it:
+   * a known gap (CLAUDE.md section 10). Philadelphia's wage tax leans to excluding it (Phila. Code 19-1501(8)(f)).
+   */
+  statutoryOptionIncome?: number;
   /** Real estate taxes paid (counts toward the SALT cap if itemizing). */
   propertyTax?: number;
   /** Mortgage interest, charitable gifts, etc. Used only if itemizing beats the standard deduction. */

@@ -10,7 +10,7 @@ import { cityName, type MetricId, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { priceWords, shortCity } from "./prices";
 import {
-  alone, compareOf, context, ownOffers, renderAlone, renderBreakdowns, renderPage, requestOf, withLeave, withTies, withWork,
+  alone, compareOf, context, ESPPS, ownOffers, renderAlone, renderBreakdowns, renderPage, requestOf, withLeave, withTies, withWork,
 } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
@@ -66,7 +66,7 @@ function expectOf(id: string, ctx: WorkContext): Expect | null {
       // A-2's bridge (stop 5B): after rent at the offer's own prices, and its month, in its own city's dollars; then the prices picked.
       if (c === "prices") return { money: "prices", rate: false };
       if (c === "own") return { money: "after", unit: city(a), rate: false, own: a as Letter };
-      if (c === "spend" || c === "saved") return { money: "after", unit: city(a), rate: true, own: a as Letter };
+      if (c === "spend" || c === "saved" || c === "inEspp") return { money: "after", unit: city(a), rate: true, own: a as Letter };
       return c === "total" ? common(false) : { money: "paid", rate: false };
     case "risk": return by(basis, basis === "perHour");
     case "drop": case "win": return by(basis, true);
@@ -411,6 +411,14 @@ describe("every figure names its dollars, and every rate or share its period (co
       expect(problems).toEqual([]);
     }, 120_000);
   }
+
+  it("offers with an ESPP (4i): its lines, its notes, their Show the work, the CSVs and the documents", () => {
+    const c = comparison(context("colAdjustedTotal", ESPPS));
+    for (const id of ["a5.B.esppIn", "l6y.B.esppHeld.1", "l6y.B.espp.sum", "br.B.1.espp", "br.C.1.espp"]) expect(c.html).toContain(`data-metric="${id}"`);
+    const problems = [...checkPage(c.ctx, c.html, "ESPP"), ...checkWork(c.ctx, c.html, "ESPP"), ...c.csv.flatMap((b) => checkCsv(c.ctx, b)),
+      ...c.docs.flatMap(([d, l]) => checkDoc(c.ctx, d, l))];
+    expect(problems).toEqual([]);
+  }, 120_000);
 
   it("at Charlotte prices, the common dollars are Charlotte's everywhere offers sit together", () => {
     const c = comparison(context("colAdjustedTotal", undefined, 4, { pricesIn: CLT }));

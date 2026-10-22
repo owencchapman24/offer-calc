@@ -22,7 +22,8 @@ behind every figure.
   stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
   offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table); v2's 4a (days off:
   vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
-  2026-10-19). How each differs from the design: `docs/ui-design.md` §12.
+  2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22). How each differs from the
+  design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
@@ -41,10 +42,9 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: the user's review of stop 4a** (days off, pull request #70, 2026-10-19), then 4i, then 4j (`docs/v2-plan.md`, approved
-2026-10-19 at the user's review of pull request #69), a review stop each, ahead of item 2, at the user's word: 4i (an employee stock
-purchase plan, each lot sold at purchase: no "hold", no capital gains) and 4j (other benefits; tax-free ones on their own line, not in
-"saved"). Decisions D16-D23 are recorded in the plan.
+**Next: the user's review of stop 4i** (the ESPP, pull request #71, 2026-10-22), then 4j (other benefits; tax-free ones on their own
+line, not in "saved"; `docs/v2-plan.md`, approved 2026-10-19 at the user's review of pull request #69), its own review stop, ahead of
+item 2, at the user's word. Stop 4a (days off, #70) was approved on 2026-10-22. Decisions D16-D23 are recorded in the plan.
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
 actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
@@ -290,6 +290,15 @@ section 2's and the plan's in step):
   Vacation given beyond what you'd take banks, accrued and used evenly, up to a cap; a leave date pays it at the salary that day ÷
   260, as supplemental wages on the last day, where the employer's state's law requires it (`VACATION_PAYOUT_STATES`) or the offer's
   policy does. Unlimited banks nothing. A stay's end pays nothing.
+- **ESPP** (v2's 4i, D20): an IRC 423 plan; each lot is sold the day it's bought ("Holding shares after purchase is an investment
+  decision and isn't modeled."), so no capital gains. Each eligible paycheck puts its percent aside, after tax; offerings run back to
+  back from the plan's date, joined at the first starting on or after your start (or "eligible from"); a purchase buys at the discount
+  off the purchase day's price, or with a lookback the lower of the offering's first day's and the purchase day's, within $25,000 a
+  calendar year at first-day value (an offering accrues each year it's outstanding, used earliest first); what's over comes back at
+  the purchase. The gain is pay that day: wages for income tax, not FICA (`statutoryOptionIncome`), nothing withheld. Money in the
+  plan is out of take-home, at face value in the after-rent total; A-2 shows it as its own share ("in the ESPP"), not in "saved", and
+  A-1's saved leaves it out (over the stay it's in "to spend": it comes back). Leaving before a purchase gives it back that day; each
+  purchase date is a cliff. The share price follows the equity's growth.
 - **Clawbacks:** cleared once the last day is the day before clock start + months; prorated by completed months by default
   (`per: "day"` optional); gross repaid by default. In the same calendar year the wages are reversed, exactly; in a later year, an
   IRC 1341 credit, federal only, over $3,000, and FICA isn't refunded.
@@ -354,7 +363,7 @@ section 2's and the plan's in step):
   `horizonSweep`, annuity terms); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
   as codes and paths); `streams.ts` (salary, bonus, cash); `vesting.ts`; `presets.ts` (the vesting presets, main-thread safe);
   `clawback.ts`; `benefits.ts` (401(k), health, perks); `timeOff.ts` (days off and weeks worked, the vacation-payout states, the
-  payout rule); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
+  payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
 - `col/`: `index.ts` (BEA RPPs, `rpp.json`), `rent.ts` (HUD FMRs, `fmr.json`, and the fallback), `cities.ts` (the slim city list,
   `cities.json`, for the main thread).
 - `format/`: the words for the engine's numbers and codes (`numbers`, `issues`, `schedule`, `warnings`). Not part of the engine.
@@ -451,6 +460,11 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 
 **Pay and benefits**
 - Private-company equity (options, double-trigger RSUs) counts as $0; RSUs are sold at vest. v2 item 4e.
+- An ESPP's shares are sold the day they're bought (D20): no holding, so no capital gains; no resets, overlapping offerings, share caps,
+  fees or plans outside section 423; a plan letting you buy within 3 months of leaving isn't modeled (the money comes back). Its gain is
+  left out of every state payroll tax and Philadelphia's wage tax, as from FICA: right for CA SDI and DE's leave, but OR's transit tax
+  (on income-tax wages), and likely WA's PFML and WA Cares, RI's TDI and MN's paid leave, reach it (up to ~$14 a $1,000 of gain); PA's
+  local EIT, entered as a flat rate, misses it too. Contributions come from the salary and bonus as paid (no per-paycheck timing).
 - Totals are tax owed; withholding is estimated for federal income tax only (no state, other-job or spouse withholding, W-4
   adjustments, other pay frequencies or safe harbors).
 - 401(k): no catch-up, no 415(c) or 401(a)(17) limit; employer HSA money isn't capped at the HSA limit (audit C10); deferrals at face
@@ -475,7 +489,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0 and item 5 (stops 5A-5C) built; 4a's extension, 4i and 4j approved (2026-10-19), next; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended) and 4i built; 4j approved (2026-10-19), next; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |

@@ -38,13 +38,20 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
       return `Repaying ${w.params.award} in ${w.params.repaidYear} for pay received in ${w.params.paidYear}: the FICA `
         + "withheld on it isn't automatically refunded (your employer may return it on a corrected W-2c). This "
         + "projection assumes you don't get it back, and gives no state relief.";
+    case "esppCap":
+      return `ESPP contributions in ${w.params.year} would buy more than ${usd(w.params.limit)} of stock at the offering's `
+        + "first-day value, the IRC 423(b)(8) limit: what's over it comes back in cash at the purchase.";
+    case "esppSoldAtPurchase":
+      return "Holding shares after purchase is an investment decision and isn't modeled: each ESPP lot counts as sold the day it's bought. "
+        + "Resets, overlapping offerings, a cap on shares an offering, fees and plans outside section 423 aren't modeled either.";
     case "unlimitedVacation":
       return "An unlimited vacation policy is taken to accrue nothing, so nothing is paid when you leave. In California a policy "
         + "that's unlimited in name but capped in practice has owed a payout (McPherson v. EF Intercultural Foundation, 2020): if "
         + "yours limits what you can take, enter it as days a year.";
     case "withholdingShortfall":
       return `Federal withholding on ${w.params.year} pay falls about ${usd(Math.round(w.params.balanceDue))} short of `
-        + `its federal income tax${w.params.supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}. `
+        + `its federal income tax${w.params.supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}`
+        + `${w.params.espp ? `${w.params.supplemental ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}. `
         + `Expect to owe it in April ${w.params.year + 1}, or raise your withholding on Form W-4.`;
     case "itemizing":
       return `Itemizing beats the standard deduction here (SALT and other deductions total $${PLAIN.format(Math.round(w.params.deduction))}).`;

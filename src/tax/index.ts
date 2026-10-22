@@ -25,13 +25,15 @@ function computeOnce(input: TaxInput, params: TaxParams): Omit<TaxResult, "margi
   const k401 = input.pretax401k ?? 0;
   const s125 = input.section125 ?? 0;
   const commute = input.commuterPretax ?? 0;
+  const statutory = input.statutoryOptionIncome ?? 0;
   const spouse = status === "joint" ? input.spouseWages ?? 0 : 0;
   const propertyTax = input.propertyTax ?? 0;
   const otherItemized = input.otherItemizedDeductions ?? 0;
 
   // Box 1 (income-tax) wages exclude 401(k), cafeteria-plan and 132(f) amounts.
-  // FICA wages exclude cafeteria-plan and 132(f) amounts but INCLUDE 401(k) deferrals.
-  const ficaWages = clamp0(input.wages - s125 - commute);
+  // FICA wages exclude cafeteria-plan and 132(f) amounts but INCLUDE 401(k) deferrals; they exclude statutory option income
+  // (an ESPP lot's spread, IRC 3121(a)(22)), which box 1 includes.
+  const ficaWages = clamp0(input.wages - s125 - commute - statutory);
   const ficaByWorker = spouse > 0 ? [ficaWages, spouse] : [ficaWages];
   const federalAGI = clamp0(input.wages + spouse - k401 - s125 - commute);
   const fica = payrollTaxes(params.payroll, ficaByWorker, status);

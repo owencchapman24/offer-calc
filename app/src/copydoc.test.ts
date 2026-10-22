@@ -5,7 +5,7 @@ import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import type { AppOffer, Letter } from "./model";
 import { dollars, figure, longDate } from "./text";
-import { alone, compareOf, context, requestOf, withLeave, withTies } from "./testing";
+import { alone, compareOf, context, ESPPS, requestOf, withEspp, withLeave, withTies } from "./testing";
 import { verdictSentence } from "./verdict";
 
 // "Copy as document" (docs/copy-as-document-plan.md): every total in the document adds up as displayed, every calculation it
@@ -73,6 +73,10 @@ const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?, DocDetail?]
   ["B's breakdown, starting later, the summary", later, "breakdown", "B", "summary"],
   ["both, the breakdowns in summary", () => context(), "both", undefined, "summary"],
   ["both, the breakdowns in full", () => context(), "both"],
+  // ESPPs (4i): B's money held at each year's end, C's on salary and bonus with a rising price; A on its own with one.
+  ["with ESPPs", () => context("colAdjustedTotal", ESPPS)],
+  ["with ESPPs, both in full", () => context("colAdjustedTotal", ESPPS), "both"],
+  ["A on its own with an ESPP, in full", () => alone("A", (o) => withEspp(o)), "breakdown"],
 ];
 
 describe("Copy as document: every total adds up as displayed", () => {
@@ -294,6 +298,24 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
     expect(ca.text).toContain("It gives 15 vacation days a year and you'd take 11, so 4 bank each year; California requires unused vacation be paid "
       + "when you leave.");
     expect(ca.text).toMatch(/you'd keep \$[\d,]+ after tax, as paid, with \$853 before tax for 2\.02 days of unused vacation paid out, repay \$10,000,/);
+  });
+
+  it("an ESPP (4i): the offer as entered, its purchases by date, A-5's note, the terms and the holding note", () => {
+    const e = made(alone("A", (o) => withEspp(o)), undefined, "breakdown", "A", "full");
+    expect(e.text).toContain("an ESPP: 10% of salary, 15% off with a lookback, 6-month offerings, each lot sold the day it's bought");
+    // A joins Jan 1, 2027's offering: Jan-Jun's 6 × 110,000 ÷ 12 × 10% = 5,500 buys 5,500 ÷ 0.85 = 6,470.59 of stock Jun 30, a gain of 970.59.
+    expect(e.text).toContain("Jun 30, 2027: ESPP purchase, the offering from Jan 1, 2027, $971, in year 1 (its gain, sold at once).");
+    // Jul 1-12, 2027's 110,000 ÷ 12 × 12/31 × 10% = 354.84 is held at year 1's end: a share of its own, 355 ÷ 153,957 = $0.23; saved is the 401(k)'s.
+    expect(e.text).toContain("in the ESPP is what's been put into it and not yet spent on shares or given back");
+    const hundred = tables(e.doc).find((t) => t.head[1] === "Of each $100 of year-1 pay")!;
+    expect(hundred.rows.filter((r) => r.label === "Saved" || r.label === "In the ESPP").map((r) => [r.label, ...r.cells]))
+      .toEqual([["Saved", "$4.29", "6,600"], ["In the ESPP", "$0.23", "355"]]);
+    // Put in over the stay: 5,854.84 + 11,000 + 11,000 + 14,850 (year 4 at the associate's 148,500) = 42,704.84; as shown, 5,855 + ... = 42,705.
+    expect(e.text).toMatch(/Its ESPP puts \$42,705 toward company stock over the stay; its purchases' gain, \$[\d,]+ before tax, is pay/);
+    expect(e.text).toContain("Holding shares after purchase is an investment decision and isn't modeled.");
+    expect(e.text).toContain("first ESPP purchase is Jun 30, 2027; leaving before a purchase gives back what you've put toward it, without the gain");
+    // A-1's year 1: 56,031 ÷ 12 = $4,669 to spend, (10,255 - 355) ÷ 12 = $825 saved, 355 ÷ 12 = $30 held.
+    expect(e.text).toContain("In year 1, as paid, in New York dollars: $4,669 a month to spend after rent, $825 a month saved and $30 a month held in the ESPP.");
   });
 
   it("in a comparison, a breakdown stays in its own city's dollars, and says what the comparison counts it as", () => {

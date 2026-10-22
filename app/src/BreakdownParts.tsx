@@ -10,20 +10,20 @@ import { daysOffWords, daysText, unpaidVacationText } from "./timeOffWords";
 import type { A2Part, MetricId, WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, hundredOf, paidTimeOff, payRows, rateText,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, paidTimeOff, payRows, rateText,
   taxYearsOf,
 } from "./partsModel";
 import type { PriceWords } from "./prices";
 import { type CompareRequest, cursorJobFor, type LeavePanel, type OfferTerms, termsJob, workJob, type WorkOffer } from "./protocol";
 import type { Action, UiState } from "./session";
-import { dayBefore, dollars, figure, longDate } from "./text";
+import { dayBefore, dollars, figure, longDate, percent } from "./text";
 import { TheWork } from "./TheWork";
 import { type Stale, staleClass, usePrinting } from "./ui";
 import type { Engine, SlowState } from "./useEngine";
 import { WARNING_AT, withholdingParts } from "./warningAt";
 import { stayWarnings, WARNING_KIND, type WarningKind } from "./warningKinds";
 import { KIND_TITLE, warningWords } from "./warningWords";
-import { moneyText, yearTable } from "./workpaper";
+import { moneyText, type YearTable, yearTable } from "./workpaper";
 import type { OwnOffer } from "./Breakdown";
 import type { LeaveBasis } from "./leaveModel";
 
@@ -239,7 +239,9 @@ function BridgeView({ ctx, letter, n, prices }: { ctx: WorkContext; letter: Lett
           {/* Where the bridge steps on to the prices picked, the month restates the line at its own prices, not the last line. */}
           {b.rows.some((r) => r.line === "total") ? `After rent at ${letter}'s own prices ` : ""}= <Fig id={`br.${letter}.${n}.spend`} label={`${inDollars(b.city!, b.spend)} a month to spend after rent, in year ${n}`}>{dollars(b.spend)}</Fig> a
           month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${inDollars(b.city!, b.saved)} a month saved, in year ${n}`}>
-            {dollars(b.saved)}</Fig> a month saved, in year {n}, in {b.city} dollars
+            {dollars(b.saved)}</Fig> a month saved
+          {b.inEspp !== undefined && <>{" "}+ <Fig id={`br.${letter}.${n}.inEspp`} label={`${inDollars(b.city!, b.inEspp)} a month held in the ESPP, in year ${n}`}>
+            {dollars(b.inEspp)}</Fig> a month held in the ESPP</>}, in year {n}, in {b.city} dollars
         </p>
       )}
       <p className="caption">
@@ -263,7 +265,7 @@ function PayByYear({ ctx, x, open, show }: Part) {
   return (
     <section className="part pay-by-year" aria-labelledby={`${L}-3-title`}>
       <PartHead letter={L} n={3} title="Pay by year, and when it arrives" />
-      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, cash: y.cash, rsu: y.rsu }))} />
+      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, cash: y.cash, rsu: y.rsu, espp: y.espp }))} />
       <div className="l6-scroll" role="region" aria-label={`${L}-3, pay by year`} tabIndex={0}>
         <table className="year-table pay-table">
           <caption className="sr-only">{L}'s pay by employment year and kind, $, as paid</caption>
@@ -315,11 +317,11 @@ function PayByYear({ ctx, x, open, show }: Part) {
   );
 }
 
-const KINDS = ["salary", "bonus", "cash", "rsu"] as const;
-const KIND_LABEL = { salary: "salary", bonus: "bonus", cash: "cash awards", rsu: "RSUs" };
+const KINDS = ["salary", "bonus", "cash", "rsu", "espp"] as const;
+const KIND_LABEL = { salary: "salary", bonus: "bonus", cash: "cash awards", rsu: "RSUs", espp: "ESPP gains" };
 
 /** Pay by year as stacked columns, each kind labeled in the legend: drawn, so hidden from screen readers (the table says it). */
-function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; cash: number; rsu: number }> }) {
+function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; cash: number; rsu: number; espp: number }> }) {
   const max = Math.max(1, ...years.map((y) => KINDS.reduce((s, k) => s + Math.max(0, y[k]), 0)));
   const kinds = KINDS.filter((k) => years.some((y) => y[k] > 0));
   return (
@@ -437,8 +439,12 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
         <>with <Fig id={`vac.${L}`} label={`${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out`}>{dollars(v.paid)}</Fig> before
           tax for {daysText(v.banked)} of unused vacation paid out,{" "}</>
       )}
+      {panel.esppRefund >= 0.5 && (
+        <>get back <Fig id={`refund.${L}`} label={`${dollars(panel.esppRefund)} put toward an ESPP purchase, given back`}>{dollars(panel.esppRefund)}</Fig> put
+          toward an ESPP purchase,{" "}</>
+      )}
       {panel.clawbackOwed >= 0.5
-        ? <>repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</> : "repay nothing,"}{" "}
+        ? <span className="one-line">repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</span> : "repay nothing,"}{" "}
       {lost.length ? <>and leave {lost.map((l, k) => <span key={k}>{k ? " and " : ""}{l}</span>)} behind</> : "and leave nothing behind"}
       {bonuses.map((f) => {
         const t = forfeitText(f);
@@ -505,6 +511,27 @@ function PaidTimeOff({ L, o }: { L: Letter; o: NonNullable<OwnOffer["input"]> })
   );
 }
 
+/** An ESPP's money over the stay and its purchases' gain, which is pay (A-3): context, in no total here (4i). */
+function EsppNote({ L, t, o, b }: { L: Letter; t: YearTable; o: NonNullable<OwnOffer["input"]>; b: NonNullable<OwnOffer["breakdown"]> }) {
+  if (!o.espp) return null;
+  const p = o.espp;
+  const putIn = esppPutIn(b.detail, b.years).sum;
+  const gain = t.rows.find((r) => r.line === "espp");
+  return (
+    <p className="part-note espp">
+      Its ESPP puts {percent(p.contributionPct)} of {p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"} toward company stock at{" "}
+      {percent(p.discount)} off{p.lookback ? ", with a lookback" : ""}:{" "}
+      <Fig id={`a5.${L}.esppIn`} label={`${dollars(putIn)} put into the ESPP over the stay, as paid`}>{dollars(putIn)}</Fig> over the stay, as paid.{" "}
+      {gain ? (<>
+        Its purchases' gain,{" "}
+        <Fig id={`l6y.${L}.espp.sum`} label={`${dollars(gain.sum)} of ESPP gain over the stay, before tax, as paid`}>{dollars(gain.sum)}</Fig> before
+        tax, is pay ({L}-3), each lot counted as sold the day it's bought.{" "}
+      </>) : "It buys nothing in the stay. "}
+      Holding shares after purchase is an investment decision and isn't modeled.
+    </p>
+  );
+}
+
 function Benefits({ ctx, x, open, show }: Part) {
   const L = x.offer.letter;
   const b = x.breakdown!;
@@ -527,6 +554,7 @@ function Benefits({ ctx, x, open, show }: Part) {
       </p>
       {missing.map((m) => <p key={m} className="part-note">{m} Add it in detailed mode.</p>)}
       <PaidTimeOff L={L} o={o} />
+      <EsppNote L={L} t={t} o={o} b={b} />
       {o.health?.oopMax ? (
         <p className="part-note">
           A bad health year costs up to the plan's out-of-pocket maximum,{" "}
@@ -658,6 +686,7 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
 function Shortfall({ L, years: wy, warnings }: { L: Letter; years: Array<{ year: number; federalIncomeTax: number; withheld: { regular: number; supplemental: number } }>; warnings: OfferWarning[] }) {
   const years = warnings.flatMap((w) => (w.code === "withholdingShortfall" ? [w.params] : []));
   const supplemental = years.some((y) => y.supplemental);
+  const espp = years.some((y) => y.espp);
   return (
     <>
       Federal withholding falls short of the federal income tax on its pay by{" "}
@@ -671,7 +700,8 @@ function Shortfall({ L, years: wy, warnings }: { L: Letter; years: Array<{ year:
           </span>
         );
       })}, owed {years.length > 1 ? "each following April" : `in April ${years[0].year + 1}`}
-      {supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real rate on them" : ""}. Raising
+      {supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real rate on them" : ""}
+      {espp ? `${supplemental ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}. Raising
       your withholding on Form W-4 spreads it out.
     </>
   );

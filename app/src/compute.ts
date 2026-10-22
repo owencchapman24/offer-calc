@@ -112,7 +112,7 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
     s.gross += cents(e.gross);
     s.tax += cents(e.tax);
     split.set(key, s);
-    const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, tax: 0 };
+    const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, tax: 0 };
     p[e.component] += cents(e.gross);
     p.tax += cents(e.tax);
     posted.set(e.employmentYear, p);
@@ -134,13 +134,15 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
       };
     }),
     split: [...split.values()].map((s) => dollarsOf(s, ["gross", "tax"])),
-    posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "tax"])),
+    posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "espp", "tax"])),
     bonuses: r.events.flatMap((e) => (e.detail.kind === "bonus"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo }] : [])),
     rsus: r.events.flatMap((e) => (e.detail.kind === "rsu"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, refresher: e.detail.grant.kind === "refresher", tranche: e.detail.tranche,
         tranches: e.detail.tranches, priceFactor: e.detail.priceFactor, ...(e.detail.nominalDate ? { nominalDate: e.detail.nominalDate } : {}) }] : [])),
     cash: r.events.flatMap((e) => (e.detail.kind === "cash" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, award: e.detail.award }] : [])),
+    espps: r.events.flatMap((e) => (e.detail.kind === "espp" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, offeringStart: e.detail.offeringStart,
+      purchase: e.detail.purchase, purchases: e.detail.purchases }] : [])),
   };
   return { detail, base: r };
 }

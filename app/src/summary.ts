@@ -103,6 +103,21 @@ export function healthText(d: OfferDraft): string {
   return parts.join("; ");
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "10% of salary, 15% off with a lookback, 6-month offerings from Jan 1; each lot sold at purchase". Blank terms read as their defaults. */
+export function esppText(d: OfferDraft): string {
+  const p = d.espp;
+  if (!p) return "Not entered";
+  if (p === "none") return "No ESPP";
+  const months = p.offeringMonths ?? 6;
+  const per = p.purchasesPerOffering ?? 1;
+  const from = p.offeringsStart;
+  return `${percent(p.contributionPct ?? 0)} of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, ${percent(p.discount ?? 0.15)} off`
+    + `${p.lookback ?? true ? " with a lookback" : ", no lookback"}, ${months}-month offerings from ${from ? `${MONTHS[from.month - 1]} ${from.day}` : "—"}`
+    + `${per > 1 ? `, ${per} purchases each` : ""}${p.eligibleFrom ? `, eligible from ${longDate(p.eligibleFrom)}` : ""}; each lot sold at purchase`;
+}
+
 export function perksText(d: OfferDraft): string {
   const p = d.perks;
   const parts = [p.section127 ? `education ${dollars(p.section127)} a year` : "", p.commuterMonthly ? `commuter ${dollars(p.commuterMonthly)} a month` : ""]

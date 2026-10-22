@@ -37,7 +37,8 @@ export const helpKey = (path: string) => path.split(".").filter((k) => !/^\d+$/.
 /** An input's name out of context ("Promotions, date"): a field inside an editor is named with its editor. */
 export function fieldName(path: string): string {
   const key = helpKey(path);
-  const h = HELP[key];
+  // A field whose name loads with detailed mode is named by its part (an ESPP's terms) until then.
+  const h = HELP[key] ?? HELP[key.split(".")[0]];
   if (!h) return "Input";
   return h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
 }
@@ -86,6 +87,8 @@ const META: Record<string, FieldMeta> = {
   "equity.refreshers.everyMonths": { label: "Every", section: "M-3", group: "equity", editor: "equity.refreshers" },
   "equity.refreshers.schedule": { label: "Vesting", section: "M-3", group: "equity", editor: "equity.refreshers" },
   ...tranches("equity.refreshers", "equity.refreshers"),
+  // An ESPP (4i): its terms' names register with detailed mode and the derivations (detailedDefaults.ts), as their help does.
+  espp: { label: "Employee stock purchase plan", section: "M-3", group: "equity" },
   // ---- sign-on and other cash ----
   cashAwards: { label: "Sign-on and other cash", section: "M-2", group: "cash", editor: "cashAwards" },
   "cashAwards.label": { label: "Name", section: "M-2", group: "cash", editor: "cashAwards" },
@@ -167,6 +170,11 @@ const QUICK_HINTS: Record<string, string> = {
 export const HELP: Record<string, FieldHelp> = Object.fromEntries(Object.entries(META).map(([k, m]) => [k, { ...m, hint: QUICK_HINTS[k] ?? "", help: "" }]));
 
 /** Fills in help text: detailed mode's (helpText.ts, loaded with detailed mode) and the ⓘ help for quick mode and About you (quickHelp.ts). */
+/** Fields only detailed mode and the derivations show, registered when they load (detailedDefaults.ts): v2's items keep the main thread lean. */
+export function addFields(fields: Record<string, FieldMeta>): void {
+  for (const [k, m] of Object.entries(fields)) HELP[k] ??= { hint: "", help: "", ...m };
+}
+
 export function addHelpText(text: Record<string, Partial<FieldText>>): void {
   for (const [k, t] of Object.entries(text)) if (HELP[k]) Object.assign(HELP[k], t);
 }

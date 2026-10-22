@@ -111,7 +111,7 @@ describe("the comparison window", () => {
     salary: { annual, raise: null, raiseOn: null, promotions: [] },
     bonus: { basis: "fixed", amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
-    cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, retirement: null, health: null,
+    cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: null, health: null,
     perks: { section127: null, commuterMonthly: null }, hours: { weekly: { bear: 35, base: 35, bull: 35 } }, timeOff: blankTimeOff(),
     costOfLiving: { area: "35620", monthlyRent: 800, rentGrowth },
   });

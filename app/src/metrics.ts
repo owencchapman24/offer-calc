@@ -22,21 +22,21 @@ export type AboutField = "filing" | "stay" | "wages" | "spouse" | "healthUsage" 
 export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | "perks" | "healthExtra" | "savings" | "rent" | "faceValue";
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
 export type BridgeLine =
-  | "letter" | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
-  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved";
+  | "letter" | "salary" | "bonus" | "cash" | "rsu" | "espp" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
+  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved" | "inEspp";
 /** L-6's employment-year lines (docs/ui-design.md §4.8): cash; total rewards and hours; after rent. workpaper.ts numbers them. */
 export type L6Line =
-  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "takeHome"
+  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "esppHeld" | "takeHome"
   | "employer" | "oop" | "hsa" | "perks" | "totalRewards" | "hours" | "afterTaxHour" | "totalRewardsHour"
   | "savings" | "rent" | "local" | "atRef" | "oopRef" | "face" | "total" | "totalHour";
 /** L-6's calendar-year tax lines: what goes in, then each tax. `rate` is the offer's share ÷ its pay (the offer's column only). */
 export type TaxLine =
-  | "wages" | "spouse" | "pretax401k" | "section125" | "taxable" | "federal" | "ss" | "medicare" | "state" | "statePayroll" | "local" | "total" | "rate";
+  | "wages" | "statutory" | "spouse" | "pretax401k" | "section125" | "taxable" | "federal" | "ss" | "medicare" | "state" | "statePayroll" | "local" | "total" | "rate";
 /** Each L-6 year line's tickmark: inputs traced, sums footed, the rest worked out. */
 const L6_KIND: Record<L6Line, TickKind> = {
-  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", gross: "footed", tax: "recomputed",
-  premiums: "traced", afterTax: "footed", yours: "recomputed", takeHome: "footed", employer: "recomputed", oop: "traced", hsa: "traced",
-  perks: "traced", totalRewards: "footed", hours: "recomputed", afterTaxHour: "recomputed", totalRewardsHour: "recomputed",
+  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", espp: "recomputed", gross: "footed",
+  tax: "recomputed", premiums: "traced", afterTax: "footed", yours: "recomputed", esppHeld: "recomputed", takeHome: "footed", employer: "recomputed",
+  oop: "traced", hsa: "traced", perks: "traced", totalRewards: "footed", hours: "recomputed", afterTaxHour: "recomputed", totalRewardsHour: "recomputed",
   savings: "recomputed", rent: "traced", local: "footed", atRef: "recomputed", oopRef: "recomputed", face: "recomputed", total: "footed",
   totalHour: "recomputed",
 };
@@ -44,7 +44,7 @@ const L6_KIND: Record<L6Line, TickKind> = {
 /** An offer's breakdown, A-1 (docs/v2-plan.md, item 5): its bottom line over its own stay, and what it's built from. `bull`: A-4's. */
 export type OwnLine = "total" | "spend" | "saved" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "rate" | "hour" | "bear" | "drop" | "bull";
 /** A-2, where the money goes: each part of a year's pay in dollars and as a share of each $100, the $100, and the employer's money on top. */
-export type A2Part = "tax" | "rent" | "health" | "saved" | "spend";
+export type A2Part = "tax" | "rent" | "health" | "saved" | "espp" | "spend";
 export type A2Line = A2Part | `${A2Part}Share` | "hundred" | "credited";
 /** A-6, tax by calendar year: the offer's pay and tax that year, its rate, and the tax by kind. */
 export type A6Line = "gross" | "tax" | "rate" | "federal" | "fica" | "state" | "local";
@@ -72,6 +72,7 @@ export type MetricId =
   | `forgone.${L}.${number}` // L-4: what was earned toward a bonus that leaving forfeits (the offer's nth)
   | `forfeit.${L}.${"rsu" | "k401"}` // L-4: RSUs or employer 401(k) money not vested by then
   | `vac.${L}` // L-4 and A-4: unused vacation paid on the last day picked (4a)
+  | `refund.${L}` // L-4 and A-4: ESPP money that comes back on the last day picked (4i)
   | `next.${L}` // L-4: what staying until the next cliff is worth
   | `nextown.${L}` // L-4: the next cliff's own part of that
   | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
@@ -96,6 +97,7 @@ export type MetricId =
   | `nextup.${L}` // A-4: what staying until the next cliff from the start (or today) is worth after tax
   | `a5.${L}.${"credited" | "added" | "month"}.${number | "sum"}` // A-5: employer 401(k) money credited; total rewards less after-tax pay
   | `a5.${L}.pto` // A-5: what its starting salary pays a year for paid days off (4a)
+  | `a5.${L}.esppIn` // A-5: what goes into its ESPP over its stay (4i)
   | `a6.${L}.${number}.${A6Line}`; // A-6: a calendar year's pay, tax, rate and tax by kind
 // L-5 and L-6 retired at stop 5B (docs/v2-plan.md, item 5, B8): each offer's warnings are in its A-6, and the `l6*` ids are A-7's
 // figures, each offer's tables over its own stay. The ids kept their names; the page calls the tables A-7.
@@ -212,7 +214,7 @@ export function metricKind(id: MetricId, ctx: WorkContext): TickKind {
     case "tie": return a === "target" ? "crossFooted" : "recomputed";
     case "rentnote": return "estimate";
     case "alone": return "crossFooted";
-    case "a2": return c === "tax" || c === "rent" || c === "credited" ? "crossFooted" : c === "hundred" || c === "health" || c === "saved" || c === "spend" ? "footed"
+    case "a2": return c === "tax" || c === "rent" || c === "espp" || c === "credited" ? "crossFooted" : c === "hundred" || c === "health" || c === "saved" || c === "spend" ? "footed"
       : "recomputed";
     case "a5": return b === "month" || b === "pto" || (b === "credited" && c !== "sum") ? "recomputed" : "footed";
     case "a6": return c === "tax" || c === "federal" || c === "rate" ? "footed" : "recomputed";

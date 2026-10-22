@@ -127,7 +127,9 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
           Year 1, as paid, in {v.place} dollars:{" "}
           <Fig id={`own.${L}.y1spend`} label={`${$(v.year1.spendMonth)} a month to spend after rent, in year 1`}>{dollars(v.year1.spendMonth)}</Fig> a
           month to spend after rent + <Fig id={`own.${L}.y1saved`} label={`${$(v.year1.savedMonth)} a month saved, in year 1`}>
-            {dollars(v.year1.savedMonth)}</Fig> a month saved. {v.differs}
+            {dollars(v.year1.savedMonth)}</Fig> a month saved
+          {v.year1.held ? <>{" "}+ <Fig id={`br.${L}.1.inEspp`} label={`${$(v.year1.heldMonth)} a month held in the ESPP, in year 1`}>
+            {dollars(v.year1.heldMonth)}</Fig> a month held in the ESPP</> : null}. {v.differs}
         </p>
       )}
       <p className="own-facts">

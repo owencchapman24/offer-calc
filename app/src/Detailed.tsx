@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
+import "./detailedDefaults"; // the defaults and fields only detailed mode and the derivations read, first: helpText adds to the fields
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
 import "./quickHelp"; // and the ⓘ help of quick mode's fields, which detailed mode shows too
-import "./detailedDefaults"; // and the defaults only detailed mode and the derivations read
 import {
-  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
+  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newEspp, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
   PromotionsEditor, RefreshersEditor, VestingStepsEditor,
 } from "./editors";
-import { ChoiceField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings } from "./controls";
+import {
+  ChoiceField, DateField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings,
+} from "./controls";
 import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
-import { type AppOffer, bonusBasis, type HealthDraft, type RetirementDraft } from "./model";
+import { type AppOffer, bonusBasis, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
 import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
 import { bonusYearsText, cashAwardsText, grantsText, matchText, promotionsText, refreshersText } from "./summary";
@@ -134,8 +136,44 @@ function Equity() {
         )}
       </FieldRow>
       <EditorRow row="equity.refreshers" title="Refreshers">{(o) => <RefreshersEditor o={o} />}</EditorRow>
+      <FieldRow k="espp">
+        {(o) => (
+          <>
+            <PlanField o={o} path="espp" label="employee stock purchase plan" has="Has an ESPP" none="No ESPP" start={newEspp} />
+            {hasEspp(o.draft) && <span className="sub field-note">Holding shares after purchase is an investment decision and isn't modeled.</span>}
+          </>
+        )}
+      </FieldRow>
+      <EsppRow k="espp.contributionPct">
+        {(o) => (
+          <span className="field">
+            <NumberField o={o} path="espp.contributionPct" kind="percent" unit="% of pay" label="ESPP contribution" blank="Not counted" />
+            <Warnings o={o} path="espp.contributionPct" />
+          </span>
+        )}
+      </EsppRow>
+      <EsppRow k="espp.eligiblePay">
+        {(o) => <ChoiceField o={o} path="espp.eligiblePay" label="pay the ESPP counts" options={[["salary", "Salary"], ["salaryAndBonus", "Salary and bonus"]]} />}
+      </EsppRow>
+      <EsppRow k="espp.discount">{(o) => <NumberField o={o} path="espp.discount" kind="percent" label="ESPP discount" />}</EsppRow>
+      <EsppRow k="espp.lookback">{(o) => <ChoiceField o={o} path="espp.lookback" label="ESPP lookback" options={[[true, "Yes"], [false, "No"]]} />}</EsppRow>
+      <EsppRow k="espp.offeringMonths">
+        {(o) => <NumberField o={o} path="espp.offeringMonths" kind="number" unit="months" label="ESPP offering length" />}
+      </EsppRow>
+      <EsppRow k="espp.purchasesPerOffering">
+        {(o) => <NumberField o={o} path="espp.purchasesPerOffering" kind="number" label="ESPP purchases an offering" />}
+      </EsppRow>
+      <EsppRow k="espp.offeringsStart">{(o) => <MonthDayField o={o} path="espp.offeringsStart" label="ESPP offerings start" none="—" />}</EsppRow>
+      <EsppRow k="espp.eligibleFrom">
+        {(o) => <DateField o={o} path="espp.eligibleFrom" label="ESPP eligible from" fallback={o.draft.startDate} />}
+      </EsppRow>
     </>
   );
+}
+
+/** A row about an ESPP's terms: a cell for each offer that has one, a dash for the others. */
+function EsppRow({ k, children }: { k: string; children: (o: AppOffer) => ReactNode }) {
+  return <FieldRow k={k}>{(o) => (hasEspp(o.draft) ? children(o) : <span className="sub">—</span>)}</FieldRow>;
 }
 
 function Hours() {

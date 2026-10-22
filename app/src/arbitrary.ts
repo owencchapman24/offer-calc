@@ -6,7 +6,7 @@ import { US_PRICES } from "./prices";
 
 // Generated inputs for the property tests (properties.test.ts, display.test.ts): offers and households as a person could enter
 // them, in every combination the samples never reach (joint filing, different start days, a later start, rent of $0, a cash
-// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges). Test code only: it imports
+// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges, an ESPP). Test code only: it imports
 // fast-check, a dev dependency, and the app never imports it.
 
 const addDays = (iso: string, n: number) => fromDays(toDays(iso) + n);
@@ -103,6 +103,18 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
     }), 1),
     rent: fc.oneof(fc.constant(null), fc.constant(0), dollars(800, 6_000, 50)),
     rentGrowth: maybe(pct(0.06)),
+    // An ESPP (4i), not entered, none, or entered: any contribution up to the $25,000 limit and past it, any discount, with or without a
+    // lookback, offerings of 1 to 27 months with purchases that split them, from any day, on salary or salary and bonus, joined late or
+    // not, the price rising or flat.
+    espp: simple ? fc.constant(null) : fc.oneof(
+      { arbitrary: fc.constant(null), weight: 2 }, { arbitrary: fc.constant("none" as const), weight: 1 },
+      { arbitrary: fc.record({
+        contributionPct: pct(0.2, 0.01), discount: maybe(pct(0.15, 0.05), 1), lookback: fc.constantFrom(null, true, false),
+        eligiblePay: fc.constantFrom(null, "salary" as const, "salaryAndBonus" as const),
+        shape: fc.constantFrom<[number, number | null]>([6, null], [3, null], [12, 2], [24, 4], [27, 3], [1, 1], [6, 6]),
+        offeringsStart: monthDay, joinAfter: maybe(fc.integer({ min: 1, max: 200 })), growth: maybe(ordered(pct(0.15, 0.01))),
+      }), weight: 2 },
+    ),
   }).map((g): OfferDraft => {
     const bonus = g.bonus === null ? b.bonus : {
       ...b.bonus, basis: g.bonus.basis, amount: g.bonus.amount, payOn: g.payOn, cutoff: g.cutoff, periodStart: g.periodStart,
@@ -117,7 +129,7 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
         clawback: c.clawback ? { months: c.clawback.months, kind: c.clawback.kind, per: null, from: null, repay: null } : null })),
       equity: {
         grants: g.grant ? [{ label: "New-hire RSUs", value: g.grant.value, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }] : [],
-        priceGrowth: g.grant?.growth ?? null,
+        priceGrowth: g.grant?.growth ?? (g.espp && g.espp !== "none" ? g.espp.growth : null),
         refreshers: g.grant && g.refreshers ? { value: g.refreshers, firstAfterMonths: null, everyMonths: null, schedule: { tranches: null, vestDates: null } } : null,
       },
       retirement: g.retirement === null || g.retirement === "none" ? g.retirement : {
@@ -127,6 +139,11 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       health: g.health === null || g.health === "none" ? g.health : {
         premium: g.health.premium, outOfPocket: { low: g.health.oop / 2, medium: g.health.oop, high: g.health.oop * 2 }, oopMax: null,
         employeeHsa: null, employerHsa: g.health.employerHsa, coverage: null,
+      },
+      espp: g.espp === null || g.espp === "none" ? g.espp : {
+        contributionPct: g.espp.contributionPct, eligiblePay: g.espp.eligiblePay, discount: g.espp.discount, lookback: g.espp.lookback,
+        offeringMonths: g.espp.shape[0], purchasesPerOffering: g.espp.shape[1], offeringsStart: g.espp.offeringsStart,
+        eligibleFrom: g.espp.joinAfter === null ? null : addDays(start, g.espp.joinAfter),
       },
       hours: { weekly: g.hours },
       timeOff: g.timeOff ?? blankTimeOff(),

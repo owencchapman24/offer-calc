@@ -45,9 +45,9 @@ export interface L6Row {
 
 /** What each subtotal adds up: its lines, in order (those shown). */
 export const FOOTS: Partial<Record<L6Line, L6Line[]>> = {
-  gross: ["salary", "bonus", "cash", "rsu", "clawback"],
+  gross: ["salary", "bonus", "cash", "rsu", "espp", "clawback"],
   afterTax: ["gross", "tax", "premiums"],
-  takeHome: ["afterTax", "yours"],
+  takeHome: ["afterTax", "yours", "esppHeld"],
   totalRewards: ["afterTax", "employer", "oop", "hsa", "perks"],
   local: ["takeHome", "savings", "rent"],
   total: ["atRef", "oopRef", "face"],
@@ -98,6 +98,7 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   if (any((y) => y.bonus)) line("bonus", "cash", "Bonus", (y) => y.bonus);
   if (any((y) => y.cash)) line("cash", "cash", cap(cashName(o)), (y) => y.cash);
   if (any((y) => y.rsu)) line("rsu", "cash", "RSUs vested", (y) => y.rsu);
+  if (any((y) => y.espp)) line("espp", "cash", "ESPP gain", (y) => y.espp, { gloss: "shares bought at a discount and sold the same day" });
   if (any((y) => y.clawback)) line("clawback", "cash", "Clawbacks repaid", (y) => y.clawback, { lead: "less" });
   sub("gross", "cash", "Pay", (y) => y.gross);
   line("tax", "cash", "Tax", (y) => -y.tax, { lead: "less", gloss: taxWho(ctx, letter) });
@@ -105,7 +106,13 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   sub("afterTax", "cash", "After-tax pay", (y) => y.afterTax);
   const yours = any((y) => y.yours);
   if (yours) line("yours", "cash", "Your 401(k) and HSA", (y) => -y.yours, { lead: "less", gloss: "pre-tax, but saved, not spent" });
-  if (yours || col) sub("takeHome", "cash", "Take-home pay", (y) => y.takeHome, "total");
+  // Money in the plan at the year's end: put in, less what bought shares or came back. A year can take out more than it puts in.
+  const held = any((y) => y.esppHeld);
+  if (held) {
+    line("esppHeld", "cash", "Held in the ESPP", (y) => -y.esppHeld,
+      { ...(ys.every((y) => y.esppHeld >= 0) ? { lead: "less" as const } : {}), gloss: "put in, less what bought shares or came back" });
+  }
+  if (yours || held || col) sub("takeHome", "cash", "Take-home pay", (y) => y.takeHome, "total");
   else rows[rows.length - 1].kind = "total";
 
   // Total rewards and hours.
@@ -195,7 +202,8 @@ function rentGloss(d: OfferDetail): string {
 
 function faceGloss(ys: ShownYear[]): string {
   const parts = [
-    ys.some((y) => y.col!.savings) && "planned savings", ys.some((y) => y.yours) && "your 401(k) and HSA", ys.some((y) => y.employer) && "the vested match",
+    ys.some((y) => y.col!.savings) && "planned savings", ys.some((y) => y.yours) && "your 401(k) and HSA", ys.some((y) => y.esppHeld) && "ESPP money held",
+    ys.some((y) => y.employer) && "the vested match",
     ys.some((y) => y.hsa) && "employer HSA money", ys.some((y) => y.perks) && "perks",
   ].filter(Boolean) as string[];
   return parts.length ? parts.join(", ") : "nothing saved";
@@ -253,9 +261,11 @@ export const addCents = (xs: number[]) => xs.reduce((s, x) => s + Math.round(x *
 const TO_CENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const toCent = (x: number) => `${x < 0 ? "−" : ""}${TO_CENT.format(Math.abs(x))}`;
 
-export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback"];
+export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "espp", "clawback"];
 /** Each kind of payment's name in the list. */
-export const KIND_NAME: Record<Component, string> = { salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", clawback: "Clawbacks" };
+export const KIND_NAME: Record<Component, string> = {
+  salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", espp: "ESPP gains", clawback: "Clawbacks",
+};
 
 export interface PaymentGroup {
   component: Component;
@@ -322,6 +332,7 @@ export function exactPay(p: WorkPayment): number {
     case "rsu": return d.fraction * d.grantValue * d.priceFactor;
     case "clawback": return p.gross;
     case "vacationPayout": return (d.days * d.annual) / d.workdays;
+    case "espp": return (d.used * d.priceRatio) / d.pricePaid - d.used;
   }
 }
 
@@ -343,6 +354,7 @@ export function paymentLabel(p: WorkPayment): string {
     case "rsu": return `${d.grant.kind === "grant" ? d.grant.label : `${d.grant.label ?? "Refresher"} ${d.grant.number}`}, tranche ${d.tranche} of ${d.tranches}`;
     case "clawback": return `${d.award} repaid`;
     case "vacationPayout": return "Unused vacation paid out";
+    case "espp": return `ESPP purchase${d.purchases > 1 ? ` ${d.purchase} of ${d.purchases}` : ""}, the offering from ${longDate(d.offeringStart)}`;
   }
 }
 
@@ -366,6 +378,8 @@ export function paymentFormula(p: WorkPayment): string {
       + `${d.nominalDate ? `; due ${longDate(d.nominalDate)}, vests on the company's next date` : ""}`;
     case "clawback": return `${toCent(d.amount)} × ${percent(d.fraction)}`;
     case "vacationPayout": return `${+d.days.toFixed(2)} days × ${amount(d.annual)} a year ÷ ${d.workdays} workdays`;
+    case "espp": return `${toCent(d.used)} × ${d.priceRatio.toFixed(6)} share value ÷ ${d.pricePaid.toFixed(6)} price paid − ${toCent(d.used)}`
+      + `${d.refunded > 0.005 ? `; ${toCent(d.refunded)} over the $25,000 limit came back` : ""}`;
   }
 }
 
@@ -459,6 +473,8 @@ function taxTablesOf(w: WorkOffer, st: string, local: string, joint: boolean, n:
     const other = R(t.without.wages);
     const rows: TaxRow[] = [
       { line: "wages", label: "Wages", gloss: "your other wages, and the offer's pay", kind: "input", with: other + offerPay, without: other, offer: offerPay },
+      ...(t.with.statutory || t.without.statutory ? [{ line: "statutory" as const, label: "Of which, ESPP gain", gloss: "income tax, not Social Security or Medicare",
+        kind: "input" as const, with: R(t.with.statutory), without: R(t.without.statutory), offer: R(t.with.statutory) - R(t.without.statutory) }] : []),
       ...(joint && (t.with.spouseWages || t.without.spouseWages) ? [{ line: "spouse" as const, label: "Your spouse's wages", kind: "input" as const, with: R(t.with.spouseWages), without: R(t.without.spouseWages), offer: 0 }] : []),
       ...(t.with.pretax401k || t.without.pretax401k ? [{ line: "pretax401k" as const, label: "Pre-tax 401(k)", gloss: "out of wages before income tax", kind: "input" as const,
         with: R(t.with.pretax401k), without: R(t.without.pretax401k), offer: R(t.with.pretax401k) - R(t.without.pretax401k) }] : []),

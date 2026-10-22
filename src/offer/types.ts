@@ -40,6 +40,8 @@ export interface OfferInput {
   hours?: Hours;
   /** Days off (they set the weeks worked) and the vacation policy (what's paid out when you leave). Defaults: timeOff.ts. */
   timeOff?: TimeOff;
+  /** An employee stock purchase plan, each lot sold the day it's bought (espp.ts). */
+  espp?: Espp;
   /** Where you'd live, for cost-of-living comparisons (BEA Regional Price Parities). */
   costOfLiving?: OfferCostOfLiving;
 }
@@ -145,6 +147,31 @@ export interface TimeOff {
    * requires it; "always": the offer's policy pays it out anywhere.
    */
   payout?: "state" | "always";
+}
+
+/**
+ * An employee stock purchase plan under IRC 423 (docs/v2-plan.md, 4i). Each eligible paycheck puts its percentage aside, after tax;
+ * each purchase buys shares at the discount (with a lookback, off the lower of the offering's first-day and purchase-day value),
+ * within the $25,000 limit (IRC 423(b)(8)), and every lot is sold the day it's bought: holding shares after purchase is an
+ * investment decision and isn't modeled. The share price follows `equity.priceGrowth`.
+ */
+export interface Espp {
+  /** Your contribution, a fraction of eligible pay, e.g. 0.1. */
+  contributionPct: number;
+  /** Pay that counts. Default "salary"; "salaryAndBonus" adds bonuses. */
+  eligiblePay?: "salary" | "salaryAndBonus";
+  /** The discount, 0 to 0.15 (IRC 423(b)(6)). */
+  discount: number;
+  /** The price is the discount off the lower of the offering's first-day and the purchase-day value. */
+  lookback: boolean;
+  /** An offering's length in whole months, 1 to 27 (IRC 423(b)(7)); one follows another. */
+  offeringMonths: number;
+  /** Purchases in each offering, evenly spaced, the last on its last day. Default 1. */
+  purchasesPerOffering?: number;
+  /** A day offerings start on: offerings run back to back from it, every `offeringMonths`. */
+  offeringsStart: MonthDay;
+  /** The first day you may join, if the plan has a wait. Default: your start date. */
+  eligibleFrom?: ISODate;
 }
 
 export interface Equity {
@@ -300,7 +327,8 @@ export type ValuedOptions = Omit<ProjectionOptions, "scenario"> & { valuationDat
 // The engine returns numbers and codes, never formatted text: src/format turns details, warnings
 // and assumptions into words, so the UI owns formatting and the engine stays fast.
 
-export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback";
+/** "espp": an ESPP purchase's spread, sold the same day: wages for income tax, not FICA (IRC 3121(a)(22)). */
+export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp";
 
 /** A new-hire grant (its label), or a refresher (the policy's label, its number and grant date). */
 export type RsuGrantRef =
@@ -327,6 +355,14 @@ export type EventDetail =
   /** -amount x fraction (after tax for a later-year repayment on a net basis). */
   | { kind: "clawback"; award: string; amount: number; fraction: number; basis: "gross" | "net"; sameYear: boolean;
       paidYear: number; repaidYear: number }
+  /**
+   * An ESPP purchase, sold the same day: the gain is used x priceRatio / pricePaid - used, where priceRatio is the purchase-day
+   * value over the offering's first-day value and pricePaid the price over that first-day value ((1 - discount) x the lower of 1
+   * and priceRatio with a lookback, else x priceRatio). `contributed` is what the purchase period put aside; `refunded` what the
+   * $25,000 limit (`limitValue`, at the first-day value) sent back in cash.
+   */
+  | { kind: "espp"; offeringStart: ISODate; purchase: number; purchases: number; contributed: number; used: number; refunded: number;
+      discount: number; lookback: boolean; priceRatio: number; pricePaid: number; limitValue: number }
   /** Unused vacation paid on your last day (component "cash"): days x annual / workdays (the salary rate that day / 260). */
   | { kind: "vacationPayout"; days: number; annual: number; workdays: number; rule: VacationPayoutRule };
 
@@ -350,7 +386,11 @@ export type BenefitDetail =
   /** annual / 12 x days / daysInMonth; capped at its annual limit; usage: the out-of-pocket level. */
   | { kind: "accrual"; annual: number; days: number; daysInMonth: number; capped: boolean; usage?: "low" | "medium" | "high" }
   /** monthly x days / daysInMonth (132(f) commuter). */
-  | { kind: "monthly"; monthly: number; days: number; daysInMonth: number };
+  | { kind: "monthly"; monthly: number; days: number; daysInMonth: number }
+  /** Money put into the ESPP from a paycheck: rate x pay, after tax. */
+  | { kind: "esppContribution"; rate: number; pay: number }
+  /** Money out of the ESPP: a purchase (its contributions, the shares sold the same day), or a refund on your last day. */
+  | { kind: "esppOut"; why: "purchase" | "leaving" };
 
 /** A warning about the inputs or the result: a code and the numbers behind it. */
 export type OfferWarning =
@@ -364,8 +404,12 @@ export type OfferWarning =
   | { code: "hsaCap"; params: { year: number; limit: number } }
   | { code: "section127Cap"; params: { year: number; limit: number } }
   | { code: "commuterCap"; params: { year: number; monthlyLimit: number } }
+  /** ESPP contributions over the $25,000 limit came back in cash at a purchase. */
+  | { code: "esppCap"; params: { year: number; limit: number } }
+  /** Every ESPP lot counts as sold the day it's bought: holding, resets, overlapping offerings and fees aren't modeled. */
+  | { code: "esppSoldAtPurchase"; params: Record<string, never> }
   | { code: "clawbackFica"; params: { award: string; paidYear: number; repaidYear: number } }
-  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean } }
+  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean; espp?: boolean } }
   /** An unlimited vacation policy where the state requires paying out vacation: assumed to accrue nothing (McPherson, in CA). */
   | { code: "unlimitedVacation"; params: { state: string } };
 
@@ -395,6 +439,9 @@ export type Assumption =
   /** `daysOff`: present when the weeks come from days off rather than `hours.weeksPerYear`. */
   | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number;
       daysOff?: { vacation: number; holidays: number; sick: number } } }
+  /** The ESPP's terms, and the share price's growth this scenario. */
+  | { code: "espp"; params: { contributionPct: number; eligiblePay: "salary" | "salaryAndBonus"; discount: number; lookback: boolean;
+      offeringMonths: number; purchasesPerOffering: number; priceGrowth: number } }
   /** The vacation policy: what banks a year and whether it's paid when you leave (`required`: by the employer state's law). */
   | { code: "vacation"; params: { policy: "days" | "unlimited"; gives: number; taken: number; cap?: number; payout: "state" | "always";
       employerState: string; required: boolean; afterYears?: number } }
@@ -428,7 +475,9 @@ export interface CompEvent {
 
 export type BenefitKind =
   | "employee401k" | "employer401k" | "premium" | "outOfPocket" | "employeeHsa" | "employerHsa"
-  | "section127" | "commuter";
+  | "section127" | "commuter"
+  /** Money into the ESPP (positive) and out of it (negative): yours, held for a purchase. */
+  | "espp";
 
 /** A dated benefit flow. Amounts are positive; kind says which way they count. */
 export interface BenefitEvent {
@@ -502,6 +551,11 @@ export interface CostOfLivingTotals {
   /** Money not spent locally, at face value: planned savings, your 401(k) and HSA contributions, vested employer 401(k), employer HSA and perks. */
   faceValue: number;
   /**
+   * The ESPP's money while the plan holds it, at face value: part of faceValue (in when it's put aside, out when it buys shares or comes
+   * back). Present only for an offer with an ESPP (4i).
+   */
+  esppHeld?: number;
+  /**
    * COL-adjusted total = discretionaryReference - outOfPocketReference + faceValue.
    * Equivalently, total rewards - rent + (nonHousingFactor - 1) x (nonHousingLocal - out-of-pocket).
    */
@@ -569,6 +623,8 @@ export interface EmploymentYearResult {
   retirement: { employee: number; employerCredited: number; employerVested: number };
   health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
   perks: { face: number; preTaxEquivalent: number };
+  /** ESPP money put in during the year, and how much more the plan holds at its end than at its start (take-home sets it aside). */
+  espp: { putIn: number; held: number };
   /** After-tax comp + vested employer retirement + perks - out-of-pocket + employer HSA. */
   totalRewards: number;
   /** Hours worked in the year (prorated if employment covers part of it). Present when hours are given. */
@@ -609,9 +665,12 @@ export interface LeaveResult {
   retirementForfeited: number;
   /** Unused vacation banked by the leave date (days), and what's paid for it, gross (0 when it isn't paid). */
   vacation: { banked: number; paid: number; rule: VacationPayoutRule | null };
+  /** ESPP money put aside for a purchase not yet made, refunded on the last day. */
+  esppRefund: number;
 }
 
-export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest" | "vacationPayout";
+export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest" | "vacationPayout"
+  | "esppPurchase";
 
 /** A date where your last day starts to matter: leave on or after it to keep what it brings. */
 export interface Cliff {

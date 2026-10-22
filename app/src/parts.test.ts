@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage } from "./testing";
-import { yearTable } from "./workpaper";
+import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withEspp } from "./testing";
+import { taxTable, yearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B), against the plan's worked example: sample A at the samples'
 // fixed dates (start Jul 13, 2026, valued that day, a 4-year stay). Hand-checked values carry their arithmetic.
@@ -134,6 +134,67 @@ describe("4a: days off, and unused vacation paid when you leave", () => {
     const d = derive("a5.A.pto", ctx);
     footsAsDisplayed("a5.A.pto", d);
     expect(d.lines.map((l) => l.value)).toEqual(["110,000", "19", "260", "8,038"]);
+  });
+});
+
+describe("an ESPP (4i): sample A putting 10% of salary in, at the plan's defaults", () => {
+  // 15% off with a lookback, 6-month offerings from Jan 1, the share price flat. A starts Jul 13, 2026, after Jul 1's offering began, so it
+  // joins Jan 1, 2027's: Jan-Jun's 6 × 110,000 ÷ 12 × 10% = 5,500 buys 5,500 ÷ 0.85 = 6,470.59 of stock on Jun 30, sold at once, a gain of
+  // 970.59. Jul 1-12, 2027's 110,000 ÷ 12 × 12/31 × 10% = 354.84 is still in the plan at year 1's end (Jul 12).
+  const ctx = alone("A", (o) => withEspp(o));
+  const d = own(ctx, "A").detail;
+  const t = yearTable(ctx, "A");
+  const line = (l: string) => t.rows.find((r) => r.line === l)!;
+  it("A-3 lists each purchase's gain by date, and its pay line adds them", () => {
+    const buys = arrivalsOf(d, 4).filter((a) => a.kind === "espp");
+    // Dec 31, 2029's offering straddles the promotion (Jul 13, 2029, to 148,500): 354.84 + 148,500 ÷ 12 × 19/31 × 10% = 758.47, + 5 months of
+    // 1,237.50 = 7,300.81, a gain of 7,300.81 ÷ 0.85 - 7,300.81 = 1,288.38; Jun 30, 2030's 6 × 1,237.50 = 7,425 gains 1,310.29.
+    expect(buys.map((a) => [a.date, a.gross])).toEqual([["2027-06-30", 970.59], ["2027-12-31", 970.59], ["2028-06-30", 970.59], ["2028-12-31", 970.59],
+      ["2029-06-30", 970.59], ["2029-12-31", 1_288.38], ["2030-06-30", 1_310.29]]);
+    expect(buys[0].label).toBe("ESPP purchase, the offering from Jan 1, 2027");
+    // Years 2 and 3 have two purchases each, 2 × 970.59 = 1,941.18; year 4, 1,288.38 + 1,310.29 = 2,598.67.
+    expect(line("espp").values).toEqual([971, 1_941, 1_941, 2_599]);
+    expect(line("gross").values[0]).toBe(152_986 + 971);
+  });
+  it("A-2: the money held at year 1's end is a share of its own, 355, $0.23 of each $100; saved stays the 401(k)'s 6,600", () => {
+    const h = hundredOf(d, 1)!;
+    // Paid 152,986 + 971 = 153,957. Saved 6,600 ÷ 153,957 = 0.042869 -> $4.29; in the ESPP 355 ÷ 153,957 = 0.002306 -> $0.23; left to
+    // spend, 153,957 - 42,071 tax - 45,600 rent - 3,300 health - 6,600 - 355 = 56,031.
+    expect(h.parts.map((p) => [p.part, p.dollars])).toEqual([["tax", 42_071], ["rent", 45_600], ["health", 3_300], ["saved", 6_600], ["espp", 355],
+      ["spend", 56_031]]);
+    expect(h.parts.filter((p) => p.part === "saved" || p.part === "espp").map((p) => centsText(p.cents))).toEqual(["$4.29", "$0.23"]);
+    expect(h.parts.reduce((s, p) => s + p.cents, 0)).toBe(10_000);
+    for (const id of ["a2.A.1.espp", "a2.A.1.esppShare", "a2.A.1.spend", "a2.A.1.hundred", "br.A.1.saved", "br.A.1.inEspp"] as const) footsAsDisplayed(id, derive(id, ctx));
+    // The bridge's month: 56,031 ÷ 12 = $4,669 to spend + (10,255 at face value - 355) ÷ 12 = $825 saved + 355 ÷ 12 = $30 in the ESPP.
+    expect(words(renderAlone(ctx))).toContain("= $4,669 a month to spend after rent + $825 a month saved + $30 a month held in the ESPP, in year 1, in New York dollars");
+  });
+  it("A-7: take-home pay is after-tax pay less the 401(k) and the money held; its work foots", () => {
+    // Put in 5,854.84 (5,500 + 354.84), out 5,500 at the purchase: 354.84 held.
+    expect(line("esppHeld").values[0]).toBe(-355);
+    expect(line("takeHome").values[0]).toBe(t.years[0].afterTax - 6_600 - 355);
+    const held = derive("l6y.A.esppHeld.1", ctx);
+    footsAsDisplayed("l6y.A.esppHeld.1", held);
+    expect(held.lines.map((l) => l.value)).toEqual(["5,854.84", "5,500.00", "355"]);
+    for (const id of ["l6y.A.espp.1", "l6y.A.face.1", "br.A.1.espp", "own.A.y1saved", "own.A.y1spend"] as const) footsAsDisplayed(id, derive(id, ctx));
+  });
+  it("A-5: what goes in over the stay, 5,855 + 11,000 + 11,000 + 14,850 = 42,705, and the holding note", () => {
+    const esppIn = derive("a5.A.esppIn", ctx);
+    footsAsDisplayed("a5.A.esppIn", esppIn);
+    expect(esppIn.lines.map((l) => l.value)).toEqual(["5,855", "11,000", "11,000", "14,850", "42,705"]);
+    const text = words(renderAlone(ctx));
+    expect(text).toContain("Its ESPP puts 10% of salary toward company stock at 15% off, with a lookback: $42,705 over the stay, as paid.");
+    expect(text).toContain("Holding shares after purchase is an investment decision and isn't modeled.");
+  });
+  it("A-4: leaving on its first last day, Jan 12, 2027, gives back Jan 1-12's 110,000 ÷ 12 × 12/31 × 10% = 354.84, without a gain", () => {
+    expect(ctx.own!.leave!.panels.A!.esppRefund).toBe(354.84);
+    const text = words(renderAlone(ctx));
+    expect(text).toContain("get back $355 put toward an ESPP purchase,");
+    expect(text).toContain("Its first ESPP purchase is Jun 30, 2027; leaving before a purchase gives back what you've put toward it, without the gain.");
+    footsAsDisplayed("refund.A", derive("refund.A", ctx));
+  });
+  it("A-7's tax: the gain is wages for income tax, not FICA: 2027's two purchases, 2 × 970.59 = 1,941", () => {
+    const row = taxTable(ctx, "A", 2027).rows.find((r) => r.line === "statutory")!;
+    expect([row.label, row.with, row.without, row.offer]).toEqual(["Of which, ESPP gain", 1_941, 0, 1_941]);
   });
 });
 

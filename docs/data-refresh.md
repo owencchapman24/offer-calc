@@ -125,6 +125,15 @@ figures (yearly, September, with D14's defaults), the IRS mileage rates (each De
 each convenience rule's and cross-state pair's sources (each January), and, if 4f is built, the repayment plans' rules. Each gets a
 section here when its item lands.
 
+**An employee stock purchase plan (4i, built 2026-10-22):**
+- **The ESPP's defaults, with each survey's new edition:** 15% off, a lookback and 6-month offerings (NASPP and Deloitte Tax's 2023
+  Employee Stock Purchase Plan Survey; a 2026 edition exists, for participants and members) and one purchase an offering (Fidelity
+  Stock Plan Services' ESPP data analysis, 2025): the reasons in `app/src/detailedDefaults.ts`, the help (`helpText.ts`) and M-11.
+  A default that's no longer the most common changes the default and its `D`'s reason, with the defaults test.
+- **Its tax, each January:** the $25,000 limit and the 15% and 27-month bounds are statute (IRC 423(b)), not indexed. Re-read IRS
+  Pub. 525's and Pub. 15-B's ESPP sections, and the state payroll taxes' wage definitions (CLAUDE.md section 10 lists those that likely
+  reach the gain; a state's agency guidance can settle one, as a flag on its payroll component in `states2026.ts`, a tax-engine change).
+
 **Days off and unused vacation (4a, built 2026-10-19):**
 - **The vacation-payout states, each January:** re-read the ten in `src/offer/timeOff.ts` (`VACATION_PAYOUT_STATES`: CA, CO, IL, LA, ME,
   MA, MT, NE, ND, RI, each with its source) from the statute or the state's labor agency, and look for states that have added or

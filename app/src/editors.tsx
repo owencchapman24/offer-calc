@@ -5,7 +5,7 @@ import { ChoiceField, DateField, EditorHead, NumberField, RangeField, ResetField
 import { DefaultTick, fieldId, hintId, inputMetric, Issues, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
 import {
-  type AppOffer, type CashAwardDraft, getPath, type GrantDraft, type HealthDraft, type PromotionDraft, type RefresherDraft, type RetirementDraft,
+  type AppOffer, type CashAwardDraft, type EsppDraft, getPath, type GrantDraft, type HealthDraft, type PromotionDraft, type RefresherDraft, type RetirementDraft,
   type ScheduleDraft,
 } from "./model";
 import { DEFAULT_PRESET, PRESET_IDS, presetOf, PRESETS, type PresetId } from "./presets";
@@ -20,6 +20,10 @@ export const newPromotion = (): PromotionDraft => ({ on: null, stepUp: null, sce
 export const newGrant = (): GrantDraft => ({ label: "", value: null, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } });
 export const newRetirement = (): RetirementDraft => ({
   contributionPct: null, type: null, eligiblePay: null, match: [], nonElectivePct: null, vesting: null, vestingService: null,
+});
+export const newEspp = (): EsppDraft => ({
+  contributionPct: null, eligiblePay: null, discount: null, lookback: null, offeringMonths: null, purchasesPerOffering: null, offeringsStart: null,
+  eligibleFrom: null,
 });
 export const newHealth = (): HealthDraft => ({
   premium: null, outOfPocket: { low: null, medium: null, high: null }, oopMax: null, employeeHsa: null, employerHsa: null, coverage: null,

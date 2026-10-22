@@ -9,7 +9,7 @@ import type { AppOffer, Letter, OfferDraft } from "./model";
 // It never names a category you can't enter: a category counts only once its input exists (has help,
 // which every rendered input must have), so the warning can always be acted on.
 
-export type Category = "premium" | "outOfPocket" | "employer401k" | "employerHsa" | "perks" | "hours";
+export type Category = "premium" | "outOfPocket" | "employer401k" | "employerHsa" | "perks" | "espp" | "hours";
 
 export interface Asymmetry {
   category: Category;
@@ -25,18 +25,22 @@ const COUNTED: Record<Category, (d: OfferDraft) => boolean> = {
   employer401k: (d) => d.retirement !== null,
   employerHsa: (d) => d.health === "none" || (d.health !== null && d.health.employerHsa !== null),
   perks: (d) => d.perks.section127 !== null || d.perks.commuterMonthly !== null,
+  // An ESPP is a benefit an offer letter may not mention, like the 401(k): entered (or entered as none), or not.
+  espp: (d) => d.espp !== null && d.espp !== undefined,
   hours: (d) => d.hours.weekly !== null,
 };
 
 /** Costs: leaving one out flatters the offer without it. Benefits flatter the offers that have them. */
-const COST: Record<Category, boolean> = { premium: true, outOfPocket: true, employer401k: false, employerHsa: false, perks: false, hours: false };
+const COST: Record<Category, boolean> = {
+  premium: true, outOfPocket: true, employer401k: false, employerHsa: false, perks: false, espp: false, hours: false,
+};
 
 const CATEGORIES = Object.keys(COUNTED) as Category[];
 
 /** The input that enters each category, by its help key. */
 export const CATEGORY_INPUT: Record<Category, string> = {
   premium: "health.premium", outOfPocket: "health.outOfPocket", employer401k: "retirement", employerHsa: "health.employerHsa",
-  perks: "perks.section127", hours: "hours.weekly",
+  perks: "perks.section127", espp: "espp", hours: "hours.weekly",
 };
 
 /** A category you can enter in the app: its input exists. */
@@ -69,8 +73,9 @@ export function asymmetryText(a: Asymmetry): string {
       return `Health premiums are counted for ${yes} but not for ${no}. If ${them} ${one ? "has" : "have"} a health plan, add it: ${otherwise}`;
     case "outOfPocket":
       return `Out-of-pocket health costs are counted for ${yes} but not for ${no}. If ${them} ${one ? "has" : "have"} a health plan, add its costs: ${otherwise}`;
-    case "employer401k":
-      return `A 401(k) is counted for ${yes} but not for ${no}. If ${them} ${one ? "offers" : "offer"} one, add it with its match: ${otherwise}`;
+    case "employer401k": case "espp":
+      return `${a.category === "espp" ? "An ESPP" : "A 401(k)"} is counted for ${yes} but not for ${no}. If ${them} ${one ? "offers" : "offer"} one, add it`
+        + `${a.category === "espp" ? " (or say none)" : " with its match"}: ${otherwise}`;
     case "employerHsa":
       return `Employer HSA money is counted for ${yes} but not for ${no}. If ${one ? `${them}'s plan puts` : "their plans put"} money in an HSA, `
         + `add it: ${otherwise}`;

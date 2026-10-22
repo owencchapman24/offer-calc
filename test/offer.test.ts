@@ -65,7 +65,7 @@ describe("worked example (golden)", () => {
     // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, total: 186_169.35 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, espp: 0, total: 186_169.35 });
   });
   it("quoted year-1 TC is $205,000: $150k + $15k target bonus + $30k sign-on + 5% of $200k RSUs", () => {
     expect(ey1.quotedTC).toBe(205_000);
@@ -78,9 +78,9 @@ describe("worked example (golden)", () => {
   });
   it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $166,169.35 with the first $10,000 vest", () => {
     expect(r.calendarYears[0].offerGross)
-      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, total: 91_693.55 });
+      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, total: 91_693.55 });
     expect(r.calendarYears[1].offerGross)
-      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, total: 166_169.35 });
+      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, espp: 0, total: 166_169.35 });
   });
   it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
     // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
@@ -1351,6 +1351,98 @@ describe("days off, and unused vacation paid when you leave (v2 4a)", () => {
     const then = kept(o, "2026-08-12").events;
     expect(then.some((e) => e.detail.kind === "vacationPayout")).toBe(true);
     expect(n.cliffValue).toBe(then.find((e) => e.detail.kind === "cash")!.afterTax);
+  });
+});
+
+describe("an employee stock purchase plan, each lot sold at purchase (v2 4i)", () => {
+  // Texas, $120,000 from Jan 1, 2026 ($10,000 a month), 10% of salary into six-month offerings (Jan-Jun, Jul-Dec) with a purchase
+  // at each end, 15% off with a lookback: $6,000 an offering. No RSUs, so the share price is flat unless equity says otherwise.
+  const all = (x: number) => ({ bear: x, base: x, bull: x });
+  const plan = { contributionPct: 0.1, discount: 0.15, lookback: true, offeringMonths: 6, offeringsStart: { month: 1, day: 1 } };
+  const tx = (o: Partial<OfferInput> = {}): OfferInput => ({ label: "T", residence: { state: "TX" }, employerState: "TX",
+    startDate: "2026-01-01", salary: { annual: 120_000 }, espp: plan, ...o });
+  const purchases = (o: OfferInput, years = 1) => projectScenario(o, single, { years }).events.filter((e) => e.component === "espp");
+
+  it("a flat price: $6,000 / 0.85 = $7,058.82 of shares, a gain of $1,058.82 each June 30 and Dec 31", () => {
+    const p = purchases(tx());
+    expect(p.map((e) => [e.date, e.gross])).toEqual([["2026-06-30", 1_058.82], ["2026-12-31", 1_058.82]]);
+    expect(p[0].detail).toMatchObject({ kind: "espp", contributed: 6_000, used: 6_000, refunded: 0, priceRatio: 1, pricePaid: 0.85 });
+    expect(eventFormula(p[0].detail)).toBe("$6,000 x 1.000000 / 0.850000 - $6,000");
+  });
+  it("the gain is wages for income tax, not FICA: Social Security on the $120,000 salary alone", () => {
+    const y = projectScenario(tx(), single, { years: 1 }).calendarYears[0];
+    // 2 x 1,058.8235 = 2,117.65 of ESPP gain in 2026: AGI 122,117.65; Social Security 6.2% x 120,000 = 7,440.
+    expect(y.withOffer.input.statutoryOptionIncome).toBeCloseTo(2_117.647, 3);
+    expect(y.withOffer.result.federalAGI).toBe(122_117.65);
+    expect(y.withOffer.result.socialSecurity).toBe(7_440);
+  });
+  it("a rising price pays the lookback: 10% a year, 180 days on, $6,000 x 1.1^(180/365.25) / 0.85 - $6,000", () => {
+    const [june] = purchases(tx({ equity: { grants: [], priceGrowth: all(0.1) } }));
+    const r = 1.1 ** (180 / 365.25);
+    expect(june.detail).toMatchObject({ priceRatio: expect.closeTo(r, 12), pricePaid: 0.85 });
+    expect(june.gross).toBeCloseTo((6_000 * r) / 0.85 - 6_000, 2);
+  });
+  it("a falling price: the lookback buys at the lower, purchase-day price, so the gain is the floor's, $1,058.82", () => {
+    const [june] = purchases(tx({ equity: { grants: [], priceGrowth: all(-0.2) } }));
+    expect(june.gross).toBe(1_058.82);
+    // Without a lookback, a rising price changes nothing: the price is 85% of the purchase-day value.
+    expect(purchases(tx({ espp: { ...plan, lookback: false }, equity: { grants: [], priceGrowth: all(0.1) } }))[0].gross).toBe(1_058.82);
+  });
+  it("the $25,000 limit: at $250,000, the second purchase of a year buys $10,294.12 of value with $8,750; $3,750 comes back", () => {
+    // $12,500 an offering. The first buys 12,500 / 0.85 = 14,705.88 of value at the first-day price; 25,000 - 14,705.88 = 10,294.12 left,
+    // which 10,294.12 x 0.85 = 8,750 buys, a gain of 10,294.12 - 8,750 = 1,544.12; 12,500 - 8,750 = 3,750 refunded.
+    const r = projectScenario(tx({ salary: { annual: 250_000 } }), single, { years: 1 });
+    const [, dec] = r.events.filter((e) => e.component === "espp");
+    expect(dec.detail).toMatchObject({ used: expect.closeTo(8_750, 6), refunded: expect.closeTo(3_750, 6), limitValue: expect.closeTo(10_294.12, 2) });
+    expect(dec.gross).toBe(1_544.12);
+    expect(formatWarning(r.warnings.find((w) => w.code === "esppCap")!)).toMatch(/\$25,000/);
+  });
+  it("an offering across two calendar years has two years' $25,000 (Treas. Reg. §1.423-2(i)), used from the earliest first", () => {
+    // $600,000: $5,000 a month in. Offerings from Nov 1: Nov 1, 2026 - Apr 30, 2027 puts in $30,000, $35,294.12 of value, within
+    // $50,000, so all of it buys (2026's $25,000, then $10,294.12 of 2027's). May 1 - Oct 31, 2027: $30,000 more, but 2027 has
+    // $14,705.88 left, which $12,500 buys: $17,500 comes back.
+    // Starting Nov 1, 2026 (offerings from Nov 1 run Nov-Apr and May-Oct, so an earlier start would join May's).
+    const p = purchases(tx({ startDate: "2026-11-01", salary: { annual: 600_000 }, espp: { ...plan, offeringsStart: { month: 11, day: 1 } } }), 2);
+    expect(p.slice(0, 2).map((e) => e.date)).toEqual(["2027-04-30", "2027-10-31"]);
+    expect(p[0].detail).toMatchObject({ used: expect.closeTo(30_000, 6), refunded: expect.closeTo(0, 6) });
+    expect(p[1].detail).toMatchObject({ used: expect.closeTo(12_500, 6), refunded: expect.closeTo(17_500, 6) });
+  });
+  it("you join the first offering that starts on or after your first day", () => {
+    expect(purchases(tx({ startDate: "2026-07-01" }))[0].date).toBe("2026-12-31"); // Jul 1: that day's offering
+    expect(purchases(tx({ startDate: "2026-07-02" }), 2)[0].date).toBe("2027-06-30"); // a day later: January's
+  });
+  it("leaving the day before a purchase refunds the offering's money; on the purchase day it buys", () => {
+    // Jan-May: $5,000; June 1-29: $10,000 x 29/30 x 10% = $966.67. Refunded on Jun 29, with no gain.
+    const before = keptIfLeaving(tx(), single, toDays("2026-06-29")).result;
+    expect(before.leave!.esppRefund).toBe(5_966.67);
+    expect(before.events.some((e) => e.component === "espp")).toBe(false);
+    const on = keptIfLeaving(tx(), single, toDays("2026-06-30")).result;
+    expect(on.events.find((e) => e.component === "espp")!.gross).toBe(1_058.82);
+    expect(on.leave!.esppRefund).toBe(0);
+    expect(cliffs(tx(), single, { years: 1 }).filter((c) => c.kind === "esppPurchase").map((c) => [c.date, c.amount]))
+      .toEqual([["2026-06-30", 1_058.82], ["2026-12-31", 1_058.82]]);
+  });
+  it("money in the plan at a year's end is out of take-home and saved: offerings from Feb 1 hold Aug-Dec's $5,000 at year 1's end", () => {
+    // Feb 1 - Jul 31 buys Jul 31 with Feb-Jul's $6,000; Aug 1 - Jan 31 buys Jan 31, 2027. January 2026's pay is before the first offering.
+    const y1 = projectScenario(tx({ espp: { ...plan, offeringsStart: { month: 2, day: 1 } } }), single, { years: 2 }).employmentYears[0];
+    expect(y1.espp).toEqual({ putIn: 11_000, held: 5_000 });
+    expect(y1.takeHome).toBeCloseTo(y1.afterTaxComp - 5_000, 2);
+  });
+  it("after rent, that money counts at face value, and apart too (esppHeld), so 'saved' can leave it out", () => {
+    const where = { costOfLiving: { area: "19100", monthlyRent: 1_500 } }; // Dallas
+    const y1 = projectScenario(tx({ ...where, espp: { ...plan, offeringsStart: { month: 2, day: 1 } } }), single, { years: 2 }).employmentYears[0];
+    expect(y1.costOfLiving!.esppHeld).toBeCloseTo(5_000, 6);
+    // Without an ESPP there's nothing to keep apart.
+    expect(projectScenario(tx({ ...where, espp: undefined }), single, { years: 1 }).employmentYears[0].costOfLiving).not.toHaveProperty("esppHeld");
+  });
+  it("an offer with an ESPP but no RSUs has the share price's growth, and no RSU assumption", () => {
+    const r = projectScenario(tx({ equity: { grants: [], priceGrowth: all(0.1) } }), single, { years: 1 });
+    expect(r.assumptions.some((a) => a.code === "rsu")).toBe(false);
+    expect(r.assumptions.find((a) => a.code === "espp")).toMatchObject({ params: { priceGrowth: 0.1 } });
+  });
+  it("says each lot is sold the day it's bought, and holding isn't modeled", () => {
+    const w = projectScenario(tx(), single, { years: 1 }).warnings.find((x) => x.code === "esppSoldAtPurchase")!;
+    expect(formatWarning(w)).toMatch(/^Holding shares after purchase is an investment decision and isn't modeled/);
   });
 });
 

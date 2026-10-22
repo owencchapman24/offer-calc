@@ -60,7 +60,7 @@ export function worked(start: ISODate, last: ISODate): { months: number; days: n
 
 export type MarkKind = "payment" | "vest" | "clawbackEnds" | "retirement";
 export const MARKS: Record<MarkKind, { glyph: string; name: string }> = {
-  payment: { glyph: "$", name: "payment (bonus, sign-on)" },
+  payment: { glyph: "$", name: "payment (bonus, sign-on, ESPP purchase)" },
   vest: { glyph: "▲", name: "RSU vest" },
   clawbackEnds: { glyph: "✓", name: "clawback ends" },
   retirement: { glyph: "◆", name: "401(k) vests" },
@@ -75,7 +75,7 @@ export const isProratedStep = (c: Cliff) => c.detail.kind === "clawbackStep" && 
 
 function markKind(c: Cliff): MarkKind | null {
   switch (c.kind) {
-    case "bonus": case "cashAward": case "vacationPayout": return "payment";
+    case "bonus": case "cashAward": case "vacationPayout": case "esppPurchase": return "payment";
     case "rsuVest": return "vest";
     case "retirementVest": return "retirement";
     case "clawbackCleared": return "clawbackEnds";
@@ -151,6 +151,7 @@ export function cliffText(c: Cliff): string {
   }
   if (d.kind === "cash") return `the ${inSentence(d.award)} (${gross} before tax)`;
   if (d.kind === "vacationPayout") return `unused vacation paid when you leave (${daysText(d.days)}, ${gross} before tax)`;
+  if (d.kind === "espp") return `an ESPP purchase (a gain of ${gross} before tax)`;
   if (d.kind === "rsu") return `an RSU vest of ${gross} (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vesting to ${percent(d.vestedShare)} (${gross})`;
   if (d.kind === "clawbackStep") {
@@ -241,7 +242,7 @@ function vestingText(v: NonNullable<NonNullable<OfferInput["retirement"]>["vesti
 
 /**
  * What leaving early would cost under an offer's terms, in words (M-9 and the document): the first bonus and its payout rule,
- * each cash award's clawback window, the first RSU vest, the employer 401(k) money's vesting, and unused vacation (4a).
+ * each cash award's clawback window, the first RSU vest, the employer 401(k) money's vesting, unused vacation (4a) and the first ESPP purchase (4i).
  */
 export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   const facts: string[] = [];
@@ -266,6 +267,10 @@ export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   if (vests) facts.push(`its employer 401(k) money ${vests}`);
   const vacation = vacationTerm(o);
   if (vacation) facts.push(vacation);
+  const buy = d.espps[0];
+  if (buy) {
+    facts.push(`its first ESPP purchase is ${longDate(buy.date)}; leaving before a purchase gives back what you've put toward it, without the gain`);
+  }
   return facts;
 }
 

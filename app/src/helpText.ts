@@ -121,8 +121,9 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   },
   "equity.priceGrowth": {
     hint: "The yearly change in the share price; 0% by default.",
-    help: "How much you expect the share price to rise or fall each year, from each grant date to its vests. It's 0% by default "
-      + "because no one knows; add a range for a bear and a bull case. Shares are sold at vest, so later moves don't count.",
+    help: "How much you expect the share price to rise or fall each year, from each grant date to its vests, and from an ESPP "
+      + "offering's first day to its purchases. It's 0% by default because no one knows; add a range for a bear and a bull case. Shares "
+      + "are sold at vest or purchase, so later moves don't count.",
   },
   "equity.refreshers": {
     hint: "Top-up grants while you stay; none unless promised.",
@@ -194,6 +195,52 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   },
   ...tranches("equity.grants"),
   ...tranches("equity.refreshers"),
+  espp: {
+    hint: "Company stock bought at a discount from pay.",
+    help: "An employee stock purchase plan puts a share of each paycheck aside, after tax, and buys company stock with it at a discount "
+      + "(IRC 423). Here each purchase is sold the day it's bought, so its gain counts as pay: taxed as income, not Social Security or "
+      + "Medicare. Holding shares after purchase is an investment decision and isn't modeled.",
+  },
+  "espp.contributionPct": {
+    hint: "Share of pay put aside each paycheck, after tax.",
+    help: "The percent of eligible pay the plan holds back each paycheck, after tax and without interest, until it buys shares. There's "
+      + "no default: blank, the plan isn't counted. While it's held, it's your money at face value; what the $25,000 limit can't buy comes "
+      + "back in cash.",
+  },
+  "espp.eligiblePay": {
+    hint: "Salary, or salary and bonuses.",
+    help: "The pay the percent comes out of. Plans count base salary; some count bonuses too. Check your plan's document.",
+  },
+  "espp.discount": {
+    hint: "Off the share price; at most 15%.",
+    help: "The plan buys at this discount off the share price, 15% at most under section 423 and in most plans. With the price flat, "
+      + "15% off makes each $85 put in $100 of stock: a gain of about 17.6%.",
+  },
+  "espp.lookback": {
+    hint: "The discount off the lower of two prices.",
+    help: "With a lookback, the discount comes off the lower of the share price on the offering's first day and on the purchase day, so "
+      + "a rising price adds to the gain. Without one, it comes off the purchase day's price. With the price flat, it changes nothing.",
+  },
+  "espp.offeringMonths": {
+    hint: "From an offering's first day to its last; up to 27.",
+    help: "How long each offering runs, in whole months. Section 423 allows up to 27 for these terms; 6 is the most common. Offerings "
+      + "here follow one another from the day below.",
+  },
+  "espp.purchasesPerOffering": {
+    hint: "Purchases in each offering; one, at its end.",
+    help: "Some longer offerings buy more than once, say every 6 months of a 24-month offering. Each purchase spends what's been put in "
+      + "since the last; with a lookback, each is priced against the offering's first day. The purchases must split its months evenly.",
+  },
+  "espp.offeringsStart": {
+    hint: "The day an offering begins, from the plan.",
+    help: "The first day of an offering, such as Jan 1 (with 6-month offerings, Jul 1 too); plans set their own, so there's no default. "
+      + "You join the first offering that starts on or after your start date, so pay before it puts nothing in.",
+  },
+  "espp.eligibleFrom": {
+    hint: "When you can join; your start date by default.",
+    help: "Some plans make new hires wait, say 30 days. Enter the first day you could join: you join the first offering that starts on "
+      + "or after it.",
+  },
 
   // ---- sign-on and other cash ----
   cashAwards: {

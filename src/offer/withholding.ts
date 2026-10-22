@@ -77,7 +77,10 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
       balanceDue: round2(balanceDue),
     });
     if (balanceDue >= WARN_AT) {
-      warnings.push({ code: "withholdingShortfall", params: { year: cy.year, balanceDue, supplemental: supplementalWithheld > 0 } });
+      // An ESPP purchase's gain needs no withholding (IRC 421(b)): it's in what's owed, not in what's withheld.
+      const espp = inYear.some((e) => e.component === "espp");
+      warnings.push({ code: "withholdingShortfall", params: { year: cy.year, balanceDue, supplemental: supplementalWithheld > 0,
+        ...(espp ? { espp } : {}) } });
     }
   }
   return {
