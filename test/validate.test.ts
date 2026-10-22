@@ -10,6 +10,8 @@ import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 const clone = (o: OfferInput): OfferInput => structuredClone(o);
 const [A, , C] = SAMPLE_OFFERS;
 const hh: Household = SAMPLE_HOUSEHOLD;
+/** A valid ESPP: 10% into six-month offerings from Jan 1, 15% off with a lookback. */
+const ESPP: NonNullable<OfferInput["espp"]> = { contributionPct: 0.1, discount: 0.15, lookback: true, offeringMonths: 6, offeringsStart: { month: 1, day: 1 } };
 
 const engineThrows = (o: OfferInput, h: Household = hh) => (["bear", "base", "bull"] as const).some((scenario) => {
   try {
@@ -73,6 +75,11 @@ const cases: Case[] = [
   ["half an hour a week", C, (o) => { o.hours!.weekly.base = 0.5; }, "hours.weekly.base", "hours", false],
   ["53 weeks a year", C, (o) => { o.hours!.weeksPerYear = 53; }, "hours.weeksPerYear", "weeks", true],
   ["a negative number of vacation days", C, (o) => { o.timeOff = { vacation: -1 }; }, "timeOff.vacation", "negative", false],
+  ["a 150% ESPP contribution", C, (o) => { o.espp = { ...ESPP, contributionPct: 1.5 }; }, "espp.contributionPct", "share", true],
+  ["a 20% ESPP discount", C, (o) => { o.espp = { ...ESPP, discount: 0.2 }; }, "espp.discount", "esppDiscount", true],
+  ["a 28-month offering", C, (o) => { o.espp = { ...ESPP, offeringMonths: 28 }; }, "espp.offeringMonths", "esppOffering", true],
+  ["4 purchases in a 6-month offering", C, (o) => { o.espp = { ...ESPP, purchasesPerOffering: 4 }; }, "espp.purchasesPerOffering", "esppPurchases", true],
+  ["an offering day that doesn't exist", C, (o) => { o.espp = { ...ESPP, offeringsStart: { month: 2, day: 30 } }; }, "espp.offeringsStart", "monthDay", false],
   ["a blank number of sick days", C, (o) => { o.timeOff = { sick: Number.NaN }; }, "timeOff.sick", "required", true],
   ["a year of workdays off: 252 vacation days and the default 8 holidays", C, (o) => { o.timeOff = { vacation: 252 }; }, "timeOff.vacation", "daysOff", true],
   ["a negative cap on banked vacation", C, (o) => { o.timeOff = { gives: 15, cap: -1 }; }, "timeOff.cap", "negative", false],

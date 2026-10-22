@@ -19,6 +19,7 @@ const round2 = (x: number) => Math.round(x * 100) / 100;
  * - clawbackStep / clawbackCleared: what you'd repay steps down, or reaches zero, once you work
  *   through the day before a window month ends (per-day proration shrinks daily: no cliffs);
  * - retirementVest: employer 401(k) money vests as service years complete;
+ * - esppPurchase: an ESPP purchase (its gain; leave the day before and the offering's money comes back without its discount);
  * - vacationPayout: unused vacation starts being paid when you leave, in a state that requires it only after a year's service
  *   (Rhode Island), once you work through the day before that anniversary.
  * `amount` is gross: the payment or vest, the repayment no longer owed, or the employer money that vests.
@@ -37,6 +38,7 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
     if (e.component === "bonus" && mustBeEmployed) push(day, { kind: "bonus", detail: e.detail, amount: e.gross });
     else if (e.component === "rsu") push(day, { kind: "rsuVest", detail: e.detail, amount: e.gross });
     else if (e.component === "cash") push(day, { kind: "cashAward", detail: e.detail, amount: e.gross });
+    else if (e.component === "espp") push(day, { kind: "esppPurchase", detail: e.detail, amount: e.gross });
   }
 
   // Clawbacks: the owed share drops when a window month completes (leave = clock + k months - 1).
@@ -125,7 +127,7 @@ export function nextCliff(
   // Unused vacation paid on a last day isn't the cliff's own, unless the cliff is the day it starts being paid.
   const payoutCliff = onDate.some((c) => c.kind === "vacationPayout");
   const payments = then.result.events
-    .filter((e) => e.date === date && (e.component === "bonus" || e.component === "rsu" || e.component === "cash")
+    .filter((e) => e.date === date && (e.component === "bonus" || e.component === "rsu" || e.component === "cash" || e.component === "espp")
       && (e.detail.kind !== "vacationPayout" || payoutCliff))
     .reduce((s, e) => s + e.afterTax, 0);
   const clawbackSaved = onDate.some((c) => c.kind === "clawbackStep" || c.kind === "clawbackCleared")

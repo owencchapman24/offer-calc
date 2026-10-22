@@ -32,6 +32,12 @@ export type OfferIssue = { path: string } & (
   | { code: "share"; params: NoParams }
   | { code: "hours"; params: { min: number; max: number } }
   | { code: "weeks"; params: { min: number; max: number } }
+  /** An ESPP discount over the 15% IRC 423(b)(6) allows. */
+  | { code: "esppDiscount"; params: { max: number } }
+  /** An ESPP offering that isn't whole months from 1 to 27 (IRC 423(b)(7)). */
+  | { code: "esppOffering"; params: { min: number; max: number } }
+  /** Purchases an offering that aren't a whole number dividing its months evenly. */
+  | { code: "esppPurchases"; params: NoParams }
   /** Vacation, holidays and sick days that come to a whole year of workdays or more (260). */
   | { code: "daysOff"; params: { max: number } }
   | { code: "wholeMonths"; params: { min: number } }
@@ -262,6 +268,24 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     if (weeks !== undefined && amount("hours.weeksPerYear", weeks, "number") && !(weeks >= 1 && weeks <= 52)) {
       add("hours.weeksPerYear", "weeks", { min: 1, max: 52 });
     }
+  }
+
+  // ---- the ESPP (4i) ---------------------------------------------------------------------------
+  const e = offer.espp;
+  if (e) {
+    share("espp.contributionPct", e.contributionPct);
+    if (amount("espp.discount", e.discount, "percent") && !(e.discount >= 0 && e.discount <= 0.15)) add("espp.discount", "esppDiscount", { max: 0.15 });
+    if (typeof e.lookback !== "boolean") add("espp.lookback", "required", { kind: "choice" });
+    const m = e.offeringMonths;
+    const monthsOk = amount("espp.offeringMonths", m, "number") && Number.isInteger(m) && m >= 1 && m <= 27;
+    if (num(m) && !monthsOk) add("espp.offeringMonths", "esppOffering", { min: 1, max: 27 });
+    const n = e.purchasesPerOffering;
+    if (n !== undefined && amount("espp.purchasesPerOffering", n, "number")
+      && !(Number.isInteger(n) && n >= 1 && (!monthsOk || m % n === 0))) add("espp.purchasesPerOffering", "esppPurchases", {});
+    const md = e.offeringsStart;
+    if (!md || !num(md.month) || !num(md.day)) add("espp.offeringsStart", "required", { kind: "date" });
+    else if (!realMonthDay(md.month, md.day)) add("espp.offeringsStart", "monthDay", { month: md.month, day: md.day });
+    if (e.eligibleFrom !== undefined) date("espp.eligibleFrom", e.eligibleFrom);
   }
 
   // ---- days off and the vacation policy (4a) ---------------------------------------------------

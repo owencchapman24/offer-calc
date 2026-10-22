@@ -27,6 +27,7 @@ export function eventLabel(d: EventDetail): string {
     case "rsu": return `RSU: ${grantLabel(d.grant)}, tranche ${d.tranche} of ${d.tranches}${d.nominalDate ? ` (nominal ${d.nominalDate})` : ""}`;
     case "clawback": return d.sameYear ? `${d.award} clawback (reverses ${d.repaidYear} wages)` : `${d.award} clawback (repays ${d.paidYear} pay)`;
     case "vacationPayout": return `Unused vacation paid out (${PLAIN.format(round2(d.days))} days)`;
+    case "espp": return `ESPP purchase, offering of ${d.offeringStart}${d.purchases > 1 ? `, purchase ${d.purchase} of ${d.purchases}` : ""}, sold at once`;
   }
 }
 
@@ -43,6 +44,8 @@ export function eventFormula(d: EventDetail): string {
     case "rsu": return `${usd(d.grantValue)} x ${pct(d.fraction)} x ${d.priceFactor.toFixed(4)} price factor`;
     case "clawback": return `-${usd(d.amount)} x ${pct(d.fraction)}${!d.sameYear && d.basis === "net" ? " after tax" : ""}`;
     case "vacationPayout": return `${PLAIN.format(round2(d.days))} days x ${usd(round2(d.annual))} / ${d.workdays} workdays`;
+    case "espp": return `${usd(round2(d.used))} x ${d.priceRatio.toFixed(6)} / ${d.pricePaid.toFixed(6)} - ${usd(round2(d.used))}`
+      + `${d.refunded > 0.005 ? ` (${usd(round2(d.refunded))} over the $25,000 limit refunded)` : ""}`;
   }
 }
 
@@ -55,6 +58,7 @@ const BENEFIT_LABELS: Record<Exclude<BenefitKind, "employee401k" | "outOfPocket"
   employeeHsa: "Your HSA contribution (pre-tax)",
   section127: "Section 127 education / student loan help (tax-free)",
   commuter: "132(f) commuter benefit (tax-free)",
+  espp: "ESPP money (yours, held for a purchase)",
 };
 
 export function benefitLabel(b: { kind: BenefitKind; detail: BenefitDetail }): string {
@@ -73,6 +77,8 @@ export function benefitFormula(b: { kind: BenefitKind; detail: BenefitDetail }):
     case "accrual":
       return `${usd(d.annual)} / 12${partOfMonth(d.days, d.daysInMonth)}${b.kind === "employeeHsa" && d.capped ? ", capped at the HSA limit" : ""}`;
     case "monthly": return `${usd(round2(d.monthly))} a month${partOfMonth(d.days, d.daysInMonth)}`;
+    case "esppContribution": return `${pct(d.rate)} of ${usd(round2(d.pay))}`;
+    case "esppOut": return d.why === "purchase" ? "used at a purchase, or refunded over the limit" : "refunded on your last day";
   }
 }
 
@@ -137,6 +143,15 @@ export function formatAssumption(a: Assumption): string {
         + `out-of-pocket (${a.params.usage} usage, capped at the out-of-pocket max) - employer HSA. Held flat each year.`;
     case "perks":
       return "Perks are tax-free and counted at face value; the pre-tax equivalent is face / (1 - that year's marginal rate).";
+    case "espp": {
+      const p = a.params;
+      return `ESPP: ${pct(p.contributionPct, 2)} of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, after tax, into `
+        + `${p.offeringMonths}-month offerings with ${p.purchasesPerOffering === 1 ? "a purchase at each end" : `${p.purchasesPerOffering} purchases each`}, `
+        + `${pct(p.discount, 2)} off${p.lookback ? " the lower of the offering's first-day and purchase-day value" : " the purchase-day value"}, `
+        + `within $25,000 a year (IRC 423(b)(8)); the share price grows ${pct(p.priceGrowth, 2)} a year. Each lot is sold the day it's bought: `
+        + "its spread is wages for income tax, not FICA (IRC 3121(a)(22)), with no withholding required. Holding shares after purchase "
+        + "is an investment decision and isn't modeled.";
+    }
     case "hours": {
       const d = a.params.daysOff;
       return `Hours: ${a.params.weekly} a week x ${PLAIN.format(round2(a.params.weeksPerYear))} weeks a year${d

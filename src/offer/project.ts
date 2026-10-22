@@ -9,6 +9,7 @@ import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
 import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
+import { esppFlows } from "./espp";
 import type {
   Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
   CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, ISODate, LeaveDayRow, LeaveResult, LeaveSweepRow,
@@ -16,7 +17,7 @@ import type {
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
-const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback"];
+const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback", "espp"];
 const sumBy = (events: RawEvent[]) => {
   const by = Object.fromEntries(COMPONENTS.map((c) => [c, 0])) as Record<Component, number>;
   for (const e of events) by[e.component] += e.gross;
@@ -126,6 +127,12 @@ export function projectScenario(offer: OfferInput, household: Household, options
     }
     vacation = { banked, paid, rule };
   }
+  // ---- the ESPP (docs/v2-plan.md, 4i): each purchase's gain is pay, sold the same day; the plan's money is yours meanwhile ------
+  const espp = offer.espp ? esppFlows(offer.espp, raw, start, until, leave, growth, warnings) : undefined;
+  if (espp) {
+    raw.push(...espp.events);
+    warnings.push({ code: "esppSoldAtPurchase", params: {} });
+  }
   if (offer.timeOff?.policy === "unlimited" && offer.employerState === "CA") {
     warnings.push({ code: "unlimitedVacation", params: { state: offer.employerState } });
   }
@@ -178,6 +185,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     benefitRaw.push(...h.flows);
     section125ByYear = h.section125ByYear;
   }
+  if (espp) benefitRaw.push(...espp.flows);
   if (offer.perks) {
     benefitRaw.push(...perkFlows(offer.perks, start, workEnd, cuts, (y) => ({
       section127: federal(jan1(y)).section127Limit, commuterMonthly: federal(jan1(y)).commuterMonthlyLimit,
@@ -198,9 +206,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
     };
     const other = household.otherWages?.[year] ?? 0;
     const withoutInput: TaxInput = { ...base, wages: other };
-    // The offer's pre-tax 401(k) deferrals and cafeteria-plan amounts (premiums, your HSA) lower its taxable wages.
+    // The offer's pre-tax 401(k) deferrals and cafeteria-plan amounts (premiums, your HSA) lower its taxable wages; an ESPP
+    // purchase's gain is wages for income tax, not FICA (IRC 3121(a)(22)).
     const withInput: TaxInput = {
       ...base, wages: other + offerGross,
+      ...(by.espp ? { statutoryOptionIncome: by.espp } : {}),
       ...(pretaxByYear.has(year) ? { pretax401k: pretaxByYear.get(year)! } : {}),
       ...(section125ByYear.has(year) ? { section125: section125ByYear.get(year)! } : {}),
     };
@@ -322,7 +332,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     ...(valuation !== undefined ? { discountFactor: discount(b.day) } : {}),
   }));
   const benefitSum = (list: typeof benefits, weight: (day: number) => number = () => 1) => {
-    const t = { retirement: 0, perks: 0, healthNet: 0, preTax: 0, employee401k: 0, credited: 0, premiums: 0, oop: 0, employerHsa: 0, employeeHsa: 0 };
+    const t = { retirement: 0, perks: 0, healthNet: 0, preTax: 0, employee401k: 0, credited: 0, premiums: 0, oop: 0, employerHsa: 0, employeeHsa: 0,
+      esppPutIn: 0, esppHeld: 0 };
     for (const b of list) {
       const w = weight(b.day);
       if (b.kind === "employer401k") { t.retirement += b.vested * w; t.credited += b.amount * w; }
@@ -332,6 +343,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       else if (b.kind === "employerHsa") t.employerHsa += b.amount * w;
       else if (b.kind === "employeeHsa") t.employeeHsa += b.amount * w;
       else if (b.kind === "employee401k") t.employee401k += b.amount * w;
+      else if (b.kind === "espp") { t.esppHeld += b.amount * w; if (b.amount > 0) t.esppPutIn += b.amount * w; }
     }
     t.healthNet = t.premiums + t.oop - t.employerHsa;
     return t;
@@ -339,12 +351,13 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const totals = (t: ReturnType<typeof benefitSum>): BenefitTotals =>
     ({ retirement: round2(t.retirement), perks: round2(t.perks), healthNet: round2(t.healthNet) });
   // Cash measures (unrounded): after-tax comp = gross - tax - premiums; take-home also less your
-  // 401(k) and HSA. Total rewards = after-tax comp + retirement + perks - out-of-pocket + employer HSA.
+  // 401(k) and HSA, and what the ESPP holds more than it did. Total rewards = after-tax comp + retirement + perks - out-of-pocket +
+  // employer HSA.
   const measures = (gross: number, tax: number, t: ReturnType<typeof benefitSum>) => {
     const afterTaxComp = gross - tax - t.premiums;
     return {
       gross, tax, premiums: t.premiums, afterTaxComp,
-      takeHome: afterTaxComp - t.employee401k - t.employeeHsa,
+      takeHome: afterTaxComp - t.employee401k - t.employeeHsa - t.esppHeld,
       totalRewards: afterTaxComp + t.retirement + t.perks - t.oop + t.employerHsa,
     };
   };
@@ -403,7 +416,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     for (const b of benefits) {
       if (b.kind === "premium") flow(b.day, b.ey, { takeHome: -b.amount });
       // Yours: out of take-home, but saved, not spent locally.
-      else if (b.kind === "employee401k" || b.kind === "employeeHsa") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount });
+      // The ESPP's money likewise while the plan holds it (out of take-home when put in, back when it comes out).
+      else if (b.kind === "employee401k" || b.kind === "employeeHsa" || b.kind === "espp") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount });
       else if (b.kind === "employer401k") flow(b.day, b.ey, { face: b.vested });
       else if (b.kind === "employerHsa" || isPerk(b.kind)) flow(b.day, b.ey, { face: b.amount });
       else if (b.kind === "outOfPocket") flow(b.day, b.ey, { oop: b.amount });
@@ -535,6 +549,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
         employeeHsa: round2(b.employeeHsa), net: round2(b.healthNet),
       },
       perks: { face: round2(b.perks), preTaxEquivalent: round2(b.preTax) },
+      espp: { putIn: round2(b.esppPutIn), held: round2(b.esppHeld) },
       totalRewards: round2(m.totalRewards),
       ...(worked !== undefined ? { hours: round2(worked) } : {}),
       ...(worked ? { hourly: { afterTaxComp: round2(m.afterTaxComp / worked), totalRewards: round2(m.totalRewards / worked) } } : {}),
@@ -554,6 +569,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       leaveDate: fromDays(leave), unvestedRsuForfeited: round2(unvested), clawbacks,
       retirementForfeited: round2(credited * (1 - vestedShare)),
       vacation: { banked: vacation!.banked, paid: round2(vacation!.paid), rule: vacation!.rule },
+      esppRefund: round2(espp?.refundOnLeave ?? 0),
     };
   }
 
@@ -588,6 +604,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   if (offer.health) assumptions.push({ code: "health", params: { usage: household.healthUsage ?? "medium" } });
   if (offer.perks) assumptions.push({ code: "perks", params: {} });
+  if (offer.espp) {
+    const e = offer.espp;
+    assumptions.push({ code: "espp", params: { contributionPct: e.contributionPct, eligiblePay: e.eligiblePay ?? "salary", discount: e.discount,
+      lookback: e.lookback, offeringMonths: e.offeringMonths, purchasesPerOffering: e.purchasesPerOffering ?? 1, priceGrowth: growth } });
+  }
   if (hours) {
     assumptions.push({ code: "hours", params: { scenario, weekly: hours.weekly[scenario], weeksPerYear: weeks,
       ...(hours.weeksPerYear === undefined ? { daysOff: daysOff(offer.timeOff) } : {}) } });
