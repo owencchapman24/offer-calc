@@ -551,6 +551,11 @@ export interface CostOfLivingTotals {
   /** Money not spent locally, at face value: planned savings, your 401(k) and HSA contributions, vested employer 401(k), employer HSA and perks. */
   faceValue: number;
   /**
+   * The ESPP's money while the plan holds it, at face value: part of faceValue (in when it's put aside, out when it buys shares or comes
+   * back). Present only for an offer with an ESPP (4i).
+   */
+  esppHeld?: number;
+  /**
    * COL-adjusted total = discretionaryReference - outOfPocketReference + faceValue.
    * Equivalently, total rewards - rent + (nonHousingFactor - 1) x (nonHousingLocal - out-of-pocket).
    */

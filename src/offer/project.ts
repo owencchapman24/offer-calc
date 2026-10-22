@@ -385,7 +385,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // what's left (non-housing spending) in reference-location dollars via non-housing RPPs. The
   // COL-adjusted total adds back money not spent locally at face value and takes out out-of-pocket
   // health spending, converted like the rest of the local spending.
-  interface ColFlow { day: number; ey: number; takeHome: number; rent: number; oop: number; face: number }
+  interface ColFlow { day: number; ey: number; takeHome: number; rent: number; oop: number; face: number; espp: number }
   let col: { info: CostOfLivingInfo; flows: ColFlow[] } | undefined;
   if (offer.costOfLiving) {
     const hc = household.costOfLiving ?? {};
@@ -411,13 +411,14 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const used = (a: ReturnType<typeof rppArea>) =>
       ({ code: a.code, name: a.name, allItems: a.allItems, housing: a.housing, nonHousing: Math.round(nonHousingRpp(a) * 1000) / 1000 });
     const flows: ColFlow[] = [];
-    const flow = (day: number, ey: number, f: Partial<ColFlow>) => flows.push({ day, ey, takeHome: 0, rent: 0, oop: 0, face: 0, ...f });
+    const flow = (day: number, ey: number, f: Partial<ColFlow>) => flows.push({ day, ey, takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0, ...f });
     for (const e of taxed) flow(e.day, e.ey, { takeHome: e.gross - e.tax });
     for (const b of benefits) {
       if (b.kind === "premium") flow(b.day, b.ey, { takeHome: -b.amount });
       // Yours: out of take-home, but saved, not spent locally.
-      // The ESPP's money likewise while the plan holds it (out of take-home when put in, back when it comes out).
-      else if (b.kind === "employee401k" || b.kind === "employeeHsa" || b.kind === "espp") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount });
+      else if (b.kind === "employee401k" || b.kind === "employeeHsa") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount });
+      // The ESPP's money likewise while the plan holds it (out of take-home when put in, back when it comes out), kept apart too.
+      else if (b.kind === "espp") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount, espp: b.amount });
       else if (b.kind === "employer401k") flow(b.day, b.ey, { face: b.vested });
       else if (b.kind === "employerHsa" || isPerk(b.kind)) flow(b.day, b.ey, { face: b.amount });
       else if (b.kind === "outOfPocket") flow(b.day, b.ey, { oop: b.amount });
@@ -439,7 +440,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     };
   }
   const colSum = (keep: (f: ColFlow) => boolean, weight: (day: number) => number = () => 1): CostOfLivingTotals => {
-    const t = { takeHome: 0, rent: 0, oop: 0, face: 0 };
+    const t = { takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0 };
     for (const f of col!.flows) {
       if (!keep(f)) continue;
       const w = weight(f.day);
@@ -447,6 +448,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       t.rent += f.rent * w;
       t.oop += f.oop * w;
       t.face += f.face * w;
+      t.espp += f.espp * w;
     }
     const k = col!.info.nonHousingFactor;
     const savings = t.takeHome * col!.info.savingsRate;
@@ -456,7 +458,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const faceValue = savings + t.face;
     return {
       savings, rent: t.rent, nonHousingLocal, discretionaryReference, outOfPocketReference, faceValue,
-      total: discretionaryReference - outOfPocketReference + faceValue,
+      total: discretionaryReference - outOfPocketReference + faceValue, ...(offer.espp ? { esppHeld: t.espp } : {}),
     };
   };
   const colRounded = (c: CostOfLivingTotals) =>
@@ -595,7 +597,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (valuation !== undefined) {
     assumptions.push({ code: "presentValue", params: { valuationDate: fromDays(valuation), discountRate } });
   }
-  if (equity) assumptions.push({ code: "rsu", params: { scenario, priceGrowth: growth } });
+  // RSUs: an offer with only an ESPP has the share price's growth (its purchases are priced by it) but no RSUs to say it of.
+  if (equity && (equity.grants.length || equity.refreshers)) assumptions.push({ code: "rsu", params: { scenario, priceGrowth: growth } });
   if (leave !== undefined) assumptions.push({ code: "leaveDate", params: { leaveDate: fromDays(leave) } });
   if (offer.retirement) {
     const r = offer.retirement;

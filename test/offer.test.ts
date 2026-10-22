@@ -1428,6 +1428,18 @@ describe("an employee stock purchase plan, each lot sold at purchase (v2 4i)", (
     expect(y1.espp).toEqual({ putIn: 11_000, held: 5_000 });
     expect(y1.takeHome).toBeCloseTo(y1.afterTaxComp - 5_000, 2);
   });
+  it("after rent, that money counts at face value, and apart too (esppHeld), so 'saved' can leave it out", () => {
+    const where = { costOfLiving: { area: "19100", monthlyRent: 1_500 } }; // Dallas
+    const y1 = projectScenario(tx({ ...where, espp: { ...plan, offeringsStart: { month: 2, day: 1 } } }), single, { years: 2 }).employmentYears[0];
+    expect(y1.costOfLiving!.esppHeld).toBeCloseTo(5_000, 6);
+    // Without an ESPP there's nothing to keep apart.
+    expect(projectScenario(tx({ ...where, espp: undefined }), single, { years: 1 }).employmentYears[0].costOfLiving).not.toHaveProperty("esppHeld");
+  });
+  it("an offer with an ESPP but no RSUs has the share price's growth, and no RSU assumption", () => {
+    const r = projectScenario(tx({ equity: { grants: [], priceGrowth: all(0.1) } }), single, { years: 1 });
+    expect(r.assumptions.some((a) => a.code === "rsu")).toBe(false);
+    expect(r.assumptions.find((a) => a.code === "espp")).toMatchObject({ params: { priceGrowth: 0.1 } });
+  });
   it("says each lot is sold the day it's bought, and holding isn't modeled", () => {
     const w = projectScenario(tx(), single, { years: 1 }).warnings.find((x) => x.code === "esppSoldAtPurchase")!;
     expect(formatWarning(w)).toMatch(/^Holding shares after purchase is an investment decision and isn't modeled/);
