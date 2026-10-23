@@ -1,7 +1,7 @@
 import type { Component, ValueBasis } from "../../src/offer/types";
 import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { type L6Line, offerByLetter, ownOf, pricesOf, shortCity, type TaxLine, type WorkContext } from "./metrics";
-import { cashName } from "./byYearModel";
+import { cashName, taxFreeNames } from "./byYearModel";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { OfferDetail, TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
@@ -45,7 +45,7 @@ export interface L6Row {
 
 /** What each subtotal adds up: its lines, in order (those shown). */
 export const FOOTS: Partial<Record<L6Line, L6Line[]>> = {
-  gross: ["salary", "bonus", "cash", "rsu", "espp", "clawback"],
+  gross: ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback"],
   afterTax: ["gross", "tax", "premiums"],
   takeHome: ["afterTax", "yours", "esppHeld"],
   totalRewards: ["afterTax", "employer", "oop", "hsa", "perks"],
@@ -99,6 +99,10 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   if (any((y) => y.cash)) line("cash", "cash", cap(cashName(o)), (y) => y.cash);
   if (any((y) => y.rsu)) line("rsu", "cash", "RSUs vested", (y) => y.rsu);
   if (any((y) => y.espp)) line("espp", "cash", "ESPP gain", (y) => y.espp, { gloss: "shares bought at a discount and sold the same day" });
+  if (any((y) => y.benefit)) {
+    const names = (o?.draft.otherBenefits ?? []).filter((b) => b.taxable !== false).map((b) => b.label.trim()).filter(Boolean);
+    line("benefit", "cash", "Taxable benefits", (y) => y.benefit, { gloss: `paid with salary${names.length ? `: ${names.join(", ")}` : ""}` });
+  }
   if (any((y) => y.clawback)) line("clawback", "cash", "Clawbacks repaid", (y) => y.clawback, { lead: "less" });
   sub("gross", "cash", "Pay", (y) => y.gross);
   line("tax", "cash", "Tax", (y) => -y.tax, { lead: "less", gloss: taxWho(ctx, letter) });
@@ -120,7 +124,10 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   if (any((y) => y.credited)) line("employer", "rewards", "Employer 401(k), vested", (y) => y.employer, { lead: "plus", gloss: vestedGloss(ctx, letter) });
   if (any((y) => y.oop)) line("oop", "rewards", "Expected out-of-pocket health costs", (y) => -y.oop, { lead: "less" });
   if (any((y) => y.hsa)) line("hsa", "rewards", "Employer HSA money", (y) => y.hsa, { lead: "plus" });
-  if (any((y) => y.perks)) line("perks", "rewards", "Perks", (y) => y.perks, { lead: "plus", gloss: "tax-free, at face value" });
+  if (any((y) => y.perks)) {
+    const names = o ? taxFreeNames(o.draft) : [];
+    line("perks", "rewards", "Tax-free benefits", (y) => y.perks, { lead: "plus", gloss: `at face value${names.length ? `: ${names.join(", ")}` : ""}` });
+  }
   sub("totalRewards", "rewards", "Total rewards", (y) => y.totalRewards, "total");
   const hours = ys.length > 0 && ys.every((y) => y.hours !== null);
   if (hours) {
@@ -204,7 +211,7 @@ function faceGloss(ys: ShownYear[]): string {
   const parts = [
     ys.some((y) => y.col!.savings) && "planned savings", ys.some((y) => y.yours) && "your 401(k) and HSA", ys.some((y) => y.esppHeld) && "ESPP money held",
     ys.some((y) => y.employer) && "the vested match",
-    ys.some((y) => y.hsa) && "employer HSA money", ys.some((y) => y.perks) && "perks",
+    ys.some((y) => y.hsa) && "employer HSA money", ys.some((y) => y.perks) && "tax-free benefits",
   ].filter(Boolean) as string[];
   return parts.length ? parts.join(", ") : "nothing saved";
 }
@@ -261,10 +268,10 @@ export const addCents = (xs: number[]) => xs.reduce((s, x) => s + Math.round(x *
 const TO_CENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const toCent = (x: number) => `${x < 0 ? "−" : ""}${TO_CENT.format(Math.abs(x))}`;
 
-export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "espp", "clawback"];
+export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback"];
 /** Each kind of payment's name in the list. */
 export const KIND_NAME: Record<Component, string> = {
-  salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", espp: "ESPP gains", clawback: "Clawbacks",
+  salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "Taxable benefits", clawback: "Clawbacks",
 };
 
 export interface PaymentGroup {
@@ -333,6 +340,7 @@ export function exactPay(p: WorkPayment): number {
     case "clawback": return p.gross;
     case "vacationPayout": return (d.days * d.annual) / d.workdays;
     case "espp": return (d.used * d.priceRatio) / d.pricePaid - d.used;
+    case "benefit": return (d.annual / 12) * (d.days / d.daysInMonth);
   }
 }
 
@@ -355,6 +363,11 @@ export function paymentLabel(p: WorkPayment): string {
     case "clawback": return `${d.award} repaid`;
     case "vacationPayout": return "Unused vacation paid out";
     case "espp": return `ESPP purchase${d.purchases > 1 ? ` ${d.purchase} of ${d.purchases}` : ""}, the offering from ${longDate(d.offeringStart)}`;
+    case "benefit": {
+      const [y, m, a] = parts(d.from);
+      const [, , b] = parts(d.to);
+      return d.days === d.daysInMonth ? `${d.label}, ${MONTHS[m - 1]} ${y}` : `${d.label}, ${SHORT[m - 1]} ${a}${a === b ? "" : ` – ${b}`}, ${y}`;
+    }
   }
 }
 
@@ -380,6 +393,7 @@ export function paymentFormula(p: WorkPayment): string {
     case "vacationPayout": return `${+d.days.toFixed(2)} days × ${amount(d.annual)} a year ÷ ${d.workdays} workdays`;
     case "espp": return `${toCent(d.used)} × ${d.priceRatio.toFixed(6)} share value ÷ ${d.pricePaid.toFixed(6)} price paid − ${toCent(d.used)}`
       + `${d.refunded > 0.005 ? `; ${toCent(d.refunded)} over the $25,000 limit came back` : ""}`;
+    case "benefit": return `${amount(d.annual)} a year ÷ 12${d.days === d.daysInMonth ? "" : ` × ${d.days}/${d.daysInMonth} days`}, taxable`;
   }
 }
 

@@ -59,6 +59,9 @@ export function warningWords(group: OfferWarning[]): string {
     case "esppCap":
       return `Its ESPP contributions would buy more than section 423's ${dollars(w.params.limit)} a year of stock, valued at each offering's first `
         + `day, in ${years}: what's over it comes back in cash at the purchase, without a gain.`;
+    case "taxFreeAsEntered":
+      return `Counted tax-free, as entered: ${join(w.params.labels)}. A fringe benefit is wages unless the law excludes it, so one marked tax-free `
+        + "that isn't makes the offer look better than it is.";
     case "esppSoldAtPurchase":
       return "Holding shares after purchase is an investment decision and isn't modeled: each ESPP lot counts as sold the day it's bought. "
         + "Resets, overlapping offerings, a cap on shares an offering, fees and plans outside section 423 aren't modeled either.";

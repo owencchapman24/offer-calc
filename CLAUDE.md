@@ -22,7 +22,8 @@ behind every figure.
   stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
   offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table); v2's 4a (days off:
   vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
-  2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22). How each differs from the
+  2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22); v2's 4j (other benefits,
+  taxable or tax-free, and tax-free benefits, the perks among them, on a line of their own, 2026-10-23). How each differs from the
   design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
@@ -42,9 +43,9 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: the user's review of stop 4i** (the ESPP, pull request #71, 2026-10-22), then 4j (other benefits; tax-free ones on their own
-line, not in "saved"; `docs/v2-plan.md`, approved 2026-10-19 at the user's review of pull request #69), its own review stop, ahead of
-item 2, at the user's word. Stop 4a (days off, #70) was approved on 2026-10-22. Decisions D16-D23 are recorded in the plan.
+**Next: the user's review of stop 4j** (other benefits, pull request #72, 2026-10-23; `docs/v2-plan.md`, 4j). Stops 4a (days off,
+#70) and 4i (the ESPP, #71) were approved on 2026-10-22 and 23. Decisions D16-D23 are recorded in the plan; at stop 4j the user moved
+today's perks to the tax-free line too (D22).
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
 actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
@@ -290,6 +291,12 @@ section 2's and the plan's in step):
   Vacation given beyond what you'd take banks, accrued and used evenly, up to a cap; a leave date pays it at the salary that day ÷
   260, as supplemental wages on the last day, where the employer's state's law requires it (`VACATION_PAYOUT_STATES`) or the offer's
   policy does. Unlimited banks nothing. A stay's end pays nothing.
+- **Other benefits** (v2's 4j, D22, D23): each a name, a yearly amount and taxable or tax-free, accrued a twelfth a month while
+  employed. Taxable ones are pay with salary (component `benefit`): income tax and FICA, withheld with each paycheck, not 401(k),
+  ESPP or bonus pay. Tax-free ones count at face value as the perks do (kind `otherBenefit`), as entered: the tool can't check an
+  exclusion, and A-6 names each. Tax-free benefits, the perks among them (the user's word at stop 4j), aren't "saved": A-1 shows them on
+  a line of their own (to spend + saved + tax-free benefits = the total, `taxFree` in the after-rent totals), the bridge's month
+  likewise, and A-2 lists them by name outside the $100. Not entered, entered as none, or entered, for the comparability note.
 - **ESPP** (v2's 4i, D20): an IRC 423 plan; each lot is sold the day it's bought ("Holding shares after purchase is an investment
   decision and isn't modeled."), so no capital gains. Each eligible paycheck puts its percent aside, after tax; offerings run back to
   back from the plan's date, joined at the first starting on or after your start (or "eligible from"); a purchase buys at the discount
@@ -363,7 +370,8 @@ section 2's and the plan's in step):
   `horizonSweep`, annuity terms); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
   as codes and paths); `streams.ts` (salary, bonus, cash); `vesting.ts`; `presets.ts` (the vesting presets, main-thread safe);
   `clawback.ts`; `benefits.ts` (401(k), health, perks); `timeOff.ts` (days off and weeks worked, the vacation-payout states, the
-  payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
+  payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); other benefits' streams are in
+  `benefits.ts` (`otherBenefitStreams`); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
 - `col/`: `index.ts` (BEA RPPs, `rpp.json`), `rent.ts` (HUD FMRs, `fmr.json`, and the fallback), `cities.ts` (the slim city list,
   `cities.json`, for the main thread).
 - `format/`: the words for the engine's numbers and codes (`numbers`, `issues`, `schedule`, `warnings`). Not part of the engine.
@@ -460,6 +468,9 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 
 **Pay and benefits**
 - Private-company equity (options, double-trigger RSUs) counts as $0; RSUs are sold at vest. v2 item 4e.
+- Other benefits are tax-free as entered: no exclusion's limit is applied (dependent care's $7,500, group-term life over $50,000,
+  achievement awards), and adoption assistance, free of income tax but not FICA, fits neither choice (D23). Each accrues evenly while
+  employed, flat in dollars (no raises, no one-time payments).
 - An ESPP's shares are sold the day they're bought (D20): no holding, so no capital gains; no resets, overlapping offerings, share caps,
   fees or plans outside section 423; a plan letting you buy within 3 months of leaving isn't modeled (the money comes back). Its gain is
   left out of every state payroll tax and Philadelphia's wage tax, as from FICA: right for CA SDI and DE's leave, but OR's transit tax
@@ -489,7 +500,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended) and 4i built; 4j approved (2026-10-19), next; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i and 4j built; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |

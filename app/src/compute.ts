@@ -112,11 +112,22 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
     s.gross += cents(e.gross);
     s.tax += cents(e.tax);
     split.set(key, s);
-    const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, tax: 0 };
+    const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
     p[e.component] += cents(e.gross);
     p.tax += cents(e.tax);
     posted.set(e.employmentYear, p);
   }
+  // Other benefits (4j), each by employment year: a taxable one's payments and their tax, a tax-free one's flows, in whole cents.
+  const others = new Map<string, OfferDetail["others"][number]>();
+  const other = (ey: number, index: number, label: string, taxable: boolean, amount: number, tax: number) => {
+    const key = `${ey}|${index}`;
+    const o = others.get(key) ?? { ey, index, label, taxable, amount: 0, tax: 0 };
+    o.amount += cents(amount);
+    o.tax += cents(tax);
+    others.set(key, o);
+  };
+  for (const e of r.events) if (e.detail.kind === "benefit") other(e.employmentYear, e.detail.index, e.detail.label, true, e.gross, e.tax);
+  for (const b of r.benefitEvents) if (b.detail.kind === "otherBenefit") other(b.employmentYear, b.detail.index, b.detail.label, false, b.amount, 0);
   const dollarsOf = <T extends object>(x: T, keys: Array<keyof T>): T => ({ ...x, ...Object.fromEntries(keys.map((k) => [k, (x[k] as number) / 100])) });
   const detail: OfferDetail = {
     window: r.window, cases, withholding, employmentYears: r.employmentYears, costOfLiving: r.costOfLiving, assumptions: r.assumptions, warnings: r.warnings,
@@ -134,13 +145,14 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
       };
     }),
     split: [...split.values()].map((s) => dollarsOf(s, ["gross", "tax"])),
-    posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "espp", "tax"])),
+    posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "espp", "benefit", "tax"])),
     bonuses: r.events.flatMap((e) => (e.detail.kind === "bonus"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo }] : [])),
     rsus: r.events.flatMap((e) => (e.detail.kind === "rsu"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, refresher: e.detail.grant.kind === "refresher", tranche: e.detail.tranche,
         tranches: e.detail.tranches, priceFactor: e.detail.priceFactor, ...(e.detail.nominalDate ? { nominalDate: e.detail.nominalDate } : {}) }] : [])),
     cash: r.events.flatMap((e) => (e.detail.kind === "cash" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, award: e.detail.award }] : [])),
+    others: [...others.values()].sort((a, b) => a.ey - b.ey || a.index - b.index).map((o) => dollarsOf(o, ["amount", "tax"])),
     espps: r.events.flatMap((e) => (e.detail.kind === "espp" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, offeringStart: e.detail.offeringStart,
       purchase: e.detail.purchase, purchases: e.detail.purchases }] : [])),
   };

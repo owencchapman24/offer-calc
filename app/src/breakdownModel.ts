@@ -38,21 +38,24 @@ export interface OwnView {
   /** The annuity factor over its own stay, as shown (4 decimals). */
   factor: number;
   months: number;
-  /** Present values over its own stay, as shown, at its own prices: total rewards − rent = the total; the total − saved = to spend. */
-  pv: { totalRewards: number; rent: number; total: number; saved: number; spend: number };
-  /** A month over its own stay, in today's dollars: the total and saved each rounded once, to spend the difference. */
-  month: { total: number; saved: number; spend: number };
+  /**
+   * Present values over its own stay, as shown, at its own prices: total rewards − rent = the total; the total − saved − tax-free
+   * benefits = to spend.
+   */
+  pv: { totalRewards: number; rent: number; total: number; saved: number; taxFree: number; spend: number };
+  /** A month over its own stay, in today's dollars: the total, saved and tax-free benefits each rounded once, to spend the rest. */
+  month: { total: number; saved: number; taxFree: number; spend: number };
   /**
    * The same total at the prices picked (Prices in), the step between them in its work: shown when they're another place's
    * prices, or once there's a comparison to tie to. `step` is the total less this, at the offer's own prices.
    */
   ref: { pv: number; month: number; step: number; place: string } | null;
   /**
-   * Year 1, as paid, at its own prices: to spend after rent, saved, and held in an ESPP at its end (4i), the year and a month (÷ 12, each
-   * rounded once).
+   * Year 1, as paid, at its own prices: to spend after rent, saved, held in an ESPP at its end (4i), and tax-free benefits (4j), the year
+   * and a month (÷ 12, each rounded once).
    */
-  year1: { start: string; end: string; spend: number; saved: number; held: number; spendMonth: number; savedMonth: number; heldMonth: number;
-    y: ShownYear } | null;
+  year1: { start: string; end: string; spend: number; saved: number; held: number; taxFree: number; spendMonth: number; savedMonth: number;
+    heldMonth: number; taxFreeMonth: number; y: ShownYear } | null;
   /** Why the stay's figure differs from year 1's, in words. */
   differs: string;
   /** Its tax over its stay ÷ its pay, as paid (the years as shown, less what runs past the stay). */
@@ -80,10 +83,11 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   // Own prices: a price factor of 1, so the after-rent total is total rewards − rent (M-6.3's identity).
   const totalRewards = R(w.totalRewards.presentValue);
   const total = R(w.totalRewards.presentValue - col.presentValue.rent);
-  // Saved: money at face value but an ESPP's, which comes back to spend (4i).
-  const saved = R(col.presentValue.faceValue - (col.presentValue.esppHeld ?? 0));
-  const month = { total: R(total / factor), saved: R(saved / factor), spend: 0 };
-  month.spend = month.total - month.saved;
+  // Saved: money at face value but an ESPP's, which comes back to spend (4i), and tax-free benefits, on a line of their own (4j, D22).
+  const taxFree = R(col.presentValue.taxFree ?? 0);
+  const saved = R(col.presentValue.faceValue - (col.presentValue.esppHeld ?? 0) - (col.presentValue.taxFree ?? 0));
+  const month = { total: R(total / factor), saved: R(saved / factor), taxFree: R(taxFree / factor), spend: 0 };
+  month.spend = month.total - month.saved - month.taxFree;
   const place = shortCity(info.area.name);
   const own = info.area.code === info.reference.code;
   const refPv = R(col.presentValue.total);
@@ -94,8 +98,9 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
   const y = ys[0];
   const year1 = y?.col ? {
     start: y.start, end: y.end, y,
-    spend: y.col.local - y.oop, saved: y.col.face - y.esppHeld, held: y.esppHeld,
-    spendMonth: R((y.col.local - y.oop) / 12), savedMonth: R((y.col.face - y.esppHeld) / 12), heldMonth: R(y.esppHeld / 12),
+    spend: y.col.local - y.oop, saved: y.col.face - y.esppHeld - y.perks, held: y.esppHeld, taxFree: y.perks,
+    spendMonth: R((y.col.local - y.oop) / 12), savedMonth: R((y.col.face - y.esppHeld - y.perks) / 12), heldMonth: R(y.esppHeld / 12),
+    taxFreeMonth: R(y.perks / 12),
   } : null;
 
   const stay = shownStay(d, b.years).stay;
@@ -119,7 +124,7 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
 
   return {
     letter, years: b.years, start: b.window.start, last: dayBefore(b.window.end), place, factor, months: b.annuity.length,
-    pv: { totalRewards, rent: totalRewards - total, total, saved, spend: total - saved }, month, ref, year1,
+    pv: { totalRewards, rent: totalRewards - total, total, saved, taxFree, spend: total - saved - taxFree }, month, ref, year1,
     differs: whyDiffers(d, ys.slice(0, b.years), b.years, offer), tax, hour, bear, bull,
   };
 }
@@ -161,8 +166,9 @@ const joinAnd = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0,
  * dollars at New York prices."
  */
 export function ownSentence(v: OwnView): string {
-  return `${v.letter} leaves you about ${dollars(v.month.total)} a month over your stay, after rent: ${dollars(v.month.spend)} to spend and `
-    + `${dollars(v.month.saved)} saved, in today's dollars at ${v.place} prices.`;
+  const m = v.month;
+  return `${v.letter} leaves you about ${dollars(m.total)} a month over your stay, after rent: ${dollars(m.spend)} to spend${m.taxFree ? "," : " and"} `
+    + `${dollars(m.saved)} saved${m.taxFree ? ` and ${dollars(m.taxFree)} in tax-free benefits` : ""}, in today's dollars at ${v.place} prices.`;
 }
 
 /** The stay as the breakdown names it: "Your 4-year stay (Jul 13, 2026 – Jul 12, 2030)". */

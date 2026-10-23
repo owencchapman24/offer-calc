@@ -22,11 +22,11 @@ export type AboutField = "filing" | "stay" | "wages" | "spouse" | "healthUsage" 
 export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | "perks" | "healthExtra" | "savings" | "rent" | "faceValue";
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
 export type BridgeLine =
-  | "letter" | "salary" | "bonus" | "cash" | "rsu" | "espp" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
-  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved" | "inEspp";
+  | "letter" | "salary" | "bonus" | "cash" | "rsu" | "espp" | "benefit" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
+  | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved" | "inEspp" | "taxFree";
 /** L-6's employment-year lines (docs/ui-design.md §4.8): cash; total rewards and hours; after rent. workpaper.ts numbers them. */
 export type L6Line =
-  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "esppHeld" | "takeHome"
+  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "benefit" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "esppHeld" | "takeHome"
   | "employer" | "oop" | "hsa" | "perks" | "totalRewards" | "hours" | "afterTaxHour" | "totalRewardsHour"
   | "savings" | "rent" | "local" | "atRef" | "oopRef" | "face" | "total" | "totalHour";
 /** L-6's calendar-year tax lines: what goes in, then each tax. `rate` is the offer's share ÷ its pay (the offer's column only). */
@@ -34,7 +34,7 @@ export type TaxLine =
   | "wages" | "statutory" | "spouse" | "pretax401k" | "section125" | "taxable" | "federal" | "ss" | "medicare" | "state" | "statePayroll" | "local" | "total" | "rate";
 /** Each L-6 year line's tickmark: inputs traced, sums footed, the rest worked out. */
 const L6_KIND: Record<L6Line, TickKind> = {
-  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", espp: "recomputed", gross: "footed",
+  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", espp: "recomputed", benefit: "recomputed", gross: "footed",
   tax: "recomputed", premiums: "traced", afterTax: "footed", yours: "recomputed", esppHeld: "recomputed", takeHome: "footed", employer: "recomputed",
   oop: "traced", hsa: "traced", perks: "traced", totalRewards: "footed", hours: "recomputed", afterTaxHour: "recomputed", totalRewardsHour: "recomputed",
   savings: "recomputed", rent: "traced", local: "footed", atRef: "recomputed", oopRef: "recomputed", face: "recomputed", total: "footed",
@@ -42,7 +42,8 @@ const L6_KIND: Record<L6Line, TickKind> = {
 };
 
 /** An offer's breakdown, A-1 (docs/v2-plan.md, item 5): its bottom line over its own stay, and what it's built from. `bull`: A-4's. */
-export type OwnLine = "total" | "spend" | "saved" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "rate" | "hour" | "bear" | "drop" | "bull";
+export type OwnLine = "total" | "spend" | "saved" | "taxFree" | "af" | "prices" | "ref" | "y1spend" | "y1saved" | "y1taxFree" | "rate" | "hour" | "bear"
+  | "drop" | "bull";
 /** A-2, where the money goes: each part of a year's pay in dollars and as a share of each $100, the $100, and the employer's money on top. */
 export type A2Part = "tax" | "rent" | "health" | "saved" | "espp" | "spend";
 export type A2Line = A2Part | `${A2Part}Share` | "hundred" | "credited";
@@ -98,6 +99,8 @@ export type MetricId =
   | `a5.${L}.${"credited" | "added" | "month"}.${number | "sum"}` // A-5: employer 401(k) money credited; total rewards less after-tax pay
   | `a5.${L}.pto` // A-5: what its starting salary pays a year for paid days off (4a)
   | `a5.${L}.esppIn` // A-5: what goes into its ESPP over its stay (4i)
+  | `a5.${L}.ob.${number}.${"stay" | "afterTax"}` // A-5: an other benefit over its stay, and a taxable one's after tax (4j)
+  | `when.${L}.benefit` // A-3: taxable benefits a month, paid with salary (4j)
   | `a6.${L}.${number}.${A6Line}`; // A-6: a calendar year's pay, tax, rate and tax by kind
 // L-5 and L-6 retired at stop 5B (docs/v2-plan.md, item 5, B8): each offer's warnings are in its A-6, and the `l6*` ids are A-7's
 // figures, each offer's tables over its own stay. The ids kept their names; the page calls the tables A-7.

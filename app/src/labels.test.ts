@@ -10,7 +10,7 @@ import { cityName, type MetricId, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { priceWords, shortCity } from "./prices";
 import {
-  alone, compareOf, context, ESPPS, ownOffers, renderAlone, renderBreakdowns, renderPage, requestOf, withLeave, withTies, withWork,
+  alone, BENEFITS, compareOf, context, ESPPS, ownOffers, renderAlone, renderBreakdowns, renderPage, requestOf, withLeave, withTies, withWork,
 } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
@@ -416,6 +416,15 @@ describe("every figure names its dollars, and every rate or share its period (co
     const c = comparison(context("colAdjustedTotal", ESPPS));
     for (const id of ["a5.B.esppIn", "l6y.B.esppHeld.1", "l6y.B.espp.sum", "br.B.1.espp", "br.C.1.espp"]) expect(c.html).toContain(`data-metric="${id}"`);
     const problems = [...checkPage(c.ctx, c.html, "ESPP"), ...checkWork(c.ctx, c.html, "ESPP"), ...c.csv.flatMap((b) => checkCsv(c.ctx, b)),
+      ...c.docs.flatMap(([d, l]) => checkDoc(c.ctx, d, l))];
+    expect(problems).toEqual([]);
+  }, 120_000);
+
+  it("offers with other benefits (4j): their lines, A-1's own line, A-5's, their Show the work, the CSVs and the documents", () => {
+    const c = comparison(context("colAdjustedTotal", BENEFITS));
+    for (const id of ["own.A.taxFree", "own.A.y1taxFree", "br.A.1.taxFree", "br.A.1.benefit", "a5.A.ob.0.stay", "a5.A.ob.0.afterTax", "a5.A.ob.1.stay",
+      "when.A.benefit", "l6y.A.benefit.1"]) expect(c.html).toContain(`data-metric="${id}"`);
+    const problems = [...checkPage(c.ctx, c.html, "benefits"), ...checkWork(c.ctx, c.html, "benefits"), ...c.csv.flatMap((b) => checkCsv(c.ctx, b)),
       ...c.docs.flatMap(([d, l]) => checkDoc(c.ctx, d, l))];
     expect(problems).toEqual([]);
   }, 120_000);

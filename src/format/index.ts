@@ -28,6 +28,7 @@ export function eventLabel(d: EventDetail): string {
     case "clawback": return d.sameYear ? `${d.award} clawback (reverses ${d.repaidYear} wages)` : `${d.award} clawback (repays ${d.paidYear} pay)`;
     case "vacationPayout": return `Unused vacation paid out (${PLAIN.format(round2(d.days))} days)`;
     case "espp": return `ESPP purchase, offering of ${d.offeringStart}${d.purchases > 1 ? `, purchase ${d.purchase} of ${d.purchases}` : ""}, sold at once`;
+    case "benefit": return `${d.label} (taxable benefit) ${d.from} to ${d.to}`;
   }
 }
 
@@ -46,6 +47,7 @@ export function eventFormula(d: EventDetail): string {
     case "vacationPayout": return `${PLAIN.format(round2(d.days))} days x ${usd(round2(d.annual))} / ${d.workdays} workdays`;
     case "espp": return `${usd(round2(d.used))} x ${d.priceRatio.toFixed(6)} / ${d.pricePaid.toFixed(6)} - ${usd(round2(d.used))}`
       + `${d.refunded > 0.005 ? ` (${usd(round2(d.refunded))} over the $25,000 limit refunded)` : ""}`;
+    case "benefit": return `${usd(round2(d.annual))} / 12${d.days === d.daysInMonth ? "" : ` x ${d.days}/${d.daysInMonth} days`}`;
   }
 }
 
@@ -59,11 +61,13 @@ const BENEFIT_LABELS: Record<Exclude<BenefitKind, "employee401k" | "outOfPocket"
   section127: "Section 127 education / student loan help (tax-free)",
   commuter: "132(f) commuter benefit (tax-free)",
   espp: "ESPP money (yours, held for a purchase)",
+  otherBenefit: "Other benefit (tax-free, as entered)",
 };
 
 export function benefitLabel(b: { kind: BenefitKind; detail: BenefitDetail }): string {
   if (b.kind === "employee401k") return `Your 401(k) deferral (${b.detail.kind === "deferral" ? b.detail.type : "pretax"})`;
   if (b.kind === "outOfPocket") return `Expected out-of-pocket (${b.detail.kind === "accrual" ? b.detail.usage : "medium"} usage)`;
+  if (b.detail.kind === "otherBenefit") return `${b.detail.label} (tax-free, as entered)`;
   return BENEFIT_LABELS[b.kind];
 }
 
@@ -79,6 +83,7 @@ export function benefitFormula(b: { kind: BenefitKind; detail: BenefitDetail }):
     case "monthly": return `${usd(round2(d.monthly))} a month${partOfMonth(d.days, d.daysInMonth)}`;
     case "esppContribution": return `${pct(d.rate)} of ${usd(round2(d.pay))}`;
     case "esppOut": return d.why === "purchase" ? "used at a purchase, or refunded over the limit" : "refunded on your last day";
+    case "otherBenefit": return `${usd(round2(d.annual))} / 12${partOfMonth(d.days, d.daysInMonth)}`;
   }
 }
 
@@ -143,6 +148,11 @@ export function formatAssumption(a: Assumption): string {
         + `out-of-pocket (${a.params.usage} usage, capped at the out-of-pocket max) - employer HSA. Held flat each year.`;
     case "perks":
       return "Perks are tax-free and counted at face value; the pre-tax equivalent is face / (1 - that year's marginal rate).";
+    case "otherBenefits": {
+      const b = a.params.benefits;
+      return `Other benefits, each a yearly amount accrued monthly while employed: ${b.map((x) => `${x.label} ${usd(round2(x.annual))} a year, `
+        + `${x.taxable ? "taxable (pay)" : "tax-free as entered (face value)"}`).join("; ")}.`;
+    }
     case "espp": {
       const p = a.params;
       return `ESPP: ${pct(p.contributionPct, 2)} of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, after tax, into `

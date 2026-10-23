@@ -267,6 +267,7 @@ export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   if (vests) facts.push(`its employer 401(k) money ${vests}`);
   const vacation = vacationTerm(o);
   if (vacation) facts.push(vacation);
+  if (o.otherBenefits?.length) facts.push(`its other benefits (${o.otherBenefits.map((b) => b.label.trim()).join(", ")}) stop on your last day`);
   const buy = d.espps[0];
   if (buy) {
     facts.push(`its first ESPP purchase is ${longDate(buy.date)}; leaving before a purchase gives back what you've put toward it, without the gain`);

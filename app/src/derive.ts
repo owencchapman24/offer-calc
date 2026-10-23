@@ -18,9 +18,10 @@ import {
 } from "./metrics";
 import { ownView, type OwnView, shareText, taxRateText } from "./breakdownModel";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, centsText, cliffCost, cliffName, esppPutIn, hundredOf, paidTimeOff, rateText as partsRate, taxYearsOf,
+  A2_LABEL, arrivalShown, arrivalsOf, centsText, cliffCost, cliffName, esppPutIn, hundredOf, otherBenefitsOf, paidTimeOff, rateText as partsRate,
+  taxYearsOf,
 } from "./partsModel";
-import { bridge, byYear, ownShownYear, shownYearOf, workedFrom, yearValue } from "./byYearModel";
+import { bridge, byYear, ownShownYear, shownYearOf, taxFreeNames, workedFrom, yearValue } from "./byYearModel";
 import type { OfferDetail, TaxRun } from "./protocol";
 import {
   BASIS_LINE as L6_BASIS_LINE, exactPay, FOOTS, lineNo, paymentAt, paymentLabel, paymentYears, rateText, sameStay, stayRows, type TaxCol, taxTable, toCent,
@@ -35,7 +36,7 @@ import { withholdingParts } from "./warningAt";
 import { paidBecause } from "./timeOffWords";
 import type { SectionId } from "./sections";
 import {
-  bonusText, cashAwardsText, employerStateText, esppText, healthText, matchText, perksText, rangeText, refreshersText, rentGrowthText,
+  bonusText, cashAwardsText, employerStateText, esppText, healthText, matchText, otherBenefitsText, perksText, rangeText, refreshersText, rentGrowthText,
   retirementText, scheduleText, vestingText,
 } from "./summary";
 import { cents, dayBefore, dollars, figure, longDate, percent, signed } from "./text";
@@ -95,13 +96,14 @@ const ABOUT_SECTION: Record<AboutField, SectionId> = {
 const BRIDGE_SECTION: Record<BridgeLine, SectionId> = {
   letter: "M-2", salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", clawback: "M-9", paid: "M-1", tax: "M-4", premiums: "M-5.2",
   afterTax: "M-1", retirement: "M-5.1", perks: "M-5.3", hsa: "M-5.2", oop: "M-5.2", totalRewards: "M-1", rent: "M-6.2", prices: "M-6.1",
-  total: "M-6.3", spend: "M-6.3", saved: "M-6.3", own: "M-6.3", inEspp: "M-3",
+  total: "M-6.3", spend: "M-6.3", saved: "M-6.3", own: "M-6.3", inEspp: "M-3", benefit: "M-5.3", taxFree: "M-5.3",
 };
 const BRIDGE_NAME: Record<BridgeLine, string> = {
   letter: "offer letter", salary: "salary line", bonus: "bonus line", cash: "cash awards line", rsu: "RSU line", espp: "ESPP line", clawback: "clawback",
   paid: "paid-in-the-year subtotal", tax: "tax", premiums: "premiums", afterTax: "after-tax pay", retirement: "employer 401(k)",
   perks: "perks", hsa: "employer HSA", oop: "out-of-pocket costs", totalRewards: "total rewards", rent: "rent", prices: "price line",
   own: "after rent at its own prices", total: "total after rent", spend: "spending a month", saved: "saving a month", inEspp: "ESPP money a month",
+  benefit: "taxable benefits line", taxFree: "tax-free benefits a month",
 };
 const READ_ONLY_NAME: Record<string, string> = {
   also: "other inputs", cashAwards: "cash awards", retirement: "401(k)", health: "health plan", perks: "perks", employerState: "employer state",
@@ -163,11 +165,12 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "a2": return A2_SECTION[c as A2Line];
     case "when": {
       if (b === "salary") return "M-2";
+      if (b === "benefit") return "M-5.3";
       const own = ctx.own?.breakdowns[a as L];
       return own && arrivalsOf(own.detail, own.years)[Number(b)]?.kind === "rsu" ? "M-3" : "M-2";
     }
     case "cliff": case "nextup": return "M-9";
-    case "a5": return b === "pto" ? "M-5.4" : b === "esppIn" ? "M-3" : "M-5";
+    case "a5": return b === "pto" ? "M-5.4" : b === "esppIn" ? "M-3" : b === "ob" ? "M-5.3" : "M-5";
     case "a6": return "M-4";
   }
   throw new Error(`Unknown figure: ${id}`);
@@ -228,10 +231,11 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "own": return ownWork(ctx, a as L, b as OwnLine);
       case "alone": return aloneWork(ctx, a as L);
       case "a2": return hundredWork(ctx, a as L, Number(b), c as A2Line);
-      case "when": return arrivalWork(ctx, a as L, b === "salary" ? "salary" : Number(b));
+      case "when": return b === "benefit" ? benefitMonthWork(ctx, a as L) : arrivalWork(ctx, a as L, b === "salary" ? "salary" : Number(b));
       case "cliff": return cliffWork(ctx, a as L, Number(b));
       case "nextup": return nextUpWork(ctx, a as L);
-      case "a5": return b === "pto" ? paidTimeOffWork(ctx, a as L) : b === "esppIn" ? esppInWork(ctx, a as L) : benefitsWork(ctx, a as L, b as "credited" | "added" | "month", c === "sum" ? "sum" : Number(c));
+      case "a5": return b === "pto" ? paidTimeOffWork(ctx, a as L) : b === "esppIn" ? esppInWork(ctx, a as L)
+        : b === "ob" ? otherBenefitWork(ctx, a as L, Number(c), id.split(".")[4] as "stay" | "afterTax") : benefitsWork(ctx, a as L, b as "credited" | "added" | "month", c === "sum" ? "sum" : Number(c));
       case "a6": return taxYearWork(ctx, a as L, Number(b), c as A6Line);
     }
     throw new Error(`Unknown figure: ${id}`);
@@ -299,10 +303,11 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "own": return `${a}'s ${OWN_NAME[b as OwnLine]}`;
     case "alone": return `${a}'s bottom line on its own`;
     case "a2": return `${a}-2's ${c === "hundred" ? "$100" : c.endsWith("Share") ? `${A2_LABEL[c.replace("Share", "") as A2Part]} share` : c === "credited" ? "employer 401(k) money" : A2_LABEL[c as A2Part]}, year ${b}`;
-    case "when": return b === "salary" ? `${a}-3's salary a month` : `${a}-3's payment ${Number(b) + 1}`;
+    case "when": return b === "salary" ? `${a}-3's salary a month` : b === "benefit" ? `${a}-3's taxable benefits a month` : `${a}-3's payment ${Number(b) + 1}`;
     case "cliff": return `${a}-4's cliff ${Number(b) + 1}`;
     case "nextup": return `${a}-4's next cliff`;
-    case "a5": return b === "pto" ? `${a}-5's paid time off` : b === "esppIn" ? `${a}-5's ESPP money, over its stay` : `${a}-5's ${b === "credited" ? "employer 401(k) money" : b === "month" ? "benefits a month" : "benefits"}${c === "sum" ? ", over its stay" : `, year ${c}`}`;
+    case "a5": return b === "pto" ? `${a}-5's paid time off` : b === "esppIn" ? `${a}-5's ESPP money, over its stay`
+      : b === "ob" ? `${a}-5's benefit ${Number(c) + 1}${id.endsWith("afterTax") ? ", after tax" : ", over its stay"}` : `${a}-5's ${b === "credited" ? "employer 401(k) money" : b === "month" ? "benefits a month" : "benefits"}${c === "sum" ? ", over its stay" : `, year ${c}`}`;
     case "a6": return `${a}-6's ${b} ${c}`;
   }
   return id;
@@ -1731,6 +1736,29 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         ties: [], ...fromInputs(ctx, letter, ESPP_INPUTS),
       };
     }
+    case "benefit":
+      return {
+        title: title("taxable benefits"), scope,
+        lines: [
+          { label: `Taxable benefits paid in year ${n}`, value: figure(y.benefit), ref: l6("benefit") },
+          { op: "−", label: "In the offer letter", value: "0" },
+          { op: "=", label: "Difference", value: signed(y.benefit), rule: "double" },
+        ],
+        notes: ["Benefits entered as taxable are pay: paid with salary, a twelfth of each a month while you work there, taxed as wages, FICA "
+          + "included. An offer letter's year doesn't count them."],
+        ties: [], ...fromInputs(ctx, letter, ["otherBenefits"]),
+      };
+    case "taxFree":
+      return {
+        title: title("tax-free benefits a month"), scope,
+        lines: [
+          { label: `Tax-free benefits in year ${n}, at face value`, value: figure(y.perks), ref: l6("perks") },
+          { op: "÷", label: "Months", value: "12" },
+          { op: "=", label: "A month", value: dollars(b.taxFree ?? 0), rule: "double" },
+        ],
+        notes: ["At face value, not restated at any prices, and not saved: a line of their own."],
+        ties: n === 1 ? [`own.${letter}.y1taxFree`] : [], uses: [],
+      };
     case "clawback":
       return { title: title("clawback"), scope, lines: [{ label: "Repaid", value: figure(-y.clawback), ref: l6("clawback") }],
         notes: ["A sign-on or other award repaid on leaving early."], ties: [], uses: [] };
@@ -1761,13 +1789,13 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
     }
     case "premiums": case "perks": case "hsa": case "oop": {
       const v = y[line];
-      const what = { premiums: "your health premiums", perks: "perks", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
+      const what = { premiums: "your health premiums", perks: "tax-free benefits", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
       return {
         title: title(what), scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(v), tick: "traced" }],
         notes: [traced, line === "oop"
           ? `Your own estimate at ${ctx.household.healthUsage ?? "medium"} use, capped at the out-of-pocket maximum; held flat each year.`
           : "Held flat each year."],
-        ties: [l6(line)], ...fromInputs(ctx, letter, { premiums: ["health.premium"], perks: ["perks.section127", "perks.commuterMonthly"],
+        ties: [l6(line)], ...fromInputs(ctx, letter, { premiums: ["health.premium"], perks: ["perks.section127", "perks.commuterMonthly", "otherBenefits"],
           hsa: ["health.employerHsa"], oop: ["health.outOfPocket", "health.oopMax"] }[line]),
       };
     }
@@ -1821,16 +1849,20 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
           notes: [`What's left each month for everything but rent and health costs, in ${b.city} dollars.`], ties: own, uses: [] }
         : { title: title("saved a month"), scope,
           lines: [
-            ...(y.esppHeld
+            ...(y.esppHeld || y.perks
               ? [{ label: `At face value in year ${n}`, value: figure(c.face), ref: l6("face") },
-                { op: y.esppHeld < 0 ? "+" as const : "−" as const, label: "ESPP money held", value: figure(Math.abs(y.esppHeld)), ref: `a2.${letter}.${n}.espp` as MetricId },
-                { op: "=" as const, label: `Saved in year ${n}`, value: figure(c.face - y.esppHeld), rule: "single" as const }]
+                ...(y.esppHeld ? [{ op: y.esppHeld < 0 ? "+" as const : "−" as const, label: "ESPP money held", value: figure(Math.abs(y.esppHeld)),
+                  ref: `a2.${letter}.${n}.espp` as MetricId }] : []),
+                ...(y.perks ? [{ op: "−" as const, label: "Tax-free benefits", value: figure(y.perks), ref: l6("perks") }] : []),
+                { op: "=" as const, label: `Saved in year ${n}`, value: figure(c.face - y.esppHeld - y.perks), rule: "single" as const }]
               : [{ label: `Saved in year ${n}, at face value`, value: figure(c.face), ref: l6("face") }]),
             { op: "÷", label: "Months", value: "12" },
             { op: "=", label: "A month", value: dollars(b.saved!), rule: "double" },
           ],
-          notes: ["Your 401(k) and HSA contributions, the vested match, employer HSA money, perks and planned savings: money not spent locally."
-            + `${y.esppHeld ? " ESPP money held at the year's end is at face value too, but it isn't saved: it's on its own line." : ""}`],
+          notes: ["Your 401(k) and HSA contributions, the vested match, employer HSA money and planned savings: money not spent locally."
+            + (y.esppHeld || y.perks ? ` ${y.esppHeld && y.perks ? "ESPP money held at the year's end and tax-free benefits"
+              : y.esppHeld ? "ESPP money held at the year's end" : "Tax-free benefits"} count at face value too, but aren't saved: each is on its own line.`
+              : "")],
           ties: own, uses: [] };
     }
   }
@@ -1880,15 +1912,18 @@ function rentLines(ctx: WorkContext, letter: L, y: ShownYear): Omit<Work, "title
 // ---- A-7: the work (L-6 until stop 5B), each offer over its own stay ------------------------------------------------
 
 const L6_SECTION: Record<L6Line, SectionId> = {
-  salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", clawback: "M-9", gross: "M-1", tax: "M-4", premiums: "M-5.2", afterTax: "M-1",
+  salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9", gross: "M-1", tax: "M-4", premiums: "M-5.2",
+  afterTax: "M-1",
   yours: "M-5.1", esppHeld: "M-3",
   takeHome: "M-1", employer: "M-5.1", oop: "M-5.2", hsa: "M-5.2", perks: "M-5.3", totalRewards: "M-1", hours: "M-5.4", afterTaxHour: "M-5.4",
   totalRewardsHour: "M-5.4", savings: "M-6.3", rent: "M-6.2", local: "M-6.3", atRef: "M-6.1", oopRef: "M-6.1", face: "M-6.3", total: "M-6.3",
   totalHour: "M-5.4",
 };
-const COMPONENT_SECTION: Record<Component, SectionId> = { salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", clawback: "M-9" };
+const COMPONENT_SECTION: Record<Component, SectionId> = {
+  salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9",
+};
 const COMPONENT_NAME: Record<Component | "all", string> = {
-  salary: "salary", bonus: "bonus", cash: "cash award", rsu: "RSU", espp: "ESPP", clawback: "clawback", all: "",
+  salary: "salary", bonus: "bonus", cash: "cash award", rsu: "RSU", espp: "ESPP", benefit: "taxable benefit", clawback: "clawback", all: "",
 };
 /** The line each per-hour line divides. */
 const PER_HOUR_OF: Partial<Record<L6Line, L6Line>> = { afterTaxHour: "afterTax", totalRewardsHour: "totalRewards", totalHour: "total" };
@@ -2016,7 +2051,7 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
   }
   const work = ctx.own?.work?.[letter];
   switch (line) {
-    case "salary": case "bonus": case "cash": case "rsu": case "espp": case "clawback": {
+    case "salary": case "bonus": case "cash": case "rsu": case "espp": case "benefit": case "clawback": {
       const posted = y.posted[line];
       const list = work ? work.payments.flatMap((p, i) => (p.ey === n && p.component === line ? [i] : [])) : [];
       const count = list.length;
@@ -2036,10 +2071,12 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
           ...(line === "rsu" ? ["RSUs count as pay on the day they vest and are assumed sold then."] : []),
           ...(line === "espp" ? ["An ESPP purchase's gain is the shares' value that day less what bought them: they're taken as sold at once. It's "
             + "wages for income tax, not for Social Security or Medicare."] : []),
+          ...(line === "benefit" ? ["Benefits entered as taxable are paid with salary, a twelfth of each a month, a part month by its days, and taxed as wages."]
+            : []),
         ],
         ties: listed ? [listed] : [],
         ...fromInputs(ctx, letter, line === "salary" ? ["salary.annual", "salary.raise", "salary.promotions"] : line === "bonus" ? [bonusPath(ctx, letter), "bonus.payOn"]
-          : line === "rsu" ? equityPaths(ctx, letter) : line === "espp" ? ESPP_INPUTS : ["cashAwards"]),
+          : line === "rsu" ? equityPaths(ctx, letter) : line === "espp" ? ESPP_INPUTS : line === "benefit" ? ["otherBenefits"] : ["cashAwards"]),
       };
     }
     case "tax": {
@@ -2061,13 +2098,13 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
       };
     }
     case "premiums": case "oop": case "hsa": case "perks": {
-      const what = { premiums: "your health premiums", perks: "perks", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
+      const what = { premiums: "your health premiums", perks: "tax-free benefits", hsa: "the employer's HSA money", oop: "expected out-of-pocket health costs" }[line];
       return {
         title, scope, lines: [{ label: what[0].toUpperCase() + what.slice(1), value: figure(Math.abs(value)), tick: "traced" }],
         notes: [offerByLetter(ctx, letter)?.sample ? "Traced to a sample input (illustrative, not market data)." : "As you entered it.",
           line === "oop" ? `Your own estimate at ${ctx.household.healthUsage ?? "medium"} use, capped at the out-of-pocket maximum; held flat each year.`
             : "Held flat each year; a part year counts its months."],
-        ties: [`br.${letter}.${n}.${line}`], ...fromInputs(ctx, letter, { premiums: ["health.premium"], perks: ["perks.section127", "perks.commuterMonthly"],
+        ties: [`br.${letter}.${n}.${line}`], ...fromInputs(ctx, letter, { premiums: ["health.premium"], perks: ["perks.section127", "perks.commuterMonthly", "otherBenefits"],
           hsa: ["health.employerHsa"], oop: ["health.outOfPocket", "health.oopMax"] }[line]),
       };
     }
@@ -2172,7 +2209,7 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
       const c = y.col!;
       const items: Array<[L6Line | null, string, number]> = [
         ["savings", "Planned savings", c.savings], ["yours", "Your 401(k) and HSA", y.yours], ["esppHeld", "ESPP money held", y.esppHeld],
-        ["employer", "Employer 401(k), vested", y.employer], ["hsa", "Employer HSA money", y.hsa], ["perks", "Perks", y.perks],
+        ["employer", "Employer 401(k), vested", y.employer], ["hsa", "Employer HSA money", y.hsa], ["perks", "Tax-free benefits", y.perks],
       ];
       const shown = items.filter(([, , v]) => v);
       return {
@@ -2696,6 +2733,10 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
     case "health": return [line("Health plan", healthText(d))];
     case "perks": return [line("Perks", perksText(d))];
     case "espp": return [line("ESPP", esppText(d))];
+    case "otherBenefits": return d.otherBenefits?.length
+      ? d.otherBenefits.map((b) => line(b.label || "Benefit", b.annual === null ? "—" : `${dollars(b.annual)} a year`, b.taxable === false ? "tax-free" : "taxable"))
+      : [line("Other benefits", otherBenefitsText(d))];
+    case "otherBenefits.taxable": return [line(label, v === false ? "Tax-free" : "Taxable")];
     case "employerState": return [line("Employer state", employerStateText(d))];
     case "costOfLiving.rentGrowth": return [line("Rent growth", rentGrowthText(d, 0.025))];
     case "hours.weekly": return [line(label, "Not counted")];
@@ -2797,12 +2838,13 @@ function aboutWork(ctx: WorkContext, field: AboutField): Work {
 // ---- an offer's breakdown: A-1, its bottom line (docs/v2-plan.md, item 5) -------------------------------------
 
 const OWN_SECTION: Record<OwnLine, SectionId> = {
-  total: "M-7.2", spend: "M-7.2", saved: "M-7.2", af: "M-7.2", prices: "M-6.1", ref: "M-6.1", y1spend: "M-1", y1saved: "M-1", rate: "M-4",
-  hour: "M-5.4", bear: "M-8", drop: "M-8", bull: "M-8",
+  total: "M-7.2", spend: "M-7.2", saved: "M-7.2", taxFree: "M-5.3", af: "M-7.2", prices: "M-6.1", ref: "M-6.1", y1spend: "M-1", y1saved: "M-1",
+  y1taxFree: "M-5.3", rate: "M-4", hour: "M-5.4", bear: "M-8", drop: "M-8", bull: "M-8",
 };
 const OWN_NAME: Record<OwnLine, string> = {
   total: "month on its own", spend: "money to spend on its own", saved: "money saved on its own", af: "annuity factor on its own",
-  prices: "price step", ref: "month at the prices picked", y1spend: "year-1 money to spend", y1saved: "year-1 money saved",
+  prices: "price step", ref: "month at the prices picked", y1spend: "year-1 money to spend", y1saved: "year-1 money saved", taxFree: "tax-free benefits on its own",
+  y1taxFree: "year-1 tax-free benefits",
   rate: "tax rate over its stay", hour: "per hour on its own", bear: "bear case on its own", drop: "drop to the bear case on its own",
   bull: "bull case on its own",
 };
@@ -2852,11 +2894,24 @@ function ownWork(ctx: WorkContext, letter: L, line: OwnLine): Work {
       title: `${letter}-1 · Saved a month over your stay, in ${place} dollars`, scope: ownScope(v),
       lines: [
         { label: "Saved at face value, present value", value: figure(v.pv.saved),
-          note: "your 401(k) and HSA, vested employer 401(k), employer HSA, perks, planned savings" },
+          note: "your 401(k) and HSA, vested employer 401(k), employer HSA, planned savings" },
         factorLine(),
         { op: "=", label: `Saved, a month over your stay, ${place} $`, value: dollars(v.month.saved), rule: "double" },
       ],
-      notes: ["Money you save isn't spent where you live, so it counts at face value, at any prices.", monthNote],
+      notes: ["Money you save isn't spent where you live, so it counts at face value, at any prices. Tax-free benefits are on their own line, "
+        + "not saved.", monthNote],
+      ties: [], uses: [`own.${letter}.total`],
+    };
+    case "taxFree": return {
+      title: `${letter}-1 · Tax-free benefits a month over your stay, in ${place} dollars`, scope: ownScope(v),
+      lines: [
+        { label: "Tax-free benefits at face value, present value", value: figure(v.pv.taxFree),
+          note: offer ? taxFreeNames(offer).join(", ") || undefined : undefined },
+        factorLine(),
+        { op: "=", label: `Tax-free benefits, a month over your stay, ${place} $`, value: dollars(v.month.taxFree), rule: "double" },
+      ],
+      notes: ["Perks and other benefits entered as tax-free count at face value: no tax comes off them, and they aren't restated at any prices "
+        + "(M-5.3). They aren't savings, so they're on their own line.", monthNote],
       ties: [], uses: [`own.${letter}.total`],
     };
     case "spend": return {
@@ -2864,13 +2919,15 @@ function ownWork(ctx: WorkContext, letter: L, line: OwnLine): Work {
       lines: [
         { label: "A month over your stay", value: dollars(v.month.total), ref: `own.${letter}.total` },
         { op: "−", label: "Saved, a month over your stay", value: dollars(v.month.saved), ref: `own.${letter}.saved` },
+        ...(v.month.taxFree ? [{ op: "−" as const, label: "Tax-free benefits, a month over your stay", value: dollars(v.month.taxFree),
+          ref: `own.${letter}.taxFree` as MetricId }] : []),
         { op: "=", label: `To spend after rent, a month over your stay, ${place} $`, value: dollars(v.month.spend), rule: "double" },
       ],
       notes: [
         "What's left to spend after tax, rent and expected out-of-pocket health costs, less what you save.",
         ...(breakdownOf(ctx, letter).detail.window.costOfLiving?.presentValue?.esppHeld !== undefined
           ? ["Its ESPP's money is in it: what the plan holds comes back to you, as shares sold at once or in cash."] : []),
-        `It's the total less what's saved, so this line takes the rounding: its own present value, ${figure(v.pv.spend)}, ÷ ${v.factor.toFixed(4)} `
+        `It's the total less what's saved${v.month.taxFree ? " and the tax-free benefits" : ""}, so this line takes the rounding: its own present value, ${figure(v.pv.spend)}, ÷ ${v.factor.toFixed(4)} `
           + `is ${cents(v.pv.spend / v.factor)}.`,
       ],
       ties: [], uses: [`own.${letter}.total`, `own.${letter}.saved`],
@@ -2963,7 +3020,6 @@ function ownWork(ctx: WorkContext, letter: L, line: OwnLine): Work {
         { label: "Your 401(k) and HSA", value: figure(y.yours) },
         { op: "+", label: "Employer 401(k), vested by the end of your stay", value: figure(y.employer) },
         { op: "+", label: "Employer HSA money", value: figure(y.hsa) },
-        { op: "+", label: "Perks, at face value", value: figure(y.perks) },
         { op: "+", label: "Planned savings", value: figure(y.col!.savings) },
       ];
       const kept = parts.filter((l) => l.value !== "0");
@@ -2977,6 +3033,22 @@ function ownWork(ctx: WorkContext, letter: L, line: OwnLine): Work {
         ],
         notes: ["Money you save counts at face value, at any prices."],
         ties: [], uses: [],
+      };
+    }
+    case "y1taxFree": {
+      const y1 = v.year1;
+      if (!y1?.taxFree) throw new Error(`Offer ${letter} has no tax-free benefits in year 1.`);
+      return {
+        title: `${letter}-1 · Tax-free benefits, a month in year 1, in ${place} dollars`,
+        scope: `Base case · year 1 (${longDate(y1.start)} – ${longDate(dayBefore(y1.end))}) · ${place} dollars as paid that year`,
+        lines: [
+          { label: "Tax-free benefits, year 1, at face value", value: figure(y1.taxFree), ref: `l6y.${letter}.perks.1`,
+            note: offer ? taxFreeNames(offer).join(", ") || undefined : undefined },
+          { op: "÷", label: "Months", value: "12" },
+          { op: "=", label: `A month in year 1, ${place} $`, value: dollars(y1.taxFreeMonth), rule: "double" },
+        ],
+        notes: ["At face value, at any prices, and not saved: a line of their own."],
+        ties: [`br.${letter}.1.taxFree`], uses: [],
       };
     }
     case "rate": {
@@ -3220,6 +3292,58 @@ function hundredWork(ctx: WorkContext, letter: L, n: number, line: A2Line): Work
     }
   }
   throw new Error(`No ${line} line in ${letter}-2.`);
+}
+
+/** A-3: taxable benefits a month at the start, paid with salary (4j): each a year as entered, added, ÷ 12. */
+function benefitMonthWork(ctx: WorkContext, letter: L): Work {
+  const o = offerByLetter(ctx, letter);
+  const input = o ? toOfferInput(o) : null;
+  const list = input && "offer" in input ? (input.offer.otherBenefits ?? []).filter((b) => b.taxable) : [];
+  if (!list.length) throw new Error(`${letter} has no taxable benefits.`);
+  const year = list.reduce((s, b) => s + b.annual, 0);
+  return {
+    title: `${letter}-3 · taxable benefits a month`, scope: "As entered · $, as paid",
+    lines: [
+      ...list.map((b, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `${b.label}, a year`, value: figure(b.annual), tick: "traced" })),
+      ...(list.length > 1 ? [{ op: "=" as const, label: "A year", value: figure(year), rule: "single" as const }] : []),
+      { op: "÷", label: "Months", value: "12" },
+      { op: "=", label: "A month", value: dollars(year / 12), rule: "double" },
+    ],
+    notes: ["Paid with salary, a twelfth a month while you work there, and taxed as wages."], ties: [], ...fromInputs(ctx, letter, ["otherBenefits"]),
+  };
+}
+
+/** A-5: an other benefit over its own stay (each year as shown, added), or a taxable one's after tax (that less its tax), 4j. */
+function otherBenefitWork(ctx: WorkContext, letter: L, index: number, what: "stay" | "afterTax"): Work {
+  const b = breakdownOf(ctx, letter);
+  const o = offerByLetter(ctx, letter);
+  const input = o ? toOfferInput(o) : null;
+  const list = input && "offer" in input ? input.offer.otherBenefits ?? [] : [];
+  const x = otherBenefitsOf(b.detail, b.years, list)[index];
+  if (!x) throw new Error(`No benefit ${index + 1} for ${letter}.`);
+  const scope = l6Scope(ctx, letter);
+  if (what === "stay") {
+    return {
+      title: `${letter}-5 · ${x.label}, over its stay`, scope,
+      lines: [
+        ...x.years.map((v, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `Year ${i + 1}`, value: figure(v) })),
+        { op: "=", label: "Over its stay", value: figure(x.stay), rule: "double" },
+      ],
+      notes: [`${figure(x.annual)} a year, a twelfth a month while you work there, a part month by its days${x.taxable ? ": pay, taxed as wages"
+        : ": tax-free, as entered, at face value"}.`],
+      ties: [], ...fromInputs(ctx, letter, [`otherBenefits.${index}.annual`, `otherBenefits.${index}.taxable`]),
+    };
+  }
+  return {
+    title: `${letter}-5 · ${x.label}, after tax over its stay`, scope,
+    lines: [
+      { label: "Paid over its stay", value: figure(x.stay), ref: `a5.${letter}.ob.${index}.stay` },
+      { op: "−", label: "Its tax", note: "its share of each year's tax on the offer's pay", value: figure(x.taxSum) },
+      { op: "=", label: "After tax", value: figure(x.afterTax), rule: "double" },
+    ],
+    notes: ["Each payment carries its calendar year's rate on the offer's pay (M-4); its tax is that, to the cent, added by year and rounded once."],
+    ties: [], uses: [],
+  };
 }
 
 /** A-3: a payment that isn't salary, by date, to the dollar; or salary a month at the start. */

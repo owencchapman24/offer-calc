@@ -13,6 +13,9 @@ addFields(Object.fromEntries(([["contributionPct", "contribution"], ["eligiblePa
   ["lookback", "lookback"], ["offeringMonths", "offering length"], ["purchasesPerOffering", "purchases an offering"],
   ["offeringsStart", "offerings start"], ["eligibleFrom", "eligible from"]] as const)
   .map(([k, label]) => [`espp.${k}`, { label: `ESPP ${label}`, section: "M-3" as const, group: "equity" as const }])));
+// Other benefits' fields, in their editor (4j).
+addFields(Object.fromEntries(([["label", "Name"], ["annual", "Amount a year"], ["taxable", "Tax"]] as const)
+  .map(([k, label]) => [`otherBenefits.${k}`, { label, section: "M-5.3" as const, group: "perks" as const, editor: "otherBenefits" }])));
 
 addDefaults({
   "timeOff.vacation": {
@@ -33,6 +36,10 @@ addDefaults({
   },
   // An ESPP's terms: the survey is NASPP and Deloitte Tax's 2023 Employee Stock Purchase Plan Survey (209 companies).
   "espp.eligiblePay": { value: "salary", shown: () => "Salary", reason: "Plans count base salary; some count bonuses too: check your plan's document." },
+  "otherBenefits.taxable": {
+    value: true, shown: () => "Taxable",
+    reason: "Any fringe benefit is wages unless the law excludes it (IRS Pub. 15-B), so a benefit counts as pay until you say it's tax-free.",
+  },
   "espp.discount": {
     value: 0.15, shown: () => "15%",
     reason: "The most common discount, and the most section 423 allows: 85% of plans in NASPP and Deloitte's 2023 survey.",

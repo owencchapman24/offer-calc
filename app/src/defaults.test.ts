@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { projectOffer } from "../../src/offer/compare";
 import { leaveDaySweep } from "../../src/offer/project";
 import { STATES_2026 } from "../../src/tax/index";
-import { asymmetries } from "./comparability";
+import { asymmetries, asymmetryText } from "./comparability";
 import { DEFAULTS } from "./defaults";
 import "./detailedDefaults";
 import { US_STATES } from "./Detailed";
@@ -31,6 +31,8 @@ const BANKS = fresh(B, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
 const BANKS_IN_CA = fresh(IN_CA, (d) => ({ ...d, timeOff: { ...d.timeOff, gives: 15 } }));
 /** B with an ESPP: 10% of salary at the plan's defaults; C's, with its share price rising, so the lookback pays. */
 const ESPP_B = withEspp(B);
+/** B with a phone stipend, its tax left at the default (taxable). */
+const STIPEND = fresh(B, (d) => ({ ...d, otherBenefits: [{ label: "Phone", annual: 600, taxable: null }] }));
 const ESPP_C = withEspp(GROWING);
 /** B putting $5,000 a year in an HSA: over self-only coverage's limit, under family coverage's. */
 const BIG_HSA = fresh(B, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employeeHsa: 5_000 } }));
@@ -90,6 +92,7 @@ function setup(key: string): { o: AppOffer; path: string; value: unknown; other:
     case "perks.commuterMonthly": return on(B, key, 100);
     case "employerState": return on(B, key, "NY", B.draft.residence.state); // NY's convenience rule: a warning
     case "costOfLiving.rentGrowth": return on(B, key, 0.05);
+    case "otherBenefits.taxable": return on(STIPEND, "otherBenefits.0.taxable", false); // tax-free: no tax on it
     case "espp.eligiblePay": return on(ESPP_B, key, "salaryAndBonus"); // B's bonus puts money in too
     case "espp.discount": return on(ESPP_B, key, 0.1);
     case "espp.lookback": return on(ESPP_C, key, false); // a rising price: without one, the purchase day's price
@@ -144,6 +147,14 @@ describe("a plan entered as none", () => {
     const blankB: AppOffer = { ...B, draft: { ...B.draft, retirement: null, health: null } };
     expect(asymmetries([A, blankB]).map((x) => x.category)).toEqual(["premium", "outOfPocket", "employer401k", "employerHsa"]);
     expect(asymmetries([A, none(none(blankB, "retirement"), "health")])).toEqual([]);
+  });
+  it("other benefits (4j): entered for A, entered as none for B, not entered for C: the note names C", () => {
+    const withList = (o: AppOffer, list: OfferDraft["otherBenefits"]): AppOffer => ({ ...o, draft: { ...o.draft, otherBenefits: list } });
+    const [a, b] = [withList(A, [{ label: "Gym", annual: 600, taxable: false }]), withList(B, [])];
+    const found = asymmetries([a, b, C]).find((x) => x.category === "otherBenefits");
+    expect(found).toMatchObject({ counted: ["A", "B"], missing: ["C"] });
+    expect(asymmetryText(found!)).toBe("Other benefits are counted for A and B but not for C. If C offers any (a stipend, insurance), or none, add them: "
+      + "otherwise the comparison favors A and B.");
   });
   it("a health plan with only a premium entered counts the premium, not out-of-pocket costs", () => {
     const h: HealthDraft = { premium: 1_200, outOfPocket: { low: null, medium: null, high: null }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null };

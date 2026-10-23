@@ -2,7 +2,7 @@ import { type Dispatch, type ReactNode, useEffect, useRef } from "react";
 import type { ISODate, OfferWarning } from "../../src/offer/types";
 import { inDollars, ownView, type OwnView, prefixOf, shareText } from "./breakdownModel";
 import { inSentence } from "./breakevenModel";
-import { bridge, notesOf } from "./byYearModel";
+import { bridge, notesOf, taxFreeNames } from "./byYearModel";
 import { caseChanges, changeText, hasRanges } from "./cases";
 import { CsvButton, Fig, useApi, useRovingTicks } from "./figures";
 import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms } from "./leaveModel";
@@ -10,7 +10,8 @@ import { daysOffWords, daysText, unpaidVacationText } from "./timeOffWords";
 import type { A2Part, MetricId, WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, paidTimeOff, payRows, rateText,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, otherBenefitsOf, paidTimeOff,
+  payRows, rateText,
   taxYearsOf,
 } from "./partsModel";
 import type { PriceWords } from "./prices";
@@ -154,7 +155,8 @@ function WhereItGoes({ ctx, x, prices, ui, dispatch, open, show }: Part) {
           {h.parts[4].cents < 0 && (
             <p className="note">Rent, tax and the rest take more than year {n} pays: the money left to spend is below zero, in parentheses.</p>
           )}
-          <EmployerAdds L={L} n={n} credited={h.credited} share={h.vestedShare} hsa={h.hsa} perks={h.perks} years={b.years} />
+          <EmployerAdds L={L} n={n} credited={h.credited} share={h.vestedShare} hsa={h.hsa} perks={h.perks} years={b.years}
+            names={x.input ? taxFreeNames(x.input) : []} />
           <p className="part-more">{show}</p>
           {open && <BridgeView ctx={ctx} letter={L} n={n} prices={prices} />}
         </>
@@ -176,17 +178,22 @@ function HundredBar({ parts }: { parts: Array<{ part: A2Part; cents: number }> }
 }
 
 /** "Outside the $100, your employer adds $3,300 of 401(k) money in year 1, on top; by the end of your 4-year stay, all of it has vested." */
-function EmployerAdds({ L, n, credited, share, hsa, perks, years }: {
-  L: Letter; n: number; credited: number; share: number | null; hsa: number; perks: number; years: number;
+function EmployerAdds({ L, n, credited, share, hsa, perks, years, names }: {
+  L: Letter; n: number; credited: number; share: number | null; hsa: number; perks: number; years: number; /** The tax-free benefits' names. */ names: string[];
 }) {
-  if (!credited && !hsa && !perks) return <p className="part-note">The employer adds nothing on top in year {n}: no 401(k) money, HSA money or perks entered.</p>;
+  if (!credited && !hsa && !perks) {
+    return <p className="part-note">The employer adds nothing on top in year {n}: no 401(k) money, HSA money or tax-free benefits entered.</p>;
+  }
   const vested = !credited || share === null ? "" : share >= 1 ? ` By the end of your ${years}-year stay, all of its 401(k) money has vested.` : share > 0
     ? ` By the end of your ${years}-year stay, ${Math.round(share * 100)}% of its 401(k) money has vested.`
     : ` None of its 401(k) money has vested by the end of your ${years}-year stay: leave then and it's left behind.`;
   const items: ReactNode[] = [];
   if (credited) items.push(<span key="k"><Fig id={`a2.${L}.${n}.credited`} label={`${dollars(credited)} of employer 401(k) money in year ${n}`}>{dollars(credited)}</Fig> of 401(k) money</span>);
   if (hsa) items.push(<span key="h"><Fig id={`br.${L}.${n}.hsa`} label={`Employer HSA money, ${dollars(hsa)} in year ${n}`}>{dollars(hsa)}</Fig> of HSA money</span>);
-  if (perks) items.push(<span key="p"><Fig id={`br.${L}.${n}.perks`} label={`Perks, ${dollars(perks)} in year ${n}`}>{dollars(perks)}</Fig> of perks</span>);
+  if (perks) {
+    items.push(<span key="p"><Fig id={`br.${L}.${n}.perks`} label={`Tax-free benefits, ${dollars(perks)} in year ${n}`}>{dollars(perks)}</Fig> of tax-free
+      benefits{names.length ? ` (${names.join(", ")})` : ""}</span>);
+  }
   return (
     <p className="part-note">
       Outside the $100, your employer adds {items.map((it, i) => <span key={i}>{i ? (i === items.length - 1 ? " and " : ", ") : ""}{it}</span>)} in year {n}, on
@@ -241,7 +248,9 @@ function BridgeView({ ctx, letter, n, prices }: { ctx: WorkContext; letter: Lett
           month to spend after rent + <Fig id={`br.${letter}.${n}.saved`} label={`${inDollars(b.city!, b.saved)} a month saved, in year ${n}`}>
             {dollars(b.saved)}</Fig> a month saved
           {b.inEspp !== undefined && <>{" "}+ <Fig id={`br.${letter}.${n}.inEspp`} label={`${inDollars(b.city!, b.inEspp)} a month held in the ESPP, in year ${n}`}>
-            {dollars(b.inEspp)}</Fig> a month held in the ESPP</>}, in year {n}, in {b.city} dollars
+            {dollars(b.inEspp)}</Fig> a month held in the ESPP</>}
+          {b.taxFree !== undefined && <>{" "}+ <Fig id={`br.${letter}.${n}.taxFree`} label={`${inDollars(b.city!, b.taxFree)} a month in tax-free benefits, in year ${n}`}>
+            {dollars(b.taxFree)}</Fig> a month in tax-free benefits</>}, in year {n}, in {b.city} dollars
         </p>
       )}
       <p className="caption">
@@ -262,10 +271,12 @@ function PayByYear({ ctx, x, open, show }: Part) {
   const notes = notesOf(b.detail, b.years);
   const arrivals = arrivalsOf(b.detail, b.years);
   const salary = x.input?.salary.annual ?? 0;
+  // Taxable other benefits are paid with salary, a twelfth a month (4j).
+  const benefitMonth = (x.input?.otherBenefits ?? []).filter((ob) => ob.taxable).reduce((s, ob) => s + ob.annual, 0) / 12;
   return (
     <section className="part pay-by-year" aria-labelledby={`${L}-3-title`}>
       <PartHead letter={L} n={3} title="Pay by year, and when it arrives" />
-      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, cash: y.cash, rsu: y.rsu, espp: y.espp }))} />
+      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, cash: y.cash, rsu: y.rsu, espp: y.espp, benefit: y.benefit }))} />
       <div className="l6-scroll" role="region" aria-label={`${L}-3, pay by year`} tabIndex={0}>
         <table className="year-table pay-table">
           <caption className="sr-only">{L}'s pay by employment year and kind, $, as paid</caption>
@@ -297,7 +308,9 @@ function PayByYear({ ctx, x, open, show }: Part) {
       <p className="part-note">
         Gross, as paid in each employment year: the same figures as {L}-7's. Salary is paid monthly:{" "}
         <Fig id={`when.${L}.salary`} label={`${dollars(salary / 12)} a month at its starting salary`}>{dollars(salary / 12)}</Fig> a month at its starting
-        salary.
+        salary{benefitMonth ? <>, with{" "}
+          <Fig id={`when.${L}.benefit`} label={`${dollars(benefitMonth)} a month of taxable benefits, paid with salary`}>{dollars(benefitMonth)}</Fig> a month of
+          taxable benefits</> : null}.
       </p>
       <p className="part-more">{show}</p>
       {open && (
@@ -317,11 +330,11 @@ function PayByYear({ ctx, x, open, show }: Part) {
   );
 }
 
-const KINDS = ["salary", "bonus", "cash", "rsu", "espp"] as const;
-const KIND_LABEL = { salary: "salary", bonus: "bonus", cash: "cash awards", rsu: "RSUs", espp: "ESPP gains" };
+const KINDS = ["salary", "bonus", "cash", "rsu", "espp", "benefit"] as const;
+const KIND_LABEL = { salary: "salary", bonus: "bonus", cash: "cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "taxable benefits" };
 
 /** Pay by year as stacked columns, each kind labeled in the legend: drawn, so hidden from screen readers (the table says it). */
-function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; cash: number; rsu: number; espp: number }> }) {
+function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; cash: number; rsu: number; espp: number; benefit: number }> }) {
   const max = Math.max(1, ...years.map((y) => KINDS.reduce((s, k) => s + Math.max(0, y[k]), 0)));
   const kinds = KINDS.filter((k) => years.some((y) => y[k] > 0));
   return (
@@ -532,6 +545,26 @@ function EsppNote({ L, t, o, b }: { L: Letter; t: YearTable; o: NonNullable<OwnO
   );
 }
 
+/** Each other benefit by name (4j): taxable or tax-free, a year as entered and over the stay, a taxable one's after tax beside it. */
+function OtherBenefitsNote({ L, o, b }: { L: Letter; o: NonNullable<OwnOffer["input"]>; b: NonNullable<OwnOffer["breakdown"]> }) {
+  const list = o.otherBenefits ?? [];
+  if (!list.length) return null;
+  const views = otherBenefitsOf(b.detail, b.years, list);
+  return (
+    <ul className="part-note other-benefits" aria-label={`${L}'s other benefits`}>
+      {views.map((x) => (
+        <li key={x.index}>
+          {x.label}, {x.taxable ? "taxable (pay)" : "tax-free, as entered"}:{" "}
+          <Fig id={`in.${L}.otherBenefits.${x.index}.annual`} label={`${x.label}, ${dollars(x.annual)} a year, as entered`}>{dollars(x.annual)}</Fig> a year,{" "}
+          <Fig id={`a5.${L}.ob.${x.index}.stay`} label={`${x.label}, ${dollars(x.stay)} over the stay, as paid`}>{dollars(x.stay)}</Fig> over the stay, as paid
+          {x.taxable ? <>{" "}(<Fig id={`a5.${L}.ob.${x.index}.afterTax`} label={`${x.label}, ${dollars(x.afterTax)} after tax over the stay, as paid`}>
+            {dollars(x.afterTax)}</Fig> after tax)</> : null}.
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Benefits({ ctx, x, open, show }: Part) {
   const L = x.offer.letter;
   const b = x.breakdown!;
@@ -555,6 +588,7 @@ function Benefits({ ctx, x, open, show }: Part) {
       {missing.map((m) => <p key={m} className="part-note">{m} Add it in detailed mode.</p>)}
       <PaidTimeOff L={L} o={o} />
       <EsppNote L={L} t={t} o={o} b={b} />
+      <OtherBenefitsNote L={L} o={o} b={b} />
       {o.health?.oopMax ? (
         <p className="part-note">
           A bad health year costs up to the plan's out-of-pocket maximum,{" "}

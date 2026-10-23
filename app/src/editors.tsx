@@ -5,8 +5,8 @@ import { ChoiceField, DateField, EditorHead, NumberField, RangeField, ResetField
 import { DefaultTick, fieldId, hintId, inputMetric, Issues, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
 import {
-  type AppOffer, type CashAwardDraft, type EsppDraft, getPath, type GrantDraft, type HealthDraft, type PromotionDraft, type RefresherDraft, type RetirementDraft,
-  type ScheduleDraft,
+  type AppOffer, type CashAwardDraft, type EsppDraft, getPath, type GrantDraft, type HealthDraft, type OtherBenefitDraft, type PromotionDraft,
+  type RefresherDraft, type RetirementDraft, type ScheduleDraft,
 } from "./model";
 import { DEFAULT_PRESET, PRESET_IDS, presetOf, PRESETS, type PresetId } from "./presets";
 import { Trace } from "./Tickmarks";
@@ -29,6 +29,7 @@ export const newHealth = (): HealthDraft => ({
   premium: null, outOfPocket: { low: null, medium: null, high: null }, oopMax: null, employeeHsa: null, employerHsa: null, coverage: null,
 });
 export const newCashAward = (): CashAwardDraft => ({ label: "", amount: null, paidOn: null, clawback: null });
+export const newOtherBenefit = (): OtherBenefitDraft => ({ label: "", annual: null, taxable: null });
 export const newRefreshers = (): RefresherDraft => ({ value: null, firstAfterMonths: null, everyMonths: null, schedule: { tranches: null, vestDates: null } });
 
 /** A field inside an editor: its label and help beside it, its problems under it, lit up when a derivation uses it. */
@@ -467,6 +468,61 @@ export function CashAwardsEditor({ o }: { o: AppOffer }) {
       })}
       <button type="button" className="link add-row" onClick={() => api.set(o, { cashAwards: [...list, newCashAward()] })}>
         + Add {list.length ? "another" : "a"} payment</button>
+    </div>
+  );
+}
+
+// ---- other benefits (4j) --------------------------------------------------------------------------
+
+/** How common benefits are usually taxed (IRS Pub. 15-B (2026), Table 2-1): the tool takes your word, so this says what to pick. */
+const USUALLY: Array<[string, string]> = [
+  ["Cash stipends paid with pay (wellness, phone, internet, home office, meals)", "Taxable: a flat allowance isn't an accountable plan"],
+  ["Reimbursements of business costs, with receipts", "Tax-free, but they repay a cost: don't enter them"],
+  ["Gym memberships, wellness rewards in cash", "Taxable; a gym on the employer's premises is tax-free"],
+  ["Employer-paid group-term life insurance", "Tax-free for coverage up to $50,000"],
+  ["Employer-paid disability, dental, vision or accident insurance", "Tax-free (not your health plan: that's counted by your cost)"],
+  ["Dependent care assistance", "Tax-free up to $7,500 a year"],
+  ["Achievement awards", "Tax-free up to $1,600 a year in a qualified plan, $400 otherwise"],
+  ["Meals on the premises for the employer's convenience; small occasional gifts (never cash)", "Tax-free"],
+  ["Adoption assistance", "Free of income tax but not FICA: neither choice fits; pick the closer"],
+];
+
+/** Other benefits: each a name, dollars a year, taxable or tax-free; up to 8. */
+export function OtherBenefitsEditor({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const list = o.draft.otherBenefits ?? [];
+  return (
+    <div className="editor-blocks">
+      {list.map((b, i) => {
+        const path = `otherBenefits.${i}`;
+        return (
+          <fieldset key={i} className="editor-block">
+            <legend>Benefit {i + 1}{b.label ? `: ${b.label}` : ""}</legend>
+            <EditorField o={o} k="otherBenefits.label" path={`${path}.label`}>
+              <input id={fieldId(o.letter, `${path}.label`)} aria-label={`Offer ${o.letter} benefit ${i + 1} name`} placeholder="Wellness stipend" maxLength={40}
+                value={b.label} data-help="otherBenefits.label" aria-describedby={hintId("otherBenefits.label")}
+                aria-invalid={issuesAt(api, o.letter, `${path}.label`).length > 0 || undefined}
+                onChange={(e) => api.set(o, { [`${path}.label`]: e.target.value })} />
+            </EditorField>
+            <EditorField o={o} k="otherBenefits.annual" path={`${path}.annual`}>
+              <NumberField o={o} path={`${path}.annual`} kind="money" unit="a year" label={`benefit ${i + 1} amount a year`} />
+            </EditorField>
+            <EditorField o={o} k="otherBenefits.taxable" path={`${path}.taxable`}>
+              <ChoiceField o={o} path={`${path}.taxable`} label={`benefit ${i + 1} tax`} options={[[true, "Taxable"], [false, "Tax-free"]]} />
+            </EditorField>
+            <button type="button" className="link remove-row" onClick={() => api.set(o, { otherBenefits: remove(list, i) })}>Remove this benefit</button>
+          </fieldset>
+        );
+      })}
+      {list.length < 8 && (
+        <button type="button" className="link add-row" onClick={() => api.set(o, { otherBenefits: [...list, newOtherBenefit()] })}>
+          + Add {list.length ? "another" : "a"} benefit</button>
+      )}
+      <table className="usually">
+        <caption>How they're usually taxed (IRS Pub. 15-B, 2026). Enter what a benefit saves you, for something you'd buy anyway.</caption>
+        <thead><tr><th scope="col">Benefit</th><th scope="col">Usually</th></tr></thead>
+        <tbody>{USUALLY.map(([what, how]) => <tr key={what}><th scope="row">{what}</th><td>{how}</td></tr>)}</tbody>
+      </table>
     </div>
   );
 }

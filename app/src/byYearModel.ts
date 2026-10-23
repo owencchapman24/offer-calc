@@ -116,8 +116,20 @@ export interface Bridge {
   saved?: number;
   /** ESPP money held at the year's end, a month (4i): present when it isn't zero. */
   inEspp?: number;
+  /** Tax-free benefits, a month (4j): present when there are any. */
+  taxFree?: number;
   /** The offer's city, its bridge's own-price line names ("New York"); present with a city. */
   city?: string;
+}
+
+/**
+ * The tax-free benefits an offer has, by name (4j): its education help and commuter benefits, and other benefits entered as tax-free.
+ * A draft's or an input's.
+ */
+export function taxFreeNames(x: { perks?: { section127?: number | null; commuterMonthly?: number | null } | null;
+  otherBenefits?: Array<{ label: string; taxable: boolean | null }> | null }): string[] {
+  return [x.perks?.section127 ? "education help" : "", x.perks?.commuterMonthly ? "commuter benefits" : "",
+    ...(x.otherBenefits ?? []).filter((b) => b.taxable === false).map((b) => b.label.trim())].filter(Boolean);
 }
 
 /** In which employment year a date falls: a date on an anniversary counts toward the year just ended (decision 1). */
@@ -182,6 +194,12 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
     rows.push({ id: id("espp"), line: "espp", kind: "change", label: "ESPP shares bought at a discount, sold at once", value: y.espp,
       ...(buys.length ? { gloss: `bought ${join([...new Set(buys.map((p) => shortDate(p.date)))])}` } : {}) });
   }
+  // Taxable other benefits aren't in the offer letter's year either: they're paid with salary (4j).
+  if (y.benefit) {
+    const names = o ? (o.draft.otherBenefits ?? []).filter((b) => b.taxable !== false).map((b) => b.label.trim()).filter(Boolean) : [];
+    rows.push({ id: id("benefit"), line: "benefit", kind: "change", label: "taxable benefits, paid with salary", value: y.benefit,
+      ...(names.length ? { gloss: join(names) } : {}) });
+  }
   if (y.clawback) rows.push({ id: id("clawback"), line: "clawback", kind: "less", label: "clawback repaid", value: y.clawback });
   rows.push({ id: id("paid"), line: "paid", kind: "subtotal", label: `Paid in year ${n}`, value: y.gross });
 
@@ -203,7 +221,11 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
     rows.push({ id: id("retirement"), line: "retirement", kind: "plus", label: "employer 401(k)", value: y.employer,
       gloss: share >= 1 ? "vested by the end of your stay" : share > 0 ? `${percent(share)} vested by the end of your stay` : "not vested by the end of your stay" });
   }
-  if (y.perks) rows.push({ id: id("perks"), line: "perks", kind: "plus", label: "perks", value: y.perks, gloss: "tax-free, at face value" });
+  if (y.perks) {
+    const names = o ? taxFreeNames(o.draft) : [];
+    rows.push({ id: id("perks"), line: "perks", kind: "plus", label: "tax-free benefits", value: y.perks,
+      gloss: `at face value${names.length ? `: ${join(names)}` : ""}` });
+  }
   if (y.hsa) rows.push({ id: id("hsa"), line: "hsa", kind: "plus", label: "employer HSA money", value: y.hsa });
   if (y.oop) rows.push({ id: id("oop"), line: "oop", kind: "less", label: "expected out-of-pocket health costs", value: -y.oop });
   rows.push({ id: id("totalRewards"), line: "totalRewards", kind: "subtotal", label: "Total rewards", value: y.totalRewards });
@@ -222,14 +244,15 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
   if (of === "own") {
     const last = same || !ctx.own?.withRef;
     rows.push({ id: id("own"), line: "own", kind: last ? "total" : "subtotal", label: `After rent, at ${place} prices`, value: own });
-    const month = { spend: (col.local - y.oop) / 12, saved: (col.face - y.esppHeld) / 12, ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}), city: place };
+    const month = { spend: (col.local - y.oop) / 12, saved: (col.face - y.esppHeld - y.perks) / 12, ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}),
+      ...(y.perks ? { taxFree: y.perks / 12 } : {}), city: place };
     if (last) return { letter, year: n, start: y.start, end: y.end, rows, ...month };
     rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
     return { letter, year: n, start: y.start, end: y.end, rows, ...month };
   }
   rows.push(...pricesRows(ctx, letter, n, col.total, own, info, place));
-  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: (col.face - y.esppHeld) / 12,
-    ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}), city: place };
+  return { letter, year: n, start: y.start, end: y.end, rows, spend: (col.atRef - col.oopRef) / 12, saved: (col.face - y.esppHeld - y.perks) / 12,
+    ...(y.esppHeld ? { inEspp: y.esppHeld / 12 } : {}), ...(y.perks ? { taxFree: y.perks / 12 } : {}), city: place };
 }
 
 /**

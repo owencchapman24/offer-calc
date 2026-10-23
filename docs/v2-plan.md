@@ -8,7 +8,8 @@ testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16
 (2026-10-16, from the owner's own use). **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22:** 4a
 extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
-ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22) and 4i (stop 4i, #71).
+ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22), 4i (stop 4i, #71, approved
+2026-10-23) and 4j (stop 4j, #72).
 What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
@@ -1378,6 +1379,15 @@ and isn't modeled."** One pull request and one review stop.
 breakdown ("+ $x … in tax-free benefits"), not inside "saved", which stays for actual savings (planned savings, your 401(k) and HSA, and
 the employer's 401(k) and HSA money). Taxable benefits are pay.
 
+**Built: stop 4j** (2026-10-23, pull request #72), as below. **The perks move too** (asked at the stop, the user's answer): education
+help and commuter benefits join the tax-free line, so for an offer with them (sample C) A-1's saved is smaller and its tax-free line
+takes the difference; its total doesn't move. The differences from the design (`docs/ui-design.md` §12 has the stop's notes):
+- **The tax choice** defaults to Taxable (`D`: any fringe benefit is wages unless the law excludes it, Pub. 15-B), not blank.
+- **The help's table** is under the benefits in their editor and in M-5.3, since a field's help holds 2-4 sentences.
+- **A-5's lines** give each benefit a year as entered and over the stay, a taxable one's after tax beside it; there's no table by year.
+- **A-6's note** ("Counted tax-free, as entered: …") is a "Not modeled: may cost you" warning, so the document and Show at the field
+  carry it too.
+
 - **Today:** perks are two inputs, education assistance (IRC 127) and transit or parking (IRC 132(f)), each capped at its limit; with the
   401(k), the HSA and the health plan, that's every benefit. A wellness stipend, a phone allowance, employer-paid life or disability
   insurance, dependent care money can't be entered, except as salary (which raises bonuses and the 401(k) with it) or as a cash award.
@@ -1522,7 +1532,7 @@ of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 
 | D19 | The balance paid out (4a) | Worked out: the days given less the days taken, accruing evenly, up to a cap; nothing banks at the defaults | A balance you enter, the same whenever you leave |
 | D20 | Holding ESPP shares (4i) | **Decided (the user's review, 2026-10-19): every lot sold at purchase; no "hold" choice, no capital gains in the tax engine; the note "Holding shares after purchase is an investment decision and isn't modeled."** (Recommended was holding counted, with capital gains in the engine) | — |
 | D21 | 4i's stops | **Moot (the user's review):** with no capital gains, 4i is one pull request and one review stop, the tax engine's change in its own commits | — |
-| D22 | Where tax-free benefits count (4j) | **Decided (the user's review): at face value on their own line in A-1 and the breakdown ("+ $x … in tax-free benefits"), not in "saved", which stays for actual savings; taxable benefits are pay.** Whether today's perks move to that line is asked at stop 4j (Recommended was with the perks, in "saved, at face value") | — |
+| D22 | Where tax-free benefits count (4j) | **Decided (the user's review): at face value on their own line in A-1 and the breakdown ("+ $x … in tax-free benefits"), not in "saved", which stays for actual savings; taxable benefits are pay.** **At stop 4j (2026-10-23) the user moved today's perks to that line too.** (Recommended was with the perks, in "saved, at face value") | — |
 | D23 | Other benefits' tax choices (4j) | Two, taxable or tax-free, as asked, with the help's table | Three, adding "free of income tax, not of FICA" (adoption assistance); or named kinds with the law's limits applied |
 
 ## Order and stops
@@ -1538,7 +1548,7 @@ approved on 2026-10-19, at the user's word.
 | 5C | Offer breakdown: Copy as document for one offer, the first visit, the scan. **Done** (pull request #66) | 5B |
 | 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
 | 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop. **Done** (pull request #71, 2026-10-22) | 4a, D20 |
-| 4j | Other benefits: named, taxable or tax-free, in every part and the document | 4i, D22, D23 |
+| 4j | Other benefits: named, taxable or tax-free, in every part and the document. **Done** (pull request #72, 2026-10-23) | 4i, D22, D23 |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
 | 4b-4c | Accuracy, the small parts: commuting, relocation, a stop each | testers (item 4), D10, D15 |

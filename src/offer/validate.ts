@@ -14,7 +14,11 @@ type NoParams = Record<string, never>;
 /** One problem with an input: what's wrong, where (a path into OfferInput, e.g. "equity.grants.0.schedule"), and its numbers. */
 export type OfferIssue = { path: string } & (
   /** Blank, or not a number. */
-  | { code: "required"; params: { kind: "amount" | "percent" | "date" | "number" | "choice" } }
+  | { code: "required"; params: { kind: "amount" | "percent" | "date" | "number" | "choice" | "text" } }
+  /** Text longer than `max` characters (a benefit's name). */
+  | { code: "tooLong"; params: { max: number } }
+  /** A list longer than `max` (other benefits). */
+  | { code: "tooMany"; params: { max: number } }
   /** Not a real "YYYY-MM-DD" date. */
   | { code: "date"; params: { value: string } }
   /** Not a real month and day (Feb 29 is allowed: it falls on Feb 28 in other years). */
@@ -257,6 +261,19 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   if (p) {
     if (p.section127 !== undefined) nonNegative("perks.section127", p.section127);
     if (p.commuterMonthly !== undefined) nonNegative("perks.commuterMonthly", p.commuterMonthly);
+  }
+
+  // ---- other benefits (4j): up to 8, each named (up to 40 characters), an amount a year, taxable or tax-free -----------------------
+  const ob = offer.otherBenefits;
+  if (ob) {
+    if (ob.length > 8) add("otherBenefits", "tooMany", { max: 8 });
+    ob.forEach((x, i) => {
+      const label = typeof x.label === "string" ? x.label.trim() : "";
+      if (!label) add(`otherBenefits.${i}.label`, "required", { kind: "text" });
+      else if (label.length > 40) add(`otherBenefits.${i}.label`, "tooLong", { max: 40 });
+      nonNegative(`otherBenefits.${i}.annual`, x.annual);
+      if (typeof x.taxable !== "boolean") add(`otherBenefits.${i}.taxable`, "required", { kind: "choice" });
+    });
   }
 
   // ---- hours -------------------------------------------------------------------------------

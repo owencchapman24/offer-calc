@@ -6,7 +6,7 @@ import { US_PRICES } from "./prices";
 
 // Generated inputs for the property tests (properties.test.ts, display.test.ts): offers and households as a person could enter
 // them, in every combination the samples never reach (joint filing, different start days, a later start, rent of $0, a cash
-// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges, an ESPP). Test code only: it imports
+// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges, an ESPP, other benefits). Test code only: it imports
 // fast-check, a dev dependency, and the app never imports it.
 
 const addDays = (iso: string, n: number) => fromDays(toDays(iso) + n);
@@ -101,6 +101,11 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       gives: maybe(fc.integer({ min: 0, max: 35 }), 1), cap: maybe(fc.integer({ min: 0, max: 40 })),
       payout: fc.constantFrom(null, "state" as const, "always" as const),
     }), 1),
+    // Other benefits (4j): not entered, none, or up to three, taxable, tax-free or at the default, of any size.
+    otherBenefits: simple ? fc.constant(null) : fc.oneof(
+      { arbitrary: fc.constant(null), weight: 2 }, { arbitrary: fc.constant([] as Array<{ annual: number; taxable: boolean | null }>), weight: 1 },
+      { arbitrary: fc.array(fc.record({ annual: dollars(0, 12_000, 50), taxable: fc.constantFrom(null, true, false) }), { minLength: 1, maxLength: 3 }), weight: 2 },
+    ),
     rent: fc.oneof(fc.constant(null), fc.constant(0), dollars(800, 6_000, 50)),
     rentGrowth: maybe(pct(0.06)),
     // An ESPP (4i), not entered, none, or entered: any contribution up to the $25,000 limit and past it, any discount, with or without a
@@ -145,6 +150,7 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
         offeringMonths: g.espp.shape[0], purchasesPerOffering: g.espp.shape[1], offeringsStart: g.espp.offeringsStart,
         eligibleFrom: g.espp.joinAfter === null ? null : addDays(start, g.espp.joinAfter),
       },
+      otherBenefits: g.otherBenefits && g.otherBenefits.map((b, i) => ({ label: `Benefit ${i + 1}`, annual: b.annual, taxable: b.taxable })),
       hours: { weekly: g.hours },
       timeOff: g.timeOff ?? blankTimeOff(),
       costOfLiving: { area: place.area, monthlyRent: g.rent, rentGrowth: g.rentGrowth },

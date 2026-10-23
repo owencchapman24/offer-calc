@@ -191,17 +191,17 @@ describe("one offer on its own, for any offer", () => {
     }), runs(8, false));
   }, 600_000);
 
-  it("its bottom line adds up as shown: to spend + saved = the month; at the prices picked, the month − the price step", () => {
+  it("its bottom line adds up as shown: to spend + saved + tax-free benefits = the month; at the prices picked, the month − the price step", () => {
     fc.assert(fc.property(single, (c) => {
       const p = alonePage(c);
       fc.pre(p !== null);
       const ctx = p!.ctx;
       const r = toOfferInput(ctx.offers[0]);
       const v = ownView("A", ctx.own!.breakdowns.A!, (r as { offer: Parameters<typeof ownView>[2] }).offer, priceWords(ctx.household.pricesIn), true);
-      expect(v.month.spend + v.month.saved).toBe(v.month.total);
+      expect(v.month.spend + v.month.saved + v.month.taxFree).toBe(v.month.total);
       expect(v.pv.totalRewards - v.pv.rent).toBe(v.pv.total);
       if (v.ref) expect(v.month.total - v.ref.step).toBe(v.ref.month);
-      if (v.year1) expect(v.year1.spend + v.year1.saved + v.year1.held).toBe(v.year1.y.totalRewards - v.year1.y.col!.rent);
+      if (v.year1) expect(v.year1.spend + v.year1.saved + v.year1.held + v.year1.taxFree).toBe(v.year1.y.totalRewards - v.year1.y.col!.rent);
     }), runs(20));
   }, 600_000);
 
@@ -238,7 +238,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         ],
         equity: { grants: [{ label: "New-hire RSUs", value: 5_000, grantDate: null, vestStart: null, schedule: { tranches: null, vestDates: null } }],
           priceGrowth: null, refreshers: null },
-        espp: null, retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
+        espp: null, retirement: "none", health: "none", perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "37980", monthlyRent: 800, rentGrowth: null },
       } },
       { place: { area: "35620", state: "NY", city: "nyc" }, draft: {
@@ -248,7 +248,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
           mustBeEmployedOnPayDate: null },
         cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: "none",
         health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null },
-        perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
+        perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: null }, timeOff: blankTimeOff(),
         costOfLiving: { area: "35620", monthlyRent: null, rentGrowth: null },
       } },
     ],

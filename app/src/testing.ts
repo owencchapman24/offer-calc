@@ -63,6 +63,14 @@ export const ESPPS = (os: AppOffer[]) => os.map((o) => (o.letter === "B" ? withE
     { eligiblePay: "salaryAndBonus", offeringMonths: 12, purchasesPerOffering: 2 })
   : o));
 
+/** An offer with other benefits (4j): a $1,200-a-year taxable wellness stipend and $600 a year of tax-free gym money, unless others are given. */
+export const withBenefits = (o: AppOffer, list: AppOffer["draft"]["otherBenefits"] = [
+  { label: "Wellness", annual: 1_200, taxable: true }, { label: "Gym", annual: 600, taxable: false }]): AppOffer =>
+  ({ ...o, draft: { ...o.draft, otherBenefits: list } });
+
+/** The samples with other benefits entered for A (taxable and tax-free), entered as none for B, and not entered for C (4j). */
+export const BENEFITS = (os: AppOffer[]) => os.map((o) => (o.letter === "A" ? withBenefits(o) : o.letter === "B" ? withBenefits(o, []) : o));
+
 /** The offers compared, by letter, and the comparison's work context. `about` changes About you (Prices in, say). */
 export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4,
   about: Partial<AppHousehold> = {}): WorkContext {

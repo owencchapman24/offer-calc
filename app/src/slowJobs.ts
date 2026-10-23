@@ -114,7 +114,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     clawbacks: r.leave!.clawbacks,
     afterTaxCompKept: k.afterTaxCompKept,
     totalRewardsKept: k.totalRewardsKept,
-    benefits: { perks: sum(["section127", "commuter"]), employerHsa: sum(["employerHsa"]), outOfPocket: sum(["outOfPocket"]) },
+    benefits: { perks: sum(["section127", "commuter", "otherBenefit"]), employerHsa: sum(["employerHsa"]), outOfPocket: sum(["outOfPocket"]) },
     retirementVested: k.retirementVested,
     retirementForfeited: r.leave!.retirementForfeited,
     unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,

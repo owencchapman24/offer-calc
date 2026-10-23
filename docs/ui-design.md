@@ -1850,6 +1850,36 @@ to after rent, where it counts at face value; A-3's dates carry the offering and
 ESPP terms' names register with detailed mode and the derivations (`detailedDefaults.ts`), as the days off did, to keep the main thread
 within 0.5 kB.
 
+**v2's item 4, stop 4j: other benefits** (2026-10-23; `docs/v2-plan.md`, 4j, approved at the user's review of pull request #69 with
+D22: tax-free benefits on a line of their own, not in "saved"; at this stop the user moved today's perks to that line too): detailed
+mode's Perks section adds "Other benefits", not entered, None, or a list (up to 8) in a row editor: each a name, an amount a year, and
+Taxable (the default, with its `D`) or Tax-free, with a table of how common benefits are usually taxed (IRS Pub. 15-B) under them.
+- **A-1**: tax-free benefits, the perks among them, on a line of their own: "= $6,732 to spend after rent + $892 saved + $50 in tax-free
+  benefits"; year 1 likewise ("+ $50 a month in tax-free benefits"). Taxable ones are pay, so in "to spend".
+- **A-2**: a taxable one inside the $100, as pay; the bridge's "plus taxable benefits, paid with salary" (with their names), its
+  "plus tax-free benefits" (renamed from "perks", with theirs) and its month's fourth part; outside the $100, "your employer adds $600 of
+  tax-free benefits (Gym)".
+- **A-3**: "Taxable benefits" in the pay table and its columns (diagonal hatching), and "with $100 a month of taxable benefits" beside
+  the monthly salary.
+- **A-4**: "Its other benefits (Wellness, Gym) stop on your last day"; "if you left on" counts them to that day.
+- **A-5**: each by name, taxable or tax-free, a year as entered and over the stay, a taxable one's after tax beside it.
+- **A-6**: their tax in each year; the note "Counted tax-free, as entered: Gym." (not modeled: may cost you). **A-7**: "Taxable
+  benefits" and "Tax-free benefits" lines, each taxable benefit's monthly payment with its formula and tax.
+- **The comparison** through every total; the comparability note names offers with the list not entered. **The copied document**: the
+  offer as entered (each benefit's name, amount and treatment, the perks too), A-1's line, A-2's employer adds, A-3's line, A-5's lines,
+  the terms and the note.
+- **The methodology**: M-5.3 (the two treatments and the usual-tax table), M-10 (tax-free as entered), M-11 (Pub. 15-B and the code
+  sections).
+- **Old saves and exports** load with other benefits not entered.
+- **Measured** (2026-10-23, side by side with `main`): the main thread 112.34 to 112.59 kB gzip (+0.25), the worker 71.34 to
+  71.92 kB (budget 75), the stylesheet 11.48 to 11.56 kB; LCP 1.81 s (1.95 on `main`), CLS 0 (the fonts on time and late), TBT 59 ms
+  (59), the first answer 0.52 s (0.53); `npm run bench` within noise; no tax-engine change, so the grid and oracle report don't move; the
+  scan without violations, the Other benefits editor included.
+
+**Stop 4j versus the plan:** the tax choice defaults to Taxable with a `D` (the plan left it open); the usual-tax table sits under the
+benefits in their editor and in M-5.3, not in a field's help (2-4 sentences); A-5 gives each benefit's year as entered and its stay
+rather than a table by year; the editor's fields' names register with detailed mode and the derivations, as the ESPP's terms did.
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

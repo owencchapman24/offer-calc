@@ -125,6 +125,12 @@ figures (yearly, September, with D14's defaults), the IRS mileage rates (each De
 each convenience rule's and cross-state pair's sources (each January), and, if 4f is built, the repayment plans' rules. Each gets a
 section here when its item lands.
 
+**Other benefits (4j, built 2026-10-23):**
+- **IRS Pub. 15-B's Table 2-1, each January:** the usual treatment of common benefits and their limits, in the editor's table
+  (`editors.tsx`, `USUALLY`) and M-5.3's: dependent care's $7,500 (not indexed, Pub. L. 119-21), adoption assistance's $17,670 (2026,
+  indexed: Rev. Proc. 2025-32 and its successors), group-term life's $50,000 and achievement awards' $1,600 and $400 (statute). Words
+  only: no figure in the engine depends on them.
+
 **An employee stock purchase plan (4i, built 2026-10-22):**
 - **The ESPP's defaults, with each survey's new edition:** 15% off, a lookback and 6-month offerings (NASPP and Deloitte Tax's 2023
   Employee Stock Purchase Plan Survey; a 2026 edition exists, for participants and members) and one purchase an offering (Fidelity
