@@ -9,7 +9,7 @@ testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16
 extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
 ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22), 4i (stop 4i, #71, approved
-2026-10-23) and 4j (stop 4j, #72).
+2026-10-23) and 4j (stop 4j, #72, approved 2026-10-23); all three are live.
 What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):

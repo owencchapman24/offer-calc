@@ -43,9 +43,9 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: the user's review of stop 4j** (other benefits, pull request #72, 2026-10-23; `docs/v2-plan.md`, 4j). Stops 4a (days off,
-#70) and 4i (the ESPP, #71) were approved on 2026-10-22 and 23. Decisions D16-D23 are recorded in the plan; at stop 4j the user moved
-today's perks to the tax-free line too (D22).
+**Next: waiting on testers' answers for item 2** (market benchmarks, as A-8; `docs/v2-plan.md`, "Questions for testers"). Stops 4a
+(days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved 2026-10-22, 23 and 23). Decisions
+D16-D23 are recorded in the plan; at stop 4j the user moved today's perks to the tax-free line too (D22).
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
 actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
