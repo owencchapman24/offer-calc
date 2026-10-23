@@ -5,7 +5,9 @@ import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
 import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
-import { healthFlows, monthlyPieces, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction } from "./benefits";
+import {
+  healthFlows, monthlyPieces, otherBenefitStreams, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction,
+} from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
 import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
@@ -17,7 +19,7 @@ import type {
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
-const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback", "espp"];
+const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback", "espp", "benefit"];
 const sumBy = (events: RawEvent[]) => {
   const by = Object.fromEntries(COMPONENTS.map((c) => [c, 0])) as Record<Component, number>;
   for (const e of events) by[e.component] += e.gross;
@@ -97,8 +99,11 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const earned = (from: number, to: number) => salaryEarned(path, from, to);
   const cash = cashEvents(offer.cashAwards ?? [], start);
   const paidCash = cash.filter((e) => e.day < workEnd);
+  // Other benefits (4j): the taxable ones are pay, paid with salary; the tax-free ones are benefit flows, below.
+  const others = otherBenefitStreams(offer.otherBenefits ?? [], start, workEnd, cuts);
   const raw: RawEvent[] = [
     ...salaryEvents(path, start, workEnd, cuts),
+    ...others.events,
     ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, yearOfPayment, warnings, leave) : []),
     ...paidCash,
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
@@ -133,6 +138,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     raw.push(...espp.events);
     warnings.push({ code: "esppSoldAtPurchase", params: {} });
   }
+  const taxFreeLabels = (offer.otherBenefits ?? []).filter((x) => !x.taxable).map((x) => x.label);
+  if (taxFreeLabels.length) warnings.push({ code: "taxFreeAsEntered", params: { labels: taxFreeLabels } });
   if (offer.timeOff?.policy === "unlimited" && offer.employerState === "CA") {
     warnings.push({ code: "unlimitedVacation", params: { state: offer.employerState } });
   }
@@ -186,6 +193,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     section125ByYear = h.section125ByYear;
   }
   if (espp) benefitRaw.push(...espp.flows);
+  benefitRaw.push(...others.flows);
   if (offer.perks) {
     benefitRaw.push(...perkFlows(offer.perks, start, workEnd, cuts, (y) => ({
       section127: federal(jan1(y)).section127Limit, commuterMonthly: federal(jan1(y)).commuterMonthlyLimit,
@@ -316,7 +324,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const completedYears = serviceYears(offer.retirement?.vestingService ?? "elapsedTime",
     hours ? hours.weekly[scenario] * weeks : undefined, start, workEnd, vestingDay, anniversaries);
   const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
-  const isPerk = (k: string) => k === "section127" || k === "commuter";
+  // Tax-free benefits: the perks, and other benefits entered as tax-free (4j), counted alike.
+  const isPerk = (k: string) => k === "section127" || k === "commuter" || k === "otherBenefit";
   const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
     ...b,
     ey: b.accruedFrom !== undefined ? anniversaries.findIndex((d) => d > b.accruedFrom!) : yearOfPayment(b.day),
@@ -385,7 +394,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // what's left (non-housing spending) in reference-location dollars via non-housing RPPs. The
   // COL-adjusted total adds back money not spent locally at face value and takes out out-of-pocket
   // health spending, converted like the rest of the local spending.
-  interface ColFlow { day: number; ey: number; takeHome: number; rent: number; oop: number; face: number; espp: number }
+  interface ColFlow { day: number; ey: number; takeHome: number; rent: number; oop: number; face: number; espp: number; taxFree: number }
   let col: { info: CostOfLivingInfo; flows: ColFlow[] } | undefined;
   if (offer.costOfLiving) {
     const hc = household.costOfLiving ?? {};
@@ -411,7 +420,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const used = (a: ReturnType<typeof rppArea>) =>
       ({ code: a.code, name: a.name, allItems: a.allItems, housing: a.housing, nonHousing: Math.round(nonHousingRpp(a) * 1000) / 1000 });
     const flows: ColFlow[] = [];
-    const flow = (day: number, ey: number, f: Partial<ColFlow>) => flows.push({ day, ey, takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0, ...f });
+    const flow = (day: number, ey: number, f: Partial<ColFlow>) =>
+      flows.push({ day, ey, takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0, taxFree: 0, ...f });
     for (const e of taxed) flow(e.day, e.ey, { takeHome: e.gross - e.tax });
     for (const b of benefits) {
       if (b.kind === "premium") flow(b.day, b.ey, { takeHome: -b.amount });
@@ -420,7 +430,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
       // The ESPP's money likewise while the plan holds it (out of take-home when put in, back when it comes out), kept apart too.
       else if (b.kind === "espp") flow(b.day, b.ey, { takeHome: -b.amount, face: b.amount, espp: b.amount });
       else if (b.kind === "employer401k") flow(b.day, b.ey, { face: b.vested });
-      else if (b.kind === "employerHsa" || isPerk(b.kind)) flow(b.day, b.ey, { face: b.amount });
+      else if (b.kind === "employerHsa") flow(b.day, b.ey, { face: b.amount });
+      // Tax-free benefits at face value, kept apart too (4j): the breakdown shows them on their own line, not in "saved".
+      else if (isPerk(b.kind)) flow(b.day, b.ey, { face: b.amount, taxFree: b.amount });
       else if (b.kind === "outOfPocket") flow(b.day, b.ey, { oop: b.amount });
     }
     // Rent is paid monthly while you work there. The lease starts on your start date, so rent
@@ -439,8 +451,10 @@ export function projectScenario(offer: OfferInput, household: Household, options
       flows,
     };
   }
+  // Tax-free benefits are kept apart when the offer has any (4j).
+  const hasTaxFree = !!offer.perks || (offer.otherBenefits ?? []).some((x) => !x.taxable);
   const colSum = (keep: (f: ColFlow) => boolean, weight: (day: number) => number = () => 1): CostOfLivingTotals => {
-    const t = { takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0 };
+    const t = { takeHome: 0, rent: 0, oop: 0, face: 0, espp: 0, taxFree: 0 };
     for (const f of col!.flows) {
       if (!keep(f)) continue;
       const w = weight(f.day);
@@ -449,6 +463,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       t.oop += f.oop * w;
       t.face += f.face * w;
       t.espp += f.espp * w;
+      t.taxFree += f.taxFree * w;
     }
     const k = col!.info.nonHousingFactor;
     const savings = t.takeHome * col!.info.savingsRate;
@@ -459,6 +474,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     return {
       savings, rent: t.rent, nonHousingLocal, discretionaryReference, outOfPocketReference, faceValue,
       total: discretionaryReference - outOfPocketReference + faceValue, ...(offer.espp ? { esppHeld: t.espp } : {}),
+      ...(hasTaxFree ? { taxFree: t.taxFree } : {}),
     };
   };
   const colRounded = (c: CostOfLivingTotals) =>
@@ -607,6 +623,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   }
   if (offer.health) assumptions.push({ code: "health", params: { usage: household.healthUsage ?? "medium" } });
   if (offer.perks) assumptions.push({ code: "perks", params: {} });
+  if (offer.otherBenefits?.length) assumptions.push({ code: "otherBenefits", params: { benefits: offer.otherBenefits.map((x) => ({ ...x })) } });
   if (offer.espp) {
     const e = offer.espp;
     assumptions.push({ code: "espp", params: { contributionPct: e.contributionPct, eligiblePay: e.eligiblePay ?? "salary", discount: e.discount,

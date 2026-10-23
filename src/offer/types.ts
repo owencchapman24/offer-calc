@@ -37,6 +37,8 @@ export interface OfferInput {
   retirement?: Retirement;
   health?: Health;
   perks?: Perks;
+  /** Other benefits, taxable or tax-free (4j). */
+  otherBenefits?: OtherBenefit[];
   hours?: Hours;
   /** Days off (they set the weeks worked) and the vacation policy (what's paid out when you leave). Defaults: timeOff.ts. */
   timeOff?: TimeOff;
@@ -112,6 +114,18 @@ export interface Perks {
   section127?: number;
   /** 132(f) employer-paid transit or parking per month, tax-free up to the monthly limit. */
   commuterMonthly?: number;
+}
+
+/**
+ * Another benefit (4j): a stipend, wellness money, employer-paid insurance and the like, each a yearly amount accrued monthly while
+ * employed. Taxable ones are pay, paid with salary (component "benefit"); tax-free ones count at face value beside the perks (kind
+ * "otherBenefit"), as entered: the engine can't check an exclusion.
+ */
+export interface OtherBenefit {
+  label: string;
+  /** Dollars a year. */
+  annual: number;
+  taxable: boolean;
 }
 
 export interface Hours {
@@ -327,8 +341,11 @@ export type ValuedOptions = Omit<ProjectionOptions, "scenario"> & { valuationDat
 // The engine returns numbers and codes, never formatted text: src/format turns details, warnings
 // and assumptions into words, so the UI owns formatting and the engine stays fast.
 
-/** "espp": an ESPP purchase's spread, sold the same day: wages for income tax, not FICA (IRC 3121(a)(22)). */
-export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp";
+/**
+ * "espp": an ESPP purchase's spread, sold the same day: wages for income tax, not FICA (IRC 3121(a)(22)). "benefit": a taxable other
+ * benefit, paid with salary (4j).
+ */
+export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "benefit";
 
 /** A new-hire grant (its label), or a refresher (the policy's label, its number and grant date). */
 export type RsuGrantRef =
@@ -364,7 +381,9 @@ export type EventDetail =
   | { kind: "espp"; offeringStart: ISODate; purchase: number; purchases: number; contributed: number; used: number; refunded: number;
       discount: number; lookback: boolean; priceRatio: number; pricePaid: number; limitValue: number }
   /** Unused vacation paid on your last day (component "cash"): days x annual / workdays (the salary rate that day / 260). */
-  | { kind: "vacationPayout"; days: number; annual: number; workdays: number; rule: VacationPayoutRule };
+  | { kind: "vacationPayout"; days: number; annual: number; workdays: number; rule: VacationPayoutRule }
+  /** A taxable other benefit (4j), its `index` in the offer's list: annual / 12 x days / daysInMonth, for [from, to] (inclusive). */
+  | { kind: "benefit"; label: string; index: number; annual: number; from: ISODate; to: ISODate; days: number; daysInMonth: number };
 
 /** Why unused vacation is or isn't paid when you leave. */
 export type VacationPayoutRule =
@@ -390,7 +409,9 @@ export type BenefitDetail =
   /** Money put into the ESPP from a paycheck: rate x pay, after tax. */
   | { kind: "esppContribution"; rate: number; pay: number }
   /** Money out of the ESPP: a purchase (its contributions, the shares sold the same day), or a refund on your last day. */
-  | { kind: "esppOut"; why: "purchase" | "leaving" };
+  | { kind: "esppOut"; why: "purchase" | "leaving" }
+  /** A tax-free other benefit (4j), its `index` in the offer's list: annual / 12 x days / daysInMonth. */
+  | { kind: "otherBenefit"; label: string; index: number; annual: number; days: number; daysInMonth: number };
 
 /** A warning about the inputs or the result: a code and the numbers behind it. */
 export type OfferWarning =
@@ -411,7 +432,9 @@ export type OfferWarning =
   | { code: "clawbackFica"; params: { award: string; paidYear: number; repaidYear: number } }
   | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean; espp?: boolean } }
   /** An unlimited vacation policy where the state requires paying out vacation: assumed to accrue nothing (McPherson, in CA). */
-  | { code: "unlimitedVacation"; params: { state: string } };
+  | { code: "unlimitedVacation"; params: { state: string } }
+  /** Other benefits counted tax-free because they were entered so (4j): the engine can't check an exclusion. */
+  | { code: "taxFreeAsEntered"; params: { labels: string[] } };
 
 /** A salary change's reasons; same-day changes multiply. */
 export type SalaryChangeReason = { kind: "merit"; rate: number } | { kind: "promotion"; stepUp: number };
@@ -436,6 +459,8 @@ export type Assumption =
       vestedShare: number; completedYears: number } }
   | { code: "health"; params: { usage: "low" | "medium" | "high" } }
   | { code: "perks"; params: NoParams }
+  /** Other benefits as entered (4j): each a yearly amount, taxable or tax-free. */
+  | { code: "otherBenefits"; params: { benefits: OtherBenefit[] } }
   /** `daysOff`: present when the weeks come from days off rather than `hours.weeksPerYear`. */
   | { code: "hours"; params: { scenario: Scenario; weekly: number; weeksPerYear: number;
       daysOff?: { vacation: number; holidays: number; sick: number } } }
@@ -477,7 +502,9 @@ export type BenefitKind =
   | "employee401k" | "employer401k" | "premium" | "outOfPocket" | "employeeHsa" | "employerHsa"
   | "section127" | "commuter"
   /** Money into the ESPP (positive) and out of it (negative): yours, held for a purchase. */
-  | "espp";
+  | "espp"
+  /** A tax-free other benefit (4j): at face value, beside the perks. */
+  | "otherBenefit";
 
 /** A dated benefit flow. Amounts are positive; kind says which way they count. */
 export interface BenefitEvent {
@@ -488,7 +515,7 @@ export interface BenefitEvent {
   amount: number;
   /** employer401k: the share vested at the leave date (or the window's last day). */
   vested?: number;
-  /** Perks: the pre-tax cash raise worth the same after tax, amount / (1 - marginal rate). */
+  /** Perks and tax-free other benefits: the pre-tax cash raise worth the same after tax, amount / (1 - marginal rate). */
   preTaxEquivalent?: number;
   calendarYear: number;
   employmentYear: number;
@@ -555,6 +582,11 @@ export interface CostOfLivingTotals {
    * back). Present only for an offer with an ESPP (4i).
    */
   esppHeld?: number;
+  /**
+   * Tax-free benefits at face value (4j): the perks and tax-free other benefits, part of faceValue, so the breakdown can show them on
+   * their own line, not in "saved". Present only for an offer with either.
+   */
+  taxFree?: number;
   /**
    * COL-adjusted total = discretionaryReference - outOfPocketReference + faceValue.
    * Equivalently, total rewards - rent + (nonHousingFactor - 1) x (nonHousingLocal - out-of-pocket).

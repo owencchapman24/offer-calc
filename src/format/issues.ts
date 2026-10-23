@@ -13,7 +13,9 @@ export function formatIssue(i: OfferIssue): string {
   switch (i.code) {
     case "required":
       return { amount: "Enter an amount.", percent: "Enter a percent.", date: "Enter a date.", number: "Enter a number.",
-        choice: "Pick one." }[i.params.kind];
+        choice: "Pick one.", text: "Enter a name." }[i.params.kind];
+    case "tooLong": return `At most ${i.params.max} characters.`;
+    case "tooMany": return `At most ${i.params.max}.`;
     case "date": return `"${i.params.value}" isn't a date: use a date like 2027-07-12.`;
     case "monthDay": {
       const { month, day } = i.params;

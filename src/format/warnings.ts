@@ -48,6 +48,9 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
       return "An unlimited vacation policy is taken to accrue nothing, so nothing is paid when you leave. In California a policy "
         + "that's unlimited in name but capped in practice has owed a payout (McPherson v. EF Intercultural Foundation, 2020): if "
         + "yours limits what you can take, enter it as days a year.";
+    case "taxFreeAsEntered":
+      return `Counted tax-free, as entered: ${w.params.labels.join(", ")}. A fringe benefit is wages unless the law excludes it; `
+        + "a benefit marked tax-free that isn't makes the offer look better than it is.";
     case "withholdingShortfall":
       return `Federal withholding on ${w.params.year} pay falls about ${usd(Math.round(w.params.balanceDue))} short of `
         + `its federal income tax${w.params.supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}`

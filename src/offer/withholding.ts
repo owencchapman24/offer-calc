@@ -37,8 +37,10 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
   for (const cy of r.calendarYears) {
     const inYear = r.events.filter((e) => e.calendarYear === cy.year);
     const salary = inYear.filter((e) => e.component === "salary");
+    // Taxable other benefits are paid with salary, so withheld as part of each paycheck (Pub. 15 section 7).
+    const regularPay = inYear.filter((e) => e.component === "salary" || e.component === "benefit");
     const supplemental = inYear.filter((e) => e.component === "bonus" || e.component === "rsu" || e.component === "cash");
-    if (salary.length + supplemental.length === 0) continue;
+    if (regularPay.length + supplemental.length === 0) continue;
     const sum = (list: typeof inYear) => list.reduce((s, e) => s + e.gross, 0);
     const salaryPay = sum(salary);
     const bonusPay = sum(supplemental.filter((e) => e.component === "bonus"));
@@ -54,9 +56,12 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
     const annualTax = (wages: number) =>
       federalIncomeTax(params.federal, wages, status, params.federal.standardDeduction[status]).tax;
     const byMonth = new Map<string, number>();
-    for (const e of salary) byMonth.set(e.date.slice(0, 7), (byMonth.get(e.date.slice(0, 7)) ?? 0) + e.gross);
+    for (const e of regularPay) {
+      const taxable = e.component === "salary" ? e.gross * salaryTaxableShare : e.gross;
+      byMonth.set(e.date.slice(0, 7), (byMonth.get(e.date.slice(0, 7)) ?? 0) + taxable);
+    }
     let regular = 0;
-    for (const pay of byMonth.values()) regular += annualTax(12 * pay * salaryTaxableShare) / 12;
+    for (const pay of byMonth.values()) regular += annualTax(12 * pay) / 12;
 
     let supplementalWithheld = 0;
     let soFar = 0;

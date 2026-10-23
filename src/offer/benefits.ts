@@ -1,6 +1,6 @@
-import { daysInMonth, jan1, nextMonthStart, yearOfDay } from "./dates";
+import { daysInMonth, fromDays, jan1, nextMonthStart, yearOfDay } from "./dates";
 import type { RawEvent } from "./streams";
-import type { BenefitDetail, BenefitKind, Health, OfferWarning, Perks, Retirement } from "./types";
+import type { BenefitDetail, BenefitKind, Health, OfferWarning, OtherBenefit, Perks, Retirement } from "./types";
 
 // Benefit flows: 401(k) money, health costs and tax-free perks. They aren't wages; the 401(k)
 // pre-tax deferrals and the cafeteria-plan amounts lower taxable wages, which the caller passes
@@ -163,6 +163,34 @@ export function healthFlows(
     add(section125ByYear, year, piece(h.premium) + employeeHsa);
   }
   return { flows, section125ByYear };
+}
+
+/**
+ * Other benefits (4j) by month while employed, each its yearly amount / 12, a partial month by its days, flat in dollars: the taxable
+ * ones as pay paid with salary (component "benefit"), the tax-free ones as benefit flows at face value (kind "otherBenefit").
+ */
+export function otherBenefitStreams(
+  list: OtherBenefit[], from: number, to: number, anniversaries: number[],
+): { events: RawEvent[]; flows: RawBenefit[] } {
+  const events: RawEvent[] = [];
+  const flows: RawBenefit[] = [];
+  list.forEach((x, index) => {
+    if (!(x.annual >= 0)) throw new Error(`Benefit "${x.label}" needs an amount of 0 or more.`);
+    if (!(x.annual > 0)) return;
+    for (const { a, b, share } of monthlyPieces(from, to, anniversaries)) {
+      const amount = (x.annual / 12) * share;
+      const days = b - a;
+      if (x.taxable) {
+        events.push({ day: b - 1, component: "benefit", gross: amount, accruedFrom: a,
+          detail: { kind: "benefit", label: x.label, index, annual: x.annual, from: fromDays(a), to: fromDays(b - 1), days,
+            daysInMonth: daysInMonth(a) } });
+      } else {
+        flows.push({ day: b - 1, kind: "otherBenefit", amount, accruedFrom: a,
+          detail: { kind: "otherBenefit", label: x.label, index, annual: x.annual, days, daysInMonth: daysInMonth(a) } });
+      }
+    }
+  });
+  return { events, flows };
 }
 
 /** Tax-free perks by month while employed, each capped at its limit for the year. */

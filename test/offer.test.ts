@@ -65,7 +65,7 @@ describe("worked example (golden)", () => {
     // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, espp: 0, total: 186_169.35 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 186_169.35 });
   });
   it("quoted year-1 TC is $205,000: $150k + $15k target bonus + $30k sign-on + 5% of $200k RSUs", () => {
     expect(ey1.quotedTC).toBe(205_000);
@@ -78,9 +78,9 @@ describe("worked example (golden)", () => {
   });
   it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $166,169.35 with the first $10,000 vest", () => {
     expect(r.calendarYears[0].offerGross)
-      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, total: 91_693.55 });
+      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 91_693.55 });
     expect(r.calendarYears[1].offerGross)
-      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, espp: 0, total: 166_169.35 });
+      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, espp: 0, benefit: 0, total: 166_169.35 });
   });
   it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
     // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
@@ -886,7 +886,7 @@ describe("cost of living (BEA RPPs)", () => {
     const y = r.employmentYears[0];
     expect(y.afterTaxComp).toBe(79_952.3);
     expect(y.costOfLiving).toEqual({ savings: 7_295.23, rent: 18_000, nonHousingLocal: 47_657.07, discretionaryReference: 47_469.9,
-      outOfPocketReference: 1_494.11, faceValue: 19_795.23, total: 65_771.03 });
+      outOfPocketReference: 1_494.11, faceValue: 19_795.23, total: 65_771.03, taxFree: 2_000 }); // the perks, apart (4j)
     // It reconciles with total rewards: 83,952.30 - rent 18,000 + (0.996073 - 1) x (47,657.07 - 1,500) = 65,771.03.
     expect(y.totalRewards).toBe(83_952.3);
     const f = r.costOfLiving!.nonHousingFactor;
@@ -906,7 +906,7 @@ describe("cost of living (BEA RPPs)", () => {
     expect(r.costOfLiving!.nonHousingFactor / us.costOfLiving!.nonHousingFactor).toBeCloseTo(ratio, 12);
     expect(r.costOfLiving!.reference).toMatchObject({ code: "16740", nonHousing: 97.293 }); // reported to 3 decimals
     expect(b).toEqual({ savings: a.savings, rent: a.rent, nonHousingLocal: a.nonHousingLocal, discretionaryReference: 46_240.45,
-      outOfPocketReference: 1_455.41, faceValue: a.faceValue, total: 64_580.27 });
+      outOfPocketReference: 1_455.41, faceValue: a.faceValue, total: 64_580.27, taxFree: 2_000 });
     expect(b.discretionaryReference / a.discretionaryReference).toBeCloseTo(ratio, 6);
     // The same ratio for an offer in another city: New York's spending scales alike, and total rewards don't move at all.
     const ny: OfferInput = { ...dallas, residence: { state: "NY" }, employerState: "NY", costOfLiving: { area: "35620", monthlyRent: 3_000 } };
@@ -1523,5 +1523,62 @@ describe("input validation", () => {
   it("rejects start dates before 2026 and bad horizons", () => {
     expect(() => projectScenario({ ...worked, startDate: "2025-12-01" }, single)).toThrow(/2026/);
     expect(() => projectScenario(worked, single, { years: 0 })).toThrow();
+  });
+});
+
+describe("other benefits, taxable or tax-free (v2 4j)", () => {
+  // Texas, $120,000 from Jul 15, 2026 (mid-month): a $1,200-a-year taxable wellness stipend, and $600 a year of tax-free gym money, each
+  // 1/12 a month, a partial month by its days.
+  const tx = (o: Partial<OfferInput> = {}): OfferInput => ({ label: "T", residence: { state: "TX" }, employerState: "TX",
+    startDate: "2026-07-15", salary: { annual: 120_000 }, ...o });
+  const stipend = { label: "Wellness", annual: 1_200, taxable: true };
+  const gym = { label: "Gym", annual: 600, taxable: false };
+  const where = { costOfLiving: { area: "19100", monthlyRent: 1_500 } }; // Dallas
+
+  it("a taxable one is pay with salary: July's 1,200 / 12 x 17/31 = 54.84, then 100 a month", () => {
+    const r = projectScenario(tx({ otherBenefits: [stipend] }), single, { years: 1 });
+    const b = r.events.filter((e) => e.component === "benefit");
+    expect(b.slice(0, 2).map((e) => [e.date, e.gross])).toEqual([["2026-07-31", 54.84], ["2026-08-31", 100]]);
+    expect(eventFormula(b[0].detail)).toBe("$1,200 / 12 x 17/31 days");
+    // 2026: 54.84 + 5 x 100 = 554.84, wages for income tax and FICA: Social Security 6.2% x 554.84 = 34.40 more.
+    const y = r.calendarYears[0];
+    expect(y.offerGross.benefit).toBe(554.84);
+    const without = projectScenario(tx(), single, { years: 1 }).calendarYears[0];
+    expect(y.withOffer.result.socialSecurity - without.withOffer.result.socialSecurity).toBeCloseTo(0.062 * 554.8387, 2);
+  });
+  it("it isn't 401(k) pay: a 6% deferral is on salary alone", () => {
+    const k401 = { retirement: { contributionPct: 0.06 } };
+    const a = projectScenario(tx({ ...k401, otherBenefits: [stipend] }), single, { years: 1 }).employmentYears[0];
+    const z = projectScenario(tx(k401), single, { years: 1 }).employmentYears[0];
+    expect(a.retirement.employee).toBe(z.retirement.employee);
+  });
+  it("past the Social Security wage base only the part under it pays it: $184,000 + $1,200 from Jan 1, 2026", () => {
+    // 2026's wage base is $184,500: 6.2% x (184,500 - 184,000) = 31 more Social Security; Medicare 1.45% x 1,200 = 17.40.
+    const o = (b: OfferInput["otherBenefits"]) => tx({ startDate: "2026-01-01", salary: { annual: 184_000 }, otherBenefits: b });
+    const a = projectScenario(o([stipend]), single, { years: 1 }).calendarYears[0].withOffer.result;
+    const z = projectScenario(o([]), single, { years: 1 }).calendarYears[0].withOffer.result;
+    expect(a.socialSecurity - z.socialSecurity).toBeCloseTo(31, 6);
+    expect(a.medicare - z.medicare).toBeCloseTo(17.4, 6);
+  });
+  it("a tax-free one is at face value, beside the perks and apart (taxFree), with no tax, and says it's as entered", () => {
+    // Year 1, Jul 15, 2026 - Jul 14, 2027: 50 x 17/31 + 11 x 50 + 50 x 14/31 = 600.
+    const r = projectScenario(tx({ ...where, otherBenefits: [gym] }), single, { years: 1 });
+    const z = projectScenario(tx(where), single, { years: 1 });
+    const [y, y0] = [r.employmentYears[0], z.employmentYears[0]];
+    expect(y.perks.face).toBeCloseTo(600, 2);
+    expect(y.tax).toBe(y0.tax);
+    expect(y.totalRewards - y0.totalRewards).toBeCloseTo(600, 2);
+    expect(y.costOfLiving!.taxFree).toBeCloseTo(600, 2);
+    expect(y0.costOfLiving).not.toHaveProperty("taxFree");
+    expect(formatWarning(r.warnings.find((w) => w.code === "taxFreeAsEntered")!)).toMatch(/^Counted tax-free, as entered: Gym\./);
+    // With the perks: $1,200 of education help + 600 = 1,800 tax-free.
+    const both = projectScenario(tx({ ...where, perks: { section127: 1_200 }, otherBenefits: [gym] }), single, { years: 1 });
+    expect(both.employmentYears[0].costOfLiving!.taxFree).toBeCloseTo(1_800, 2);
+  });
+  it("a last day mid-month stops them: Sep 10 pays 54.84 + 100 + 100 x 10/30 = 188.17", () => {
+    const r = keptIfLeaving(tx({ otherBenefits: [stipend, gym] }), single, toDays("2026-09-10")).result;
+    expect(r.events.filter((e) => e.component === "benefit").reduce((s, e) => s + e.gross, 0)).toBeCloseTo(188.17, 6);
+    // The gym money likewise, half of it: 50 x 17/31 + 50 + 50 x 10/30 = 94.09.
+    expect(r.benefitEvents.filter((b) => b.kind === "otherBenefit").reduce((s, b) => s + b.amount, 0)).toBeCloseTo(94.09, 2);
   });
 });
