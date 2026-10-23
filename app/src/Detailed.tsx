@@ -5,8 +5,8 @@ import "./detailedDefaults"; // the defaults and fields only detailed mode and t
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
 import "./quickHelp"; // and the ⓘ help of quick mode's fields, which detailed mode shows too
 import {
-  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newEspp, newGrant, newHealth, newPromotion, newRefreshers, newRetirement,
-  PromotionsEditor, RefreshersEditor, VestingStepsEditor,
+  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newEspp, newGrant, newHealth, newOtherBenefit, newPromotion, newRefreshers,
+  newRetirement, OtherBenefitsEditor, PromotionsEditor, RefreshersEditor, VestingStepsEditor,
 } from "./editors";
 import {
   ChoiceField, DateField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings,
@@ -15,7 +15,7 @@ import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
 import { type AppOffer, bonusBasis, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
 import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
-import { bonusYearsText, cashAwardsText, grantsText, matchText, promotionsText, refreshersText } from "./summary";
+import { bonusYearsText, cashAwardsText, grantsText, matchText, otherBenefitsText, promotionsText, refreshersText } from "./summary";
 import { percent } from "./text";
 
 // Detailed mode's sections (docs/ui-design.md §3.3), one open at a time, each a run of rows with one
@@ -366,6 +366,7 @@ function Health() {
 }
 
 function Perks() {
+  const api = useLedger();
   return (
     <>
       <FieldRow k="perks.section127">
@@ -374,6 +375,19 @@ function Perks() {
       <FieldRow k="perks.commuterMonthly">
         {(o) => <><NumberField o={o} path="perks.commuterMonthly" kind="money" label="commuter benefit a month" /><Warnings o={o} path="perks.commuterMonthly" /></>}
       </FieldRow>
+      <FieldRow k="otherBenefits" issues="editor">
+        {(o) => (
+          <span className="field">
+            <EditorCell o={o} row="otherBenefits" summary={otherBenefitsText(o.draft)} empty={!o.draft.otherBenefits?.length}
+              start={() => api.set(o, { otherBenefits: [newOtherBenefit()] })} />
+            {o.draft.otherBenefits === null && <>
+              <button type="button" className="link" aria-label={`Offer ${o.letter}: no other benefits`} onClick={() => api.set(o, { otherBenefits: [] })}>None</button>
+              <span className="sub not-counted">Not counted</span>
+            </>}
+          </span>
+        )}
+      </FieldRow>
+      <EditorRow row="otherBenefits" title="Other benefits">{(o) => <OtherBenefitsEditor o={o} />}</EditorRow>
     </>
   );
 }

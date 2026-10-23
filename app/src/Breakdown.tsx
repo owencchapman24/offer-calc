@@ -109,6 +109,8 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
         <span className="own-split">
           = <Fig id={`own.${L}.spend`} label={`${$(a.spend)} a month to spend after rent, over your stay`}>{dollars(a.spend)}</Fig> to spend after rent{" "}
           + <Fig id={`own.${L}.saved`} label={`${$(a.saved)} a month saved, over your stay`}>{dollars(a.saved)}</Fig> saved
+          {a.taxFree ? <>{" "}+ <Fig id={`own.${L}.taxFree`} label={`${$(a.taxFree)} a month in tax-free benefits, over your stay`}>{dollars(a.taxFree)}</Fig> in
+            tax-free benefits</> : null}
         </span>
       </p>
       {a.total < 0 && <p className="note">Rent and tax take more than this offer pays, so there's less than nothing left to spend.</p>}
@@ -129,7 +131,9 @@ function OwnBody({ v, prices, compared }: { v: OwnView; prices: PriceWords; comp
           month to spend after rent + <Fig id={`own.${L}.y1saved`} label={`${$(v.year1.savedMonth)} a month saved, in year 1`}>
             {dollars(v.year1.savedMonth)}</Fig> a month saved
           {v.year1.held ? <>{" "}+ <Fig id={`br.${L}.1.inEspp`} label={`${$(v.year1.heldMonth)} a month held in the ESPP, in year 1`}>
-            {dollars(v.year1.heldMonth)}</Fig> a month held in the ESPP</> : null}. {v.differs}
+            {dollars(v.year1.heldMonth)}</Fig> a month held in the ESPP</> : null}
+          {v.year1.taxFree ? <>{" "}+ <Fig id={`own.${L}.y1taxFree`} label={`${$(v.year1.taxFreeMonth)} a month in tax-free benefits, in year 1`}>
+            {dollars(v.year1.taxFreeMonth)}</Fig> a month in tax-free benefits</> : null}. {v.differs}
         </p>
       )}
       <p className="own-facts">

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withEspp } from "./testing";
+import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withEspp } from "./testing";
 import { taxTable, yearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B), against the plan's worked example: sample A at the samples'
@@ -195,6 +195,46 @@ describe("an ESPP (4i): sample A putting 10% of salary in, at the plan's default
   it("A-7's tax: the gain is wages for income tax, not FICA: 2027's two purchases, 2 × 970.59 = 1,941", () => {
     const row = taxTable(ctx, "A", 2027).rows.find((r) => r.line === "statutory")!;
     expect([row.label, row.with, row.without, row.offer]).toEqual(["Of which, ESPP gain", 1_941, 0, 1_941]);
+  });
+});
+
+describe("other benefits (4j): sample A with a $1,200 taxable wellness stipend and $600 of tax-free gym money", () => {
+  // Each a twelfth a month: year 1, Jul 13, 2026 - Jul 12, 2027, has Jul 13-31 (19/31), eleven whole months and Jul 1-12 (12/31), so
+  // 100 x 31/31 + 1,100 = 1,200 of the stipend and 50 x 31/31 + 550 = 600 of gym money, every year of the 4.
+  const ctx = alone("A", (o) => withBenefits(o));
+  const plain = alone("A");
+  const d = own(ctx, "A").detail;
+  const text = words(renderAlone(ctx));
+  it("A-2: the taxable one is pay, inside the $100 (152,986 + 1,200 = 154,186); the tax-free one is outside it, by name", () => {
+    expect(hundredOf(d, 1)!.paid).toBe(154_186);
+    expect(text).toContain("plus taxable benefits, paid with salary Wellness 1,200");
+    expect(text).toMatch(/\$600 T? ?of tax-free benefits \(Gym\)/);
+  });
+  it("A-1: tax-free benefits on a line of their own, not in saved; to spend + saved + tax-free = the total, as shown", () => {
+    const v = own(ctx, "A");
+    const b = ctx.own!.breakdowns.A!;
+    expect(b.detail.window.costOfLiving!.presentValue!.taxFree).toBeGreaterThan(0);
+    for (const id of ["own.A.total", "own.A.spend", "own.A.saved", "own.A.taxFree", "own.A.y1taxFree", "own.A.y1saved", "br.A.1.taxFree", "br.A.1.saved",
+      "br.A.1.benefit"] as const) footsAsDisplayed(id, derive(id, ctx));
+    // Saved is what it was without the benefits: the gym money isn't savings.
+    expect(derive("own.A.saved", ctx).lines.at(-1)!.value).toBe(derive("own.A.saved", plain).lines.at(-1)!.value);
+    // Year 1: 600 / 12 = $50 a month.
+    expect(text).toMatch(/\+ \$50 a month in tax-free benefits\. Your stay's figure/);
+    expect(text).toMatch(/= \$[\d,]+ to spend after rent \+ \$[\d,]+ saved \+ \$\d+ in tax-free benefits/);
+    void v;
+  });
+  it("A-3: the taxable one by year, and a month with salary: 1,200 / 12 = $100", () => {
+    const t = yearTable(ctx, "A");
+    expect(t.rows.find((r) => r.line === "benefit")!.values).toEqual([1_200, 1_200, 1_200, 1_200]);
+    expect(text).toContain("a month at its starting salary, with $100 a month of taxable benefits.");
+    footsAsDisplayed("when.A.benefit", derive("when.A.benefit", ctx));
+  });
+  it("A-4 says they stop on your last day; A-5 names each, over the stay, the taxable one after tax; A-6 names the tax-free one", () => {
+    expect(text).toContain("Its other benefits (Wellness, Gym) stop on your last day.");
+    expect(text).toMatch(/Wellness, taxable \(pay\): \$1,200 T? ?a year, \$4,800 over the stay, as paid \( ?\$[\d,]+ after tax\)\./);
+    expect(text).toMatch(/Gym, tax-free, as entered: \$600 T? ?a year, \$2,400 over the stay, as paid\./);
+    for (const id of ["a5.A.ob.0.stay", "a5.A.ob.0.afterTax", "a5.A.ob.1.stay"] as const) footsAsDisplayed(id, derive(id, ctx));
+    expect(text).toContain("Counted tax-free, as entered: Gym.");
   });
 });
 

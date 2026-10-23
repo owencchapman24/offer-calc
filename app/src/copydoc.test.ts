@@ -5,7 +5,7 @@ import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import type { AppOffer, Letter } from "./model";
 import { dollars, figure, longDate } from "./text";
-import { alone, compareOf, context, ESPPS, requestOf, withEspp, withLeave, withTies } from "./testing";
+import { alone, BENEFITS, compareOf, context, ESPPS, requestOf, withBenefits, withEspp, withLeave, withTies } from "./testing";
 import { verdictSentence } from "./verdict";
 
 // "Copy as document" (docs/copy-as-document-plan.md): every total in the document adds up as displayed, every calculation it
@@ -77,6 +77,9 @@ const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?, DocDetail?]
   ["with ESPPs", () => context("colAdjustedTotal", ESPPS)],
   ["with ESPPs, both in full", () => context("colAdjustedTotal", ESPPS), "both"],
   ["A on its own with an ESPP, in full", () => alone("A", (o) => withEspp(o)), "breakdown"],
+  // Other benefits (4j): A's taxable and tax-free, none for B, not entered for C; and A on its own with them.
+  ["with other benefits, both in full", () => context("colAdjustedTotal", BENEFITS), "both"],
+  ["A on its own with other benefits, in full", () => alone("A", (o) => withBenefits(o)), "breakdown"],
 ];
 
 describe("Copy as document: every total adds up as displayed", () => {
@@ -298,6 +301,17 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
     expect(ca.text).toContain("It gives 15 vacation days a year and you'd take 11, so 4 bank each year; California requires unused vacation be paid "
       + "when you leave.");
     expect(ca.text).toMatch(/you'd keep \$[\d,]+ after tax, as paid, with \$853 before tax for 2\.02 days of unused vacation paid out, repay \$10,000,/);
+  });
+
+  it("other benefits (4j): the offer as entered, the bottom line's own line, A-2's employer adds, A-5's lines, the terms and the note", () => {
+    const e = made(alone("A", (o) => withBenefits(o)), undefined, "breakdown", "A", "full");
+    expect(e.text).toContain("Wellness, $1,200 a year, taxable; Gym, $600 a year, tax-free as entered");
+    expect(e.text).toMatch(/A leaves you about \$[\d,]+ a month over your stay, after rent, in New York dollars: \$[\d,]+ to spend, \$[\d,]+ saved and \$\d+ in tax-free benefits\./);
+    expect(e.text).toContain("$600 of tax-free benefits (Gym)");
+    expect(e.text).toMatch(/Wellness, taxable \(pay\): \$1,200 a year, \$4,800 over the stay, as paid \(\$[\d,]+ after tax\)\./);
+    expect(e.text).toContain("Gym, tax-free, as entered: $600 a year, $2,400 over the stay, as paid.");
+    expect(e.text).toContain("Its other benefits (Wellness, Gym) stop on your last day.");
+    expect(e.text).toContain("Counted tax-free, as entered: Gym.");
   });
 
   it("an ESPP (4i): the offer as entered, its purchases by date, A-5's note, the terms and the holding note", () => {

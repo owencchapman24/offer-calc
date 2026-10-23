@@ -63,6 +63,10 @@ export interface OfferDraft {
   /** Null: not entered. "none": no health plan from this job, such as staying on a parent's plan (entered, as none). */
   health: HealthDraft | null | "none";
   perks: { section127: number | null; commuterMonthly: number | null };
+  /**
+   * Other benefits (4j). Null: not entered (not counted). []: entered, none. Absent in drafts saved before 2026-10-23: not entered.
+   */
+  otherBenefits: OtherBenefitDraft[] | null;
   hours: {
     /** Null: not counted. */
     weekly: ByScenario | null;
@@ -130,11 +134,17 @@ export function withTimeOff(d: OfferDraft): OfferDraft {
   return { ...d, hours, timeOff: w == null ? d.timeOff ?? blankTimeOff() : { ...blankTimeOff(), vacation: Math.round((52 - w) * 500) / 100, holidays: 0, sick: 0 } };
 }
 
-/** A saved draft in today's shape: days off (`withTimeOff`), and no ESPP where it was saved before one could be entered (2026-10-22). */
+/**
+ * A saved draft in today's shape: days off (`withTimeOff`), and no ESPP (2026-10-22) or other benefits (2026-10-23) where it was saved
+ * before they could be entered.
+ */
 export function draftNow(d: OfferDraft): OfferDraft {
   const t = withTimeOff(d);
-  return !t?.hours || t.espp !== undefined ? t : { ...t, espp: null };
+  return !t?.hours ? t : { ...t, espp: t.espp ?? null, otherBenefits: t.otherBenefits ?? null };
 }
+
+/** Another benefit as entered (4j): its name, dollars a year, and taxable (null: taxable, the default) or tax-free. */
+export interface OtherBenefitDraft { label: string; annual: number | null; taxable: boolean | null }
 
 export interface PromotionDraft {
   on: string | null;
@@ -333,6 +343,7 @@ export function dropTrailing<T>(rows: T[], blank: (row: T) => boolean): T[] {
 }
 const blankPromotion = (p: PromotionDraft) => p.on === null && p.stepUp === null;
 const blankTranche = (t: { month: number | null; fraction: number | null }) => t.month === null && t.fraction === null;
+const blankBenefit = (b: OtherBenefitDraft) => !b.label && b.annual === null && b.taxable === null;
 const blankCash = (a: CashAwardDraft) => a.amount === null && !a.label && a.paidOn === null && a.clawback === null;
 const blankTier = (t: { upToPct: number | null; rate: number | null }) => t.upToPct === null && t.rate === null;
 const blankStep = (s: { years: number | null; pct: number | null }) => s.years === null && s.pct === null;
@@ -381,6 +392,8 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   if (health) offer.health = health;
   const perks = { ...(d.perks.section127 ? { section127: d.perks.section127 } : {}), ...(d.perks.commuterMonthly ? { commuterMonthly: d.perks.commuterMonthly } : {}) };
   if (Object.keys(perks).length) offer.perks = perks;
+  const others = dropTrailing(d.otherBenefits ?? [], blankBenefit);
+  if (others.length) offer.otherBenefits = others.map((b) => ({ label: b.label, annual: req(b.annual), taxable: b.taxable ?? true }));
   if (d.hours.weekly) offer.hours = { weekly: d.hours.weekly };
   const timeOff = timeOffInput(d.timeOff);
   if (timeOff) offer.timeOff = timeOff;
@@ -553,6 +566,7 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
       coverage: or(h.coverage),
     } : null,
     perks: { section127: or(o.perks?.section127), commuterMonthly: or(o.perks?.commuterMonthly) },
+    otherBenefits: o.otherBenefits ? o.otherBenefits.map((b) => ({ ...b })) : null,
     hours: { weekly: o.hours?.weekly ?? null },
     timeOff: withTimeOff({ hours: { weekly: null, weeksPerYear: o.hours?.weeksPerYear }, timeOff: { ...blankTimeOff(), ...o.timeOff } } as unknown as OfferDraft).timeOff,
     costOfLiving: { area: o.costOfLiving?.area ?? null, monthlyRent: or(o.costOfLiving?.monthlyRent), rentGrowth: or(o.costOfLiving?.rentGrowth) },
@@ -566,7 +580,7 @@ export function blankDraft(): OfferDraft {
     bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
     cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: null, health: null,
-    perks: { section127: null, commuterMonthly: null }, hours: { weekly: null }, timeOff: blankTimeOff(),
+    perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: null }, timeOff: blankTimeOff(),
     costOfLiving: { area: null, monthlyRent: null, rentGrowth: null },
   };
 }
@@ -708,6 +722,7 @@ export function alsoCounted(d: OfferDraft): string[] {
   if (d.retirement && d.retirement !== "none") out.push("401(k)");
   if (d.health && d.health !== "none") out.push("health");
   if (d.perks.section127 || d.perks.commuterMonthly) out.push("perks");
+  if (d.otherBenefits?.length) out.push("other benefits");
   if (d.hours.weekly) out.push(`${d.hours.weekly.base} hrs/week`);
   if (Object.values(d.timeOff).some((v) => v !== null)) out.push("days off");
   return out;

@@ -768,6 +768,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .seg-health, .seg-cash { background: repeating-linear-gradient(45deg, var(--graphite) 0 1.5px, transparent 1.5px 5px); }
 .seg-saved, .seg-rsu { background: radial-gradient(var(--graphite) 1.1px, transparent 1.3px) 0 0 / 5px 5px; }
 .seg-espp { background: repeating-linear-gradient(0deg, var(--graphite) 0 1.5px, transparent 1.5px 4px); }
+.seg-benefit { background: repeating-linear-gradient(135deg, var(--graphite) 0 1.5px, transparent 1.5px 5px); }
+.other-benefits { padding-left: 1.2em; }
+.usually { margin-top: 10px; font-size: 13px; border-collapse: collapse; max-width: 640px; }
+.usually caption { text-align: left; margin-bottom: 4px; color: var(--graphite); }
+.usually th, .usually td { text-align: left; vertical-align: top; padding: 3px 10px 3px 0; font-weight: 400; border-top: 1px solid var(--rule); }
 .seg-spend { background: var(--band); }
 .hundred { max-width: 640px; }
 .hundred-bar { display: flex; height: 18px; border: 1px solid var(--ink); background: var(--sheet); }

@@ -126,6 +126,8 @@ const META: Record<string, FieldMeta> = {
   // ---- perks ----
   "perks.section127": { label: "Education assistance, a year", section: "M-5.3", group: "perks" },
   "perks.commuterMonthly": { label: "Commuter, a month", section: "M-5.3", group: "perks" },
+  // Other benefits (4j): the fields in their editor register with detailed mode and the derivations (detailedDefaults.ts).
+  otherBenefits: { label: "Other benefits", section: "M-5.3", group: "perks", editor: "otherBenefits" },
   // ---- hours ----
   "hours.weekly": { label: "Weekly hours", section: "M-5.4", group: "hours" },
   "timeOff.vacation": { label: "Vacation days you'd take, a year", section: "M-5.4", group: "hours" },
@@ -187,7 +189,7 @@ export const LEDGER_SECTIONS: Array<{ id: LedgerSection; title: string; holds: s
   { id: "equity", title: "Equity", holds: "RSU grants, vesting, price growth, refreshers" },
   { id: "retirement", title: "401(k)", holds: "your deferral, the match, vesting" },
   { id: "health", title: "Health", holds: "premium, out-of-pocket, HSA" },
-  { id: "perks", title: "Perks", holds: "education, commuter" },
+  { id: "perks", title: "Perks", holds: "education, commuter, other benefits" },
   { id: "hours", title: "Hours and days off", holds: "per week, vacation, holidays, sick days" },
   { id: "where", title: "Where you'd live", holds: "city, rent, employer state" },
 ];

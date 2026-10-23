@@ -172,6 +172,9 @@ const DRAFT: Shape = (v, p, ps) => {
   // Days off arrived on 2026-10-19: optional, so earlier exports still import (their weeks a year become days off).
   const t = (v as { timeOff?: unknown } | null)?.timeOff;
   if (v && typeof v === "object" && t !== undefined) TIME_OFF(t, `${p}.timeOff`, ps);
+  // Other benefits arrived on 2026-10-23: optional likewise.
+  const ob = (v as { otherBenefits?: unknown } | null)?.otherBenefits;
+  if (v && typeof v === "object" && ob !== undefined) nullable(arr(obj({ label: str, annual: nullable(num), taxable: nullable(bool) })))(ob, `${p}.otherBenefits`, ps);
   // The ESPP arrived on 2026-10-22: optional likewise.
   const e = (v as { espp?: unknown } | null)?.espp;
   if (v && typeof v === "object" && e !== undefined) nullable(either(none, ESPP, "\"none\" or an ESPP"))(e, `${p}.espp`, ps);

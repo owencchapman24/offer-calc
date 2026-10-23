@@ -10,9 +10,10 @@ import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms, onAxis, wor
 import {
   aboutIsDefault, type BridgeLine, detailOf, offerByLetter, ownOf, pricesOf, rentEstimate, rentNotes, res, shortCity, type WorkContext,
 } from "./metrics";
-import { bridge, cashName as cashNameOf, notesOf, ownShownYear, shownYearOf, yearNotes, yearValue } from "./byYearModel";
+import { bridge, cashName as cashNameOf, notesOf, ownShownYear, shownYearOf, taxFreeNames, yearNotes, yearValue } from "./byYearModel";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, payRows, rateText,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, otherBenefitsOf, payRows,
+  rateText,
   taxYearsOf,
 } from "./partsModel";
 import { ASSUMPTIONS, CITY_TAX, cityTax, hasEspp, type Letter } from "./model";
@@ -198,7 +199,7 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
   add({ kind: "heading", text: "1. The answer" });
   const meaning = v.basis === "colAdjustedTotal" ? `That counts what's left to spend after tax and rent, priced as in ${p.city}, plus what you save`
     : v.basis === "cash" ? "That's pay after tax and health premiums"
-    : v.basis === "totalRewards" ? "That's after-tax pay plus the employer 401(k), HSA money and perks, less out-of-pocket health costs"
+    : v.basis === "totalRewards" ? "That's after-tax pay plus the employer 401(k), HSA money and tax-free benefits, less out-of-pocket health costs"
     : `That's ${r.sweep.perHourOf === "colAdjustedTotal" ? `the total ${p.phrase}` : "total rewards"}, as paid, divided by the hours worked`;
   const third = r.letters.length === 3 ? ` ${v.ranks[2].letter} comes third.` : "";
   const dollarsToday = v.basis === "perHour" ? "" : ", in today's dollars";
@@ -245,7 +246,7 @@ function answer(ctx: WorkContext, add: Add, worked: Worked[]) {
   const asPaid = rows.some((x) => /per hour/.test(x.label)) ? "; per hour as paid" : "";
   add({ kind: "table", table: { title: `Each step over your ${n}-year stay: totals in today's dollars${asPaid}`, head: ["", ...r.letters, "Leads by"], rows } });
   if (rows.some((x) => x.label === "Total rewards")) {
-    add({ kind: "note", runs: ["Total rewards adds the employer 401(k), HSA money and perks to after-tax pay, less out-of-pocket health costs."] });
+    add({ kind: "note", runs: ["Total rewards adds the employer 401(k), HSA money and tax-free benefits to after-tax pay, less out-of-pocket health costs."] });
   }
 
   // How long you stay, and the hours.
@@ -388,6 +389,10 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     for (const a of o.cashAwards ?? []) parts.push(`${dollars(a.amount)} ${inSentence(a.label.trim() || "cash award")}`);
     if (o.equity && (o.equity.grants.length || (o.equity.refreshers?.value.base ?? 0) > 0)) parts.push(equityText(o.equity));
     if (o.espp) parts.push(esppDocText(o.espp));
+    // Perks and other benefits (4j), each by name with its treatment.
+    if (o.perks?.section127) parts.push(`${dollars(o.perks.section127)} a year of education help, tax-free`);
+    if (o.perks?.commuterMonthly) parts.push(`${dollars(o.perks.commuterMonthly)} a month of commuter benefits, tax-free`);
+    for (const b of o.otherBenefits ?? []) parts.push(`${b.label.trim()}, ${dollars(b.annual)} a year, ${b.taxable ? "taxable" : "tax-free as entered"}`);
     parts.push(o.hours ? `${o.hours.weekly.base} hours a week for ${weeksText(o)} weeks a year, after ${daysOffWords(o)}` : `${daysOffWords(o)} a year`);
     const info = d.costOfLiving;
     const city = draft ? cityTax(draft) : null;
@@ -401,7 +406,7 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
 
 // ---- 3. The bridge, year 1 ------------------------------------------------------------------------------------------
 
-const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "cash", "rsu", "espp", "clawback", "paid", "tax", "premiums", "afterTax", "retirement", "perks", "hsa", "oop",
+const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback", "paid", "tax", "premiums", "afterTax", "retirement", "perks", "hsa", "oop",
   "totalRewards", "rent", "prices", "total"];
 /** A line's label when the offers' own reasons differ: theirs go in the notes. */
 const GENERAL: Partial<Record<BridgeLine, string>> = {
@@ -466,7 +471,7 @@ function bridgeSection(ctx: WorkContext, add: Add, worked: Worked[]) {
     });
     const espp = r.letters.some((l) => { const o = offerByLetter(ctx, l); return !!o && hasEspp(o.draft); });
     notes.push(`Prices other than rent run ${join(runs)}. Spending is restated at those prices; savings (your 401(k), the employer's money, HSA money`
-      + `${espp ? ", perks and ESPP money held" : " and perks"}) count at face value.`);
+      + `${espp ? ", tax-free benefits and ESPP money held" : " and tax-free benefits"}) count at face value.`);
   }
   add({ kind: "table", table: { title: `${same ? `${longDate(bs[0].start)} – ${longDate(dayBefore(bs[0].end))}` : "Each offer's first year"}, as paid; each `
     + "total adds the lines above it", head: ["", ...r.letters], rows, foots: true } });
@@ -847,10 +852,10 @@ function bottomLine(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   const m = v.month;
   const p = pricesOf(ctx);
   add({ kind: "heading", text: "1. The bottom line" });
-  worked.push({ op: "+", of: [dollars(m.spend), dollars(m.saved)], is: dollars(m.total) });
+  worked.push({ op: "+", of: [dollars(m.spend), dollars(m.saved), ...(m.taxFree ? [dollars(m.taxFree)] : [])], is: dollars(m.total) });
   add({ kind: "para", runs: [
-    { b: `${L} leaves you about ${dollars(m.total)} a month over your stay, after rent, in ${v.place} dollars: ${dollars(m.spend)} to spend and `
-      + `${dollars(m.saved)} saved.` },
+    { b: `${L} leaves you about ${dollars(m.total)} a month over your stay, after rent, in ${v.place} dollars: ${dollars(m.spend)} to spend`
+      + `${m.taxFree ? `, ${dollars(m.saved)} saved and ${dollars(m.taxFree)} in tax-free benefits` : ` and ${dollars(m.saved)} saved`}.` },
     ` That's what's left to spend after tax and rent, plus what you save, over the ${years(n)}, in today's dollars, at ${v.place}'s own prices.`
       + (m.total < 0 ? " Rent and tax take more than this offer pays, so there's less than nothing left to spend." : ""),
   ] });
@@ -863,8 +868,10 @@ function bottomLine(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   }
   const facts: string[] = [];
   if (v.year1) {
-    facts.push(`In year 1, as paid, in ${v.place} dollars: ${dollars(v.year1.spendMonth)} a month to spend after rent${v.year1.held ? "," : " and"} `
-      + `${dollars(v.year1.savedMonth)} a month saved${v.year1.held ? ` and ${dollars(v.year1.heldMonth)} a month held in the ESPP` : ""}. ${v.differs}`);
+    const y1 = v.year1;
+    const parts = [`${dollars(y1.spendMonth)} a month to spend after rent`, `${dollars(y1.savedMonth)} a month saved`,
+      ...(y1.held ? [`${dollars(y1.heldMonth)} a month held in the ESPP`] : []), ...(y1.taxFree ? [`${dollars(y1.taxFreeMonth)} a month in tax-free benefits`] : [])];
+    facts.push(`In year 1, as paid, in ${v.place} dollars: ${join(parts)}. ${v.differs}`);
   }
   if (v.hour) {
     worked.push({ op: "÷", of: [figure(v.hour.total), figure(v.hour.hours)], is: cents(v.hour.value) });
@@ -898,14 +905,15 @@ function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full:
   const notes = [`Tax is your household's tax with the offer less without it; health costs are your premiums and expected out-of-pocket costs; saved is `
     + `your 401(k) and HSA and any planned savings${x.o.espp ? "; in the ESPP is what's been put into it and not yet spent on shares or given back" : ""}. Left to spend, ${figure(spend)} ÷ 12, is ${dollars(spend / 12)} a month in year 1, after rent, in `
     + `${v.place} dollars.`];
-  const adds = [h.credited ? `${dollars(h.credited)} of 401(k) money` : "", h.hsa ? `${dollars(h.hsa)} of HSA money` : "", h.perks ? `${dollars(h.perks)} of perks` : ""]
-    .filter(Boolean);
+  const names = taxFreeNames(x.o);
+  const adds = [h.credited ? `${dollars(h.credited)} of 401(k) money` : "", h.hsa ? `${dollars(h.hsa)} of HSA money` : "",
+    h.perks ? `${dollars(h.perks)} of tax-free benefits${names.length ? ` (${names.join(", ")})` : ""}` : ""].filter(Boolean);
   const share = h.vestedShare;
   const vested = !h.credited || share === null ? "" : share >= 1 ? ` By the end of your ${n}-year stay, all of its 401(k) money has vested.` : share > 0
     ? ` By the end of your ${n}-year stay, ${Math.round(share * 100)}% of its 401(k) money has vested.`
     : ` None of its 401(k) money has vested by the end of your ${n}-year stay: leave then and it's left behind.`;
   notes.push(adds.length ? `Outside the $100, the employer adds ${join(adds)} in year 1, on top.${vested}`
-    : "The employer adds nothing on top in year 1: no 401(k) money, HSA money or perks entered.");
+    : "The employer adds nothing on top in year 1: no 401(k) money, HSA money or tax-free benefits entered.");
   add({ kind: "para", runs: [notes.join(" ")] });
   if (!full) return;
 
@@ -1040,7 +1048,7 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
 
 // ---- 5. What the benefits are worth (A-5)
 
-const BENEFIT_HEAD: Partial<Record<string, string>> = { employer: "401(k), vested", hsa: "HSA money", perks: "Perks", oop: "Out-of-pocket" };
+const BENEFIT_HEAD: Partial<Record<string, string>> = { employer: "401(k), vested", hsa: "HSA money", perks: "Tax-free benefits", oop: "Out-of-pocket" };
 
 function benefitsSection(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   const { L, o, n } = x;
@@ -1055,6 +1063,10 @@ function benefitsSection(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
   if (!o.health) notes.push("No health plan entered: premiums and out-of-pocket costs aren't counted.");
   if (o.health?.oopMax) notes.push(`A bad health year costs up to the plan's out-of-pocket maximum, ${dollars(o.health.oopMax)}, in any year of your stay, `
     + "on top of the premiums.");
+  for (const b of otherBenefitsOf(x.d, n, o.otherBenefits ?? [])) {
+    notes.push(`${b.label}, ${b.taxable ? "taxable (pay)" : "tax-free, as entered"}: ${dollars(b.annual)} a year, ${dollars(b.stay)} over the stay, as paid`
+      + `${b.taxable ? ` (${dollars(b.afterTax)} after tax)` : ""}.`);
+  }
   if (o.espp) {
     const putIn = esppPutIn(x.d, n).sum;
     const gain = t.rows.find((r) => r.line === "espp");

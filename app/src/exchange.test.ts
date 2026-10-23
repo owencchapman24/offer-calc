@@ -51,7 +51,8 @@ describe("import", () => {
     let s = samples(TODAY);
     s = reducer(s, { type: "edit", id: s.offers[2].id, set: { "health.premium": 1_500, "retirement.vesting": { kind: "cliff", years: 2 }, "timeOff.vacation": 15, "timeOff.gives": 20, "timeOff.payout": "always" } });
     s = reducer(s, { type: "edit", id: s.offers[1].id, set: { espp: { ...newEspp(), contributionPct: 0.08, lookback: false, offeringsStart: { month: 5, day: 1 } } } });
-    s = reducer(s, { type: "edit", id: s.offers[0].id, set: { espp: "none" } });
+    s = reducer(s, { type: "edit", id: s.offers[0].id, set: { espp: "none", otherBenefits: [{ label: "Gym", annual: 600, taxable: false }] } });
+    s = reducer(s, { type: "edit", id: s.offers[2].id, set: { otherBenefits: [] } });
     s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
     expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
     // A spouse's wages (2026-10-14) round-trip; exports from before them import as none.
@@ -85,11 +86,11 @@ describe("import", () => {
     expect(none.ok && none.offers.map((o) => o.draft.timeOff.vacation)).toEqual([null, null, null]);
   });
 
-  it("an export from before the ESPP (2026-10-22) imports with none", () => {
+  it("an export from before the ESPP (2026-10-22) or other benefits (2026-10-23) imports with neither entered", () => {
     const file = JSON.parse(exportSession(samples(TODAY), TODAY, NOW).text);
-    for (const o of file.offers) delete o.draft.espp;
+    for (const o of file.offers) { delete o.draft.espp; delete o.draft.otherBenefits; }
     const r = readImport(JSON.stringify(file));
-    expect(r.ok && r.offers.map((o) => o.draft.espp)).toEqual([null, null, null]);
+    expect(r.ok && r.offers.map((o) => [o.draft.espp, o.draft.otherBenefits])).toEqual([[null, null], [null, null], [null, null]]);
   });
 
   it("an invalid file lists its problems and changes nothing", () => {
@@ -114,6 +115,8 @@ describe("import", () => {
         "offers.0.draft.residence.philadelphia: should be true or false."],
       ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }), "household.spouseWages: should be an amount of $0 or more."],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],
+      ["a benefit's tax, not yes or no", bad((x) => { x.offers[0].draft.otherBenefits = [{ label: "Gym", annual: 600, taxable: "maybe" }]; }),
+        "offers.0.draft.otherBenefits.0.taxable: should be true or false."],
       ["an ESPP's lookback, not yes or no", bad((x) => { x.offers[0].draft.espp = { ...newEspp(), lookback: "maybe" }; }),
         "offers.0.draft.espp: should be \"none\" or an ESPP."],
     ];

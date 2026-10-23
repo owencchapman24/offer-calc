@@ -19,6 +19,7 @@ export const EDITORS: Array<{ section: Section; row: string; letter: "A" | "B" |
   { section: "equity", row: "equity.refreshers", letter: "C", title: "Refreshers" },
   { section: "retirement", row: "retirement.match", letter: "B", title: "401(k) match" },
   { section: "retirement", row: "retirement.vesting.steps", letter: "A", title: "Vesting steps" },
+  { section: "perks", row: "otherBenefits", letter: "A", title: "Other benefits" },
 ];
 
 const dashed = (path: string) => path.replace(/\./g, "-");

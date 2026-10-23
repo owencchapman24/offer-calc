@@ -22,9 +22,10 @@ const BREAKDOWN: PartTable[] = ["a2", "bridge", "a3", "a5", "a6"];
 
 /** The figures a breakdown table shows (year 1 for A-2's), by id: every one of them should be in its CSV. */
 const PART_IDS: Record<PartTable, (l: Letter) => RegExp> = {
-  a2: (l) => new RegExp(`^a2\\.${l}\\.1\\.((tax|rent|health|saved|spend)(Share)?|hundred)$`),
-  bridge: (l) => new RegExp(`^br\\.${l}\\.1\\.(?!spend$|saved$)`),
-  a3: (l) => new RegExp(`^l6y\\.${l}\\.(salary|bonus|cash|rsu|clawback|gross)\\.`),
+  a2: (l) => new RegExp(`^a2\\.${l}\\.1\\.((tax|rent|health|saved|espp|spend)(Share)?|hundred)$`),
+  // The bridge's table: not the month under it (to spend, saved, held in an ESPP, tax-free benefits).
+  bridge: (l) => new RegExp(`^br\\.${l}\\.1\\.(?!spend$|saved$|inEspp$|taxFree$)`),
+  a3: (l) => new RegExp(`^l6y\\.${l}\\.(salary|bonus|cash|rsu|espp|benefit|clawback|gross)\\.`),
   a5: (l) => new RegExp(`^(a5\\.${l}\\.(credited|added)\\.|l6y\\.${l}\\.(employer|hsa|perks|premiums|oop|yours)\\.)`),
   a6: (l) => new RegExp(`^a6\\.${l}\\.`),
 };

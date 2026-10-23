@@ -195,6 +195,7 @@ export function DateField({ o, path, label, fallback }: { o: AppOffer; path: str
 export const EDITOR_NAMES: Record<string, string> = {
   "salary.promotions": "promotions", "bonus.amounts": "bonus by year", "equity.grants": "RSU grants", "equity.refreshers": "refreshers",
   cashAwards: "sign-on and other cash", "retirement.match": "401(k) match", "retirement.vesting.steps": "401(k) vesting steps",
+  otherBenefits: "other benefits",
 };
 
 /**

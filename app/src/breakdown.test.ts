@@ -30,9 +30,9 @@ describe("A-1, the bottom line: sample A on its own, as the plan works it out (v
   it("a month over its own stay, in today's New York dollars: $6,671 to spend + $892 saved = $7,563", () => {
     // Total rewards 500,588 − rent 171,439 = 329,149 of present value after rent at New York prices; ÷ 43.5191 = 7,563.32, shown 7,563.
     // Saved at face value 38,823 ÷ 43.5191 = 892.09, shown 892; to spend is the difference, 7,563 − 892 = 6,671 (the line taking the rounding).
-    expect(v.pv).toEqual({ totalRewards: 500_588, rent: 171_439, total: 329_149, saved: 38_823, spend: 290_326 });
+    expect(v.pv).toEqual({ totalRewards: 500_588, rent: 171_439, total: 329_149, saved: 38_823, taxFree: 0, spend: 290_326 });
     expect(v.factor).toBe(43.5191);
-    expect(v.month).toEqual({ total: 7_563, saved: 892, spend: 6_671 });
+    expect(v.month).toEqual({ total: 7_563, saved: 892, taxFree: 0, spend: 6_671 });
     expect(v.place).toBe("New York");
     expect([v.start, v.last, v.years, v.months]).toEqual(["2026-07-13", "2030-07-12", 4, 48]);
   });

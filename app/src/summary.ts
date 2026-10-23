@@ -118,6 +118,14 @@ export function esppText(d: OfferDraft): string {
     + `${per > 1 ? `, ${per} purchases each` : ""}${p.eligibleFrom ? `, eligible from ${longDate(p.eligibleFrom)}` : ""}; each lot sold at purchase`;
 }
 
+/** "Wellness $1,200 taxable; Gym $600 tax-free", "None" (entered, none), or "Not entered" (4j). */
+export function otherBenefitsText(d: OfferDraft): string {
+  const list = d.otherBenefits;
+  if (!list) return "Not entered";
+  if (!list.length) return "None";
+  return list.map((b) => `${b.label || "Benefit"} ${b.annual === null ? "$—" : dollars(b.annual)} ${b.taxable === false ? "tax-free" : "taxable"}`).join("; ");
+}
+
 export function perksText(d: OfferDraft): string {
   const p = d.perks;
   const parts = [p.section127 ? `education ${dollars(p.section127)} a year` : "", p.commuterMonthly ? `commuter ${dollars(p.commuterMonthly)} a month` : ""]

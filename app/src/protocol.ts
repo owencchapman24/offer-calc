@@ -58,7 +58,7 @@ export interface OfferDetail {
    * Each employment year's payments as posted: each to the cent, as the engine rounds it, added exactly, by component, and their tax.
    * L-6 lists the payments; the year figures (footing.ts) round these sums, so a year's lines tie to its payments.
    */
-  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; espp: number; tax: number }>;
+  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; espp: number; benefit: number; tax: number }>;
   /** Bonus payments: when, how much, for which stretch of work. */
   bonuses: Array<{ ey: number; date: ISODate; gross: number; periodFrom: ISODate; periodTo: ISODate }>;
   /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
@@ -66,6 +66,11 @@ export interface OfferDetail {
     priceFactor: number; nominalDate?: ISODate }>;
   /** Cash awards (a sign-on, a relocation payment): when, how much, which award (A-3's dates). */
   cash: Array<{ ey: number; date: ISODate; gross: number; award: string }>;
+  /**
+   * Each other benefit (4j) by employment year: its place in the offer's list, its name, taxable or not, and what it came to (a
+   * taxable one's pay, with its tax; a tax-free one's face value), each to the cent, added exactly.
+   */
+  others: Array<{ ey: number; index: number; label: string; taxable: boolean; amount: number; tax: number }>;
   /** ESPP purchases, each sold the same day (4i): when, the gain, and which offering's purchase. */
   espps: Array<{ ey: number; date: ISODate; gross: number; offeringStart: ISODate; purchase: number; purchases: number }>;
 }

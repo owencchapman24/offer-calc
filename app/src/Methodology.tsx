@@ -274,6 +274,32 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             Tax-free perks, such as education assistance (up to $5,250 a year) and commuter benefits (up to $340 a month), count
             at face value.
           </p>
+          <p>
+            <strong>Other benefits</strong> (a stipend, wellness money, employer-paid insurance) are each a yearly amount you enter,
+            paid a twelfth a month while you work there and stopping on your last day. A taxable one is pay: paid with salary, taxed
+            as wages (Social Security and Medicare included) and withheld with each paycheck; it isn't 401(k) or bonus pay. A
+            tax-free one counts at face value, as the perks do. Tax-free benefits, the perks among them, aren't savings, so an offer's
+            bottom line shows them on a line of their own: to spend + saved + tax-free benefits = the total. The tool takes your word
+            on tax-free: any fringe benefit is wages unless the law excludes it, at its fair market value (IRS Pub. 15-B), and A-6
+            names each one counted tax-free. Usually:
+          </p>
+          <table className="method-table">
+            <thead><tr><th scope="col">Benefit</th><th scope="col">Usually</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Cash stipends paid with pay (wellness, phone, internet, home office, meals)</th><td>Taxable: a flat allowance isn't an accountable plan (Treas. Reg. §1.62-2)</td></tr>
+              <tr><th scope="row">Reimbursements of business costs, with receipts</th><td>Tax-free, and not a benefit to you: they repay a cost, so don't enter them</td></tr>
+              <tr><th scope="row">Gym memberships, wellness rewards in cash</th><td>Taxable; an athletic facility on the employer's premises is tax-free (IRC 132(j)(4))</td></tr>
+              <tr><th scope="row">Employer-paid group-term life insurance</th><td>Tax-free for coverage up to $50,000 (IRC 79); the cost of more is wages, which the tool doesn't work out</td></tr>
+              <tr><th scope="row">Employer-paid disability, dental, vision or accident insurance</th><td>Tax-free (IRC 106). Not the employer's share of your health plan: health plans count by your cost (<Ref id="M-5.2" />)</td></tr>
+              <tr><th scope="row">Dependent care assistance</th><td>Tax-free up to $7,500 a year from 2026 ($3,750 married filing separately), not indexed (IRC 129)</td></tr>
+              <tr><th scope="row">Adoption assistance</th><td>Free of income tax up to $17,670 in 2026, but not of Social Security and Medicare: neither choice fits</td></tr>
+              <tr><th scope="row">Achievement awards</th><td>Tax-free up to $1,600 a year in a qualified plan, $400 otherwise (IRC 74(c), 274(j))</td></tr>
+              <tr><th scope="row">Meals on the premises for the employer's convenience; small occasional gifts (never cash or gift cards)</th><td>Tax-free (IRC 119; 132(e))</td></tr>
+            </tbody>
+          </table>
+          <p>
+            Enter what a benefit saves you, for something you'd buy anyway; less, or nothing, for something you wouldn't.
+          </p>
         </Section>
         <Section id="M-5.4">
           <p>
@@ -534,6 +560,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <h3 className="method-sub">Pay and benefits</h3>
           <ul>
             <li>RSUs are assumed sold at vest; options and private-company equity count as $0.</li>
+            <li>Other benefits marked tax-free are counted tax-free as entered: the tool doesn't check the law's exclusions or limits for
+              them, and a benefit that's free of income tax but not of Social Security and Medicare (adoption assistance) fits neither
+              choice. Each accrues evenly while you work there.</li>
             <li>An ESPP's shares are taken as sold the day they're bought, so there's no holding period or capital gain. Offerings run
               one after another, with no reset when the price falls, no overlapping offerings, no cap on shares an offering and no
               fees; a plan outside section 423 isn't modeled. Its gain is left out of every state payroll tax and Philadelphia's wage
@@ -575,6 +604,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">IRC 421, 423 and 3121(a)(22); Treas. Reg. §1.423-2; IRS Pub. 525 and Pub. 15-B</th>
                 <td>An ESPP: the discount and lookback, the 27-month offering, the $25,000 limit, the ordinary income on a sale at
                   purchase, and no FICA or withholding on it</td><td>Read Oct 2026</td></tr>
+              <tr><th scope="row">IRS Pub. 15-B (2026), Table 2-1; Treas. Reg. §1.62-2; IRC 74, 79, 106, 119, 129, 132</th>
+                <td>Other benefits: which are usually taxable, and the exclusions' limits</td><td>2026</td></tr>
               <tr><th scope="row">NASPP and Deloitte Tax, 2023 Employee Stock Purchase Plan Survey; Fidelity Stock Plan Services, ESPP Data
                 Analysis (2025)</th><td>An ESPP's defaults: 15% off (85% of plans), a lookback (83%), 6-month offerings (57%), one purchase
                   an offering</td><td>2023, 2025</td></tr>

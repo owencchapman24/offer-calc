@@ -405,6 +405,28 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
     help: "Education assistance or student loan payments under Section 127, tax-free up to $5,250 a year; above that, only the "
       + "limit counts. It counts at face value. $0 is the default.",
   },
+  otherBenefits: {
+    hint: "Stipends, wellness money, insurance: each named, taxable or tax-free.",
+    help: "Benefits the other fields don't cover, up to 8, each a yearly amount paid a twelfth a month while you work there. Taxable ones "
+      + "are pay, taxed as wages; tax-free ones count at face value, on their own line beside the perks. The tool takes your word on "
+      + "tax-free (M-5.3 has the usual rules), and None says the offer has none.",
+  },
+  "otherBenefits.label": {
+    hint: "What it is, up to 40 characters.",
+    help: "A name for the benefit, such as Wellness stipend or Life insurance. It names the benefit in the breakdown; it doesn't change "
+      + "any number.",
+  },
+  "otherBenefits.annual": {
+    hint: "Dollars a year; enter what it saves you.",
+    help: "What it's worth a year: for something you'd buy anyway, what it saves you; for something you wouldn't, less, or nothing. It "
+      + "counts at face value, a twelfth a month while you work there, and stops on your last day.",
+  },
+  "otherBenefits.taxable": {
+    hint: "Taxable unless the law excludes it.",
+    help: "Any fringe benefit is wages unless the law excludes it, so Taxable is the default. Cash stipends are usually taxable; "
+      + "employer-paid disability or life insurance up to $50,000, and dependent care up to $7,500, usually aren't. The table under the "
+      + "benefits gives the common ones.",
+  },
   "perks.commuterMonthly": {
     hint: "Transit or parking the employer pays, a month.",
     help: "Commuter benefits under Section 132(f), tax-free up to $340 a month; above that, only the limit counts. They count at "

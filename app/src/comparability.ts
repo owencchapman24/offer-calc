@@ -9,7 +9,7 @@ import type { AppOffer, Letter, OfferDraft } from "./model";
 // It never names a category you can't enter: a category counts only once its input exists (has help,
 // which every rendered input must have), so the warning can always be acted on.
 
-export type Category = "premium" | "outOfPocket" | "employer401k" | "employerHsa" | "perks" | "espp" | "hours";
+export type Category = "premium" | "outOfPocket" | "employer401k" | "employerHsa" | "perks" | "otherBenefits" | "espp" | "hours";
 
 export interface Asymmetry {
   category: Category;
@@ -26,13 +26,15 @@ const COUNTED: Record<Category, (d: OfferDraft) => boolean> = {
   employerHsa: (d) => d.health === "none" || (d.health !== null && d.health.employerHsa !== null),
   perks: (d) => d.perks.section127 !== null || d.perks.commuterMonthly !== null,
   // An ESPP is a benefit an offer letter may not mention, like the 401(k): entered (or entered as none), or not.
+  // Other benefits (4j): the list entered (or entered as none), or not.
+  otherBenefits: (d) => d.otherBenefits != null,
   espp: (d) => d.espp !== null && d.espp !== undefined,
   hours: (d) => d.hours.weekly !== null,
 };
 
 /** Costs: leaving one out flatters the offer without it. Benefits flatter the offers that have them. */
 const COST: Record<Category, boolean> = {
-  premium: true, outOfPocket: true, employer401k: false, employerHsa: false, perks: false, espp: false, hours: false,
+  premium: true, outOfPocket: true, employer401k: false, employerHsa: false, perks: false, otherBenefits: false, espp: false, hours: false,
 };
 
 const CATEGORIES = Object.keys(COUNTED) as Category[];
@@ -40,7 +42,7 @@ const CATEGORIES = Object.keys(COUNTED) as Category[];
 /** The input that enters each category, by its help key. */
 export const CATEGORY_INPUT: Record<Category, string> = {
   premium: "health.premium", outOfPocket: "health.outOfPocket", employer401k: "retirement", employerHsa: "health.employerHsa",
-  perks: "perks.section127", espp: "espp", hours: "hours.weekly",
+  perks: "perks.section127", otherBenefits: "otherBenefits", espp: "espp", hours: "hours.weekly",
 };
 
 /** A category you can enter in the app: its input exists. */
@@ -79,8 +81,9 @@ export function asymmetryText(a: Asymmetry): string {
     case "employerHsa":
       return `Employer HSA money is counted for ${yes} but not for ${no}. If ${one ? `${them}'s plan puts` : "their plans put"} money in an HSA, `
         + `add it: ${otherwise}`;
-    case "perks":
-      return `Perks are counted for ${yes} but not for ${no}. If ${them} ${one ? "offers" : "offer"} education or commuter benefits, add them: ${otherwise}`;
+    case "perks": case "otherBenefits":
+      return `${a.category === "perks" ? "Perks are" : "Other benefits are"} counted for ${yes} but not for ${no}. If ${them} ${one ? "offers" : "offer"} `
+        + `${a.category === "perks" ? "education or commuter benefits" : "any (a stipend, insurance), or none"}, add them: ${otherwise}`;
     case "hours":
       return `Weekly hours are entered for ${yes} but not for ${no}, so nothing is compared per hour. Add ${one ? `${them}'s` : "their"} hours to compare `
         + "per hour.";

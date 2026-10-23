@@ -76,7 +76,7 @@ export interface ShownCol {
   atRef: number;
   /** Out-of-pocket health costs at the prices picked, likewise. */
   oopRef: number;
-  /** Saved, at face value: savings + your 401(k) and HSA + ESPP money held + vested employer 401(k) + employer HSA + perks. */
+  /** At face value: savings + your 401(k) and HSA + ESPP money held + vested employer 401(k) + employer HSA + tax-free benefits. */
   face: number;
   /** atRef − oopRef + face. */
   total: number;
@@ -95,7 +95,9 @@ export interface ShownYear {
   clawback: number;
   /** ESPP purchases' gain, each lot sold the day it's bought (4i). */
   espp: number;
-  /** salary + bonus + cash + rsu + clawback + espp. */
+  /** Taxable other benefits, paid with salary (4j). */
+  benefit: number;
+  /** salary + bonus + cash + rsu + clawback + espp + benefit. */
   gross: number;
   tax: number;
   premiums: number;
@@ -112,6 +114,7 @@ export interface ShownYear {
   employer: number;
   oop: number;
   hsa: number;
+  /** Tax-free benefits at face value: the perks and the tax-free other benefits (4j). */
   perks: number;
   /** afterTax + employer − oop + hsa + perks. */
   totalRewards: number;
@@ -137,14 +140,15 @@ export function shownYears(d: OfferDetail): ShownYear[] {
 }
 
 function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof shownIndexes> | null): ShownYear {
-  const p = d.posted.find((q) => q.ey === y.year) ?? { ey: y.year, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, tax: 0 };
+  const p = d.posted.find((q) => q.ey === y.year) ?? { ey: y.year, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
   const salary = R(p.salary);
   const bonus = R(p.bonus);
   const cash = R(p.cash);
   const rsu = R(p.rsu);
   const clawback = R(p.clawback);
   const espp = R(p.espp);
-  const gross = salary + bonus + cash + rsu + clawback + espp;
+  const benefit = R(p.benefit);
+  const gross = salary + bonus + cash + rsu + clawback + espp + benefit;
   const tax = R(p.tax);
   const premiums = R(y.health.premiums);
   const afterTax = gross - tax - premiums;
@@ -171,7 +175,7 @@ function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof
   }
   const q = { salary: R(y.quoted.salary), bonus: R(y.quoted.bonus), cash: R(y.quoted.cash), rsu: R(y.quoted.rsu) };
   return {
-    n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, espp, gross, tax, premiums, afterTax, yours, esppHeld, takeHome,
+    n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, espp, benefit, gross, tax, premiums, afterTax, yours, esppHeld, takeHome,
     credited, employer, oop, hsa, perks, totalRewards, hours: y.hours === undefined ? null : R(y.hours), col,
     quoted: { ...q, letter: q.salary + q.bonus + q.cash + q.rsu }, posted: p,
   };

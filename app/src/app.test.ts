@@ -356,6 +356,9 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
     const read = (x: unknown) => loadSession({ getItem: () => JSON.stringify(x), setItem: () => {} }, TODAY).offers[0].draft;
     const old = { ...s0, offers: s0.offers.map((o) => { const { espp: _, ...draft } = o.draft; return { ...o, draft }; }) };
     expect(read(old).espp).toBeNull();
+    // Other benefits (2026-10-23) likewise: not entered.
+    const older = { ...s0, offers: s0.offers.map((o) => { const { otherBenefits: _, ...draft } = o.draft; return { ...o, draft }; }) };
+    expect(read(older).otherBenefits).toBeNull();
     const espp = { ...newEspp(), contributionPct: 0.1, offeringsStart: { month: 2, day: 1 } };
     const now = { ...s0, offers: s0.offers.map((o) => ({ ...o, draft: { ...o.draft, espp } })) };
     expect(read(now).espp).toEqual(espp);

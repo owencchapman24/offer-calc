@@ -119,7 +119,7 @@ export const esppName = (p: { offeringStart: ISODate; purchase: number; purchase
 export const arrivalShown = (a: Arrival) => R(a.gross);
 
 /** A-3's lines: pay by kind, footed into pay each year. A-7's lines, the same figures and ids. */
-export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "espp", "clawback", "gross"] as const;
+export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback", "gross"] as const;
 export const payRows = (t: YearTable) => t.rows.filter((r) => (PAY_LINES as readonly string[]).includes(r.line) && r.section === "cash");
 
 // ---- A-4: terms that can bite -----------------------------------------------------------------------------------------------
@@ -195,6 +195,33 @@ export const lastDayOf = (window: { end: ISODate }) => dayBefore(window.end);
 // ---- A-5: what the benefits are worth -------------------------------------------------------------------------------------
 
 const BENEFIT_LINES = ["employer", "hsa", "perks", "premiums", "oop", "yours"] as const;
+
+/** An other benefit over an offer's own stay (4j): each year's as shown, added, and a taxable one's tax and what's left after it. */
+export interface OtherBenefitView {
+  index: number;
+  label: string;
+  taxable: boolean;
+  /** Dollars a year, as entered. */
+  annual: number;
+  years: number[];
+  stay: number;
+  /** Its tax each year (a taxable one's share of its year's tax), as shown, and added. */
+  tax: number[];
+  taxSum: number;
+  afterTax: number;
+}
+
+/** Each other benefit in an offer's own stay, in the order entered, each year rounded once (A-5, A-7 and the document). */
+export function otherBenefitsOf(d: OfferDetail, years: number, list: Array<{ label: string; annual: number; taxable: boolean }>): OtherBenefitView[] {
+  return list.map((b, index) => {
+    const rows = Array.from({ length: years }, (_, i) => d.others.find((o) => o.ey === i + 1 && o.index === index));
+    const ys = rows.map((r) => R(r?.amount ?? 0));
+    const tax = rows.map((r) => R(r?.tax ?? 0));
+    const stay = ys.reduce((s, v) => s + v, 0);
+    const taxSum = tax.reduce((s, v) => s + v, 0);
+    return { index, label: b.label, taxable: b.taxable, annual: b.annual, years: ys, stay, tax, taxSum, afterTax: stay - taxSum };
+  });
+}
 
 /** What goes into an ESPP each year of its stay, as shown (each rounded once), and the years added (A-5's context: it's in after-tax pay). */
 export function esppPutIn(d: OfferDetail, years: number): { years: number[]; sum: number } {
