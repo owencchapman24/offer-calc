@@ -12,6 +12,7 @@ import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
 import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
 import { esppFlows } from "./espp";
+import { commissionFlows } from "./commission";
 import type {
   Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
   CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, ISODate, LeaveDayRow, LeaveResult, LeaveSweepRow,
@@ -19,7 +20,9 @@ import type {
 } from "./types";
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
-const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "clawback", "espp", "benefit"];
+/** The award a repaid recoverable draw is handed back as (4h). */
+export const DRAW_LABEL = "Draw against commission";
+const COMPONENTS: Component[] = ["salary", "bonus", "commission", "cash", "rsu", "clawback", "espp", "benefit"];
 const sumBy = (events: RawEvent[]) => {
   const by = Object.fromEntries(COMPONENTS.map((c) => [c, 0])) as Record<Component, number>;
   for (const e of events) by[e.component] += e.gross;
@@ -101,10 +104,16 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const paidCash = cash.filter((e) => e.day < workEnd);
   // Other benefits (4j): the taxable ones are pay, paid with salary; the tax-free ones are benefit flows, below.
   const others = otherBenefitStreams(offer.otherBenefits ?? [], start, workEnd, cuts);
+  // Commission (4h): draws with salary, each period's payout after it; a piece's employment year follows its first day.
+  const commission = offer.commission
+    ? commissionFlows(offer.commission, scenario, start, until, leave, cuts, (day) => anniversaries.findIndex((d) => d > day), windowEnd,
+      warnings)
+    : undefined;
   const raw: RawEvent[] = [
     ...salaryEvents(path, start, workEnd, cuts),
     ...others.events,
     ...(offer.bonus ? bonusEvents(offer.bonus, scenario, start, until, earned, yearOfPayment, warnings, leave) : []),
+    ...(commission?.events ?? []),
     ...paidCash,
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
   ];
@@ -143,9 +152,24 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (offer.timeOff?.policy === "unlimited" && offer.employerState === "CA") {
     warnings.push({ code: "unlimitedVacation", params: { state: offer.employerState } });
   }
+  // A recoverable draw not earned back: kept or repaid on leaving (below); at the stay's end it's still pay in the stay.
+  const drawOwed = commission?.outstanding.reduce((s, q) => s + q.amount, 0) ?? 0;
+  const drawRepaid = leave !== undefined && leave < until && offer.commission?.draw?.onLeaving === "repaid" ? drawOwed : 0;
+  if (commission) {
+    warnings.push({ code: "commissionEvenly", params: {} });
+    if (leave !== undefined && drawOwed > 0.005) {
+      warnings.push({ code: "drawNotEarnedBack", params: { date: fromDays(leave), balance: round2(drawOwed),
+        why: drawRepaid > 0 ? "repaid" : "kept" } });
+    } else if (leave === undefined && commission.balanceAtStayEnd > 0.005) {
+      warnings.push({ code: "drawNotEarnedBack", params: { date: fromDays(windowEnd - 1), balance: round2(commission.balanceAtStayEnd),
+        why: "stayEnd" } });
+    }
+  }
 
   // ---- clawbacks, part 1: repayments in the year of the payment reverse those wages ----
-  interface Pending { label: string; amount: number; paidDay: number; fraction: number; basis: "gross" | "net"; sameYear: boolean }
+  interface Pending {
+    label: string; amount: number; paidDay: number; fraction: number; basis: "gross" | "net"; sameYear: boolean; draw?: boolean;
+  }
   const pending: Pending[] = [];
   if (leave !== undefined && leave < until) {
     (offer.cashAwards ?? []).forEach((award, i) => {
@@ -167,6 +191,25 @@ export function projectScenario(offer: OfferInput, household: Household, options
         });
       }
     });
+    // A recoverable draw repaid on the last day (4h, D28), gross, as a clawback: each calendar year's outstanding draws apart, so
+    // this year's reverse its wages and an earlier year's are repaid pay (the IRC 1341 credit over $3,000, no FICA back).
+    if (drawRepaid > 0) {
+      const byYear = new Map<number, { amount: number; day: number }>();
+      for (const q of commission!.outstanding) {
+        const y = byYear.get(yearOfDay(q.day)) ?? { amount: 0, day: q.day };
+        byYear.set(yearOfDay(q.day), { amount: y.amount + q.amount, day: Math.max(y.day, q.day) });
+      }
+      for (const [year, { amount, day }] of [...byYear].sort((x, y) => x[0] - y[0])) {
+        const p: Pending = { label: DRAW_LABEL, amount, paidDay: day, fraction: 1, basis: "gross", sameYear: year === yearOfDay(leave),
+          draw: true };
+        pending.push(p);
+        if (p.sameYear) {
+          raw.push({ day: leave, component: "clawback", gross: -amount,
+            detail: { kind: "clawback", award: DRAW_LABEL, amount, fraction: 1, basis: "gross", sameYear: true, paidYear: year,
+              repaidYear: year, draw: true } });
+        }
+      }
+    }
   }
 
   // ---- tax parameters for every year we simulate --------------------------------
@@ -268,7 +311,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     raw.push({
       day: leave!, component: "clawback", gross: -owed, nonWage: { tax: -taxRelief },
       detail: { kind: "clawback", award: p.label, amount: p.amount, fraction: p.fraction, basis: p.basis, sameYear: false,
-        paidYear: yearOfDay(p.paidDay), repaidYear: yearOfDay(leave!) },
+        paidYear: yearOfDay(p.paidDay), repaidYear: yearOfDay(leave!), ...(p.draw ? { draw: true } : {}) },
     });
     warnings.push({ code: "clawbackFica", params: { award: p.label, paidYear: yearOfDay(p.paidDay), repaidYear: yearOfDay(leave!) } });
     return result(p, owed, treatment, taxRelief, owed - taxRelief);
@@ -276,7 +319,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   function result(p: Pending, owed: number, treatment: ClawbackResult["treatment"], taxRelief: number, netCost: number): ClawbackResult {
     return {
       award: p.label, paidOn: fromDays(p.paidDay), repaidOn: fromDays(leave!), fraction: p.fraction, basis: p.basis,
-      owed: round2(owed), treatment, taxRelief: round2(taxRelief), netCost: round2(netCost),
+      owed: round2(owed), ...(p.draw ? { draw: true } : {}), treatment, taxRelief: round2(taxRelief), netCost: round2(netCost),
     };
   }
   raw.sort((a, b) => a.day - b.day);
@@ -525,6 +568,10 @@ export function projectScenario(offer: OfferInput, household: Household, options
     : bonus.basis === "percentOfSalary" ? bonus.amount.base * rateAt(path, anniversaries[n - 1])
     : bonus.basis === "fixed" ? bonus.amount.base
     : bonus.amounts[Math.min(n, bonus.amounts.length) - 1].base;
+  // The offer letter's commission: the expected amount for the year, with no proration or payout lag (4h).
+  const c = offer.commission;
+  const commissionTarget = (n: number) => !c ? 0
+    : c.basis === "fixed" ? c.amount.base : c.amounts[Math.min(n, c.amounts.length) - 1].base;
   // Quoted RSUs: new-hire tranches by nominal date at grant value (refreshers aren't in an offer letter).
   const quotedRsu = new Map<number, number>();
   for (const g of grants) {
@@ -547,7 +594,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     const employedDays = Math.max(0, Math.min(workEnd, anniversaries[n]) - anniversaries[n - 1]);
     const worked = hours ? hours.weekly[scenario] * weeks * (employedDays / yearDays) : undefined;
     const quoted = {
-      salary: round2(rateAt(path, anniversaries[n - 1])), bonus: round2(bonusTarget(n)),
+      salary: round2(rateAt(path, anniversaries[n - 1])), bonus: round2(bonusTarget(n)), commission: round2(commissionTarget(n)),
       cash: round2(quotedCash.get(n) ?? 0), rsu: round2(quotedRsu.get(n) ?? 0),
     };
     employmentYears.push({
@@ -559,7 +606,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
       afterTaxComp: round2(m.afterTaxComp),
       takeHome: round2(m.takeHome),
       // The sum of the rounded parts, so the offer-letter bridge foots to the cent.
-      quotedTC: round2(quoted.salary + quoted.bonus + quoted.cash + quoted.rsu),
+      quotedTC: round2(quoted.salary + quoted.bonus + quoted.commission + quoted.cash + quoted.rsu),
       quoted,
       retirement: { employee: round2(b.employee401k), employerCredited: round2(b.credited), employerVested: round2(b.retirement) },
       health: {
@@ -588,6 +635,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
       retirementForfeited: round2(credited * (1 - vestedShare)),
       vacation: { banked: vacation!.banked, paid: round2(vacation!.paid), rule: vacation!.rule },
       esppRefund: round2(espp?.refundOnLeave ?? 0),
+      ...(commission ? { commission: { toCome: round2(commission.toCome), forfeited: round2(commission.forfeited),
+        drawBalance: round2(drawOwed), drawRepaid: round2(drawRepaid) } } : {}),
     };
   }
 
@@ -609,6 +658,12 @@ export function projectScenario(offer: OfferInput, household: Household, options
       : bonus.basis === "fixed"
         ? { code: "bonus", params: { scenario, basis: "fixed", amount: bonus.amount[scenario] } }
         : { code: "bonus", params: { scenario, basis: "byEmploymentYear", amounts: bonus.amounts.map((a) => a[scenario]) } });
+  }
+  if (c) {
+    assumptions.push({ code: "commission", params: { scenario,
+      amounts: c.basis === "fixed" ? [c.amount[scenario]] : c.amounts.map((a) => a[scenario]), byEmploymentYear: c.basis === "byEmploymentYear",
+      period: c.period, payAfterDays: c.payAfterDays, mustBeEmployedOnPayDate: c.mustBeEmployedOnPayDate ?? false,
+      ...(c.draw ? { draw: { ...c.draw } } : {}) } });
   }
   if (valuation !== undefined) {
     assumptions.push({ code: "presentValue", params: { valuationDate: fromDays(valuation), discountRate } });

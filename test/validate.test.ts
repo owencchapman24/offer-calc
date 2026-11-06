@@ -12,6 +12,9 @@ const [A, , C] = SAMPLE_OFFERS;
 const hh: Household = SAMPLE_HOUSEHOLD;
 /** A valid ESPP: 10% into six-month offerings from Jan 1, 15% off with a lookback. */
 const ESPP: NonNullable<OfferInput["espp"]> = { contributionPct: 0.1, discount: 0.15, lookback: true, offeringMonths: 6, offeringsStart: { month: 1, day: 1 } };
+/** A valid commission: $60,000 a year, quarterly, 30 days after each quarter. */
+const COMMISSION: NonNullable<OfferInput["commission"]> = { basis: "fixed", amount: { bear: 40_000, base: 60_000, bull: 80_000 },
+  period: "quarter", payAfterDays: 30 };
 
 const engineThrows = (o: OfferInput, h: Household = hh) => (["bear", "base", "bull"] as const).some((scenario) => {
   try {
@@ -80,6 +83,16 @@ const cases: Case[] = [
   ["a 28-month offering", C, (o) => { o.espp = { ...ESPP, offeringMonths: 28 }; }, "espp.offeringMonths", "esppOffering", true],
   ["4 purchases in a 6-month offering", C, (o) => { o.espp = { ...ESPP, purchasesPerOffering: 4 }; }, "espp.purchasesPerOffering", "esppPurchases", true],
   ["an offering day that doesn't exist", C, (o) => { o.espp = { ...ESPP, offeringsStart: { month: 2, day: 30 } }; }, "espp.offeringsStart", "monthDay", false],
+  ["a blank commission", C, (o) => { o.commission = { ...COMMISSION, amount: { ...COMMISSION.amount, base: Number.NaN } }; }, "commission.amount.base", "required", false],
+  ["a negative commission", C, (o) => { o.commission = { ...COMMISSION, amount: { ...COMMISSION.amount, bear: -1 } }; }, "commission.amount.bear", "negative", false],
+  ["commission by year with no years", C, (o) => { o.commission = { period: "quarter", payAfterDays: 30, basis: "byEmploymentYear", amounts: [] }; }, "commission.amounts", "noYears", true],
+  ["commission with no period", C, (o) => { o.commission = { ...COMMISSION, period: undefined as never }; }, "commission.period", "required", true],
+  ["commission with no payout lag", C, (o) => { o.commission = { ...COMMISSION, payAfterDays: Number.NaN }; }, "commission.payAfterDays", "required", true],
+  ["a 400-day payout lag", C, (o) => { o.commission = { ...COMMISSION, payAfterDays: 400 }; }, "commission.payAfterDays", "dayRange", true],
+  ["a payout lag of half a day", C, (o) => { o.commission = { ...COMMISSION, payAfterDays: 0.5 }; }, "commission.payAfterDays", "dayRange", true],
+  ["a negative draw", C, (o) => { o.commission = { ...COMMISSION, draw: { monthly: -1, recoverable: false } }; }, "commission.draw.monthly", "negative", true],
+  ["a draw of either kind", C, (o) => { o.commission = { ...COMMISSION, draw: { monthly: 1_000, recoverable: undefined as never } }; }, "commission.draw.recoverable", "required", false],
+  ["a draw for 0 months", C, (o) => { o.commission = { ...COMMISSION, draw: { monthly: 1_000, recoverable: true, months: 0 } }; }, "commission.draw.months", "wholeMonths", true],
   ["a benefit with no name", C, (o) => { o.otherBenefits = [{ label: " ", annual: 600, taxable: false }]; }, "otherBenefits.0.label", "required", false],
   ["a benefit's name over 40 characters", C, (o) => { o.otherBenefits = [{ label: "x".repeat(41), annual: 600, taxable: true }]; }, "otherBenefits.0.label", "tooLong", false],
   ["a negative benefit", C, (o) => { o.otherBenefits = [{ label: "Phone", annual: -1, taxable: true }]; }, "otherBenefits.0.annual", "negative", true],

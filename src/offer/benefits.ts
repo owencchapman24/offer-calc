@@ -36,7 +36,9 @@ export function retirementFlows(
   if (!((ret.nonElectivePct ?? 0) >= 0)) throw new Error("nonElectivePct can't be negative.");
   const type = ret.type ?? "pretax";
   const eligible = pay
-    .filter((e) => e.component === "salary" || (ret.eligiblePay === "salaryAndBonus" && e.component === "bonus"))
+    // "Salary and bonus" counts commission too, draws included (4h, D26).
+    .filter((e) => e.component === "salary"
+      || (ret.eligiblePay === "salaryAndBonus" && (e.component === "bonus" || e.component === "commission")))
     .sort((a, b) => a.day - b.day);
   const flows: RawBenefit[] = [];
   const deferred = new Map<number, number>();

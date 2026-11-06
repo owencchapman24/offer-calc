@@ -23,9 +23,12 @@ export function eventLabel(d: EventDetail): string {
   switch (d.kind) {
     case "salary": return `Salary ${d.from} to ${d.to}`;
     case "bonus": return `Bonus for ${d.periodFrom} to ${d.periodTo}${d.proratedToLeave ? " (prorated to leave date)" : ""}`;
+    case "commission": return `Commission for ${d.periodFrom} to ${d.periodTo}${d.proratedToLeave ? " (prorated to leave date)" : ""}`;
+    case "commissionDraw": return `Draw against commission ${d.from} to ${d.to}`;
     case "cash": return d.award;
     case "rsu": return `RSU: ${grantLabel(d.grant)}, tranche ${d.tranche} of ${d.tranches}${d.nominalDate ? ` (nominal ${d.nominalDate})` : ""}`;
-    case "clawback": return d.sameYear ? `${d.award} clawback (reverses ${d.repaidYear} wages)` : `${d.award} clawback (repays ${d.paidYear} pay)`;
+    case "clawback": return `${d.award} ${d.draw ? "repaid, not earned back" : "clawback"} (${d.sameYear ? `reverses ${d.repaidYear} wages`
+      : `repays ${d.paidYear} pay`})`;
     case "vacationPayout": return `Unused vacation paid out (${PLAIN.format(round2(d.days))} days)`;
     case "espp": return `ESPP purchase, offering of ${d.offeringStart}${d.purchases > 1 ? `, purchase ${d.purchase} of ${d.purchases}` : ""}, sold at once`;
     case "benefit": return `${d.label} (taxable benefit) ${d.from} to ${d.to}`;
@@ -41,6 +44,10 @@ export function eventFormula(d: EventDetail): string {
       return d.basis === "percentOfSalary"
         ? `${pct(d.rate)} x ${usd(round2(d.salaryEarned))} salary earned in the period`
         : `${usd(d.amount)}${d.employmentYear ? ` (employment year ${d.employmentYear} amount)` : ""} x ${d.daysEmployed}/${d.periodDays} days employed`;
+    case "commission":
+      return `${d.pieces.map((p) => `${usd(round2(p.monthly))} a month x ${p.months.toFixed(4)} months`).join(" + ")} - ${usd(round2(d.drawn))} `
+        + `drawn${d.balanceIn > 0.005 ? ` - ${usd(round2(d.balanceIn))} draw not yet earned back` : ""}, at least $0`;
+    case "commissionDraw": return `${usd(round2(d.monthly))} a month${d.days === d.daysInMonth ? "" : ` x ${d.days}/${d.daysInMonth} days`}`;
     case "cash": return usd(d.amount);
     case "rsu": return `${usd(d.grantValue)} x ${pct(d.fraction)} x ${d.priceFactor.toFixed(4)} price factor`;
     case "clawback": return `-${usd(d.amount)} x ${pct(d.fraction)}${!d.sameYear && d.basis === "net" ? " after tax" : ""}`;
@@ -127,6 +134,16 @@ export function formatAssumption(a: Assumption): string {
       if (p.basis === "fixed") return `Bonus: ${usd(p.amount)} a year, prorated by days employed (${p.scenario} scenario).`;
       return `Bonus by employment year: ${p.amounts.map(usd).join(", ")} (last repeats; ${p.scenario} scenario), prorated by days employed.`;
     }
+    case "commission": {
+      const p = a.params;
+      const d = p.draw;
+      return `Commission: ${p.byEmploymentYear ? `${p.amounts.map(usd).join(", ")} by employment year (the last repeats)` : `${usd(p.amounts[0])} a year`} `
+        + `(${p.scenario} scenario), earned a twelfth each calendar month while employed (a partial month by its days), paid ${p.payAfterDays} days `
+        + `after each calendar ${p.period}; ${p.mustBeEmployedOnPayDate ? "commission not paid by your last day is forfeited"
+          : "commission earned by your last day is paid on its usual date"}${d ? `; a ${d.recoverable ? "recoverable" : "guaranteed"} draw of `
+          + `${usd(d.monthly)} a month${d.months !== undefined ? ` for ${d.months} months` : ""} with salary${d.recoverable
+            ? `, its balance not earned back ${d.onLeaving === "repaid" ? "repaid" : "kept"} on leaving` : ""}` : ""}.`;
+    }
     case "presentValue":
       return `Present values discount each payment's after-tax cash from its date to ${a.params.valuationDate} at `
         + `${pct(a.params.discountRate, 2)} a year.`;
@@ -195,9 +212,10 @@ export function formatAssumption(a: Assumption): string {
         + "converted the same way) + money not spent locally, at face value: planned savings, your 401(k) and HSA "
         + "contributions, vested employer 401(k), employer HSA and perks.";
     case "withholding":
-      return "Withholding is estimated, federal income tax only: salary by the IRS percentage method (2020+ Form W-4 with "
-        + "your filing status and nothing else entered, monthly pay); bonuses, RSU vests and cash awards at the 22% "
-        + "supplemental rate (37% over $1 million a year). State withholding, FICA and other jobs' withholding aren't included.";
+      return "Withholding is estimated, federal income tax only: salary and a draw against commission by the IRS percentage method "
+        + "(2020+ Form W-4 with your filing status and nothing else entered, monthly pay); bonuses, commission payouts, RSU vests and cash "
+        + "awards at the 22% supplemental rate (37% over $1 million a year), and commission with no salary or draw as a month's regular pay "
+        + "(Pub. 15 section 7, method 1b). State withholding, FICA and other jobs' withholding aren't included.";
   }
 }
 

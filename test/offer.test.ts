@@ -7,7 +7,8 @@ import {
   type Cliff, type OfferInput,
 } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
-import { describeSchedule, eventFormula, formatWarning } from "../src/format/index";
+import { describeSchedule, eventFormula, formatAssumption, formatWarning } from "../src/format/index";
+import { federalIncomeTax } from "../src/tax/federal";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { areaStates, cityOptions, findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
@@ -65,7 +66,7 @@ describe("worked example (golden)", () => {
     // 2026 salary: 12,500 x 29/31 + 4 x 12,500 = 61,693.55; bonus 10% of that = 6,169.35.
     expect(ey1.start).toBe("2026-08-03");
     expect(ey1.end).toBe("2027-08-03");
-    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 186_169.35 });
+    expect(ey1.gross).toEqual({ salary: 150_000, bonus: 6_169.35, commission: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 186_169.35 });
   });
   it("quoted year-1 TC is $205,000: $150k + $15k target bonus + $30k sign-on + 5% of $200k RSUs", () => {
     expect(ey1.quotedTC).toBe(205_000);
@@ -78,9 +79,9 @@ describe("worked example (golden)", () => {
   });
   it("calendar years: 2026 = $91,693.55 (partial year), 2027 = $166,169.35 with the first $10,000 vest", () => {
     expect(r.calendarYears[0].offerGross)
-      .toEqual({ salary: 61_693.55, bonus: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 91_693.55 });
+      .toEqual({ salary: 61_693.55, bonus: 0, commission: 0, cash: 30_000, rsu: 0, clawback: 0, espp: 0, benefit: 0, total: 91_693.55 });
     expect(r.calendarYears[1].offerGross)
-      .toEqual({ salary: 150_000, bonus: 6_169.35, cash: 0, rsu: 10_000, clawback: 0, espp: 0, benefit: 0, total: 166_169.35 });
+      .toEqual({ salary: 150_000, bonus: 6_169.35, commission: 0, cash: 0, rsu: 10_000, clawback: 0, espp: 0, benefit: 0, total: 166_169.35 });
   });
   it("2026 offer tax in TX is $18,357.14 (hand-checked)", () => {
     // Federal: taxable 91,693.548 - 16,100 = 75,593.548; 1,240 + 4,560 + 22% x 25,193.548 = 11,342.58.
@@ -300,8 +301,8 @@ describe("RSUs in the projection", () => {
     // Year 1: $150k salary + 10% target bonus $15k + $30k sign-on + the month-12 tranche, 5% of $200k = $10k.
     // Year 2: no sign-on; the month-18 and month-24 tranches, 7.5% + 7.5% of $200k = $30k.
     const [y1, y2] = projectScenario(worked, single).employmentYears;
-    expect(y1.quoted).toEqual({ salary: 150_000, bonus: 15_000, cash: 30_000, rsu: 10_000 });
-    expect(y2.quoted).toEqual({ salary: 150_000, bonus: 15_000, cash: 0, rsu: 30_000 });
+    expect(y1.quoted).toEqual({ salary: 150_000, bonus: 15_000, commission: 0, cash: 30_000, rsu: 10_000 });
+    expect(y2.quoted).toEqual({ salary: 150_000, bonus: 15_000, commission: 0, cash: 0, rsu: 30_000 });
     // Paid in year 1 is $186,169.35: the bonus paid in it is the $6,169.35 stub, and the first vest snaps into year 2.
     expect(y1.gross.bonus - y1.quoted.bonus).toBeCloseTo(-8_830.65, 2);
     expect(y1.gross.rsu - y1.quoted.rsu).toBe(-10_000);
@@ -1580,5 +1581,185 @@ describe("other benefits, taxable or tax-free (v2 4j)", () => {
     expect(r.events.filter((e) => e.component === "benefit").reduce((s, e) => s + e.gross, 0)).toBeCloseTo(188.17, 6);
     // The gym money likewise, half of it: 50 x 17/31 + 50 + 50 x 10/30 = 94.09.
     expect(r.benefitEvents.filter((b) => b.kind === "otherBenefit").reduce((s, b) => s + b.amount, 0)).toBeCloseTo(94.09, 2);
+  });
+});
+
+describe("commission, paid after each month or quarter (v2 4h)", () => {
+  // Texas, from Jul 13, 2026 (the samples' start), $60,000 of salary and $60,000 a year of commission expected ($5,000 a month; $40,000
+  // low, $80,000 high), paid quarterly (calendar quarters), 30 days after each quarter ends: docs/v2-plan.md 4h's example 1.
+  const all = (x: number) => ({ bear: x, base: x, bull: x });
+  const quarterly: NonNullable<OfferInput["commission"]> = { basis: "fixed", amount: { bear: 40_000, base: 60_000, bull: 80_000 },
+    period: "quarter", payAfterDays: 30 };
+  const tx = (o: Partial<OfferInput> = {}): OfferInput => ({ label: "T", residence: { state: "TX" }, employerState: "TX",
+    startDate: "2026-07-13", salary: { annual: 60_000 }, commission: quarterly, ...o });
+  const payouts = (r: { events: Array<{ detail: { kind: string }; date: string; gross: number }> }) =>
+    r.events.filter((e) => e.detail.kind === "commission").map((e) => [e.date, e.gross]);
+
+  it("example 1: Q3 earns 5,000 x 19/31 + 2 x 5,000 = 13,064.52, paid Oct 30; then 15,000 each quarter, 30 days after it", () => {
+    const r = projectScenario(tx(), single, { years: 2 });
+    expect(payouts(r).slice(0, 5)).toEqual([["2026-10-30", 13_064.52], ["2027-01-30", 15_000], ["2027-04-30", 15_000],
+      ["2027-07-30", 15_000], ["2027-10-30", 15_000]]);
+    const q3 = r.events.find((e) => e.detail.kind === "commission")!.detail;
+    expect(q3).toMatchObject({ periodFrom: "2026-07-01", periodTo: "2026-09-30", earnedFrom: "2026-07-13", earnedTo: "2026-09-30",
+      drawn: 0, balanceIn: 0 });
+    expect(q3.kind === "commission" && q3.pieces).toEqual([{ monthly: 5_000, months: expect.closeTo(19 / 31 + 2, 12) }]);
+    expect(eventFormula(q3)).toBe("$5,000 a month x 2.6129 months - $0 drawn, at least $0");
+  });
+  it("year 1 earns 60,000 and pays 43,064.52: Apr 1 - Jul 12, 2027's 16,935.48 is paid in year 2; the letter says 60,000", () => {
+    const r = projectScenario(tx(), single, { years: 2 });
+    const [y1, y2] = r.employmentYears;
+    // 15,000 + 5,000 x 12/31 = 16,935.48 earned Apr 1 - Jul 12, 2027, paid Jul 30 and Oct 30, 2027.
+    expect(y1.gross.commission).toBe(43_064.52);
+    expect(y2.gross.commission).toBe(60_000);
+    expect(y1.quoted).toMatchObject({ salary: 60_000, commission: 60_000 });
+    expect(y1.quotedTC).toBe(120_000);
+    // Cash basis: 2026 has only Q3's payout; Q4's, paid Jan 30, 2027, is 2027's.
+    expect(r.calendarYears.find((c) => c.year === 2026)!.offerGross.commission).toBe(13_064.52);
+  });
+  it("a 4-year stay pays 223,064.52 inside it: Apr 1 - Jul 12, 2030's 16,935.48 is paid after the stay, so it isn't counted", () => {
+    const r = projectScenario(tx(), single, { years: 4 });
+    const inStay = r.events.filter((e) => e.component === "commission" && e.inWindow).reduce((s, e) => s + e.gross, 0);
+    expect(inStay).toBeCloseTo(4 * 60_000 - 16_935.48, 2);
+  });
+  it("the bear and bull cases are the low and the high: Q3 is 40,000 / 12 x 2.6129 = 8,709.68 and 80,000 / 12 x 2.6129 = 17,419.35", () => {
+    expect(payouts(projectScenario(tx(), single, { scenario: "bear", years: 1 }))[0]).toEqual(["2026-10-30", 8_709.68]);
+    expect(payouts(projectScenario(tx(), single, { scenario: "bull", years: 1 }))[0]).toEqual(["2026-10-30", 17_419.35]);
+  });
+  it("leaving Jan 29, 2027, by default Q4's 15,000 is still paid Jan 30 and Jan 1-29's 5,000 x 29/31 = 4,677.42 on Apr 30", () => {
+    const r = keptIfLeaving(tx(), single, toDays("2027-01-29")).result;
+    expect(payouts(r)).toEqual([["2026-10-30", 13_064.52], ["2027-01-30", 15_000], ["2027-04-30", 4_677.42]]);
+    expect(r.leave!.commission).toEqual({ toCome: 19_677.42, forfeited: 0, drawBalance: 0, drawRepaid: 0 });
+    // A day more is a day's commission, 5,000 / 31 = 161.29: no cliff.
+    expect(payouts(keptIfLeaving(tx(), single, toDays("2027-01-30")).result)[2]).toEqual(["2027-04-30", 4_838.71]);
+    expect(cliffs(tx(), single, { years: 1 }).some((c) => c.kind === "commission")).toBe(false);
+  });
+  it("only if employed on the payout date: leaving Jan 29 forfeits both; Jan 30 keeps Q4's 15,000 and forfeits 4,838.71", () => {
+    const strict = tx({ commission: { ...quarterly, mustBeEmployedOnPayDate: true } });
+    const before = keptIfLeaving(strict, single, toDays("2027-01-29")).result;
+    expect(payouts(before)).toEqual([["2026-10-30", 13_064.52]]);
+    expect(before.leave!.commission).toMatchObject({ toCome: 0, forfeited: 19_677.42 });
+    const w = before.warnings.find((x) => x.code === "commissionForfeited")!;
+    expect(formatWarning(w)).toBe("Leaving on 2027-01-29 forfeits $15,000 of commission for 2026-10-01 to 2026-12-31 (paid 2027-01-30, "
+      + "to those employed that day).");
+    const on = keptIfLeaving(strict, single, toDays("2027-01-30")).result;
+    expect(payouts(on)).toEqual([["2026-10-30", 13_064.52], ["2027-01-30", 15_000]]);
+    expect(on.leave!.commission!.forfeited).toBe(4_838.71);
+    // So each payout date is a cliff, under that rule alone.
+    expect(cliffs(strict, single, { years: 1 }).filter((c) => c.kind === "commission").map((c) => [c.date, c.amount]).slice(0, 3))
+      .toEqual([["2026-10-30", 13_064.52], ["2027-01-30", 15_000], ["2027-04-30", 15_000]]);
+    expect(nextCliff(strict, single, "2027-01-29").next).toMatchObject({ date: "2027-01-30", daysAway: 1 });
+  });
+  it("a payout dated on an anniversary is the year just ended: June 2027's, 13 days after it, on Jul 13, is year-1 pay", () => {
+    const monthly = tx({ commission: { ...quarterly, period: "month", payAfterDays: 13 } });
+    const june = projectScenario(monthly, single, { years: 2 }).events.find((e) => e.date === "2027-07-13" && e.component === "commission")!;
+    expect(june.employmentYear).toBe(1);
+  });
+  it("by year, each month's piece takes its employment year's amount: July 2027 is 2,000 x 12/31 + 4,000 x 19/31 = 3,225.81", () => {
+    const byYear = tx({ commission: { basis: "byEmploymentYear", amounts: [all(24_000), all(48_000)], period: "month", payAfterDays: 0 } });
+    const r = projectScenario(byYear, single, { years: 2 });
+    const july = r.events.find((e) => e.date === "2027-07-31" && e.component === "commission")!;
+    expect(july.gross).toBe(3_225.81);
+    expect(july.detail.kind === "commission" && july.detail.pieces).toEqual([
+      { monthly: 2_000, months: expect.closeTo(12 / 31, 12), employmentYear: 1 },
+      { monthly: 4_000, months: expect.closeTo(19 / 31, 12), employmentYear: 2 }]);
+    expect(r.employmentYears[1].quoted.commission).toBe(48_000);
+  });
+  it("withheld as supplemental wages at 22%: Q3's 13,064.52 x 22% = 2,874.19 in 2026, beside the salary's regular withholding", () => {
+    const y = withholdingShortfall(tx(), single, { years: 1 }).years.find((x) => x.year === 2026)!;
+    expect(y.withheld.supplemental).toBe(2_874.19);
+  });
+  it("commission only: no regular wages, so Pub. 15 section 7's method 1b withholds Q3's payout as October's regular pay", () => {
+    const only = tx({ salary: { annual: 0 } });
+    const y = withholdingShortfall(only, single, { years: 1 }).years.find((x) => x.year === 2026)!;
+    // 12 x 13,064.52 = 156,774.19 annualized, taxed with the standard deduction, / 12.
+    const fed = paramsForYear(2026).federal;
+    const expected = federalIncomeTax(fed, 12 * (60_000 / 12) * (19 / 31 + 2), "single", fed.standardDeduction.single).tax / 12;
+    expect(y.withheld.supplemental).toBe(0);
+    expect(y.withheld.regular).toBeCloseTo(expected, 2);
+  });
+  it("in the 401(k)'s 'salary and bonus' choice, commission counts too: a 6% deferral of Q3's payout", () => {
+    const r = projectScenario(tx({ retirement: { contributionPct: 0.06, eligiblePay: "salaryAndBonus" } }), single, { years: 1 });
+    const d = r.benefitEvents.find((b) => b.kind === "employee401k" && b.date === "2026-10-30")!;
+    expect(d.amount).toBe(783.87); // 6% x 13,064.52
+    expect(projectScenario(tx({ retirement: { contributionPct: 0.06 } }), single, { years: 1 }).benefitEvents
+      .some((b) => b.kind === "employee401k" && b.date === "2026-10-30")).toBe(false);
+  });
+  it("with a bonus too, each is its own pay: the letter adds both", () => {
+    const both = tx({ bonus: { basis: "fixed", amount: all(10_000), payOn: { month: 3, day: 15 } } });
+    const y1 = projectScenario(both, single, { years: 1 }).employmentYears[0];
+    expect(y1.quoted).toMatchObject({ bonus: 10_000, commission: 60_000 });
+    expect(y1.gross.commission).toBe(43_064.52);
+  });
+  it("says it's counted as earned evenly, and writes the terms out", () => {
+    const r = projectScenario(tx(), single, { years: 1 });
+    expect(formatWarning(r.warnings.find((w) => w.code === "commissionEvenly")!)).toMatch(/^Commission counts as earned evenly/);
+    expect(formatAssumption(r.assumptions.find((a) => a.code === "commission")!)).toBe("Commission: $60,000 a year (base scenario), earned "
+      + "a twelfth each calendar month while employed (a partial month by its days), paid 30 days after each calendar quarter; commission "
+      + "earned by your last day is paid on its usual date.");
+  });
+
+  describe("a draw against commission (example 2)", () => {
+    // Monthly, 15 days after each month, $36,000 a year expected ($3,000 a month) and $12,000 low, with a $2,000 draw for the first
+    // 3 months, Jul 13 - Oct 12, 2026: 2,000 x 19/31 = 1,225.81 in July, 2,000 in August and September, 2,000 x 12/31 = 774.19 in October.
+    const drawn = (recoverable: boolean, onLeaving?: "kept" | "repaid"): OfferInput => tx({ commission: { basis: "fixed",
+      amount: { bear: 12_000, base: 36_000, bull: 36_000 }, period: "month", payAfterDays: 15,
+      draw: { monthly: 2_000, recoverable, months: 3, ...(onLeaving ? { onLeaving } : {}) } } });
+    const draws = (r: { events: Array<{ detail: { kind: string }; date: string; gross: number }> }) =>
+      r.events.filter((e) => e.detail.kind === "commissionDraw").map((e) => [e.date, e.gross]);
+
+    it("is paid with salary, month by month, from your start for its 3 months: 6,000.00 in all", () => {
+      const r = projectScenario(drawn(false), single, { years: 1 });
+      expect(draws(r)).toEqual([["2026-07-31", 1_225.81], ["2026-08-31", 2_000], ["2026-09-30", 2_000], ["2026-10-12", 774.19]]);
+    });
+    it("base case: each payout is commission less the month's draw: 612.90, 1,000, 1,000, 2,225.81, then 3,000 a month", () => {
+      for (const recoverable of [false, true]) {
+        expect(payouts(projectScenario(drawn(recoverable), single, { years: 1 })).slice(0, 5)).toEqual([["2026-08-15", 612.9],
+          ["2026-09-15", 1_000], ["2026-10-15", 1_000], ["2026-11-15", 2_225.81], ["2026-12-15", 3_000]]);
+      }
+    });
+    it("bear case, guaranteed: a floor, so nothing for July to September, 225.81 for October: 6,225.81 against 3,612.90 earned", () => {
+      const r = projectScenario(drawn(false), single, { scenario: "bear", years: 1 });
+      expect(payouts(r).slice(0, 2)).toEqual([["2026-11-15", 225.81], ["2026-12-15", 1_000]]);
+    });
+    it("bear case, recoverable: a balance of 2,612.90 after September, paid down to 387.10, so January's first pays 612.90 on Feb 15", () => {
+      const r = projectScenario(drawn(true), single, { scenario: "bear", years: 1 });
+      expect(payouts(r)[0]).toEqual(["2027-02-15", 612.9]);
+      const out = r.events.filter((e) => e.detail.kind === "commission")[0].detail;
+      expect(out).toMatchObject({ balanceIn: expect.closeTo(387.1, 2), balanceOut: 0 });
+    });
+    it("leaving Sep 30 in the bear case with a recoverable draw: 2,612.90 not earned back, kept by default", () => {
+      const r = keptIfLeaving(drawn(true), single, toDays("2026-09-30"), { scenario: "bear" }).result;
+      expect(r.leave!.commission).toEqual({ toCome: 0, forfeited: 0, drawBalance: 2_612.9, drawRepaid: 0 });
+      expect(r.leave!.clawbacks).toEqual([]);
+      expect(formatWarning(r.warnings.find((w) => w.code === "drawNotEarnedBack")!)).toBe("Leaving on 2026-09-30 leaves $2,612.90 of a "
+        + "recoverable draw not earned back: counted as kept. Whether you'd owe it depends on the commission plan's terms and the state's law.");
+    });
+    it("repaid instead: handed back on the last day, gross, reversing 2026's wages as a clawback in its year does", () => {
+      const kept = keptIfLeaving(drawn(true, "kept"), single, toDays("2026-09-30"), { scenario: "bear" });
+      const repaid = keptIfLeaving(drawn(true, "repaid"), single, toDays("2026-09-30"), { scenario: "bear" });
+      expect(repaid.result.leave!.clawbacks).toEqual([expect.objectContaining({ award: "Draw against commission", owed: 2_612.9, draw: true,
+        treatment: "sameYearReversal" })]);
+      expect(repaid.result.leave!.commission!.drawRepaid).toBe(2_612.9);
+      expect(repaid.clawbackOwed).toBeCloseTo(2_612.9, 2);
+      // The wages are reversed, so the tax on them comes back: kept less repaid is the balance less its tax relief.
+      const relief = repaid.result.leave!.clawbacks[0].taxRelief;
+      expect(relief).toBeGreaterThan(0);
+      expect(kept.afterTaxCompKept - repaid.afterTaxCompKept).toBeCloseTo(2_612.9 - relief, 1);
+    });
+    it("a balance from an earlier year's draws is repaid pay: 2026's 8,000 under IRC 1341, 2027's 1,935.48 reversed", () => {
+      // From Nov 1, 2026: $1,000 a month earned against a $5,000 recoverable draw. Nov and Dec owe 4,000 each; leaving Jan 15, 2027,
+      // January's 5,000 x 15/31 = 2,419.35 against 1,000 x 15/31 = 483.87 earned owes 1,935.48 more.
+      const o = tx({ startDate: "2026-11-01", commission: { basis: "fixed", amount: all(12_000), period: "month", payAfterDays: 15,
+        draw: { monthly: 5_000, recoverable: true, onLeaving: "repaid" } } });
+      const c = keptIfLeaving(o, single, toDays("2027-01-15")).result.leave!.clawbacks;
+      expect(c.map((x) => [x.owed, x.treatment])).toEqual([[8_000, "irc1341Credit"], [1_935.48, "sameYearReversal"]]);
+    });
+    it("at the stay's end a recoverable draw not earned back is still pay in the stay, and A-6 says how much", () => {
+      // $1,000 a month earned against a $2,000 recoverable draw all year: 12,000 owed at the end of a 1-year stay.
+      const o = tx({ startDate: "2026-01-01", commission: { basis: "fixed", amount: all(12_000), period: "month", payAfterDays: 15,
+        draw: { monthly: 2_000, recoverable: true } } });
+      const w = projectScenario(o, single, { years: 1 }).warnings.find((x) => x.code === "drawNotEarnedBack")!;
+      expect(w.params).toEqual({ date: "2026-12-31", balance: 12_000, why: "stayEnd" });
+    });
   });
 });
