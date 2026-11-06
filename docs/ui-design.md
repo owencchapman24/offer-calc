@@ -1904,7 +1904,8 @@ months (`D` every month) and, recoverable, what happens to it on leaving (`D` ke
   A-4's terms, cliffs and "if you left on", leaving early's rows. **The methodology**: M-2, M-4, M-8, M-9, M-10, M-11.
 - **Old saves and exports** load with no commission.
 - **Measured** (2026-11-05, side by side with `main`): the main thread 112.59 to 113.02 kB gzip (+0.43), the worker 71.92 to 74.14 kB
-  (+2.22; budget 75), the stylesheet 11.56 to 11.60 kB; no tax-engine change, so the grid and oracle report don't move.
+  (+2.22; budget 75), the stylesheet 11.56 to 11.60 kB; LCP 1.96 s, CLS 0 (the fonts on time and late), TBT 40 ms, the first answer
+  0.45 s; `npm run bench` within noise; no tax-engine change, so the grid and oracle report don't move; the scan without violations.
 
 **Stop 4h versus the plan:** the stream is `src/offer/commission.ts`; the draw's presence and kind are one choice; A-2's lag is one line in
 short dates; "if you left on" gains three figures; a forfeited period doesn't earn back a recoverable draw, and a repaid draw is handed

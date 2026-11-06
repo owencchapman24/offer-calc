@@ -1258,7 +1258,9 @@ one review stop, no tax-engine change, the sources marked unchecked re-read firs
   §2751 in FindLaw's copy (current as of Jan 1, 2026; the legislature's site and Justia refuse automated reads); IRS Pub. 15 (2026) and
   Pub. 15-T (2026) read in full: neither names a draw or an advance against commission, so the draw as regular wages stays our reading.
 - **Measured** (2026-11-05, side by side with `main`): the main thread 112.59 to 113.02 kB gzip (+0.43, within v2's 0.5 kB); the worker
-  71.92 to 74.14 kB (+2.22, over the design's estimate of under 1 kB, and 0.86 kB under its 75 kB budget); the stylesheet 11.56 to 11.60 kB.
+  71.92 to 74.14 kB (+2.22, over the design's estimate of under 1 kB, and 0.86 kB under its 75 kB budget); the stylesheet 11.56 to 11.60 kB;
+  LCP 1.96 s, CLS 0 (the fonts on time and late), TBT 40 ms, the first answer 0.45 s; `npm run bench` within noise; the grid and
+  `npm run offers` byte-identical; the scan without violations in 71 states, the Commission section entered and by year among them.
 
 - **Today:** there's no commission field. The owner's own offer includes commission (finding 3): it can go in as a bonus in dollars
   with a range, but a bonus is paid once a year, on its payout date, and commission is usually paid monthly or quarterly. So its
