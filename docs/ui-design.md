@@ -1883,14 +1883,14 @@ rather than a table by year; the editor's fields' names register with detailed m
 **Stop 4h** (commission, 2026-11-05, pull request #78; `docs/v2-plan.md` 4h, approved 2026-11-05 at the review of #74 with the user's
 changes to D24 and D28): detailed mode gains a Commission section after the bonus: dollars a year (`D`) or by year (its editor), the
 expected amount with "+ range" for the bear and bull cases, how often it's paid (monthly or quarterly, calendar quarters) and the days
-after each period ends (both required, no default, each one's help pointing to the commission plan), when you leave (`D` paid for work
-to your last day, or only if employed on the payout date), and a draw (`D` none, guaranteed or recoverable), its dollars a month, its
+after each period ends (both required, no default, each one's help pointing to the commission plan), when you leave (`D` "Paid to
+your last day", or "Only if employed at payout"), and a draw (`D` none, guaranteed or recoverable), its dollars a month, its
 months (`D` every month) and, recoverable, what happens to it on leaving (`D` kept, or repaid).
 - **A-1**: commission after tax in "to spend"; year 1's note "commission earned late in year 1 is paid in year 2".
 - **A-2**: commission inside the $100, as pay; the bridge's head "salary + target bonus + expected commission + …", then "commission
   earned in year 1, paid in year 2" (−16,935 in the design's example 1, "Apr 1 – Jul 12, paid Jul 30 and Oct 30") and, with a draw,
   "draw paid beyond the commission earned" or "draw earned back from commission".
-- **A-3**: "Commission" in the pay table and the chart (thin double hatching); each quarterly payout by date ("Oct 30, 2026 · Commission
+- **A-3**: "Commission" in the pay table and the chart (a grid hatch); each quarterly payout by date ("Oct 30, 2026 · Commission
   for Jul 13 – Sep 30, 2026: $13,065, in year 1"); monthly commission in one line ("Commission is paid monthly, 15 days after each month:
   $3,000 a month expected in year 1; the first, Aug 15, 2026, for Jul 13 – 31, 2026"), and a draw beside the monthly salary.
 - **A-4**: the terms ("Its commission is paid quarterly, 30 days after each quarter ends, the first Oct 30, 2026; leaving before a payout

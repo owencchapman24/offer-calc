@@ -53,7 +53,7 @@ addDefaults({
     alsoClear: { "commission.amount": null, "commission.amounts": [] },
   },
   "commission.mustBeEmployedOnPayDate": {
-    value: false, shown: () => "Paid for work to your last day",
+    value: false, shown: () => "Paid to your last day",
     reason: "Commission earned is wages, which state laws require be paid after you leave; a plan's written terms can say it's earned only once paid.",
   },
   "commission.draw": { value: null, shown: () => "None", reason: "A draw is a term of the commission plan, so none counts until you enter one." },

@@ -145,7 +145,7 @@ function Commission() {
       </CommissionRow>
       <CommissionRow k="commission.mustBeEmployedOnPayDate">
         {(o) => <ChoiceField o={o} path="commission.mustBeEmployedOnPayDate" label="commission when you leave"
-          options={[[false, "Paid for work to your last day"], [true, "Only if employed on the payout date"]]} />}
+          options={[[false, "Paid to your last day"], [true, "Only if employed at payout"]]} />}
       </CommissionRow>
       <CommissionRow k="commission.draw">{(o) => <DrawField o={o} />}</CommissionRow>
       <DrawRow k="commission.draw.monthly">
@@ -178,7 +178,7 @@ function DrawField({ o }: { o: AppOffer }) {
         onChange={(e) => api.set(o, { "commission.draw": e.target.value === "none" ? null
           : { monthly: w?.monthly ?? null, months: w?.months ?? null, onLeaving: w?.onLeaving ?? null, recoverable: e.target.value === "recoverable" } })}>
         <option value="none">None</option>
-        <option value="guaranteed">Guaranteed (non-recoverable)</option>
+        <option value="guaranteed">Guaranteed</option>
         <option value="recoverable">Recoverable</option>
       </select>
       <DefaultTick o={o} path="commission.draw" label="no draw" />
