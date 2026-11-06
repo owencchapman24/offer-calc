@@ -43,14 +43,17 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: waiting on testers' answers for item 2** (market benchmarks, as A-8; `docs/v2-plan.md`, "Questions for testers"). Stops 4a
-(days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved 2026-10-22, 23 and 23). Decisions
-D16-D23 are recorded in the plan; at stop 4j the user moved today's perks to the tax-free line too (D22).
+**Next: 4h, commission** (`docs/v2-plan.md`, item 4h), approved on 2026-11-05 at the user's review of pull request #74 (D24-D27 as
+recommended, D24 in the user's words; D28 changed: a recoverable draw kept or repaid on leaving is an input), built next, before item
+2, at the user's word: one review stop. Then item 2 (market benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`,
+"Questions for testers"). Stops 4a (days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved
+2026-10-22, 23 and 23). Decisions D16-D23 are recorded in the plan; at stop 4j the user moved today's perks to the tax-free line too
+(D22).
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
-actually have?"), at the user's word; record the answer when it comes. After 4a, 4i and 4j, the plan's order puts item 2 (market
-benchmarks, as A-8) next, after the testers' answers to its questions (`docs/v2-plan.md`, "Questions for testers"). Item 4 gained 4h,
-commission (the owner's own use, finding 3), unranked and not built.
+actually have?"), at the user's word; record the answer when it comes. After 4h, the plan's order puts item 2 (market benchmarks,
+as A-8) next, after the testers' answers to its questions (`docs/v2-plan.md`, "Questions for testers"). 4h came from the owner's own
+use (finding 3).
 
 **The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
@@ -333,8 +336,9 @@ section 2's and the plan's in step):
   sentence.)
 - **Budgets:** the main thread 120 kB gzip, with Lighthouse holding LCP at 2.5 s (kilobytes are the proxy, LCP the outcome);
   Lighthouse from the `lighthouse` package, not `@lhci/cli` (which pins Lighthouse 12.6, with npm advisories).
-- **v2's decisions** (D1-D23, B1-B13) are in `docs/v2-plan.md`; D1, D14, D16-D23 (2026-10-19: D20 and D22 as the user changed them,
-  D21 moot) and B1-B13 are approved, the rest stand as recommended.
+- **v2's decisions** (D1-D28, B1-B13) are in `docs/v2-plan.md`; D1, D14, D16-D23 (2026-10-19: D20 and D22 as the user changed them,
+  D21 moot), D24-D28 (2026-11-05: D24 in the user's words, D28 as the user changed it) and B1-B13 are approved, the rest stand as
+  recommended.
 
 ## 8. The validation gate (after any tax change)
 1. `npm test`: hand-checked values, and the frozen-law tests unchanged.
@@ -500,7 +504,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D23, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i and 4j built; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D28, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i and 4j built; 4h approved, next; the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |
