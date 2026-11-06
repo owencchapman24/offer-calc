@@ -10,7 +10,7 @@ extended (sick days, unlimited vacation, paying out unused vacation on leaving) 
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
 ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22), 4i (stop 4i, #71, approved
 2026-10-23) and 4j (stop 4j, #72, approved 2026-10-23); all three are live. **4h, commission, designed in pull request #74, was
-approved on 2026-11-05 with the user's changes to D24 and D28,** and is built next, before item 2, at the user's word.
+approved on 2026-11-05 with the user's changes to D24 and D28,** and is built (stop 4h, pull request #78, 2026-11-05), for review.
 What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
@@ -386,7 +386,7 @@ one projection, so a later-starting offer's own stay and the comparison's window
   A-2 (a "getting to work" share of the $100); relocation into year 1 (A-2, A-3); startup options into A-3 and A-4's bad case; Public
   Service Loan Forgiveness beside A-1; vacation paid out on leaving into A-4 (approved 2026-10-19); an ESPP into A-3's pay and
   payments, A-4's cliffs and A-5 (4i); other benefits into A-2's $100 or beside it, and A-5 (4j); commission into A-2's pay and
-  bridge, A-3's payments and A-4's terms, cliffs and bad case (4h, approved 2026-11-05). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
+  bridge, A-3's payments and A-4's terms, cliffs and bad case (4h, built 2026-11-05). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
   for each) partly cancels out, but in one offer's bottom line nothing cancels. Hence 4a-4c move up.
 
 ### Re-ranked priority (approved 2026-10-15)
@@ -932,7 +932,7 @@ Ten parts, each its own pull request (4d and 4e two), in this order (D10): the t
 first, then relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for
 commuters, was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4)
 place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked; designed
-in pull request #74 (2026-10-23) and approved on 2026-11-05 (decisions D24-D28), it's built next, before item 2, at the user's word.
+in pull request #74 (2026-10-23) and approved on 2026-11-05 (decisions D24-D28), it's built (stop 4h, pull request #78), before item 2.
 
 **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22 (D21 moot):** 4a gains sick days, an "unlimited"
 vacation policy and paying out unused vacation on leaving; two parts are new, 4i (an employee stock purchase plan, each lot sold at
@@ -1232,6 +1232,35 @@ plan as where to find them. So quarters are calendar quarters, with no "Quarters
 balance on leaving is an input, "If you leave owing a recoverable draw: kept / repaid", default kept. Stein v. hhgregg is cited only
 as read in the opinion itself, which it now is (below). **4h is built next, before item 2,** at the user's word: one pull request and
 one review stop, no tax-engine change, the sources marked unchecked re-read first.
+
+**Built: stop 4h** (2026-11-05, pull request #78), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
+- **The engine's stream** is a module of its own, `src/offer/commission.ts`, beside the ESPP's, not `streams.ts`; and the projection reports
+  each period that reconciled (`commissionPeriods`, a draw-covered $0 one included), its commission split at anniversaries, so A-2's
+  bridge can say how much of a year's commission is paid in the next.
+- **The draw's presence and kind are one choice,** None (`D`), Guaranteed (non-recoverable) or Recoverable, so a draw's kind is never
+  blank; then its dollars a month (required), its months (`D` every month) and, recoverable, "If you leave owing a recoverable draw"
+  (`D` Kept, or Repaid).
+- **A-2's lag is one line,** "commission earned in year 1, paid in year 2" (in a later year that differs, one net line), its gloss in
+  short dates as the bonus's ("Apr 1 – Jul 12, paid Jul 30 and Oct 30"); with a draw, "draw paid beyond the commission earned" or "draw
+  earned back from commission".
+- **"If you left on"** (A-4, L-4, the document) gains three ticked figures: commission paid after your last day, commission forfeited,
+  and a recoverable draw kept; one repaid is in "repay", with the clawbacks.
+- **Two rules the design left open:** under "Only if employed on the payout date", a forfeited period's commission doesn't earn back a
+  recoverable draw (its draws join what's owed); and a repaid draw is handed back by the calendar year of the draws still owed (the oldest
+  are earned back first): this year's reverse their wages, an earlier year's are repaid pay (the IRC 1341 credit over $3,000).
+- **Method 1b** (withholding with no regular wages) applies to commission payouts only; a bonus or RSU vest with neither salary nor a draw
+  keeps the flat 22%, as before 4h.
+- **Eligible pay (D26):** the 401(k)'s and the ESPP's second choice reads "Salary and commission" or "Salary, bonus and commission" when
+  the offer has commission, and the assumption's words say so.
+- **The sources marked unchecked, re-read first:** Stein v. hhgregg from the court's own slip opinion (File Name 17a0232p.06; Moore, J.;
+  Sutton, J., concurring in part and dissenting in part): a policy holding departing employees liable for draws "requires a repayment of
+  wages already delivered", so violates the free-and-clear rule, while recovering draws from later commission is lawful; Cal. Lab. Code
+  §2751 in FindLaw's copy (current as of Jan 1, 2026; the legislature's site and Justia refuse automated reads); IRS Pub. 15 (2026) and
+  Pub. 15-T (2026) read in full: neither names a draw or an advance against commission, so the draw as regular wages stays our reading.
+- **Measured** (2026-11-05, side by side with `main`): the main thread 112.59 to 113.02 kB gzip (+0.43, within v2's 0.5 kB); the worker
+  71.92 to 74.14 kB (+2.22, over the design's estimate of under 1 kB, and 0.86 kB under its 75 kB budget); the stylesheet 11.56 to 11.60 kB;
+  LCP 1.96 s, CLS 0 (the fonts on time and late), TBT 40 ms, the first answer 0.45 s; `npm run bench` within noise; the grid and
+  `npm run offers` byte-identical; the scan without violations in 71 states, the Commission section entered and by year among them.
 
 - **Today:** there's no commission field. The owner's own offer includes commission (finding 3): it can go in as a bonus in dollars
   with a range, but a bonus is paid once a year, on its payout date, and commission is usually paid monthly or quarterly. So its
@@ -1701,7 +1730,7 @@ approved on 2026-10-19, at the user's word.
 | 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
 | 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop. **Done** (pull request #71, 2026-10-22) | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document. **Done** (pull request #72, 2026-10-23) | 4i, D22, D23 |
-| 4h | Commission: the stream (monthly or quarterly, the lag, the range, a draw, the leaving rule), its inputs, every part, the document; one pull request, one stop. Designed (pull request #74) and approved 2026-11-05; built next, before item 2, at the user's word | D24-D28 (decided) |
+| 4h | Commission: the stream (monthly or quarterly, the lag, the range, a draw, the leaving rule), its inputs, every part, the document; one pull request, one stop. Designed (pull request #74) and approved 2026-11-05. **Built** (pull request #78, 2026-11-05), for review | D24-D28 (decided) |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
 | 4b-4c | Accuracy, the small parts: commuting, relocation, a stop each | testers (item 4), D10, D15 |

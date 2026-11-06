@@ -1880,6 +1880,38 @@ Taxable (the default, with its `D`) or Tax-free, with a table of how common bene
 benefits in their editor and in M-5.3, not in a field's help (2-4 sentences); A-5 gives each benefit's year as entered and its stay
 rather than a table by year; the editor's fields' names register with detailed mode and the derivations, as the ESPP's terms did.
 
+**Stop 4h** (commission, 2026-11-05, pull request #78; `docs/v2-plan.md` 4h, approved 2026-11-05 at the review of #74 with the user's
+changes to D24 and D28): detailed mode gains a Commission section after the bonus: dollars a year (`D`) or by year (its editor), the
+expected amount with "+ range" for the bear and bull cases, how often it's paid (monthly or quarterly, calendar quarters) and the days
+after each period ends (both required, no default, each one's help pointing to the commission plan), when you leave (`D` "Paid to
+your last day", or "Only if employed at payout"), and a draw (`D` none, guaranteed or recoverable), its dollars a month, its
+months (`D` every month) and, recoverable, what happens to it on leaving (`D` kept, or repaid).
+- **A-1**: commission after tax in "to spend"; year 1's note "commission earned late in year 1 is paid in year 2".
+- **A-2**: commission inside the $100, as pay; the bridge's head "salary + target bonus + expected commission + …", then "commission
+  earned in year 1, paid in year 2" (−16,935 in the design's example 1, "Apr 1 – Jul 12, paid Jul 30 and Oct 30") and, with a draw,
+  "draw paid beyond the commission earned" or "draw earned back from commission".
+- **A-3**: "Commission" in the pay table and the chart (a grid hatch); each quarterly payout by date ("Oct 30, 2026 · Commission
+  for Jul 13 – Sep 30, 2026: $13,065, in year 1"); monthly commission in one line ("Commission is paid monthly, 15 days after each month:
+  $3,000 a month expected in year 1; the first, Aug 15, 2026, for Jul 13 – 31, 2026"), and a draw beside the monthly salary.
+- **A-4**: the terms ("Its commission is paid quarterly, 30 days after each quarter ends, the first Oct 30, 2026; leaving before a payout
+  still pays the part earned by your last day", and the draw's); under "only if employed", each quarterly payout a cliff, monthly ones in
+  one line; "if you left on" with the commission paid after the last day, what's forfeited, a recoverable draw kept or repaid; the bad
+  case ("commission $40,000 a year instead of $60,000", with a guaranteed draw "(at least the $2,000 a month draw until …)").
+- **A-6**: its tax; the withholding line names commission with bonuses; warnings: commission counted as earned evenly (not modeled), a
+  recoverable draw still owed at the stay's end. **A-7**: the "Commission" line, each payout's and each draw's formula and tax.
+- **The comparison**: L-2's scenarios and its no-range text; L-3's note (commission doesn't move with salary); L-4's payouts after the
+  last day, the forfeit warning and markers. **The copied document**: the offer as entered, the bridge's lines, A-3's dates and month,
+  A-4's terms, cliffs and "if you left on", leaving early's rows. **The methodology**: M-2, M-4, M-8, M-9, M-10, M-11.
+- **Old saves and exports** load with no commission.
+- **Measured** (2026-11-05, side by side with `main`): the main thread 112.59 to 113.02 kB gzip (+0.43), the worker 71.92 to 74.14 kB
+  (+2.22; budget 75), the stylesheet 11.56 to 11.60 kB; LCP 1.96 s, CLS 0 (the fonts on time and late), TBT 40 ms, the first answer
+  0.45 s; `npm run bench` within noise; no tax-engine change, so the grid and oracle report don't move; the scan without violations.
+
+**Stop 4h versus the plan:** the stream is `src/offer/commission.ts`; the draw's presence and kind are one choice; A-2's lag is one line in
+short dates; "if you left on" gains three figures; a forfeited period doesn't earn back a recoverable draw, and a repaid draw is handed
+back by the calendar year of its draws; method 1b is for commission only; the worker grew 2.22 kB, not under 1 (the plan's 4h has the
+list).
+
 **UI slices.** The numbers are stable IDs: slices 1-3 shipped in order; from slice 4 on, the
 build order differs (below). The engine prerequisites came first and aren't numbered.
 1. **Shell** (done, 2026-10-08): quick mode, About you, the lead schedule, the if-you-stay

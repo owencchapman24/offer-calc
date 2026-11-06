@@ -1,12 +1,12 @@
 import { DATA_YEARS } from "../../src/col/cities";
 import { describeSchedule } from "../../src/format/schedule";
-import type { AnnualBonus, Equity, Espp, ISODate, OfferInput, OfferWarning, ValueBasis, VestingSchedule } from "../../src/offer/types";
+import type { AnnualBonus, Commission, Equity, Espp, ISODate, OfferInput, OfferWarning, ValueBasis, VestingSchedule } from "../../src/offer/types";
 import { inSentence, rentTie, scalesText, tieView } from "./breakevenModel";
 import { ownView, type OwnView, shareText, taxRateText } from "./breakdownModel";
 import { CASES, caseChanges, changeText, dropText, hasRanges, riskCarriers, riskView } from "./cases";
 import { asymmetries, asymmetryText } from "./comparability";
 import { shownIndexes, shownStay, shownYears } from "./footing";
-import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms, onAxis, worked as timeWorked } from "./leaveModel";
+import { commissionForfeits, commissionPeriod, firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms, onAxis, worked as timeWorked } from "./leaveModel";
 import {
   aboutIsDefault, type BridgeLine, detailOf, offerByLetter, ownOf, pricesOf, rentEstimate, rentNotes, res, shortCity, type WorkContext,
 } from "./metrics";
@@ -24,9 +24,9 @@ import { basisSaid, extraHoursView, marginText, perText, pipeline, placeOf, verd
 import { withholdingParts } from "./warningAt";
 import { stayWarnings, WARNING_KIND } from "./warningKinds";
 import { KIND_TITLE, warningWords } from "./warningWords";
-import { yearTable } from "./workpaper";
+import { addCents, yearTable } from "./workpaper";
 import { daysOffWords, daysText, unpaidVacationText, weeksText } from "./timeOffWords";
-import { paidTimeOff } from "./partsModel";
+import { commissionMonth, paidTimeOff } from "./partsModel";
 
 // "Copy as document" (docs/copy-as-document-plan.md): the comparison as a 2-3 page summary someone who has never seen the tool can
 // read, for the clipboard as HTML with a plain-text fallback, so it pastes into Google Docs, Word and email with its tables. Since
@@ -327,6 +327,23 @@ function bonusText(b: AnnualBonus, stay: number): string {
   return `${t}, paid each ${monthDay(b.payOn)}${b.firstPayoutGuaranteed ? ", the first guaranteed" : ""}`;
 }
 
+/** "commission $60,000 a year expected ($40,000 to $80,000), paid quarterly, 30 days after each quarter ends; a guaranteed draw …" (4h). */
+function commissionDocText(c: Commission, stay: number): string {
+  const range = (a: { bear: number; base: number; bull: number }) =>
+    (a.bear !== a.base || a.bull !== a.base ? ` (${dollars(a.bear)} to ${dollars(a.bull)})` : "");
+  let t: string;
+  if (c.basis === "fixed") t = `commission ${dollars(c.amount.base)} a year expected${range(c.amount)}`;
+  else {
+    const xs = c.amounts.map((a) => a.base);
+    t = `commission ${join(xs.map((x) => dollars(x)))} expected for years 1–${xs.length}${xs.length < stay ? ", the last repeating" : ""}`;
+  }
+  const w = c.draw;
+  const draw = w && w.monthly > 0 ? `; a ${w.recoverable ? "recoverable" : "guaranteed"} draw of ${dollars(w.monthly)} a month${w.months !== undefined
+    ? ` for ${w.months} ${w.months === 1 ? "month" : "months"}` : ""}${w.recoverable ? `, ${w.onLeaving === "repaid" ? "repaid" : "kept"} if not earned back on leaving` : ""}` : "";
+  return `${t}, paid ${c.period === "month" ? "monthly" : "quarterly"}, ${c.payAfterDays} days after each ${c.period} ends${c.mustBeEmployedOnPayDate
+    ? ", only to those employed on the payout date" : ""}${draw}`;
+}
+
 /** A vesting schedule, precisely: its split by year, its shape, and its cadence. "5/15/40/40 (back-loaded), semiannual after a 1-year cliff" */
 export function vestingText(s: VestingSchedule): string {
   const pcts: number[] = [];
@@ -386,6 +403,7 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     }
     const parts = [pay];
     if (o.bonus) parts.push(bonusText(o.bonus, n));
+    if (o.commission) parts.push(commissionDocText(o.commission, n));
     for (const a of o.cashAwards ?? []) parts.push(`${dollars(a.amount)} ${inSentence(a.label.trim() || "cash award")}`);
     if (o.equity && (o.equity.grants.length || (o.equity.refreshers?.value.base ?? 0) > 0)) parts.push(equityText(o.equity));
     if (o.espp) parts.push(esppDocText(o.espp));
@@ -406,12 +424,14 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
 
 // ---- 3. The bridge, year 1 ------------------------------------------------------------------------------------------
 
-const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback", "paid", "tax", "premiums", "afterTax", "retirement", "perks", "hsa", "oop",
+const ORDER: BridgeLine[] = ["letter", "salary", "bonus", "commission", "draw", "cash", "rsu", "espp", "benefit", "clawback", "paid", "tax", "premiums", "afterTax",
+  "retirement", "perks", "hsa", "oop",
   "totalRewards", "rent", "prices", "total"];
 /** A line's label when the offers' own reasons differ: theirs go in the notes. */
 const GENERAL: Partial<Record<BridgeLine, string>> = {
   salary: "salary paid differs from the letter", bonus: "bonus paid differs from the target", cash: "cash awards paid in another year",
-  rsu: "RSUs vest on a different schedule", prices: "prices other than rent",
+  rsu: "RSUs vest on a different schedule", prices: "prices other than rent", commission: "commission's payout lag",
+  draw: "draw paid beyond, or earned back from, commission",
 };
 const TOTALS = new Set<BridgeLine>(["paid", "afterTax", "totalRewards", "total"]);
 
@@ -482,7 +502,7 @@ function bridgeSection(ctx: WorkContext, add: Add, worked: Worked[]) {
   const letterParts = r.letters.map((l) => {
     const q = shownYearOf(ctx, l, 1).quoted;
     const o = offerByLetter(ctx, l);
-    const parts = ([[q.salary, "salary"], [q.bonus, "target bonus"], [q.cash, cashNameOf(o)], [q.rsu, "RSUs due"]] as Array<[number, string]>)
+    const parts = ([[q.salary, "salary"], [q.bonus, "target bonus"], [q.commission, "expected commission"], [q.cash, cashNameOf(o)], [q.rsu, "RSUs due"]] as Array<[number, string]>)
       .filter(([x]) => x);
     if (parts.length > 1) worked.push({ op: "+", of: parts.map(([x]) => figure(x)), is: figure(q.letter) });
     const names = parts.map(([, w]) => w).join("|");
@@ -673,6 +693,12 @@ function leavingSection(ctx: WorkContext, opts: DocOptions, add: Add, worked: Wo
     { label: "You'd keep, after tax, as paid", cells: panels.map((x) => (x ? dollars(x.afterTaxCompKept) : "not started")) },
     { label: "You'd repay, before tax", cells: cell((x) => some(x.clawbackOwed)) },
     { label: "Bonus earned but not paid", cells: bonusCells },
+    ...(panels.some((x) => x?.commission)
+      ? [{ label: "Commission paid after the last day, before tax (in what you'd keep)", cells: cell((x) => some(addCents((x.commission?.after ?? []).map((a) => a.gross)))) },
+        { label: "Commission earned but not paid, forfeited", cells: cell((x) => some(addCents(commissionForfeits(x.warnings).map((f) => f.forfeited)))) },
+        ...(panels.some((x) => x?.commission && x.commission.drawBalance >= 0.5)
+          ? [{ label: "A recoverable draw not earned back (kept, or repaid in what you'd repay)", cells: cell((x) => some(x.commission?.drawBalance ?? 0)) }] : [])]
+      : []),
     { label: "RSUs not yet vested, at grant value", cells: cell((x) => some(x.unvestedRsuForfeited)) },
     { label: "Employer 401(k) not yet vested", cells: cell((x) => some(x.retirementForfeited)) },
     { label: "Unused vacation paid out, before tax (in what you'd keep)", cells: cell((x) => some(x.vacation.paid)) },
@@ -927,7 +953,7 @@ function whereItGoes(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full:
   add({ kind: "table", table: { title: "From the offer letter to after rent, year 1, as paid: each total adds the lines above it", head: ["", "Year 1"], rows,
     foots: true } });
   const q = ownShownYear(ctx, L, 1).quoted;
-  const parts = ([[q.salary, "salary"], [q.bonus, "target bonus"], [q.cash, cashNameOf(offerByLetter(ctx, L))], [q.rsu, "RSUs due"]] as Array<[number, string]>)
+  const parts = ([[q.salary, "salary"], [q.bonus, "target bonus"], [q.commission, "expected commission"], [q.cash, cashNameOf(offerByLetter(ctx, L))], [q.rsu, "RSUs due"]] as Array<[number, string]>)
     .filter(([y]) => y);
   if (parts.length > 1) {
     worked.push({ op: "+", of: parts.map(([y]) => figure(y)), is: figure(q.letter) });
@@ -961,8 +987,16 @@ function payByYear(ctx: WorkContext, x: Own, add: Add, worked: Worked[], full: b
   const month = dollars(o.salary.annual / 12);
   worked.push({ op: "÷", of: [dollars(o.salary.annual), "12"], is: month });
   const arrivals = arrivalsOf(x.d, n);
-  add({ kind: "para", runs: [`Salary is paid monthly: ${dollars(o.salary.annual)} ÷ 12 = ${month} a month at its starting salary.${!arrivals.length
-    ? " Nothing else is paid in your stay: no bonus, cash award or RSU vest entered." : full ? " Every other payment in your stay, by date:" : ""}`] });
+  // Commission paid monthly is a line, not twelve dates a year (4h); a draw is paid with salary.
+  const cm = commissionMonth(o, x.d);
+  if (cm?.monthly != null) worked.push({ op: "÷", of: [dollars(cm.monthly * 12), "12"], is: dollars(cm.monthly) });
+  const commission = cm ? `${cm.draw ? ` A draw against commission is paid with it: ${dollars(cm.draw.monthly)} a month from year 1${cm.draw.until
+    ? ` until ${longDate(cm.draw.until)}` : ", every month you're there"}.` : ""}`
+    + `${cm.monthly != null ? ` Commission is paid monthly, ${cm.lag} ${cm.lag === 1 ? "day" : "days"} after each month: ${dollars(cm.monthly * 12)} ÷ 12 = `
+      + `${dollars(cm.monthly)} a month expected in year 1${cm.first ? `; the first, ${longDate(cm.first.date)}, for ${commissionPeriod(cm.first)}` : ""}.` : ""}` : "";
+  add({ kind: "para", runs: [`Salary is paid monthly: ${dollars(o.salary.annual)} ÷ 12 = ${month} a month at its starting salary.${commission}${!arrivals.length
+    ? (cm?.monthly != null ? "" : " Nothing else is paid in your stay: no bonus, commission, cash award or RSU vest entered.")
+    : full ? " Every other payment in your stay, by date:" : ""}`] });
   if (arrivals.length && full) {
     add({ kind: "list", items: arrivals.map((a) => `${longDate(a.date)}: ${a.label}, ${dollars(arrivalShown(a))}, in year ${a.ey}${a.note ? ` (${a.note})` : ""}.`) });
   }
@@ -1016,8 +1050,14 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
         return `; ${t.before}${dollars(f.earned)}${t.after} is forfeited`;
       });
       const v = panel.vacation;
+      const c = panel.commission;
+      const toCome = c ? addCents(c.after.map((a) => a.gross)) : 0;
+      const lostCommission = addCents(commissionForfeits(panel.warnings).map((f) => f.forfeited));
+      if (lostCommission >= 0.5) bonuses.push(`; ${dollars(lostCommission)} of commission is forfeited (it's paid only to those employed on its payout date)`);
       const vacation = `${v.paid >= 0.5 ? `with ${dollars(v.paid)} before tax for ${daysText(v.banked)} of unused vacation paid out, ` : ""}`
-        + `${panel.esppRefund >= 0.5 ? `get back ${dollars(panel.esppRefund)} put toward an ESPP purchase, ` : ""}`;
+        + `${panel.esppRefund >= 0.5 ? `get back ${dollars(panel.esppRefund)} put toward an ESPP purchase, ` : ""}`
+        + `${toCome >= 0.5 ? `with ${dollars(toCome)} of commission paid after your last day, ` : ""}`
+        + `${c && c.drawBalance >= 0.5 && c.drawRepaid < 0.5 ? `keep ${dollars(c.drawBalance)} of a recoverable draw not earned back, ` : ""}`;
       const unpaid = unpaidVacationText(v);
       paras.push(`If your last day were ${longDate(panel.leaveDate)}, ${into}${opts.picked ? " (the day picked in Offer Calc)" : ""}: you'd keep `
         + `${dollars(panel.afterTaxCompKept)} after tax, as paid, ${vacation}${panel.clawbackOwed >= 0.5 ? `repay ${dollars(panel.clawbackOwed)},` : "repay nothing,"} and `
@@ -1042,6 +1082,7 @@ function termsSection(ctx: WorkContext, opts: DocOptions, x: Own, add: Add, work
     add({ kind: "para", runs: ["Every cliff in its stay, by date, and what leaving the day before it gives up:"] });
     add({ kind: "list", items: lines.map((c) => (c.kind === "steps"
       ? `${longDate(c.from)} – ${longDate(c.until)}: the ${inSentence(c.award.trim() || "award")}'s clawback shrinks ${dollars(c.perMonth)} each month worked.`
+      : c.kind === "monthly" ? `${longDate(c.from)} – ${longDate(c.until)}: each month's commission, ${c.count} payouts: leave before one and that month's is forfeited.`
       : `${longDate(c.cliff.date)}: ${cliffName(c.cliff)}, ${dollars(c.cliff.amount)} before tax: ${cliffCost(c.cliff)}.`)) });
   }
 }
@@ -1105,8 +1146,8 @@ function shortfallText(d: OfferDetail, warnings: OfferWarning[]): string {
     return `${dollars(y ? withholdingParts(y).short : p.balanceDue)} for ${p.year}`;
   });
   return `Federal withholding falls short of the federal income tax on its pay by ${join(shorts)}, owed ${ys.length > 1 ? "each following April"
-    : `in April ${ys[0].year + 1}`}${ys.some((y) => y.supplemental) ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real "
-    + "rate on them" : ""}${ys.some((y) => y.espp) ? `${ys.some((y) => y.supplemental) ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}`
+    : `in April ${ys[0].year + 1}`}${ys.some((y) => y.supplemental) ? `: bonuses${ys.some((y) => y.commission) ? ", commission" : ""} and RSU vests are `
+    + "withheld at the flat 22% supplemental rate, below the real rate on them" : ""}${ys.some((y) => y.espp) ? `${ys.some((y) => y.supplemental) ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}`
     + ". Raising your withholding on Form W-4 spreads it out.";
 }
 
@@ -1136,7 +1177,7 @@ function taxSection(x: Own, add: Add, worked: Worked[]) {
   const groups = stayWarnings([...d.warnings, ...d.withholding.warnings], lastYear);
   if (!groups.length) {
     add({ kind: "para", runs: ["No warnings over its stay. Checked: the 401(k), HSA and perk limits, the bonus cutoff, an employer state's remote-work rule, "
-      + "and federal withholding against the tax on bonuses and RSU vests."] });
+      + "and federal withholding against the tax on bonuses, commission and RSU vests."] });
     return;
   }
   const items: string[] = [];

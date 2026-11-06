@@ -34,6 +34,13 @@ const ESPP_B = withEspp(B);
 /** B with a phone stipend, its tax left at the default (taxable). */
 const STIPEND = fresh(B, (d) => ({ ...d, otherBenefits: [{ label: "Phone", annual: 600, taxable: null }] }));
 const ESPP_C = withEspp(GROWING);
+/** B with commission (4h): $24,000 a year expected, quarterly, 30 days after each quarter; with a guaranteed draw; and lean, with a recoverable one. */
+const COMMISSION: OfferDraft["commission"] = { basis: null, amount: all(24_000), amounts: [], period: "quarter", payAfterDays: 30,
+  mustBeEmployedOnPayDate: null, draw: null };
+const COMMISSION_B = fresh(B, (d) => ({ ...d, commission: { ...COMMISSION } }));
+const DRAW_B = fresh(B, (d) => ({ ...d, commission: { ...COMMISSION, draw: { monthly: 2_000, recoverable: false, months: null, onLeaving: null } } }));
+const OWING_B = fresh(B, (d) => ({ ...d, commission: { ...COMMISSION, amount: all(12_000),
+  draw: { monthly: 2_000, recoverable: true, months: null, onLeaving: null } } }));
 /** B putting $5,000 a year in an HSA: over self-only coverage's limit, under family coverage's. */
 const BIG_HSA = fresh(B, (d) => ({ ...d, health: { ...(d.health as HealthDraft), employeeHsa: 5_000 } }));
 
@@ -56,6 +63,11 @@ function setup(key: string): { o: AppOffer; path: string; value: unknown; other:
     case "bonus.cutoff": return on(B, key, { month: 7, day: 1 }); // B starts Jul 13: a Jul 1 cutoff skips its first bonus
     case "bonus.firstPayoutGuaranteed": return on(B, key, true); // the bear case's first bonus at the target
     case "bonus.mustBeEmployedOnPayDate": return on(B, key, false); // a bonus unpaid at the last day, prorated
+    case "commission.basis": return on(COMMISSION_B, key, "byEmploymentYear"); // by year with no years entered: no commission
+    case "commission.mustBeEmployedOnPayDate": return on(COMMISSION_B, key, true); // leaving forfeits a quarter's payout
+    case "commission.draw": return on(COMMISSION_B, key, { monthly: 2_000, recoverable: false, months: null, onLeaving: null });
+    case "commission.draw.months": return on(DRAW_B, key, 3);
+    case "commission.draw.onLeaving": return on(OWING_B, key, "repaid"); // leaving owing the draw hands it back
     case "equity.grants.grantDate": return on(GROWING, "equity.grants.0.grantDate", "2026-04-13", C.draft.startDate);
     case "equity.grants.vestStart": return on(C, "equity.grants.0.vestStart", "2026-10-13", C.draft.startDate);
     case "equity.grants.schedule": return on(C, "equity.grants.0.schedule.tranches", shortSchedule, PRESETS[DEFAULT_PRESET].tranches);

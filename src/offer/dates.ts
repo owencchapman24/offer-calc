@@ -46,6 +46,12 @@ export function nextMonthStart(day: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) / DAY_MS;
 }
 
+/** First day of the month containing `day`, or with `every` 3 of its calendar quarter (Jan 1, Apr 1, Jul 1, Oct 1). */
+export function periodStartOf(day: number, every: 1 | 3 = 1): number {
+  const d = new Date(day * DAY_MS);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - (d.getUTCMonth() % every), 1) / DAY_MS;
+}
+
 /** Number of days in the month containing `day`. */
 export function daysInMonth(day: number): number {
   const d = new Date(day * DAY_MS);

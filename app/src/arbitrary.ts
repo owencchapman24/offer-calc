@@ -1,12 +1,12 @@
 import fc from "fast-check";
 import type { ByScenario } from "../../src/offer/types";
 import { fromDays, toDays } from "../../src/offer/dates";
-import { type AppHousehold, type AppOffer, blankDraft, blankTimeOff, type Letter, type OfferDraft, type RetirementDraft } from "./model";
+import { type AppHousehold, type AppOffer, blankCommission, blankDraft, blankTimeOff, type Letter, type OfferDraft, type RetirementDraft } from "./model";
 import { US_PRICES } from "./prices";
 
 // Generated inputs for the property tests (properties.test.ts, display.test.ts): offers and households as a person could enter
 // them, in every combination the samples never reach (joint filing, different start days, a later start, rent of $0, a cash
-// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges, an ESPP, other benefits). Test code only: it imports
+// award before day one, a guaranteed first bonus, fractional 401(k) vesting, per-hour ranges, an ESPP, other benefits, commission). Test code only: it imports
 // fast-check, a dev dependency, and the app never imports it.
 
 const addDays = (iso: string, n: number) => fromDays(toDays(iso) + n);
@@ -106,6 +106,19 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       { arbitrary: fc.constant(null), weight: 2 }, { arbitrary: fc.constant([] as Array<{ annual: number; taxable: boolean | null }>), weight: 1 },
       { arbitrary: fc.array(fc.record({ annual: dollars(0, 12_000, 50), taxable: fc.constantFrom(null, true, false) }), { minLength: 1, maxLength: 3 }), weight: 2 },
     ),
+    // Commission (4h): none, or an amount a year (with a range or not) or by year, monthly or quarterly, paid 0 to 60 days after, by
+    // either leaving rule, with no draw, a guaranteed one or a recoverable one (kept or repaid), for some months or every month.
+    commission: simple ? fc.constant(null) : fc.oneof(
+      { arbitrary: fc.constant(null), weight: 2 },
+      { arbitrary: fc.record({
+        amount: ordered(dollars(0, 120_000, 1_000)),
+        byYear: fc.option(fc.array(ordered(dollars(0, 120_000, 1_000)), { minLength: 1, maxLength: 3 }), { nil: null, freq: 3 }),
+        period: fc.constantFrom("month" as const, "quarter" as const), payAfterDays: fc.integer({ min: 0, max: 60 }),
+        mustBeEmployed: fc.constantFrom(null, true, false),
+        draw: maybe(fc.record({ monthly: dollars(0, 8_000, 100), recoverable: fc.boolean(), months: maybe(fc.integer({ min: 1, max: 12 })),
+          onLeaving: fc.constantFrom(null, "kept" as const, "repaid" as const) }), 1),
+      }), weight: 2 },
+    ),
     rent: fc.oneof(fc.constant(null), fc.constant(0), dollars(800, 6_000, 50)),
     rentGrowth: maybe(pct(0.06)),
     // An ESPP (4i), not entered, none, or entered: any contribution up to the $25,000 limit and past it, any discount, with or without a
@@ -130,6 +143,11 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
       salary: { annual: g.salary, raise: g.raise, raiseOn: g.raiseOn,
         promotions: g.promotion ? [{ on: addDays(start, g.promotion.afterDays), stepUp: g.promotion.stepUp, scenarios: null }] : [] },
       bonus,
+      commission: g.commission === null ? blankCommission() : {
+        basis: g.commission.byYear ? "byEmploymentYear" : null, amount: g.commission.byYear ? null : g.commission.amount,
+        amounts: g.commission.byYear ?? [], period: g.commission.period, payAfterDays: g.commission.payAfterDays,
+        mustBeEmployedOnPayDate: g.commission.mustBeEmployed, draw: g.commission.draw,
+      },
       cashAwards: g.cash.map((c, i) => ({ label: `Award ${i + 1}`, amount: c.amount, paidOn: c.paidOn,
         clawback: c.clawback ? { months: c.clawback.months, kind: c.clawback.kind, per: null, from: null, repay: null } : null })),
       equity: {

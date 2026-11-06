@@ -24,19 +24,19 @@ import {
 import { bridge, byYear, ownShownYear, shownYearOf, taxFreeNames, workedFrom, yearValue } from "./byYearModel";
 import type { OfferDetail, TaxRun } from "./protocol";
 import {
-  BASIS_LINE as L6_BASIS_LINE, exactPay, FOOTS, lineNo, paymentAt, paymentLabel, paymentYears, rateText, sameStay, stayRows, type TaxCol, taxTable, toCent,
-  yearCell, yearName, yearTable,
+  addCents, BASIS_LINE as L6_BASIS_LINE, exactPay, FOOTS, lineNo, paymentAt, paymentLabel, paymentYears, rateRuns, rateText, sameStay, stayRows, type TaxCol,
+  taxTable, toCent, yearCell, yearName, yearTable,
 } from "./workpaper";
 import { monthOf, shownGap } from "./verdict";
 import { type CaseChange, caseChanges, caseValue, changeText, dropAmount, leadText, riskView } from "./cases";
 import { cashLever, inSentence, rentTie, scalesText } from "./breakevenModel";
 import type { Ties, TieRow } from "./protocol";
-import { bonusWorked, cliffsText, cliffText, periodText, reconcile } from "./leaveModel";
+import { bonusWorked, cliffsText, cliffText, commissionPeriod, periodText, reconcile } from "./leaveModel";
 import { withholdingParts } from "./warningAt";
 import { paidBecause } from "./timeOffWords";
 import type { SectionId } from "./sections";
 import {
-  bonusText, cashAwardsText, employerStateText, esppText, healthText, matchText, otherBenefitsText, perksText, rangeText, refreshersText, rentGrowthText,
+  bonusText, cashAwardsText, commissionText, drawText, employerStateText, esppText, healthText, matchText, otherBenefitsText, perksText, rangeText, refreshersText, rentGrowthText,
   retirementText, scheduleText, vestingText,
 } from "./summary";
 import { cents, dayBefore, dollars, figure, longDate, percent, signed } from "./text";
@@ -86,7 +86,7 @@ const phrase = (ctx: WorkContext, b: Basis) => (b === "perHour" && (ctx.results?
 const SECTION_OF: Record<ValueBasis, SectionId> = { cash: "M-4", totalRewards: "M-5", colAdjustedTotal: "M-6.3" };
 /** Inputs without help of their own (the read-only rows, "also"): their methodology section, by the path's head. */
 const INPUT_SECTION: Record<string, SectionId> = {
-  salary: "M-2", startDate: "M-7.3", bonus: "M-2", cashAwards: "M-2", equity: "M-3", retirement: "M-5.1", health: "M-5.2", perks: "M-5.3",
+  salary: "M-2", startDate: "M-7.3", bonus: "M-2", commission: "M-2", cashAwards: "M-2", equity: "M-3", retirement: "M-5.1", health: "M-5.2", perks: "M-5.3",
   hours: "M-5.4", costOfLiving: "M-6.2", residence: "M-4", employerState: "M-4", also: "M-5",
 };
 const inputSection = (path: string): SectionId => HELP[helpKey(path)]?.section ?? INPUT_SECTION[path.split(".")[0]] ?? "M-1";
@@ -94,12 +94,14 @@ const ABOUT_SECTION: Record<AboutField, SectionId> = {
   filing: "M-4", stay: "M-7.3", wages: "M-4", spouse: "M-4", healthUsage: "M-5.2", prices: "M-6.1",
 };
 const BRIDGE_SECTION: Record<BridgeLine, SectionId> = {
-  letter: "M-2", salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", clawback: "M-9", paid: "M-1", tax: "M-4", premiums: "M-5.2",
+  letter: "M-2", salary: "M-2", bonus: "M-2", commission: "M-2", draw: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", clawback: "M-9", paid: "M-1",
+  tax: "M-4", premiums: "M-5.2",
   afterTax: "M-1", retirement: "M-5.1", perks: "M-5.3", hsa: "M-5.2", oop: "M-5.2", totalRewards: "M-1", rent: "M-6.2", prices: "M-6.1",
   total: "M-6.3", spend: "M-6.3", saved: "M-6.3", own: "M-6.3", inEspp: "M-3", benefit: "M-5.3", taxFree: "M-5.3",
 };
 const BRIDGE_NAME: Record<BridgeLine, string> = {
-  letter: "offer letter", salary: "salary line", bonus: "bonus line", cash: "cash awards line", rsu: "RSU line", espp: "ESPP line", clawback: "clawback",
+  letter: "offer letter", salary: "salary line", bonus: "bonus line", commission: "commission's payout lag", draw: "draw line", cash: "cash awards line",
+  rsu: "RSU line", espp: "ESPP line", clawback: "clawback",
   paid: "paid-in-the-year subtotal", tax: "tax", premiums: "premiums", afterTax: "after-tax pay", retirement: "employer 401(k)",
   perks: "perks", hsa: "employer HSA", oop: "out-of-pocket costs", totalRewards: "total rewards", rent: "rent", prices: "price line",
   own: "after rent at its own prices", total: "total after rent", spend: "spending a month", saved: "saving a month", inEspp: "ESPP money a month",
@@ -151,7 +153,8 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "in": return inputSection(pathOf(id));
     case "about": return ABOUT_SECTION[a as AboutField];
     case "risk": case "drop": case "win": return "M-8";
-    case "kept": case "repay": case "forfeit": case "forgone": case "next": case "nextown": case "vac": case "refund": return "M-9";
+    case "kept": case "repay": case "forfeit": case "forgone": case "next": case "nextown": case "vac": case "refund": case "tocome": case "forgonec":
+    case "drawkept": return "M-9";
     case "stayafter": case "recon": return "M-7.3";
     case "wh": return "M-4";
     case "flip": case "tie": case "rentnote": return "M-7.4";
@@ -166,6 +169,7 @@ export function metricSection(id: MetricId, ctx: WorkContext): SectionId {
     case "when": {
       if (b === "salary") return "M-2";
       if (b === "benefit") return "M-5.3";
+      if (b === "commission" || b === "draw") return "M-2";
       const own = ctx.own?.breakdowns[a as L];
       return own && arrivalsOf(own.detail, own.years)[Number(b)]?.kind === "rsu" ? "M-3" : "M-2";
     }
@@ -215,6 +219,9 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "forgone": return forgoneWork(ctx, a as L, Number(b));
       case "vac": return vacationWork(ctx, a as L);
       case "refund": return esppRefundWork(ctx, a as L);
+      case "tocome": return commissionToComeWork(ctx, a as L);
+      case "forgonec": return commissionForgoneWork(ctx, a as L);
+      case "drawkept": return drawKeptWork(ctx, a as L);
       case "next": return nextWork(ctx, a as L);
       case "nextown": return nextOwnWork(ctx, a as L);
       case "stayafter": return stayAfterWork(ctx, a as L);
@@ -231,7 +238,8 @@ export function derive(id: MetricId, ctx: WorkContext): Derivation {
       case "own": return ownWork(ctx, a as L, b as OwnLine);
       case "alone": return aloneWork(ctx, a as L);
       case "a2": return hundredWork(ctx, a as L, Number(b), c as A2Line);
-      case "when": return b === "benefit" ? benefitMonthWork(ctx, a as L) : arrivalWork(ctx, a as L, b === "salary" ? "salary" : Number(b));
+      case "when": return b === "benefit" ? benefitMonthWork(ctx, a as L) : b === "commission" || b === "draw" ? commissionMonthWork(ctx, a as L, b)
+        : arrivalWork(ctx, a as L, b === "salary" ? "salary" : Number(b));
       case "cliff": return cliffWork(ctx, a as L, Number(b));
       case "nextup": return nextUpWork(ctx, a as L);
       case "a5": return b === "pto" ? paidTimeOffWork(ctx, a as L) : b === "esppIn" ? esppInWork(ctx, a as L)
@@ -287,6 +295,9 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "forgone": return `${a}'s forfeited bonus`;
     case "vac": return `${a}'s unused vacation paid out`;
     case "refund": return `${a}'s ESPP money given back`;
+    case "tocome": return `${a}'s commission paid after the last day`;
+    case "forgonec": return `${a}'s forfeited commission`;
+    case "drawkept": return `${a}'s draw not earned back`;
     case "next": return `${a}'s value of staying`;
     case "nextown": return `${a}'s next cliff`;
     case "stayafter": return `${a}'s stay after tax`;
@@ -303,7 +314,8 @@ export function figureName(id: MetricId, ctx: WorkContext): string {
     case "own": return `${a}'s ${OWN_NAME[b as OwnLine]}`;
     case "alone": return `${a}'s bottom line on its own`;
     case "a2": return `${a}-2's ${c === "hundred" ? "$100" : c.endsWith("Share") ? `${A2_LABEL[c.replace("Share", "") as A2Part]} share` : c === "credited" ? "employer 401(k) money" : A2_LABEL[c as A2Part]}, year ${b}`;
-    case "when": return b === "salary" ? `${a}-3's salary a month` : b === "benefit" ? `${a}-3's taxable benefits a month` : `${a}-3's payment ${Number(b) + 1}`;
+    case "when": return b === "salary" ? `${a}-3's salary a month` : b === "benefit" ? `${a}-3's taxable benefits a month`
+      : b === "commission" ? `${a}-3's commission a month` : b === "draw" ? `${a}-3's draw a month` : `${a}-3's payment ${Number(b) + 1}`;
     case "cliff": return `${a}-4's cliff ${Number(b) + 1}`;
     case "nextup": return `${a}-4's next cliff`;
     case "a5": return b === "pto" ? `${a}-5's paid time off` : b === "esppIn" ? `${a}-5's ESPP money, over its stay`
@@ -653,6 +665,7 @@ const CASE_NAME: Record<Scenario, string> = { bear: "Bear case", base: "Base cas
 function changePath(ctx: WorkContext, letter: L, kind: CaseChange["kind"]): string {
   switch (kind) {
     case "bonus": case "bonusByYear": return bonusPath(ctx, letter);
+    case "commission": case "commissionByYear": return commissionPath(ctx, letter);
     case "raise": return "salary.raise";
     case "promotion": return "salary.promotions";
     case "priceGrowth": return "equity.priceGrowth";
@@ -1172,6 +1185,58 @@ function vacationWork(ctx: WorkContext, letter: L): Work {
   };
 }
 
+/** L-4 and A-4: commission earned by the last day and paid after it, on each period's usual date (4h). */
+function commissionToComeWork(ctx: WorkContext, letter: L): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const c = p.commission;
+  if (!c || !c.after.length) throw new Error(`No commission is paid to ${letter} after that day.`);
+  return {
+    title: `${letter} · commission paid after your last day`, scope,
+    lines: [
+      ...c.after.map((x, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `Commission for ${commissionPeriod(x)}`, note: `paid ${longDate(x.date)}`,
+        value: toCent(x.gross) })),
+      { op: "=", label: "Paid after your last day, before tax", value: figure(addCents(c.after.map((x) => x.gross))), rule: "double" },
+    ],
+    notes: ["Commission earned by your last day is paid on its usual date, after you've gone: the period you leave in counts its commission to "
+      + "that day, less its draws. It's in what you keep, taxed in the year it's paid. A plan that pays only those employed on the payout date "
+      + "forfeits it: \"When you leave\" in detailed mode."],
+    ties: [], ...fromInputs(ctx, letter, [commissionPath(ctx, letter), "commission.mustBeEmployedOnPayDate"]),
+  };
+}
+
+/** L-4 and A-4: commission not paid by the last day, forfeited under a plan that pays only those employed on the payout date (4h). */
+function commissionForgoneWork(ctx: WorkContext, letter: L): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const ws = p.warnings.flatMap((w) => (w.code === "commissionForfeited" ? [w.params] : []));
+  if (!ws.length) throw new Error(`No commission is forfeited by ${letter} on that day.`);
+  return {
+    title: `${letter} · commission forfeited`, scope,
+    lines: [
+      ...ws.map((w, i): WorkLine => ({ ...(i ? { op: "+" as const } : {}), label: `Commission for ${commissionPeriod(w.detail)}`, note: `paid ${longDate(w.payDate)}`,
+        value: toCent(w.forfeited) })),
+      { op: "=", label: "Forfeited, before tax", value: figure(addCents(ws.map((w) => w.forfeited))), rule: "double" },
+    ],
+    notes: ["Under this plan commission is paid only to those still employed on its payout date, so what's unpaid by your last day is "
+      + "forfeited (less any draws already paid for it, which you keep)."],
+    ties: [], ...fromInputs(ctx, letter, [commissionPath(ctx, letter), "commission.mustBeEmployedOnPayDate"]),
+  };
+}
+
+/** L-4 and A-4: a recoverable draw not earned back by the last day, kept (D28). Repaid, it's a clawback: repayWork. */
+function drawKeptWork(ctx: WorkContext, letter: L): Work {
+  const { panel: p, scope } = panelOf(ctx, letter);
+  const c = p.commission;
+  if (!c || !(c.drawBalance >= 0.5) || c.drawRepaid >= 0.5) throw new Error(`${letter} keeps no draw not earned back on that day.`);
+  return {
+    title: `${letter} · a recoverable draw not earned back`, scope,
+    lines: [{ label: "Draws paid, less the commission that earned them back", value: figure(c.drawBalance) }],
+    notes: ["Kept, as entered: it's pay you've had, in what you keep. Whether you'd owe it depends on the commission plan's terms and the "
+      + "state's law. For a draw that brought pay up to the minimum wage, the Sixth Circuit held that a policy making departing employees repay "
+      + "it violates the FLSA (Stein v. hhgregg, 2017). Choose \"Repaid\" in detailed mode if your plan requires it."],
+    ties: [], ...fromInputs(ctx, letter, ["commission.draw.monthly", "commission.draw.onLeaving"]),
+  };
+}
+
 /** L-4 and A-4: ESPP money put toward a purchase after the last day, given back that day (4i). */
 function esppRefundWork(ctx: WorkContext, letter: L): Work {
   const { panel: p, scope } = panelOf(ctx, letter);
@@ -1662,13 +1727,16 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         lines: [
           { label: "Salary at the year's start", value: figure(q.salary), ref: `in.${letter}.salary.annual` },
           ...(q.bonus ? [{ op: "+" as const, label: "Target bonus on it", value: figure(q.bonus), ref: `in.${letter}.bonus.amount` as MetricId }] : []),
+          ...(q.commission ? [{ op: "+" as const, label: "Expected commission", value: figure(q.commission),
+            ref: `in.${letter}.${commissionPath(ctx, letter)}` as MetricId }] : []),
           ...(q.cash ? [{ op: "+" as const, label: "Cash awards paid in the year", value: figure(q.cash), ref: `in.${letter}.cashAwards` as MetricId }] : []),
           ...(q.rsu ? [{ op: "+" as const, label: "New-hire RSUs due in the year, at grant value", value: figure(q.rsu),
             ref: `in.${letter}.equity.grants` as MetricId }] : []),
           { op: "=", label: "The offer letter's year", value: figure(q.letter), rule: "double" },
         ],
         notes: ["What an offer letter quotes: no proration, payout timing, company vest dates, share-price growth or refreshers. The lines under it in the bridge are those differences."],
-        ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter), ...(q.cash ? ["cashAwards"] : []), ...(q.rsu ? ["equity.grants"] : [])]),
+        ties: [], ...fromInputs(ctx, letter, ["salary.annual", bonusPath(ctx, letter), ...(q.commission ? [commissionPath(ctx, letter)] : []),
+          ...(q.cash ? ["cashAwards"] : []), ...(q.rsu ? ["equity.grants"] : [])]),
       };
     case "salary": case "cash":
       return {
@@ -1697,6 +1765,48 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
         ],
         ties: [], ...fromInputs(ctx, letter, [bonusPath(ctx, letter), "bonus.payOn", "bonus.periodStart",
           ...(o?.draft.bonus.cutoff ? ["bonus.cutoff"] : [])]),
+      };
+    }
+    case "commission": case "draw": {
+      // Commission (4h): what the year's periods earned (paid in it), against the letter; with a draw, the draws on top or earned back.
+      const t = d.commissionTiming.find((x) => x.ey === n);
+      const draw = o?.draft.commission.draw ?? null;
+      const paidFor = draw ? Math.round(t?.paidFor ?? 0) : y.commission;
+      const timing = [
+        t && t.later > 0.5 && t.laterFrom ? `${dollars(t.later)} earned ${longDate(t.laterFrom)} – ${longDate(dayBefore(y.end))} is paid after the year`
+          + `${t.laterPaid.length ? `, on ${join(t.laterPaid.map(longDate))}` : ""}` : "",
+        t && t.before > 0.5 ? `${dollars(t.before)} earned in year ${n - 1} is paid in this one` : "",
+      ].filter(Boolean);
+      if (line === "commission") {
+        return {
+          title: title("commission's payout lag"), scope,
+          lines: [
+            { label: `Commission paid in year ${n} for its months or quarters`, value: figure(paidFor),
+              ...(draw ? { note: "what they earned, before the draws paid with salary" } : { ref: l6("commission") }) },
+            { op: "−", label: "Expected in the offer letter", value: figure(q.commission), ref: `in.${letter}.${commissionPath(ctx, letter)}` },
+            { op: "=", label: "Difference", value: signed(row!.value), rule: "double" },
+          ],
+          notes: [
+            ...(timing.length ? [`${timing.join("; ")}.`] : []),
+            "Commission is earned evenly, a twelfth of the year's amount a month, and each month or quarter is paid the days after it ends that "
+              + "you entered. So year 1 pays less than the offer letter's year: what's earned at its end is paid in year 2.",
+          ],
+          ties: [], ...fromInputs(ctx, letter, [commissionPath(ctx, letter), "commission.period", "commission.payAfterDays"]),
+        };
+      }
+      return {
+        title: title("draw against commission"), scope,
+        lines: [
+          { label: `Commission and its draws paid in year ${n}`, value: figure(y.commission), ref: l6("commission") },
+          { op: "−", label: "Commission its months or quarters earned", value: figure(paidFor) },
+          { op: "=", label: "Difference", value: signed(row!.value), rule: "double" },
+        ],
+        notes: [draw?.recoverable
+          ? "A recoverable draw is an advance, paid with salary each month: what commission doesn't cover is taken from later commission before "
+            + "it's paid. So it moves pay earlier, not up: a year it's paid shows more, a year it's earned back less."
+          : "A guaranteed draw is a floor, paid with salary each month: each month or quarter pays at least its draws, so a lean one pays more "
+            + "than its commission. Draws are paid in the period, its commission after it, so a period across the year's end shows here too."],
+        ties: [], ...fromInputs(ctx, letter, ["commission.draw.monthly", "commission.draw.months", "commission.draw"]),
       };
     }
     case "rsu": {
@@ -1912,7 +2022,7 @@ function rentLines(ctx: WorkContext, letter: L, y: ShownYear): Omit<Work, "title
 // ---- A-7: the work (L-6 until stop 5B), each offer over its own stay ------------------------------------------------
 
 const L6_SECTION: Record<L6Line, SectionId> = {
-  salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9", gross: "M-1", tax: "M-4", premiums: "M-5.2",
+  salary: "M-2", bonus: "M-2", commission: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9", gross: "M-1", tax: "M-4", premiums: "M-5.2",
   afterTax: "M-1",
   yours: "M-5.1", esppHeld: "M-3",
   takeHome: "M-1", employer: "M-5.1", oop: "M-5.2", hsa: "M-5.2", perks: "M-5.3", totalRewards: "M-1", hours: "M-5.4", afterTaxHour: "M-5.4",
@@ -1920,10 +2030,11 @@ const L6_SECTION: Record<L6Line, SectionId> = {
   totalHour: "M-5.4",
 };
 const COMPONENT_SECTION: Record<Component, SectionId> = {
-  salary: "M-2", bonus: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9",
+  salary: "M-2", bonus: "M-2", commission: "M-2", cash: "M-2", rsu: "M-3", espp: "M-3", benefit: "M-5.3", clawback: "M-9",
 };
 const COMPONENT_NAME: Record<Component | "all", string> = {
-  salary: "salary", bonus: "bonus", cash: "cash award", rsu: "RSU", espp: "ESPP", benefit: "taxable benefit", clawback: "clawback", all: "",
+  salary: "salary", bonus: "bonus", commission: "commission", cash: "cash award", rsu: "RSU", espp: "ESPP", benefit: "taxable benefit", clawback: "clawback",
+  all: "",
 };
 /** The line each per-hour line divides. */
 const PER_HOUR_OF: Partial<Record<L6Line, L6Line>> = { afterTaxHour: "afterTax", totalRewardsHour: "totalRewards", totalHour: "total" };
@@ -2051,7 +2162,7 @@ function l6YearWork(ctx: WorkContext, letter: L, line: L6Line, col: number | "su
   }
   const work = ctx.own?.work?.[letter];
   switch (line) {
-    case "salary": case "bonus": case "cash": case "rsu": case "espp": case "benefit": case "clawback": {
+    case "salary": case "bonus": case "commission": case "cash": case "rsu": case "espp": case "benefit": case "clawback": {
       const posted = y.posted[line];
       const list = work ? work.payments.flatMap((p, i) => (p.ey === n && p.component === line ? [i] : [])) : [];
       const count = list.length;
@@ -2364,7 +2475,39 @@ function l6PaymentWork(ctx: WorkContext, letter: L, i: number, what: "gross" | "
     }
     case "clawback":
       lines.push({ label: "Repaid", value: toCent(p.gross) });
-      inputs = ["cashAwards"];
+      inputs = d.draw ? ["commission.draw.monthly", "commission.draw.onLeaving"] : ["cashAwards"];
+      break;
+    case "commission": {
+      // Earned, drawn and the balance at the fewest decimals (2 to 6) at which earned − drawn − balance is the pay to the cent.
+      let k = 2;
+      while (k < 6 && Math.abs(+d.earned.toFixed(k) - +d.drawn.toFixed(k) - +d.balanceIn.toFixed(k) - p.gross) > 0.005 + 1e-9) k++;
+      const at = (x: number) => decimals(+x.toFixed(k), k);
+      const earned = +d.earned.toFixed(k);
+      const slack = 0.5 * 10 ** -k + 1e-9;
+      const runs = rateRuns(d.pieces);
+      if (runs.length === 1) {
+        const annual = runs[0].monthly * 12;
+        lines.push({ label: "Commission expected a year", value: enough(annual, 0, (x) => Math.abs(x / 12 * runs[0].months - earned) <= slack).text },
+          { op: "÷", label: "Months", value: "12" },
+          { op: "×", label: "Months earned in the period", note: `${longDate(d.earnedFrom)} – ${longDate(d.earnedTo)}, a part month by its days`,
+            value: enough(runs[0].months, 4, (x) => Math.abs((annual / 12) * x - earned) <= slack).text });
+      } else {
+        // A rate that changes at an anniversary (amounts by year): each run's commission, at the decimals at which they add to it.
+        let j = k;
+        while (j < 8 && Math.abs(runs.reduce((s, r) => s + +(r.monthly * r.months).toFixed(j), 0) - earned) > slack) j++;
+        runs.forEach((r, i) => lines.push({ ...(i ? { op: "+" as const } : {}), label: `${amountOf(r.monthly)} a month × ${+r.months.toFixed(4)} months`,
+          value: decimals(+(r.monthly * r.months).toFixed(j), j) }));
+      }
+      lines.push({ op: "=", label: "Commission earned in the period", value: at(d.earned) });
+      if (d.drawn > 0.005) lines.push({ op: "−", label: "Draws paid with salary for it", value: at(d.drawn) });
+      if (d.balanceIn > 0.005) lines.push({ op: "−", label: "Draw not yet earned back, carried in", value: at(d.balanceIn) });
+      inputs = [commissionPath(ctx, letter), "commission.period", "commission.payAfterDays", ...(d.drawn > 0.005 ? ["commission.draw.monthly"] : [])];
+      break;
+    }
+    case "commissionDraw":
+      lines.push({ label: "Draw against commission, a month", value: enough(d.monthly, 0, (x) => cent(x * (d.days / d.daysInMonth)) === cent(p.gross)).text });
+      if (d.days !== d.daysInMonth) lines.push({ op: "×", label: `Days worked of the month's ${d.daysInMonth}`, value: `${d.days}/${d.daysInMonth}` });
+      inputs = ["commission.draw.monthly", "commission.draw.months", "commission.draw.recoverable"];
       break;
   }
   if (d.kind !== "cash" && d.kind !== "clawback") lines.push({ op: "=", label: "Pay", value: toCent(p.gross), rule: "double" });
@@ -2373,6 +2516,11 @@ function l6PaymentWork(ctx: WorkContext, letter: L, i: number, what: "gross" | "
     notes: [
       ...(d.kind === "salary" ? ["A month's salary is the annual rate ÷ 12; a part month earns its share by days. It's dated on the last day it covers."] : []),
       ...(d.kind === "bonus" ? [`Paid ${longDate(p.date)} for the period ${longDate(d.periodFrom)} – ${longDate(d.periodTo)}, counting the days you worked in it.`] : []),
+      ...(d.kind === "commission" ? [`Paid ${longDate(p.date)} for ${commissionPeriod(d)}: commission is earned evenly, a twelfth of the year's amount `
+        + `a month, and paid after the period ends.${d.drawn > 0.005 ? " Its draws were paid with salary in the period, so they come off it." : ""}`
+        + `${d.recoverable && d.balanceOut > 0.005 ? ` ${dollars(d.balanceOut)} of the draw is still to be earned back from later commission.` : ""}`] : []),
+      ...(d.kind === "commissionDraw" ? [`Paid with salary: ${d.recoverable ? "a recoverable draw, an advance that later commission pays back before "
+        + "it's paid" : "a guaranteed draw, a floor: the period pays the larger of its commission and its draws"}.`] : []),
       ...(d.kind === "rsu" && d.nominalDate ? [`Due ${longDate(d.nominalDate)} on its schedule; it vests on the company's next vest date, ${longDate(p.date)}.`] : []),
       ...(d.kind === "rsu" ? ["RSUs count as pay on the day they vest, at the share price then, and are assumed sold."] : []),
       "To the cent, as the engine rounds each payment.",
@@ -2602,6 +2750,12 @@ function inputValue(ctx: WorkContext, o: AppOffer, path: string): string {
   return lines.map((l) => (lines.length > 1 ? `${l.label} ${l.value}` : l.value ?? "")).join("; ");
 }
 
+/** The commission input that sets its amounts: dollars a year, or by year (4h). */
+const commissionPath = (ctx: WorkContext, letter: L) =>
+  (offerByLetter(ctx, letter)?.draft.commission.basis === "byEmploymentYear" ? "commission.amounts" : "commission.amount");
+/** "60,000", "3,333.33": a monthly rate with cents only when it has them. */
+const amountOf = (x: number) => (Number.isInteger(x) ? figure(x) : toCent(x));
+
 /** The bonus input that sets its amounts: a target, or dollars by year. */
 const bonusPath = (ctx: WorkContext, letter: L) =>
   (bonusBasis(offerByLetter(ctx, letter)?.draft.bonus ?? { basis: null } as AppOffer["draft"]["bonus"]) === "byEmploymentYear" ? "bonus.amounts" : "bonus.amount");
@@ -2707,6 +2861,10 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
       return d.bonus.amounts.length ? d.bonus.amounts.map((a, i) => line(`Year ${i + 1}${i === d.bonus.amounts.length - 1 ? ", and after" : ""}`,
         a ? rangeText(a, dollars) : "—")) : [line(label, "None")];
     case "bonus.amount": return [line("Target bonus", bonusText(d))];
+    case "commission.amount": case "commission.amounts": return [line("Commission", commissionText(d))];
+    case "commission.draw": return [line("Draw against commission", drawText(d) || "None")];
+    case "commission.payAfterDays": return [line(label, v === null || v === undefined ? "—" : `${v} days after each period ends`)];
+    case "commission.mustBeEmployedOnPayDate": return [line(label, v === true ? "Only if employed on the payout date" : "Paid for work to your last day")];
     case "bonus.basis": return [line(label, { percentOfSalary: "% of salary", fixed: "Dollars a year", byEmploymentYear: "Dollars by employment year" }[bonusBasis(d.bonus)])];
     case "retirement.match": return d.retirement && d.retirement !== "none" ? [line(label, matchText(d.retirement))] : [line(label, "—")];
     case "retirement.vesting": return d.retirement && d.retirement !== "none" ? [line(label, vestingText(d.retirement))] : [line(label, "—")];
@@ -2756,6 +2914,8 @@ function inputLines(d: OfferDraft, path: string): WorkLine[] {
 /** How a choice reads. */
 const CHOICE_WORDS: Record<string, Record<string, string>> = {
   "retirement.type": { pretax: "Pre-tax", roth: "Roth" },
+  "commission.period": { month: "Monthly", quarter: "Quarterly" },
+  "commission.draw.onLeaving": { kept: "Kept", repaid: "Repaid" },
   "retirement.eligiblePay": { salary: "Salary", salaryAndBonus: "Salary and bonus" },
   "retirement.vestingService": { elapsedTime: "Years worked", planYearHours: "Plan years with 1,000 hours" },
   "health.coverage": { self: "Self", family: "Family" },
@@ -3295,6 +3455,36 @@ function hundredWork(ctx: WorkContext, letter: L, n: number, line: A2Line): Work
 }
 
 /** A-3: taxable benefits a month at the start, paid with salary (4j): each a year as entered, added, ÷ 12. */
+/** A-3: commission expected a month, paid monthly; or a draw against it a month, paid with salary (4h). */
+function commissionMonthWork(ctx: WorkContext, letter: L, which: "commission" | "draw"): Work {
+  const o = offerByLetter(ctx, letter);
+  const input = o ? toOfferInput(o) : null;
+  const c = input && "offer" in input ? input.offer.commission : undefined;
+  if (!c) throw new Error(`${letter} has no commission.`);
+  if (which === "draw") {
+    if (!c.draw) throw new Error(`${letter} has no draw against commission.`);
+    return {
+      title: `${letter}-3 · draw against commission a month`, scope: "As entered · $, as paid",
+      lines: [{ label: "Draw against commission, a month", value: figure(c.draw.monthly), tick: "traced" }],
+      notes: [c.draw.recoverable ? "Paid with salary each month: an advance against commission, which later commission pays back before it's paid."
+        : "Paid with salary each month: a floor, so each month or quarter pays at least its draws."],
+      ties: [], ...fromInputs(ctx, letter, ["commission.draw.monthly", "commission.draw.months", "commission.draw.recoverable"]),
+    };
+  }
+  const year = (c.basis === "fixed" ? c.amount : c.amounts[0]).base;
+  return {
+    title: `${letter}-3 · commission a month`, scope: "Base case · year 1 · $, as paid",
+    lines: [
+      { label: "Commission expected a year", value: figure(year), ref: `in.${letter}.${commissionPath(ctx, letter)}` },
+      { op: "÷", label: "Months", value: "12" },
+      { op: "=", label: "A month", value: dollars(year / 12), rule: "double" },
+    ],
+    notes: ["Earned evenly, a twelfth of the year's amount a month while you work there; each month's is paid the days after it ends that you "
+      + "entered. A-7 lists each payout."],
+    ties: [], ...fromInputs(ctx, letter, [commissionPath(ctx, letter), "commission.payAfterDays"]),
+  };
+}
+
 function benefitMonthWork(ctx: WorkContext, letter: L): Work {
   const o = offerByLetter(ctx, letter);
   const input = o ? toOfferInput(o) : null;
@@ -3378,6 +3568,8 @@ function arrivalWork(ctx: WorkContext, letter: L, which: number | "salary"): Wor
       a.kind === "bonus" ? "Bonuses are paid once a year for the work before it, so the first covers only the days you've worked."
         : a.kind === "rsu" ? "RSUs count as pay on the day they vest, at the share price then, and are assumed sold."
         : a.kind === "espp" ? "An ESPP purchase's gain counts as pay on the purchase day: the shares are taken as sold at once."
+        : a.kind === "commission" ? "Commission is earned evenly, a twelfth of the year's amount a month, and each quarter's is paid the days after "
+          + "it ends that you entered, less any draws paid for it with salary."
         : "A cash award counts on the day it's paid.",
       `${letter}-7 lists every payment, with how it was worked out and its tax.`,
     ],
