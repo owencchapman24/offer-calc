@@ -409,11 +409,11 @@ export type EventDetail =
       amount: number; employmentYear?: number; daysEmployed: number; periodDays: number }
   /**
    * A commission payout (4h): the period's commission earned on [earnedFrom, earnedTo] (inclusive), each run of months at one monthly
-   * rate (`pieces`: monthly x months, a partial month counting its days), less the draws paid for the period and the recoverable
+   * rate in one employment year (`pieces`: monthly x months, a partial month counting its days), less the draws paid for the period and the recoverable
    * balance carried in, never below zero: paid = max(0, earned - drawn - balanceIn); balanceOut = max(0, balanceIn + drawn - earned).
    */
   | { kind: "commission"; period: "month" | "quarter"; periodFrom: ISODate; periodTo: ISODate; earnedFrom: ISODate; earnedTo: ISODate;
-      pieces: Array<{ monthly: number; months: number; employmentYear?: number }>; earned: number; drawn: number; balanceIn: number;
+      pieces: Array<{ monthly: number; months: number; employmentYear: number }>; earned: number; drawn: number; balanceIn: number;
       balanceOut: number; recoverable?: boolean; proratedToLeave: boolean }
   /** A draw against commission, paid with salary: monthly x days / daysInMonth, for [from, to] (inclusive). */
   | { kind: "commissionDraw"; from: ISODate; to: ISODate; monthly: number; days: number; daysInMonth: number; recoverable: boolean }
@@ -869,6 +869,11 @@ export interface ScenarioResult {
   leave?: LeaveResult;
   /** Present when the offer has costOfLiving. */
   costOfLiving?: CostOfLivingInfo;
+  /**
+   * Commission's periods (4h), each that reconciled: its payout's date and employment year (the payment rule), what it paid (0 when
+   * its draws covered it), and whether that was paid in the projection (not forfeited, not after its end). Present with commission.
+   */
+  commissionPeriods?: Array<{ payDate: ISODate; employmentYear: number; paid: number; paidOut: boolean; detail: CommissionDetail }>;
   /** Input-specific warnings, as codes and numbers; src/format writes them out. */
   warnings: OfferWarning[];
   /** Assumptions behind these numbers, for the methodology page. */

@@ -35,6 +35,17 @@ export function eventLabel(d: EventDetail): string {
   }
 }
 
+/** A commission period's runs at one monthly rate, joined across an anniversary where the rate doesn't change. */
+export function monthRuns(pieces: Array<{ monthly: number; months: number }>): Array<{ monthly: number; months: number }> {
+  const out: Array<{ monthly: number; months: number }> = [];
+  for (const p of pieces) {
+    const last = out[out.length - 1];
+    if (last && last.monthly === p.monthly) last.months += p.months;
+    else out.push({ monthly: p.monthly, months: p.months });
+  }
+  return out;
+}
+
 /** The arithmetic behind a payment: "$150,000 / 12 x 29/31 days". */
 export function eventFormula(d: EventDetail): string {
   switch (d.kind) {
@@ -45,7 +56,7 @@ export function eventFormula(d: EventDetail): string {
         ? `${pct(d.rate)} x ${usd(round2(d.salaryEarned))} salary earned in the period`
         : `${usd(d.amount)}${d.employmentYear ? ` (employment year ${d.employmentYear} amount)` : ""} x ${d.daysEmployed}/${d.periodDays} days employed`;
     case "commission":
-      return `${d.pieces.map((p) => `${usd(round2(p.monthly))} a month x ${p.months.toFixed(4)} months`).join(" + ")} - ${usd(round2(d.drawn))} `
+      return `${monthRuns(d.pieces).map((p) => `${usd(round2(p.monthly))} a month x ${p.months.toFixed(4)} months`).join(" + ")} - ${usd(round2(d.drawn))} `
         + `drawn${d.balanceIn > 0.005 ? ` - ${usd(round2(d.balanceIn))} draw not yet earned back` : ""}, at least $0`;
     case "commissionDraw": return `${usd(round2(d.monthly))} a month${d.days === d.daysInMonth ? "" : ` x ${d.days}/${d.daysInMonth} days`}`;
     case "cash": return usd(d.amount);

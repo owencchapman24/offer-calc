@@ -23,6 +23,11 @@ export interface CommissionResult {
   outstanding: Array<{ day: number; amount: number }>;
   /** A recoverable draw's balance after the last period ending by `stayEnd` (exclusive). */
   balanceAtStayEnd: number;
+  /**
+   * Every period that reconciled: its payout's day, what it paid (0 when its draws covered it), and whether that was paid inside the
+   * projection (not forfeited, not on or after its end).
+   */
+  periods: Array<{ day: number; paid: number; paidOut: boolean; detail: CommissionDetail }>;
 }
 
 /**
@@ -69,6 +74,7 @@ export function commissionFlows(
   // period's draws pays down from the front.
   const queue: Array<{ day: number; amount: number }> = [];
   const balance = () => queue.reduce((s, q) => s + q.amount, 0);
+  const periods: CommissionResult["periods"] = [];
   for (let from = periodStartOf(start, months); from < workEnd;) {
     const to = addMonths(from, months);
     const payDay = to - 1 + c.payAfterDays;
@@ -84,9 +90,9 @@ export function commissionFlows(
       const monthly = annualFor(n) / 12;
       earned += monthly * p.share;
       const last = pieces[pieces.length - 1];
-      const ey = c.basis === "byEmploymentYear" ? n : undefined;
-      if (last && last.monthly === monthly && last.employmentYear === ey) last.months += p.share;
-      else pieces.push({ monthly, months: p.share, ...(ey !== undefined ? { employmentYear: ey } : {}) });
+      // Runs split at anniversaries too, so the bridge can say how much of a period each employment year earned.
+      if (last && last.monthly === monthly && last.employmentYear === n) last.months += p.share;
+      else pieces.push({ monthly, months: p.share, employmentYear: n });
     }
     const periodDraws = draws.filter((d) => d.accruedFrom! >= a && d.accruedFrom! < b);
     const drawn = periodDraws.reduce((s, d) => s + d.gross, 0);
@@ -127,8 +133,9 @@ export function commissionFlows(
       events.push({ day: payDay, component: "commission", gross: paid, detail });
       if (leave !== undefined && payDay > leave) toCome += paid;
     }
+    periods.push({ day: payDay, paid, paidOut: !beyond && !lost, detail });
     if (to <= stayEnd) balanceAtStayEnd = recoverable ? balance() : 0;
     from = to;
   }
-  return { events, toCome, forfeited, outstanding: queue.filter((q) => q.amount > 0.005), balanceAtStayEnd };
+  return { events, toCome, forfeited, outstanding: queue.filter((q) => q.amount > 0.005), balanceAtStayEnd, periods };
 }

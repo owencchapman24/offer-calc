@@ -1602,7 +1602,14 @@ describe("commission, paid after each month or quarter (v2 4h)", () => {
     const q3 = r.events.find((e) => e.detail.kind === "commission")!.detail;
     expect(q3).toMatchObject({ periodFrom: "2026-07-01", periodTo: "2026-09-30", earnedFrom: "2026-07-13", earnedTo: "2026-09-30",
       drawn: 0, balanceIn: 0 });
-    expect(q3.kind === "commission" && q3.pieces).toEqual([{ monthly: 5_000, months: expect.closeTo(19 / 31 + 2, 12) }]);
+    expect(q3.kind === "commission" && q3.pieces).toEqual([{ monthly: 5_000, months: expect.closeTo(19 / 31 + 2, 12), employmentYear: 1 }]);
+    // Q3 2027 is earned in both years: Jul 1-12 in year 1, the rest in year 2; the formula joins them, as one rate.
+    const q3b = r.events.find((e) => e.date === "2027-10-30")!.detail;
+    expect(q3b.kind === "commission" && q3b.pieces.map((p) => p.employmentYear)).toEqual([1, 2]);
+    expect(eventFormula(q3b)).toBe("$5,000 a month x 3.0000 months - $0 drawn, at least $0");
+    // Every period that reconciled, a draw-covered $0 one included, with its payout's employment year.
+    expect(r.commissionPeriods!.slice(0, 4).map((p) => [p.payDate, p.employmentYear, p.paid])).toEqual([["2026-10-30", 1, 13_064.52],
+      ["2027-01-30", 1, 15_000], ["2027-04-30", 1, 15_000], ["2027-07-30", 2, 15_000]]);
     expect(eventFormula(q3)).toBe("$5,000 a month x 2.6129 months - $0 drawn, at least $0");
   });
   it("year 1 earns 60,000 and pays 43,064.52: Apr 1 - Jul 12, 2027's 16,935.48 is paid in year 2; the letter says 60,000", () => {

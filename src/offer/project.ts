@@ -709,7 +709,10 @@ export function projectScenario(offer: OfferInput, household: Household, options
 
   return {
     label: offer.label, scenario, events, benefitEvents, calendarYears, employmentYears, window: windowTotals,
-    ...(leaveResult ? { leave: leaveResult } : {}), ...(col ? { costOfLiving: col.info } : {}), warnings, assumptions,
+    ...(leaveResult ? { leave: leaveResult } : {}), ...(col ? { costOfLiving: col.info } : {}),
+    ...(commission ? { commissionPeriods: commission.periods.map((p) => ({ payDate: fromDays(p.day), employmentYear: yearOfPayment(p.day),
+      paid: round2(p.paid), paidOut: p.paidOut, detail: p.detail })) } : {}),
+    warnings, assumptions,
   };
 }
 
