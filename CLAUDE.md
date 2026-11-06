@@ -23,8 +23,9 @@ behind every figure.
   offer and its choice with two or more, the first visit's single sample, a CSV for every breakdown table); v2's 4a (days off:
   vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
   2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22); v2's 4j (other benefits,
-  taxable or tax-free, and tax-free benefits, the perks among them, on a line of their own, 2026-10-23). How each differs from the
-  design: `docs/ui-design.md` §12.
+  taxable or tax-free, and tax-free benefits, the perks among them, on a line of their own, 2026-10-23); v2's 4h (commission, paid
+  monthly or quarterly after a lag, with a range, a draw against it and what's paid when you leave, 2026-11-05, for review). How each
+  differs from the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
@@ -43,9 +44,9 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**Next: 4h, commission** (`docs/v2-plan.md`, item 4h), approved on 2026-11-05 at the user's review of pull request #74 (D24-D27 as
-recommended, D24 in the user's words; D28 changed: a recoverable draw kept or repaid on leaving is an input), built next, before item
-2, at the user's word: one review stop. Then item 2 (market benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`,
+**4h, commission, is built and waits on the user's review** (stop 4h, pull request #75; `docs/v2-plan.md`, item 4h, approved on
+2026-11-05 at the user's review of pull request #74: D24-D27 as recommended, D24 in the user's words; D28 changed: a recoverable draw
+kept or repaid on leaving is an input). Then item 2 (market benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`,
 "Questions for testers"). Stops 4a (days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved
 2026-10-22, 23 and 23). Decisions D16-D23 are recorded in the plan; at stop 4j the user moved today's perks to the tax-free line too
 (D22).
@@ -309,6 +310,14 @@ section 2's and the plan's in step):
   plan is out of take-home, at face value in the after-rent total; A-2 shows it as its own share ("in the ESPP"), not in "saved", and
   A-1's saved leaves it out (over the stay it's in "to spend": it comes back). Leaving before a purchase gives it back that day; each
   purchase date is a cliff. The share price follows the equity's growth.
+- **Commission** (v2's 4h, D24-D28): an amount a year (a range sets bear and bull) or by employment year, earned a twelfth each calendar
+  month while employed, a part month by its days; each calendar month or quarter is paid the days after it ends that you enter (both
+  required, no default), as one payment: what it earned less the draws paid for it, never below zero (`commission.ts`). A draw is paid
+  with salary for its months: guaranteed, a floor; recoverable, a balance later commission pays down, oldest draws first. Leaving: by
+  default commission earned to the last day is paid on its usual date; "only if employed on the payout date" forfeits it, each payout a
+  cliff; a recoverable draw's balance is kept (`D`) or repaid on the last day as a clawback. Payouts are supplemental wages, withheld at
+  22% (with no salary or draw, as a month's regular pay); a draw is regular wages. The letter's figure is the expected amount; the 401(k)'s
+  and ESPP's "salary and bonus" counts it.
 - **Clawbacks:** cleared once the last day is the day before clock start + months; prorated by completed months by default
   (`per: "day"` optional); gross repaid by default. In the same calendar year the wages are reversed, exactly; in a later year, an
   IRC 1341 credit, federal only, over $3,000, and FICA isn't refunded.
@@ -374,7 +383,8 @@ section 2's and the plan's in step):
   `horizonSweep`, annuity terms); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
   as codes and paths); `streams.ts` (salary, bonus, cash); `vesting.ts`; `presets.ts` (the vesting presets, main-thread safe);
   `clawback.ts`; `benefits.ts` (401(k), health, perks); `timeOff.ts` (days off and weeks worked, the vacation-payout states, the
-  payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); other benefits' streams are in
+  payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); `commission.ts` (commission's draws,
+  payouts and a recoverable draw's balance); other benefits' streams are in
   `benefits.ts` (`otherBenefitStreams`); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
 - `col/`: `index.ts` (BEA RPPs, `rpp.json`), `rent.ts` (HUD FMRs, `fmr.json`, and the fallback), `cities.ts` (the slim city list,
   `cities.json`, for the main thread).
@@ -472,6 +482,10 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 
 **Pay and benefits**
 - Private-company equity (options, double-trigger RSUs) counts as $0; RSUs are sold at vest. v2 item 4e.
+- Commission counts as earned evenly, with a range for a lean or strong year: quotas, accelerators, caps, splits, chargebacks and
+  commission paid on collection aren't modeled; it's paid each calendar month or quarter (not twice a month, yearly or on fiscal
+  quarters). A draw is taken as regular wages for withholding (no source names one). Method 1b covers commission only: a bonus with no
+  regular wages keeps the flat rate.
 - Other benefits are tax-free as entered: no exclusion's limit is applied (dependent care's $7,500, group-term life over $50,000,
   achievement awards), and adoption assistance, free of income tax but not FICA, fits neither choice (D23). Each accrues evenly while
   employed, flat in dollars (no raises, no one-time payments).
@@ -504,7 +518,7 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D28, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i and 4j built; 4h approved, next; the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D28, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i, 4j and 4h built (4h for review); the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |
