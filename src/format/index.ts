@@ -166,7 +166,8 @@ export function formatAssumption(a: Assumption): string {
         + "are forfeited, and clawbacks are repaid that day.";
     case "retirement": {
       const p = a.params;
-      return `401(k): ${pct(p.contributionPct, 2)} ${p.type} deferral of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, `
+      return `401(k): ${pct(p.contributionPct, 2)} ${p.type} deferral of ${p.eligiblePay === "salaryAndBonus" ? `salary${p.commission ? ", bonus and commission"
+        : " and bonus"}` : "salary"}, `
         + "capped at the 402(g) limit; the match follows each paycheck's deferral (no true-up). Employer money "
         + `${p.vestedShare === 1 ? "is fully vested" : `is ${pct(p.vestedShare, 1)} vested`} after ${p.completedYears} completed `
         + "years. Your deferrals count as yours at face value (deferred tax on withdrawal and investment growth aren't modeled).";
@@ -183,7 +184,8 @@ export function formatAssumption(a: Assumption): string {
     }
     case "espp": {
       const p = a.params;
-      return `ESPP: ${pct(p.contributionPct, 2)} of ${p.eligiblePay === "salaryAndBonus" ? "salary and bonus" : "salary"}, after tax, into `
+      return `ESPP: ${pct(p.contributionPct, 2)} of ${p.eligiblePay === "salaryAndBonus" ? `salary${p.commission ? ", bonus and commission" : " and bonus"}`
+        : "salary"}, after tax, into `
         + `${p.offeringMonths}-month offerings with ${p.purchasesPerOffering === 1 ? "a purchase at each end" : `${p.purchasesPerOffering} purchases each`}, `
         + `${pct(p.discount, 2)} off${p.lookback ? " the lower of the offering's first-day and purchase-day value" : " the purchase-day value"}, `
         + `within $25,000 a year (IRC 423(b)(8)); the share price grows ${pct(p.priceGrowth, 2)} a year. Each lot is sold the day it's bought: `

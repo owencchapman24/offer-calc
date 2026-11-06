@@ -524,7 +524,7 @@ export type Assumption =
   | { code: "rsu"; params: { scenario: Scenario; priceGrowth: number } }
   | { code: "leaveDate"; params: { leaveDate: ISODate } }
   | { code: "retirement"; params: { contributionPct: number; type: "pretax" | "roth"; eligiblePay: "salary" | "salaryAndBonus";
-      vestedShare: number; completedYears: number } }
+      vestedShare: number; completedYears: number; commission?: boolean } }
   | { code: "health"; params: { usage: "low" | "medium" | "high" } }
   | { code: "perks"; params: NoParams }
   /** Other benefits as entered (4j): each a yearly amount, taxable or tax-free. */
@@ -534,7 +534,7 @@ export type Assumption =
       daysOff?: { vacation: number; holidays: number; sick: number } } }
   /** The ESPP's terms, and the share price's growth this scenario. */
   | { code: "espp"; params: { contributionPct: number; eligiblePay: "salary" | "salaryAndBonus"; discount: number; lookback: boolean;
-      offeringMonths: number; purchasesPerOffering: number; priceGrowth: number } }
+      offeringMonths: number; purchasesPerOffering: number; priceGrowth: number; commission?: boolean } }
   /** The vacation policy: what banks a year and whether it's paid when you leave (`required`: by the employer state's law). */
   | { code: "vacation"; params: { policy: "days" | "unlimited"; gives: number; taken: number; cap?: number; payout: "state" | "always";
       employerState: string; required: boolean; afterYears?: number } }

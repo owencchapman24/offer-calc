@@ -663,7 +663,9 @@ export function projectScenario(offer: OfferInput, household: Household, options
     assumptions.push({ code: "commission", params: { scenario,
       amounts: c.basis === "fixed" ? [c.amount[scenario]] : c.amounts.map((a) => a[scenario]), byEmploymentYear: c.basis === "byEmploymentYear",
       period: c.period, payAfterDays: c.payAfterDays, mustBeEmployedOnPayDate: c.mustBeEmployedOnPayDate ?? false,
-      ...(c.draw ? { draw: { ...c.draw } } : {}) } });
+      // A recoverable draw's rule on leaving as it applies (kept by default), so a default and the same value entered read alike.
+      ...(c.draw ? { draw: { monthly: c.draw.monthly, recoverable: c.draw.recoverable, ...(c.draw.months !== undefined ? { months: c.draw.months } : {}),
+        ...(c.draw.recoverable ? { onLeaving: c.draw.onLeaving ?? "kept" } : {}) } } : {}) } });
   }
   if (valuation !== undefined) {
     assumptions.push({ code: "presentValue", params: { valuationDate: fromDays(valuation), discountRate } });
@@ -674,7 +676,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (offer.retirement) {
     const r = offer.retirement;
     assumptions.push({ code: "retirement", params: { contributionPct: r.contributionPct, type: r.type ?? "pretax",
-      eligiblePay: r.eligiblePay ?? "salary", vestedShare, completedYears } });
+      eligiblePay: r.eligiblePay ?? "salary", vestedShare, completedYears, ...(c ? { commission: true } : {}) } });
   }
   if (offer.health) assumptions.push({ code: "health", params: { usage: household.healthUsage ?? "medium" } });
   if (offer.perks) assumptions.push({ code: "perks", params: {} });
@@ -682,7 +684,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (offer.espp) {
     const e = offer.espp;
     assumptions.push({ code: "espp", params: { contributionPct: e.contributionPct, eligiblePay: e.eligiblePay ?? "salary", discount: e.discount,
-      lookback: e.lookback, offeringMonths: e.offeringMonths, purchasesPerOffering: e.purchasesPerOffering ?? 1, priceGrowth: growth } });
+      lookback: e.lookback, offeringMonths: e.offeringMonths, purchasesPerOffering: e.purchasesPerOffering ?? 1, priceGrowth: growth,
+      ...(c ? { commission: true } : {}) } });
   }
   if (hours) {
     assumptions.push({ code: "hours", params: { scenario, weekly: hours.weekly[scenario], weeksPerYear: weeks,
