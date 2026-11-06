@@ -10,7 +10,7 @@ extended (sick days, unlimited vacation, paying out unused vacation on leaving) 
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
 ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22), 4i (stop 4i, #71, approved
 2026-10-23) and 4j (stop 4j, #72, approved 2026-10-23); all three are live. **4h, commission, designed in pull request #74, was
-approved on 2026-11-05 with the user's changes to D24 and D28,** and is built (stop 4h, pull request #75, 2026-11-05), for review.
+approved on 2026-11-05 with the user's changes to D24 and D28,** and is built (stop 4h, pull request #78, 2026-11-05), for review.
 What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
@@ -932,7 +932,7 @@ Ten parts, each its own pull request (4d and 4e two), in this order (D10): the t
 first, then relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for
 commuters, was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4)
 place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked; designed
-in pull request #74 (2026-10-23) and approved on 2026-11-05 (decisions D24-D28), it's built (stop 4h, pull request #75), before item 2.
+in pull request #74 (2026-10-23) and approved on 2026-11-05 (decisions D24-D28), it's built (stop 4h, pull request #78), before item 2.
 
 **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22 (D21 moot):** 4a gains sick days, an "unlimited"
 vacation policy and paying out unused vacation on leaving; two parts are new, 4i (an employee stock purchase plan, each lot sold at
@@ -1233,7 +1233,7 @@ balance on leaving is an input, "If you leave owing a recoverable draw: kept / r
 as read in the opinion itself, which it now is (below). **4h is built next, before item 2,** at the user's word: one pull request and
 one review stop, no tax-engine change, the sources marked unchecked re-read first.
 
-**Built: stop 4h** (2026-11-05, pull request #75), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
+**Built: stop 4h** (2026-11-05, pull request #78), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
 - **The engine's stream** is a module of its own, `src/offer/commission.ts`, beside the ESPP's, not `streams.ts`; and the projection reports
   each period that reconciled (`commissionPeriods`, a draw-covered $0 one included), its commission split at anniversaries, so A-2's
   bridge can say how much of a year's commission is paid in the next.
@@ -1730,7 +1730,7 @@ approved on 2026-10-19, at the user's word.
 | 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
 | 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop. **Done** (pull request #71, 2026-10-22) | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document. **Done** (pull request #72, 2026-10-23) | 4i, D22, D23 |
-| 4h | Commission: the stream (monthly or quarterly, the lag, the range, a draw, the leaving rule), its inputs, every part, the document; one pull request, one stop. Designed (pull request #74) and approved 2026-11-05. **Built** (pull request #75, 2026-11-05), for review | D24-D28 (decided) |
+| 4h | Commission: the stream (monthly or quarterly, the lag, the range, a draw, the leaving rule), its inputs, every part, the document; one pull request, one stop. Designed (pull request #74) and approved 2026-11-05. **Built** (pull request #78, 2026-11-05), for review | D24-D28 (decided) |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
 | 4b-4c | Accuracy, the small parts: commuting, relocation, a stop each | testers (item 4), D10, D15 |

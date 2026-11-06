@@ -44,7 +44,7 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**4h, commission, is built and waits on the user's review** (stop 4h, pull request #75; `docs/v2-plan.md`, item 4h, approved on
+**4h, commission, is built and waits on the user's review** (stop 4h, pull request #78; `docs/v2-plan.md`, item 4h, approved on
 2026-11-05 at the user's review of pull request #74: D24-D27 as recommended, D24 in the user's words; D28 changed: a recoverable draw
 kept or repaid on leaving is an input). Then item 2 (market benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`,
 "Questions for testers"). Stops 4a (days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved

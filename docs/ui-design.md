@@ -1880,7 +1880,7 @@ Taxable (the default, with its `D`) or Tax-free, with a table of how common bene
 benefits in their editor and in M-5.3, not in a field's help (2-4 sentences); A-5 gives each benefit's year as entered and its stay
 rather than a table by year; the editor's fields' names register with detailed mode and the derivations, as the ESPP's terms did.
 
-**Stop 4h** (commission, 2026-11-05, pull request #75; `docs/v2-plan.md` 4h, approved 2026-11-05 at the review of #74 with the user's
+**Stop 4h** (commission, 2026-11-05, pull request #78; `docs/v2-plan.md` 4h, approved 2026-11-05 at the review of #74 with the user's
 changes to D24 and D28): detailed mode gains a Commission section after the bonus: dollars a year (`D`) or by year (its editor), the
 expected amount with "+ range" for the bear and bull cases, how often it's paid (monthly or quarterly, calendar quarters) and the days
 after each period ends (both required, no default, each one's help pointing to the commission plan), when you leave (`D` paid for work
