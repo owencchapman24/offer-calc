@@ -5,7 +5,7 @@ import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import type { AppOffer, Letter } from "./model";
 import { dollars, figure, longDate } from "./text";
-import { alone, BENEFITS, compareOf, context, ESPPS, requestOf, withBenefits, withEspp, withLeave, withTies } from "./testing";
+import { alone, BENEFITS, COMMISSIONS, compareOf, context, ESPPS, requestOf, withBenefits, withCommission, withEspp, withLeave, withTies } from "./testing";
 import { verdictSentence } from "./verdict";
 
 // "Copy as document" (docs/copy-as-document-plan.md): every total in the document adds up as displayed, every calculation it
@@ -79,6 +79,10 @@ const CONTEXTS: Array<[string, () => WorkContext, DocKind?, Letter?, DocDetail?]
   ["A on its own with an ESPP, in full", () => alone("A", (o) => withEspp(o)), "breakdown"],
   // Other benefits (4j): A's taxable and tax-free, none for B, not entered for C; and A on its own with them.
   ["with other benefits, both in full", () => context("colAdjustedTotal", BENEFITS), "both"],
+  // Commission (4h): A's quarterly, B's monthly with a guaranteed draw, C's by year with a recoverable draw; A on its own.
+  ["with commission", () => context("colAdjustedTotal", COMMISSIONS)],
+  ["with commission, both in full", () => context("colAdjustedTotal", COMMISSIONS), "both"],
+  ["A on its own with commission, in full", () => alone("A", (o) => withCommission(o)), "breakdown"],
   ["A on its own with other benefits, in full", () => alone("A", (o) => withBenefits(o)), "breakdown"],
 ];
 
@@ -312,6 +316,14 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
     expect(e.text).toContain("Gym, tax-free, as entered: $600 a year, $2,400 over the stay, as paid.");
     expect(e.text).toContain("Its other benefits (Wellness, Gym) stop on your last day.");
     expect(e.text).toContain("Counted tax-free, as entered: Gym.");
+  });
+
+  it("commission (4h): the offer as entered, the bridge's lag, its payouts by date, the terms and leaving early", () => {
+    const e = made(alone("A", (o) => withCommission(o)), undefined, "breakdown", "A", "full");
+    expect(e.text).toContain("commission $60,000 a year expected ($40,000 to $80,000), paid quarterly, 30 days after each quarter ends");
+    expect(e.text).toContain("Oct 30, 2026: Commission for Jul 13 – Sep 30, 2026, $13,065, in year 1.");
+    expect(e.text).toContain("with $16,935 of commission paid after your last day,");
+    expect(e.text).toMatch(/commission earned in year 1, paid in year 2/);
   });
 
   it("an ESPP (4i): the offer as entered, its purchases by date, A-5's note, the terms and the holding note", () => {

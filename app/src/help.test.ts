@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ResetFields } from "./controls";
 import { LedgerProvider } from "./fields";
-import type { AppOffer, RetirementDraft } from "./model";
+import { type AppOffer, blankCommission, type RetirementDraft } from "./model";
 import { DEFAULTS } from "./defaults";
 import { HELP, helpKey } from "./help";
 import { SECTIONS } from "./sections";
@@ -21,9 +21,15 @@ describe("help on every input", () => {
   // The samples, with C's vesting entered as your own tranches and company vest dates on the refreshers, B's 401(k) vesting in graded
   // steps and A with an ESPP and a benefit, so every editor's and plan's fields render.
   const graded = { kind: "graded" as const, steps: [{ years: 2, pct: 0.5 }, { years: 3, pct: 1 }] };
+  // B with commission and a recoverable draw, C with commission by year (4h), so its section's fields and editor render.
+  const commission = { ...blankCommission(), period: "quarter" as const, payAfterDays: 30 };
   const custom = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "A"
     ? withEspp({ ...o, draft: { ...o.draft, otherBenefits: [{ label: "Phone", annual: 600, taxable: true }] } }) : o.letter === "B" ? { ...o, draft: { ...o.draft,
-    retirement: { ...(o.draft.retirement as RetirementDraft), vesting: graded } } } : o.letter !== "C" ? o : { ...o, draft: { ...o.draft, equity: {
+    retirement: { ...(o.draft.retirement as RetirementDraft), vesting: graded },
+    commission: { ...commission, amount: { bear: 12_000, base: 24_000, bull: 36_000 }, draw: { monthly: 1_000, recoverable: true, months: 3, onLeaving: null } } } }
+    : o.letter !== "C" ? o : { ...o, draft: { ...o.draft,
+    commission: { ...commission, basis: "byEmploymentYear", amounts: [{ bear: 10_000, base: 10_000, bull: 10_000 }, { bear: 20_000, base: 20_000, bull: 20_000 }] },
+    equity: {
     ...o.draft.equity,
     grants: o.draft.equity.grants.map((g) => ({ ...g, schedule: { ...g.schedule, tranches: [{ month: 12, fraction: 0.5 }, { month: 24, fraction: 0.5 }] } })),
     refreshers: { ...o.draft.equity.refreshers!, schedule: { tranches: [{ month: 12, fraction: 1 }], vestDates: { months: [3, 9], day: 1 } } },

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withEspp } from "./testing";
+import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withCommission, withEspp } from "./testing";
+import { bridge } from "./byYearModel";
 import { taxTable, yearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B), against the plan's worked example: sample A at the samples'
@@ -235,6 +236,61 @@ describe("other benefits (4j): sample A with a $1,200 taxable wellness stipend a
     expect(text).toMatch(/Gym, tax-free, as entered: \$600 T? ?a year, \$2,400 over the stay, as paid\./);
     for (const id of ["a5.A.ob.0.stay", "a5.A.ob.0.afterTax", "a5.A.ob.1.stay"] as const) footsAsDisplayed(id, derive(id, ctx));
     expect(text).toContain("Counted tax-free, as entered: Gym.");
+  });
+});
+
+describe("commission (4h): sample A with the design's example 1, $60,000 a year ($40,000 to $80,000), quarterly, 30 days after", () => {
+  // A starts Jul 13, 2026: Q3 earns 5,000 × 19/31 + 2 × 5,000 = 13,064.52, paid Oct 30; each later quarter 15,000, 30 days after it ends.
+  const ctx = alone("A", (o) => withCommission(o));
+  const d = own(ctx, "A").detail;
+  const text = words(renderAlone(ctx));
+  it("A-2's bridge: the letter's 60,000, less year 1's commission paid in year 2, Apr 1 – Jul 12, 2027's 15,000 + 5,000 × 12/31 = 16,935", () => {
+    const b = bridge(ctx, "A", 1);
+    expect(b.rows.find((r) => r.line === "letter")!.label).toBe("Offer letter: salary + target bonus + expected commission + sign-on");
+    const lag = b.rows.find((r) => r.line === "commission")!;
+    expect([lag.label, lag.value, lag.gloss]).toEqual(["commission earned in year 1, paid in year 2", -16_935, "Apr 1 – Jul 12, paid Jul 30 and Oct 30"]);
+    expect(b.rows.some((r) => r.line === "draw")).toBe(false);
+    // Year 2 pays Jul 30, 2027 to Apr 30, 2028: four quarters, 60,000, so no line.
+    expect(bridge(ctx, "A", 2).rows.some((r) => r.line === "commission")).toBe(false);
+    for (const id of ["br.A.1.letter", "br.A.1.commission", "br.A.1.paid"] as const) footsAsDisplayed(id, derive(id, ctx));
+  });
+  it("A-3: commission by year, 43,065 then 60,000, and each quarter's payout by date", () => {
+    expect(yearTable(ctx, "A").rows.find((r) => r.line === "commission")!.values).toEqual([43_065, 60_000, 60_000, 60_000]);
+    const quarters = arrivalsOf(d, 4).filter((a) => a.kind === "commission");
+    expect(quarters.slice(0, 3).map((a) => [a.date, a.label, a.gross])).toEqual([["2026-10-30", "Commission for Jul 13 – Sep 30, 2026", 13_064.52],
+      ["2027-01-30", "Commission for Q4 2026", 15_000], ["2027-04-30", "Commission for Q1 2027", 15_000]]);
+    expect(text).toContain("Oct 30, 2026 · Commission for Jul 13 – Sep 30, 2026: $13,065 , in year 1");
+  });
+  it("A-1 says why year 1 differs; A-4 gives the terms, and leaving Jan 12, 2027 still pays Q4's 15,000 and Jan 1-12's 1,935.48 after it", () => {
+    expect(text).toContain("commission earned late in year 1 is paid in year 2");
+    expect(text).toContain("Its commission is paid quarterly, 30 days after each quarter ends, the first Oct 30, 2026; leaving before a payout still pays "
+      + "the part earned by your last day.");
+    expect(text).toContain("with $16,935 of commission paid after your last day,");
+    footsAsDisplayed("tocome.A", derive("tocome.A", ctx));
+    expect(text).toContain("commission $40,000 a year instead of $60,000");
+  });
+  it("only if employed on the payout date: each payout is a cliff, and leaving Jan 12, 2027 forfeits Q4's 15,000 and Jan 1-12's 1,935.48", () => {
+    const strict = alone("A", (o) => withCommission(o, { mustBeEmployedOnPayDate: true }));
+    const t = words(renderAlone(strict));
+    expect(t).toContain("Jan 30, 2027 · the commission for Q4 2026, $15,000 before tax: leave the day before and it's forfeited");
+    expect(t).toContain("$16,935 of commission is forfeited (it's paid only to those employed on its payout date)");
+    footsAsDisplayed("forgonec.A", derive("forgonec.A", strict));
+  });
+});
+
+describe("commission (4h): sample B with example 2, $36,000 a year monthly, 15 days after, and a guaranteed $2,000 draw for 3 months", () => {
+  const ctx = alone("B", (o) => withCommission(o, { amount: { bear: 12_000, base: 36_000, bull: 36_000 }, period: "month", payAfterDays: 15,
+    draw: { monthly: 2_000, recoverable: false, months: 3, onLeaving: null } }));
+  const text = words(renderAlone(ctx));
+  it("A-3 says the month's commission and the draw in a line, not twelve dates a year", () => {
+    expect(text).toContain("and a draw against commission of $2,000 a month from year 1 until Oct 12, 2026.");
+    // July 2026 earns 3,000 × 19/31 = 1,838.71, less its 2,000 × 19/31 = 1,225.81 draw: 612.90, on Aug 15.
+    expect(text).toContain("Commission is paid monthly, 15 days after each month: $3,000 a month expected in year 1; the first, Aug 15, 2026, for Jul 13 – 31, 2026.");
+    for (const id of ["when.A.commission", "when.A.draw"] as const) footsAsDisplayed(id, derive(id, ctx));
+  });
+  it("A-4's terms give the draw; its bad case says the floor", () => {
+    expect(text).toContain("Its draw of $2,000 a month until Oct 12, 2026 is guaranteed: each month pays at least its draws.");
+    expect(text).toContain("commission $12,000 a year instead of $36,000 (at least the $2,000 a month draw until Oct 12, 2026)");
   });
 });
 

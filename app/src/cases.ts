@@ -1,7 +1,7 @@
 import type { Basis, ByScenario, OfferInput, Scenario, WindowTotals } from "../../src/offer/types";
 import { type Letter, toOfferInput } from "./model";
 import { detailOf, indexOf, join, offerByLetter, res, type WorkContext } from "./metrics";
-import { cents, dollars, percent } from "./text";
+import { cents, dayBefore, dollars, longDate, percent } from "./text";
 import { monthOf, shownGap } from "./verdict";
 
 // L-2 · If things go badly (docs/ui-design.md §4.4), the view model: each offer's bear, base and bull
@@ -39,6 +39,9 @@ export type CaseChange =
   | { kind: "bonus"; basis: "percentOfSalary" | "fixed"; value: number; base: number; firstGuaranteed: boolean }
   /** `ratio`: the scenario over the base, when it's the same every year; else the years that differ. */
   | { kind: "bonusByYear"; ratio: number | null; years: number[]; firstGuaranteed: boolean }
+  /** Commission a year in this scenario and the base (4h); `draw`: a guaranteed draw's floor a month, and its last day. */
+  | { kind: "commission"; value: number; base: number; draw: { monthly: number; until: string | null } | null }
+  | { kind: "commissionByYear"; years: number[]; draw: { monthly: number; until: string | null } | null }
   | { kind: "raise"; value: number; base: number }
   /** `included`: the promotion happens in this scenario but not the base case (else the reverse). */
   | { kind: "promotion"; on: string; stepUp: number; included: boolean }
@@ -47,6 +50,12 @@ export type CaseChange =
   | { kind: "hours"; value: number; base: number };
 
 const differs = (a: number, b: number) => Math.abs(a - b) > 1e-9;
+/** A date plus whole months, the day clamped to the month's end, as the engine counts them. */
+function addMonthsIso(date: string, months: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
 const ranged = (x: ByScenario | undefined) => !!x && (differs(x.bear, x.base) || differs(x.bull, x.base));
 const inCase = (scenarios: Scenario[] | undefined, s: Scenario) => (scenarios ?? CASES).includes(s);
 
@@ -70,6 +79,17 @@ export function caseChanges(o: OfferInput, s: Scenario, end: string, perHour: bo
       out.push({ kind: "bonusByYear", ratio: same ? ratios[0] : null, years, firstGuaranteed });
     }
   }
+  const c = o.commission;
+  // A guaranteed draw floors a lean scenario's months (4h): said with the commission's change.
+  const floor = c?.draw && !c.draw.recoverable && c.draw.monthly > 0 ? { monthly: c.draw.monthly,
+    until: c.draw.months !== undefined ? dayBefore(addMonthsIso(o.startDate, c.draw.months)) : null } : null;
+  if (c && c.basis === "fixed" && differs(c.amount[s], c.amount.base)) {
+    out.push({ kind: "commission", value: c.amount[s], base: c.amount.base, draw: floor });
+  }
+  if (c?.basis === "byEmploymentYear") {
+    const years = c.amounts.flatMap((a, i) => (differs(a[s], a.base) ? [i + 1] : []));
+    if (years.length) out.push({ kind: "commissionByYear", years, draw: floor });
+  }
   const raise = o.salary.raise;
   if (raise && differs(raise[s], raise.base)) out.push({ kind: "raise", value: raise[s], base: raise.base });
   for (const p of o.salary.promotions ?? []) {
@@ -91,7 +111,9 @@ export function caseChanges(o: OfferInput, s: Scenario, end: string, perHour: bo
 /** Whether any uncertain input has a range (or a promotion limited to some scenarios). */
 export function hasRanges(o: OfferInput): boolean {
   const b = o.bonus;
+  const c = o.commission;
   return (b?.basis === "byEmploymentYear" ? b.amounts.some(ranged) : ranged(b?.amount)) || ranged(o.salary.raise)
+    || (c ? (c.basis === "byEmploymentYear" ? c.amounts.some(ranged) : ranged(c.amount)) : false)
     || (o.salary.promotions ?? []).some((p) => !CASES.every((s) => inCase(p.scenarios, s)))
     || ranged(o.equity?.priceGrowth) || ranged(o.equity?.refreshers?.value) || ranged(o.hours?.weekly);
 }
@@ -110,6 +132,11 @@ export function changeText(c: CaseChange): string {
     case "bonusByYear":
       if (c.ratio === null) return `bonuses differ in year${c.years.length > 1 ? "s" : ""} ${join(c.years.map(String))}${guaranteed}`;
       return `bonuses ${percent(Math.abs(1 - c.ratio))} ${c.ratio < 1 ? "under" : "over"} target${guaranteed}`;
+    case "commission": case "commissionByYear": {
+      const floor = c.draw ? ` (at least the ${dollars(c.draw.monthly)} a month draw${c.draw.until ? ` until ${longDate(c.draw.until)}` : ""})` : "";
+      return c.kind === "commission" ? `commission ${dollars(c.value)} a year instead of ${dollars(c.base)}${floor}`
+        : `commission differs in year${c.years.length > 1 ? "s" : ""} ${join(c.years.map(String))}${floor}`;
+    }
     case "raise": return `raises ${percent(c.value)} a year instead of ${percent(c.base)}`;
     case "promotion": return c.included ? `a promotion in ${year(c.on)} (${signedRate(c.stepUp)})` : `no promotion in ${year(c.on)}`;
     case "priceGrowth": return `share price ${signedRate(c.value)} a year instead of ${signedRate(c.base)}`;
@@ -119,7 +146,8 @@ export function changeText(c: CaseChange): string {
 }
 
 const NOUN: Record<CaseChange["kind"], { word: string; plural: boolean }> = {
-  bonus: { word: "bonus", plural: false }, bonusByYear: { word: "bonuses", plural: true }, raise: { word: "raises", plural: true },
+  bonus: { word: "bonus", plural: false }, bonusByYear: { word: "bonuses", plural: true }, commission: { word: "commission", plural: false },
+  commissionByYear: { word: "commission", plural: false }, raise: { word: "raises", plural: true },
   promotion: { word: "promotion", plural: false }, priceGrowth: { word: "share price", plural: false },
   refreshers: { word: "refreshers", plural: true }, hours: { word: "hours", plural: true },
 };

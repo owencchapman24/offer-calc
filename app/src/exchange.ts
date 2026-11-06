@@ -178,7 +178,16 @@ const DRAFT: Shape = (v, p, ps) => {
   // The ESPP arrived on 2026-10-22: optional likewise.
   const e = (v as { espp?: unknown } | null)?.espp;
   if (v && typeof v === "object" && e !== undefined) nullable(either(none, ESPP, "\"none\" or an ESPP"))(e, `${p}.espp`, ps);
+  // Commission arrived on 2026-11-05: optional likewise.
+  const c = (v as { commission?: unknown } | null)?.commission;
+  if (v && typeof v === "object" && c !== undefined) COMMISSION(c, `${p}.commission`, ps);
 };
+
+const COMMISSION: Shape = obj({
+  basis: nullable(oneOf("fixed", "byEmploymentYear")), amount: nullable(scenarios), amounts: arr(nullable(scenarios)),
+  period: nullable(oneOf("month", "quarter")), payAfterDays: nullable(num), mustBeEmployedOnPayDate: nullable(bool),
+  draw: nullable(obj({ monthly: nullable(num), recoverable: nullable(bool), months: nullable(num), onLeaving: nullable(oneOf("kept", "repaid")) })),
+});
 
 const ESPP: Shape = obj({
   contributionPct: nullable(num), eligiblePay: nullable(oneOf("salary", "salaryAndBonus")), discount: nullable(num), lookback: nullable(bool),

@@ -1,6 +1,6 @@
 import { statesOf } from "../../src/col/cities";
 import type {
-  AnnualBonus, ByScenario, CashAward, Clawback, Espp, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
+  AnnualBonus, ByScenario, CashAward, Clawback, Commission, CommissionTerms, Espp, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
 } from "../../src/offer/types";
 import type { FilingStatus } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
@@ -45,6 +45,8 @@ export interface OfferDraft {
     promotions: PromotionDraft[];
   };
   bonus: BonusDraft;
+  /** Commission (docs/v2-plan.md, 4h). A blank amount: none, as the bonus. Absent in drafts saved before 2026-11-05: blank. */
+  commission: CommissionDraft;
   cashAwards: CashAwardDraft[];
   equity: {
     grants: GrantDraft[];
@@ -135,12 +137,12 @@ export function withTimeOff(d: OfferDraft): OfferDraft {
 }
 
 /**
- * A saved draft in today's shape: days off (`withTimeOff`), and no ESPP (2026-10-22) or other benefits (2026-10-23) where it was saved
- * before they could be entered.
+ * A saved draft in today's shape: days off (`withTimeOff`), and no ESPP (2026-10-22), other benefits (2026-10-23) or commission
+ * (2026-11-05) where it was saved before they could be entered.
  */
 export function draftNow(d: OfferDraft): OfferDraft {
   const t = withTimeOff(d);
-  return !t?.hours ? t : { ...t, espp: t.espp ?? null, otherBenefits: t.otherBenefits ?? null };
+  return !t?.hours ? t : { ...t, espp: t.espp ?? null, otherBenefits: t.otherBenefits ?? null, commission: t.commission ?? blankCommission() };
 }
 
 /** Another benefit as entered (4j): its name, dollars a year, and taxable (null: taxable, the default) or tax-free. */
@@ -171,6 +173,38 @@ export interface BonusDraft {
   /** Null: yes. */
   mustBeEmployedOnPayDate: boolean | null;
 }
+
+/** Commission as entered (4h). */
+export interface CommissionDraft {
+  /** Null: dollars a year. "byEmploymentYear": dollars by employment year, the last repeating (D27). */
+  basis: "fixed" | "byEmploymentYear" | null;
+  /** Dollars a year expected; "+ range" adds its low (bear) and high (bull). Null: blank, so no commission. */
+  amount: ByScenario | null;
+  /** byEmploymentYear: dollars for employment years 1, 2, ...; the last repeats. A null year is blank. */
+  amounts: Array<ByScenario | null>;
+  /** Monthly or quarterly (calendar quarters). No default (D24): blank is a problem at the field. */
+  period: "month" | "quarter" | null;
+  /** Days after each period ends that it's paid. No default (D24): blank is a problem at the field. */
+  payAfterDays: number | null;
+  /** Null: paid for work to your last day (D25). true: only if employed on the payout date. */
+  mustBeEmployedOnPayDate: boolean | null;
+  /** Null: no draw. */
+  draw: CommissionDrawDraft | null;
+}
+
+export interface CommissionDrawDraft {
+  /** Dollars a month. */
+  monthly: number | null;
+  /** Guaranteed (false) or recoverable (true). No default: blank is a problem at the field. */
+  recoverable: boolean | null;
+  /** Null: every month you're there. */
+  months: number | null;
+  /** A recoverable draw not earned back when you leave. Null: kept (D28). */
+  onLeaving: "kept" | "repaid" | null;
+}
+
+export const blankCommission = (): CommissionDraft => ({ basis: null, amount: null, amounts: [], period: null, payAfterDays: null,
+  mustBeEmployedOnPayDate: null, draw: null });
 
 export interface ScheduleDraft {
   /** Null: the default preset (25/25/25/25, quarterly after a 1-year cliff). */
@@ -381,6 +415,8 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   };
   const bonus = bonusInput(d.bonus);
   if (bonus) offer.bonus = bonus;
+  const commission = commissionInput(d.commission);
+  if (commission) offer.commission = commission;
   const cash = dropTrailing(d.cashAwards, blankCash);
   if (cash.length) offer.cashAwards = cash.map(cashInput);
   const espp = hasEspp(d) ? d.espp : null;
@@ -427,6 +463,29 @@ function bonusInput(b: BonusDraft): AnnualBonus | undefined {
   return { ...timing, basis, amount: b.amount! };
 }
 
+/**
+ * Commission as entered (4h): a blank or zero amount is none. The period, the payout lag and a draw's kind have no default (D24), so a
+ * blank one is a problem at its field (the validator's); the leaving rule and a recoverable draw's on leaving are at their defaults.
+ */
+function commissionInput(c: CommissionDraft | undefined): Commission | undefined {
+  if (!c) return undefined;
+  const zero = (s: ByScenario | null) => !s || (s.bear === 0 && s.base === 0 && s.bull === 0);
+  const d = c.draw;
+  const terms: CommissionTerms = {
+    period: c.period as CommissionTerms["period"], payAfterDays: req(c.payAfterDays),
+    ...(c.mustBeEmployedOnPayDate !== null ? { mustBeEmployedOnPayDate: c.mustBeEmployedOnPayDate } : {}),
+    ...(d ? { draw: { monthly: req(d.monthly), recoverable: d.recoverable as boolean, ...(d.months !== null ? { months: d.months } : {}),
+      ...(d.recoverable && d.onLeaving !== null ? { onLeaving: d.onLeaving } : {}) } } : {}),
+  };
+  if (c.basis === "byEmploymentYear") {
+    const amounts = dropTrailing(c.amounts, (a) => a === null);
+    if (!amounts.length || amounts.every((a) => a !== null && zero(a))) return undefined;
+    return { ...terms, basis: "byEmploymentYear", amounts: amounts.map((a) => a ?? all(Number.NaN)) };
+  }
+  if (zero(c.amount)) return undefined;
+  return { ...terms, basis: "fixed", amount: c.amount! };
+}
+
 function cashInput(a: CashAwardDraft): CashAward {
   const paidOn = a.paidOn === null ? { daysAfterStart: DRAFT_DEFAULTS.cashDaysAfterStart }
     : typeof a.paidOn === "string" ? a.paidOn : { daysAfterStart: req(a.paidOn.daysAfterStart) };
@@ -467,6 +526,13 @@ function equityInput(e: OfferDraft["equity"], espp = false): OfferInput["equity"
     } } : {}),
   };
 }
+
+/** The offer has commission entered: an amount a year, or one by year, that isn't blank or zero. */
+export const hasCommission = (d: Pick<OfferDraft, "commission">): boolean => {
+  const c = d.commission;
+  const some = (s: ByScenario | null) => !!s && (s.bear !== 0 || s.base !== 0 || s.bull !== 0);
+  return !!c && (c.basis === "byEmploymentYear" ? c.amounts.some(some) : some(c.amount));
+};
 
 /** The offer has an ESPP entered (not "not entered", not none). */
 export const hasEspp = (d: Pick<OfferDraft, "espp">): d is { espp: EsppDraft } => d.espp !== null && d.espp !== "none";
@@ -526,6 +592,7 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
   const r = o.retirement;
   const h = o.health;
   const p = o.espp;
+  const cm = o.commission;
   return {
     label,
     residence: { state: o.residence.state, nyc: o.residence.locality?.kind === "nyc",
@@ -543,6 +610,13 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
       payOn: or(b?.payOn), periodStart: or(b?.periodStart), cutoff: or(b?.cutoff),
       firstPayoutGuaranteed: or(b?.firstPayoutGuaranteed), mustBeEmployedOnPayDate: or(b?.mustBeEmployedOnPayDate),
     },
+    commission: cm ? {
+      basis: cm.basis === "fixed" ? null : cm.basis, amount: cm.basis === "fixed" ? { ...cm.amount } : null,
+      amounts: cm.basis === "byEmploymentYear" ? cm.amounts.map((a) => ({ ...a })) : [], period: cm.period, payAfterDays: cm.payAfterDays,
+      mustBeEmployedOnPayDate: or(cm.mustBeEmployedOnPayDate),
+      draw: cm.draw ? { monthly: cm.draw.monthly, recoverable: cm.draw.recoverable, months: or(cm.draw.months), onLeaving: or(cm.draw.onLeaving) }
+        : null,
+    } : blankCommission(),
     cashAwards: (o.cashAwards ?? []).map((a) => ({
       label: a.label, amount: a.amount, paidOn: typeof a.paidOn === "string" ? a.paidOn : { daysAfterStart: a.paidOn.daysAfterStart },
       clawback: a.clawback ? { months: a.clawback.months, kind: a.clawback.kind, per: or(a.clawback.per), from: or(a.clawback.from),
@@ -579,6 +653,7 @@ export function blankDraft(): OfferDraft {
     salary: { annual: null, raise: null, raiseOn: null, promotions: [] },
     bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
+    commission: blankCommission(),
     cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: null, health: null,
     perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: null }, timeOff: blankTimeOff(),
     costOfLiving: { area: null, monthlyRent: null, rentGrowth: null },
@@ -716,6 +791,7 @@ export function alsoCounted(d: OfferDraft): string[] {
   const b = d.bonus;
   if (b.periodStart || b.cutoff || b.firstPayoutGuaranteed !== null || b.mustBeEmployedOnPayDate !== null
     || (b.payOn && (b.payOn.month !== DRAFT_DEFAULTS.bonusPayOn.month || b.payOn.day !== DRAFT_DEFAULTS.bonusPayOn.day))) out.push("bonus timing");
+  if (hasCommission(d)) out.push("commission");
   if (d.cashAwards.length) out.push(d.cashAwards.every((a) => /sign/i.test(a.label)) ? "sign-on" : "cash awards");
   if (d.equity.grants.length || d.equity.refreshers) out.push("RSUs");
   if (hasEspp(d)) out.push("ESPP");

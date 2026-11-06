@@ -4,7 +4,7 @@ import { expect, type Page } from "@playwright/test";
 // in a fresh browser context, so the sample offers load, as on a first visit.
 
 /** The ledger's sections in detailed mode (app/src/help.ts, LEDGER_SECTIONS). */
-export const SECTIONS = ["pay", "bonus", "cash", "equity", "retirement", "health", "perks", "hours", "where"] as const;
+export const SECTIONS = ["pay", "bonus", "commission", "cash", "equity", "retirement", "health", "perks", "hours", "where"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 /**

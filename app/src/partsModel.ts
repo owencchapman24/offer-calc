@@ -3,7 +3,7 @@ import { daysOff, WORKDAYS_A_YEAR } from "../../src/offer/timeOff";
 import { inSentence } from "./breakevenModel";
 import { workedFrom } from "./byYearModel";
 import { shownYears } from "./footing";
-import { isProratedStep, periodText } from "./leaveModel";
+import { addMonthsIso, commissionPeriod, isProratedStep, periodText } from "./leaveModel";
 import type { A2Part, A6Line } from "./metrics";
 import type { OfferDetail } from "./protocol";
 import { dayBefore, longDate } from "./text";
@@ -82,7 +82,7 @@ export interface Arrival {
   i: number;
   date: ISODate;
   ey: number;
-  kind: "bonus" | "cash" | "rsu" | "espp";
+  kind: "bonus" | "commission" | "cash" | "rsu" | "espp";
   label: string;
   /** To the cent, as the engine posts it. */
   gross: number;
@@ -90,7 +90,10 @@ export interface Arrival {
   note?: string;
 }
 
-/** Every payment that isn't salary in the offer's own stay's employment years, by date: each bonus, cash award, RSU vest and ESPP purchase's gain. */
+/**
+ * Every payment that isn't salary in the offer's own stay's employment years, by date: each bonus, quarterly commission payout (4h;
+ * monthly commission is one line a year, `commissionMonth`), cash award, RSU vest and ESPP purchase's gain.
+ */
 export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
   const list: Array<Omit<Arrival, "i">> = [
     ...d.bonuses.filter((b) => b.ey <= years).map((b) => {
@@ -99,6 +102,8 @@ export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
       return { date: b.date, ey: b.ey, kind: "bonus" as const, label: `Bonus for ${periodText(from, b.periodTo)}`, gross: b.gross,
         ...(days < 360 ? { note: "for part of a year" } : {}) };
     }),
+    ...(d.commissions ?? []).filter((c) => c.ey <= years && c.period === "quarter").map((c) => ({ date: c.date, ey: c.ey, kind: "commission" as const,
+      label: `Commission for ${commissionPeriod(c)}`, gross: c.gross, ...(c.drawn > 0.005 ? { note: "after the draws paid with salary" } : {}) })),
     ...(d.cash ?? []).filter((c) => c.ey <= years).map((c) => ({ date: c.date, ey: c.ey, kind: "cash" as const, label: c.award, gross: c.gross })),
     ...d.rsus.filter((v) => v.ey <= years).map((v) => ({
       date: v.date, ey: v.ey, kind: "rsu" as const, label: `RSU vest, ${v.refresher ? "a refresher" : "the new-hire grant"}, ${v.tranche} of ${v.tranches}`,
@@ -107,8 +112,21 @@ export function arrivalsOf(d: OfferDetail, years: number): Arrival[] {
     ...d.espps.filter((p) => p.ey <= years).map((p) => ({ date: p.date, ey: p.ey, kind: "espp" as const, label: esppName(p), gross: p.gross,
       note: "its gain, sold at once" })),
   ];
-  const order = { bonus: 0, cash: 1, rsu: 2, espp: 3 };
+  const order = { bonus: 0, commission: 1, cash: 2, rsu: 3, espp: 4 };
   return list.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind]).map((x, i) => ({ ...x, i }));
+}
+
+/**
+ * Commission paid monthly (4h), for A-3's note: the expected amount a month in year 1 (as entered, before any draw), the days after each
+ * month it's paid, the first payout; and a draw's monthly amount and its last day. Null without commission.
+ */
+export function commissionMonth(o: OfferInput | null | undefined, d: OfferDetail): { monthly: number | null; lag: number; first: OfferDetail["commissions"][number] | null;
+  draw: { monthly: number; until: ISODate | null } | null } | null {
+  const c = o?.commission;
+  if (!c) return null;
+  const year1 = (c.basis === "fixed" ? c.amount : c.amounts[0]).base;
+  const w = c.draw && c.draw.monthly > 0 ? { monthly: c.draw.monthly, until: c.draw.months !== undefined ? dayBefore(addMonthsIso(o.startDate, c.draw.months)) : null } : null;
+  return { monthly: c.period === "month" ? year1 / 12 : null, lag: c.payAfterDays, first: c.period === "month" ? d.commissions[0] ?? null : null, draw: w };
 }
 
 /** "ESPP purchase, the offering from Jan 1, 2027", "ESPP purchase 2 of 4, ...". */
@@ -119,7 +137,7 @@ export const esppName = (p: { offeringStart: ISODate; purchase: number; purchase
 export const arrivalShown = (a: Arrival) => R(a.gross);
 
 /** A-3's lines: pay by kind, footed into pay each year. A-7's lines, the same figures and ids. */
-export const PAY_LINES = ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback", "gross"] as const;
+export const PAY_LINES = ["salary", "bonus", "commission", "cash", "rsu", "espp", "benefit", "clawback", "gross"] as const;
 export const payRows = (t: YearTable) => t.rows.filter((r) => (PAY_LINES as readonly string[]).includes(r.line) && r.section === "cash");
 
 // ---- A-4: terms that can bite -----------------------------------------------------------------------------------------------
@@ -127,7 +145,9 @@ export const payRows = (t: YearTable) => t.rows.filter((r) => (PAY_LINES as read
 /** A cliff inside the stay, as A-4 lists it: by itself, or a prorated clawback's monthly steps as one line. */
 export type CliffLine =
   | { kind: "cliff"; i: number; cliff: Cliff }
-  | { kind: "steps"; award: string; perMonth: number; from: ISODate; until: ISODate };
+  | { kind: "steps"; award: string; perMonth: number; from: ISODate; until: ISODate }
+  /** Monthly commission paid only to those employed on the payout date (4h): each month's payout a cliff, as one line. */
+  | { kind: "monthly"; from: ISODate; until: ISODate; count: number };
 
 /** The cliffs inside the stay in date order, each with its place in the list (its figure's id), a prorated clawback's steps as one line. */
 export function cliffLines(cliffs: Cliff[]): CliffLine[] {
@@ -140,6 +160,9 @@ export function cliffLines(cliffs: Cliff[]): CliffLine[] {
       steps.set(award, [...(steps.get(award) ?? []), c]);
       const line = out.find((x): x is Extract<CliffLine, { kind: "steps" }> => x.kind === "steps" && x.award === award)!;
       line.until = c.date;
+    } else if (c.detail.kind === "commission" && c.detail.period === "month") {
+      const line = out.find((x): x is Extract<CliffLine, { kind: "monthly" }> => x.kind === "monthly");
+      if (line) { line.until = c.date; line.count++; } else out.push({ kind: "monthly", from: c.date, until: c.date, count: 1 });
     } else out.push({ kind: "cliff", i, cliff: c });
   });
   return out;
@@ -155,6 +178,7 @@ export function cliffCost(c: Cliff): string {
     case "clawbackStep": return "the clawback shrinks";
     case "vacationPayout": return "leave before and unused vacation isn't paid";
     case "esppPurchase": return "leave the day before and what you put toward it comes back without the gain";
+    case "commission": return "leave the day before and it's forfeited";
   }
 }
 
@@ -165,6 +189,7 @@ export function cliffName(c: Cliff): string {
   if (d.kind === "cash") return `the ${inSentence(d.award.trim() || "cash award")}`;
   if (d.kind === "vacationPayout") return "unused vacation starts being paid when you leave";
   if (d.kind === "espp") return `an ESPP purchase (the offering from ${longDate(d.offeringStart)})`;
+  if (d.kind === "commission") return `the commission for ${commissionPeriod(d)}`;
   if (d.kind === "rsu") return `an RSU vest (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
   if (d.kind === "retirementVest") return `your employer 401(k) money vests to ${Math.round(d.vestedShare * 100)}%`;
   if (d.kind === "clawbackStep") return `the ${inSentence(d.award.trim() || "award")}'s clawback ends`;

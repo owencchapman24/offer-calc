@@ -58,7 +58,8 @@ export interface OfferDetail {
    * Each employment year's payments as posted: each to the cent, as the engine rounds it, added exactly, by component, and their tax.
    * L-6 lists the payments; the year figures (footing.ts) round these sums, so a year's lines tie to its payments.
    */
-  posted: Array<{ ey: number; salary: number; bonus: number; cash: number; rsu: number; clawback: number; espp: number; benefit: number; tax: number }>;
+  posted: Array<{ ey: number; salary: number; bonus: number; commission: number; cash: number; rsu: number; clawback: number; espp: number;
+    benefit: number; tax: number }>;
   /** Bonus payments: when, how much, for which stretch of work. */
   bonuses: Array<{ ey: number; date: ISODate; gross: number; periodFrom: ISODate; periodTo: ISODate }>;
   /** RSU vests: when, how much, which grant, and the date the schedule named if a company vest date moved it. */
@@ -71,6 +72,19 @@ export interface OfferDetail {
    * taxable one's pay, with its tax; a tax-free one's face value), each to the cent, added exactly.
    */
   others: Array<{ ey: number; index: number; label: string; taxable: boolean; amount: number; tax: number }>;
+  /**
+   * Commission payouts (4h): when, how much, for which period, what the period earned and the draws paid for it (A-3's dates). A
+   * period its draws covered pays $0 and isn't a payout.
+   */
+  commissions: Array<{ ey: number; date: ISODate; gross: number; period: "month" | "quarter"; periodFrom: ISODate; periodTo: ISODate;
+    earnedFrom: ISODate; earnedTo: ISODate; earned: number; drawn: number }>;
+  /**
+   * Commission's timing by employment year (4h), for the bridge, unrounded: what the year earned (`earned`), what the periods paid out
+   * in it earned (`paidFor`, their commission before draws), what the year earned that's paid in a later year (`later`, from
+   * `laterFrom` to the year's end, on `laterPaid`), and what earlier years earned that it pays (`before`).
+   */
+  commissionTiming: Array<{ ey: number; earned: number; paidFor: number; later: number; laterFrom: ISODate | null; laterPaid: ISODate[];
+    before: number }>;
   /** ESPP purchases, each sold the same day (4i): when, the gain, and which offering's purchase. */
   espps: Array<{ ey: number; date: ISODate; gross: number; offeringStart: ISODate; purchase: number; purchases: number }>;
 }
@@ -171,6 +185,12 @@ export interface LeavePanel {
   vacation: { banked: number; paid: number; annual: number | null; rule: VacationPayoutRule | null };
   /** ESPP money put toward a purchase after `leaveDate`, refunded that day without a gain (4i). */
   esppRefund: number;
+  /**
+   * Commission (4h): each payout after `leaveDate` for work done by it (part of `paid`), and a recoverable draw not earned back by
+   * then, kept or repaid (the repaid part is a clawback). Null without commission.
+   */
+  commission: { after: Array<{ date: ISODate; gross: number; period: "month" | "quarter"; periodFrom: ISODate; periodTo: ISODate;
+    earnedFrom: ISODate; earnedTo: ISODate }>; drawBalance: number; drawRepaid: number } | null;
 }
 
 /** L-4's panel at a last day for a comparison: L-4 and the document ask alike, so they share the result. */

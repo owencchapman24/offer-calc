@@ -6,7 +6,7 @@ import type { Household as EngineHousehold, OfferInput } from "../../src/offer/t
 import { validateOffer } from "../../src/offer/validate";
 import { computeTaxes, type Locality, paramsForYear, type TaxInput } from "../../src/tax";
 import { aboutYou, appOffers, type Case, cases, type Household, type Place, PLACES, runs } from "./arbitrary";
-import { ASSUMPTIONS, blankTimeOff, firstYear, toHousehold, toOfferInput } from "./model";
+import { ASSUMPTIONS, blankCommission, blankTimeOff, firstYear, toHousehold, toOfferInput } from "./model";
 
 // Properties of the engine as the app drives it, over generated offers and households (arbitrary.ts), where the samples'
 // hand-checked numbers can't reach. Each states what should hold for anyone; a counterexample is shrunk to the smallest case
@@ -111,6 +111,7 @@ describe("the comparison window", () => {
     salary: { annual, raise: null, raiseOn: null, promotions: [] },
     bonus: { basis: "fixed", amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
       mustBeEmployedOnPayDate: null },
+    commission: blankCommission(),
     cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: null, health: null,
     perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: { bear: 35, base: 35, bull: 35 } }, timeOff: blankTimeOff(),
     costOfLiving: { area: "35620", monthlyRent: 800, rentGrowth },

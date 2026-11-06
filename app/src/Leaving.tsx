@@ -4,7 +4,7 @@ import { niceTicks, useChartWidth } from "./axes";
 import { Fig, useRovingTicks } from "./figures";
 import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
-  forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, sliderText, valueAt, worked,
+  commissionForfeits, forfeits, forfeitText, leaveWarningTexts, MARKS, onAxis, reconcile, segmentText, sliderText, valueAt, worked,
 } from "./leaveModel";
 import { inSentence } from "./breakevenModel";
 import { shownStay } from "./footing";
@@ -290,6 +290,9 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
   const n = panel.next;
   const value = n ? (basis === "cash" ? n.valueOfStaying.afterTaxComp : n.valueOfStaying.totalRewards) : 0;
   const fs = forfeits(panel.warnings, start);
+  const cm = panel.commission;
+  const toCome = cm ? cm.after.reduce((s, x) => s + x.gross, 0) : 0;
+  const lostCommission = commissionForfeits(panel.warnings).reduce((s, w) => s + w.forfeited, 0);
   return (
     <li className="leave-offer">
       <p className="leave-line">
@@ -303,6 +306,14 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
         {panel.esppRefund >= 0.5 && (
           <>, get back <Fig id={`refund.${letter}`} label={`${dollars(panel.esppRefund)} put toward an ESPP purchase, given back`}>{dollars(panel.esppRefund)}</Fig> put
             toward an ESPP purchase</>
+        )}
+        {toCome >= 0.5 && (
+          <>, with <Fig id={`tocome.${letter}`} label={`${dollars(toCome)} of commission paid after the last day, before tax`}>{dollars(toCome)}</Fig> of
+            commission paid after it</>
+        )}
+        {cm && cm.drawBalance >= 0.5 && cm.drawRepaid < 0.5 && (
+          <>, keep <Fig id={`drawkept.${letter}`} label={`${dollars(cm.drawBalance)} of a recoverable draw not earned back, kept`}>{dollars(cm.drawBalance)}</Fig> of
+            a recoverable draw not earned back</>
         )}
         {owed.length > 0 && (
           <>
@@ -350,6 +361,13 @@ function Offer({ letter, start, panel, basis, axis, line, ctx }: {
                     </span>
                   );
                 })}: you must be employed on the payout date.
+              </li>
+            )}
+            {lostCommission >= 0.5 && (
+              <li>
+                <span className="warn-icon" aria-hidden="true">⚠</span> Leaving then forfeits{" "}
+                <Fig id={`forgonec.${letter}`} label={`${dollars(lostCommission)} of commission forfeited`}>{dollars(lostCommission)}</Fig> of commission
+                earned by then: it's paid only to those employed on its payout date.
               </li>
             )}
             {leaveWarningTexts(panel.warnings).map((x) => <li key={x}><span className="warn-icon" aria-hidden="true">⚠</span> {x}</li>)}

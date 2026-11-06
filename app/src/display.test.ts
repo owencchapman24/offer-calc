@@ -12,7 +12,7 @@ import { firstLastDay, leaveAxis } from "./leaveModel";
 import type { Derivation, MetricId, WorkContext } from "./metrics";
 import { compareOf, contextOf, footsAsDisplayed, half, parseShown, renderAlone, renderBreakdowns, renderPage, withLeave, withTies, withWork } from "./testing";
 import { ownView } from "./breakdownModel";
-import { blankTimeOff, toOfferInput } from "./model";
+import { blankCommission, blankTimeOff, toOfferInput } from "./model";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { marginText, verdict } from "./verdict";
@@ -232,6 +232,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         salary: { annual: 30_000, raise: null, raiseOn: null, promotions: [{ on: "2028-03-09", stepUp: 0, scenarios: null }] },
         bonus: { basis: null, amount: { bear: 0, base: 0, bull: 0 }, amounts: [], payOn: { month: 1, day: 1 }, periodStart: null, cutoff: null,
           firstPayoutGuaranteed: null, mustBeEmployedOnPayDate: null },
+        commission: blankCommission(),
         cashAwards: [
           { label: "Award 1", amount: 1_000, paidOn: null, clawback: { months: 14, kind: null, per: null, from: null, repay: null } },
           { label: "Award 2", amount: 40_000, paidOn: "2027-08-22", clawback: { months: 7, kind: null, per: null, from: null, repay: null } },
@@ -246,6 +247,7 @@ describe("the page, for the cases the nightly fuzz run found", () => {
         salary: { annual: 30_000, raise: null, raiseOn: null, promotions: [] },
         bonus: { basis: null, amount: null, amounts: [], payOn: null, periodStart: null, cutoff: null, firstPayoutGuaranteed: null,
           mustBeEmployedOnPayDate: null },
+        commission: blankCommission(),
         cashAwards: [], equity: { grants: [], priceGrowth: null, refreshers: null }, espp: null, retirement: "none",
         health: { premium: 0, outOfPocket: { low: 0, medium: 0, high: 0 }, oopMax: null, employeeHsa: null, employerHsa: 0, coverage: null },
         perks: { section127: null, commuterMonthly: null }, otherBenefits: null, hours: { weekly: null }, timeOff: blankTimeOff(),

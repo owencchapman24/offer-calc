@@ -119,9 +119,14 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     retirementForfeited: r.leave!.retirementForfeited,
     unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
     next: nextCliff(o, req.household, req.leaveDate, options, { skip: proratedStep }).next,
-    warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica"),
+    warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica" || w.code === "commissionForfeited"),
     vacation: { ...r.leave!.vacation, annual: payout?.detail.kind === "vacationPayout" ? payout.detail.annual : null },
     esppRefund: r.leave!.esppRefund,
+    commission: r.leave!.commission ? {
+      after: r.events.flatMap((e) => (e.detail.kind === "commission" && e.date > req.leaveDate ? [{ date: e.date, gross: e.gross, period: e.detail.period,
+        periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo, earnedFrom: e.detail.earnedFrom, earnedTo: e.detail.earnedTo }] : [])),
+      drawBalance: r.leave!.commission.drawBalance, drawRepaid: r.leave!.commission.drawRepaid,
+    } : null,
   };
 }
 

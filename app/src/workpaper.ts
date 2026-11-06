@@ -5,6 +5,7 @@ import { cashName, taxFreeNames } from "./byYearModel";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { OfferDetail, TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
+import { commissionPeriod } from "./leaveModel";
 
 // A-7 · The work (docs/ui-design.md §4.8, L-6 until stop 5B; docs/v2-plan.md, item 5): an offer's employment years line by line
 // (cash; total rewards and hours; after rent), its stay's totals, every payment with its formula and tax, and each calendar year's
@@ -45,7 +46,7 @@ export interface L6Row {
 
 /** What each subtotal adds up: its lines, in order (those shown). */
 export const FOOTS: Partial<Record<L6Line, L6Line[]>> = {
-  gross: ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback"],
+  gross: ["salary", "bonus", "commission", "cash", "rsu", "espp", "benefit", "clawback"],
   afterTax: ["gross", "tax", "premiums"],
   takeHome: ["afterTax", "yours", "esppHeld"],
   totalRewards: ["afterTax", "employer", "oop", "hsa", "perks"],
@@ -96,6 +97,9 @@ export function yearTable(ctx: WorkContext, letter: L): YearTable {
   // Cash: what's paid, its tax, and what reaches you.
   line("salary", "cash", "Salary", (y) => y.salary);
   if (any((y) => y.bonus)) line("bonus", "cash", "Bonus", (y) => y.bonus);
+  if (any((y) => y.commission)) {
+    line("commission", "cash", "Commission", (y) => y.commission, o?.draft.commission.draw ? { gloss: "its payouts, and the draw against it paid with salary" } : {});
+  }
   if (any((y) => y.cash)) line("cash", "cash", cap(cashName(o)), (y) => y.cash);
   if (any((y) => y.rsu)) line("rsu", "cash", "RSUs vested", (y) => y.rsu);
   if (any((y) => y.espp)) line("espp", "cash", "ESPP gain", (y) => y.espp, { gloss: "shares bought at a discount and sold the same day" });
@@ -268,10 +272,11 @@ export const addCents = (xs: number[]) => xs.reduce((s, x) => s + Math.round(x *
 const TO_CENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const toCent = (x: number) => `${x < 0 ? "−" : ""}${TO_CENT.format(Math.abs(x))}`;
 
-export const COMPONENTS: Component[] = ["salary", "bonus", "cash", "rsu", "espp", "benefit", "clawback"];
+export const COMPONENTS: Component[] = ["salary", "bonus", "commission", "cash", "rsu", "espp", "benefit", "clawback"];
 /** Each kind of payment's name in the list. */
 export const KIND_NAME: Record<Component, string> = {
-  salary: "Salary", bonus: "Bonus", cash: "Cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "Taxable benefits", clawback: "Clawbacks",
+  salary: "Salary", bonus: "Bonus", commission: "Commission", cash: "Cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "Taxable benefits",
+  clawback: "Clawbacks",
 };
 
 export interface PaymentGroup {
@@ -335,6 +340,8 @@ export function exactPay(p: WorkPayment): number {
   switch (d.kind) {
     case "salary": return (d.annual / 12) * (d.days / d.daysInMonth);
     case "bonus": return d.basis === "percentOfSalary" ? d.rate * d.salaryEarned : (d.amount * d.daysEmployed) / d.periodDays;
+    case "commission": return d.earned - d.drawn - d.balanceIn;
+    case "commissionDraw": return d.monthly * (d.days / d.daysInMonth);
     case "cash": return d.amount;
     case "rsu": return d.fraction * d.grantValue * d.priceFactor;
     case "clawback": return p.gross;
@@ -358,6 +365,13 @@ export function paymentLabel(p: WorkPayment): string {
       return d.days === d.daysInMonth ? `Salary, ${MONTHS[m - 1]} ${y}` : `Salary, ${SHORT[m - 1]} ${a}${a === b ? "" : ` – ${b}`}, ${y}`;
     }
     case "bonus": return `Bonus for ${periodText(d.periodFrom, d.periodTo)}`;
+    case "commission": return `Commission for ${commissionPeriod(d)}`;
+    case "commissionDraw": {
+      const [y, m, a] = parts(d.from);
+      const [, , b] = parts(d.to);
+      return d.days === d.daysInMonth ? `Draw against commission, ${MONTHS[m - 1]} ${y}`
+        : `Draw against commission, ${SHORT[m - 1]} ${a}${a === b ? "" : ` – ${b}`}, ${y}`;
+    }
     case "cash": return d.award;
     case "rsu": return `${d.grant.kind === "grant" ? d.grant.label : `${d.grant.label ?? "Refresher"} ${d.grant.number}`}, tranche ${d.tranche} of ${d.tranches}`;
     case "clawback": return `${d.award} repaid`;
@@ -369,6 +383,17 @@ export function paymentLabel(p: WorkPayment): string {
       return d.days === d.daysInMonth ? `${d.label}, ${MONTHS[m - 1]} ${y}` : `${d.label}, ${SHORT[m - 1]} ${a}${a === b ? "" : ` – ${b}`}, ${y}`;
     }
   }
+}
+
+/** A commission period's runs at one monthly rate, joined across an anniversary where the rate doesn't change. */
+export function rateRuns(pieces: Array<{ monthly: number; months: number }>): Array<{ monthly: number; months: number }> {
+  const out: Array<{ monthly: number; months: number }> = [];
+  for (const p of pieces) {
+    const last = out[out.length - 1];
+    if (last && last.monthly === p.monthly) last.months += p.months;
+    else out.push({ monthly: p.monthly, months: p.months });
+  }
+  return out;
 }
 
 /** "2026" for a calendar-year period; "Jul 1, 2026 – Jun 30, 2027" otherwise. */
@@ -386,6 +411,11 @@ export function paymentFormula(p: WorkPayment): string {
     case "bonus": return d.basis === "percentOfSalary"
       ? `${percent(d.rate)} of ${toCent(d.salaryEarned)} salary earned in the period`
       : `${amount(d.amount)}${d.employmentYear ? ` (year ${d.employmentYear}'s)` : ""} × ${d.daysEmployed}/${d.periodDays} days worked`;
+    case "commission": {
+      const runs = rateRuns(d.pieces).map((p) => `${amount(+p.monthly.toFixed(2))} a month × ${+p.months.toFixed(4)} months`).join(" + ");
+      return `${runs}${d.drawn > 0.005 ? ` − ${toCent(d.drawn)} drawn` : ""}${d.balanceIn > 0.005 ? ` − ${toCent(d.balanceIn)} draw not yet earned back` : ""}`;
+    }
+    case "commissionDraw": return `${amount(d.monthly)} a month${d.days === d.daysInMonth ? "" : ` × ${d.days}/${d.daysInMonth} days`}, against commission`;
     case "cash": return "paid once";
     case "rsu": return `${amount(d.grantValue)} × ${+(d.fraction * 100).toFixed(4)}%${Math.abs(d.priceFactor - 1) > 1e-9 ? ` × ${d.priceFactor.toFixed(4)} share-price growth` : ""}`
       + `${d.nominalDate ? `; due ${longDate(d.nominalDate)}, vests on the company's next date` : ""}`;

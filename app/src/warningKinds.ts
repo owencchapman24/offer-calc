@@ -11,7 +11,7 @@ export type WarningKind = "changes" | "notModeled" | "cash";
 export const WARNING_KIND: Record<OfferWarning["code"], WarningKind | null> = {
   k401Cap: "changes", hsaCap: "changes", section127Cap: "changes", commuterCap: "changes", bonusCutoff: "changes", esppCap: "changes",
   convenienceRule: "notModeled", unlimitedVacation: "notModeled", esppSoldAtPurchase: "notModeled", taxFreeAsEntered: "notModeled", withholdingShortfall: "cash", bonusForfeited: null,
-  clawbackFica: null,
+  clawbackFica: null, commissionEvenly: "notModeled", drawNotEarnedBack: "notModeled", commissionForfeited: null,
 };
 
 /** A calendar year a warning is about, if it's about one (a limit reached that year, a shortfall on its pay). */
