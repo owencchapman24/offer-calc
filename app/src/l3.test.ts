@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { breakeven, comparisonWindow } from "../../src/offer/compare";
+import { breakeven } from "../../src/offer/breakeven";
+import { comparisonWindow } from "../../src/offer/compare";
 import { projectScenario } from "../../src/offer/project";
 import type { OfferInput, ValueBasis } from "../../src/offer/types";
 import { cashLever, scalesText, tieView } from "./breakevenModel";

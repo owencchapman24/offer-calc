@@ -118,8 +118,9 @@ section 2's and the plan's in step):
 - `npm run fuzz`: the property tests (`app/src/properties.test.ts`, `display.test.ts`) on a random seed at ten times `npm test`'s
   runs, shrinking each counterexample; it prints the seed (`FUZZ_SEED=<seed> npm run fuzz` replays it). CI runs it nightly.
 - `npm run dev` / `build` / `preview`: the app (Vite, `app/vite.config.ts`), built to `dist/`.
-- `npm run check-bundle` (after a build): the main thread, a quick-mode visit, against 120 kB gzip in one chunk; the worker against
-  75 kB gzip; the stylesheet reported (`scripts/lib/bundle.ts`).
+- `npm run check-bundle` (after a build): the main thread, a quick-mode visit, against 120 kB gzip in one chunk; what the worker
+  loads before its first answer (its script and every chunk that imports statically) against 75 kB gzip; the stylesheet, and what
+  the worker loads on first use, reported (`scripts/lib/bundle.ts`).
 - `npm run lighthouse [-- <url>]` (after a build): Lighthouse's mobile profile, a warm-up and five runs. Fails on a median LCP over
   2.5 s, CLS over 0.02 or TBT over 200 ms, or a run that shows no answer (A-1 on a first visit, or the verdict); reports the time to the first answer (observed, not
   budgeted). Needs Chrome or `CHROME_PATH` (Edge on Windows). The median LCP's run's report goes to `.lighthouse/report.html`.
@@ -154,6 +155,10 @@ section 2's and the plan's in step):
   except `test/law.test.ts`.
 - No misleading defaults: raises, price growth, refreshers and the savings rate default to 0, shown in the assumptions. The engine
   has no default inflation; the offer model defaults to 2.5%, shown.
+- A feature only some offers have is an optional module (`src/offer/optional.ts`: the ESPP's and commission's): the engine reaches it
+  through `optional(name)`, never an import, so the worker can load it on first use; an offer whose module isn't loaded throws.
+  `index.ts` provides every one for scripts and tests (`test/setup.ts`). A new one goes in `OptionalModules` and `needs`, `index.ts`
+  and the worker's `modules`; `imports.test.ts` fails if another engine module imports it.
 - Generated data isn't edited by hand: `src/col/rpp.json`, `fmr.json` and `cities.json` (a test fails if the city list is stale).
 
 **The app:**
@@ -180,6 +185,11 @@ section 2's and the plan's in step):
   - Which lazy chunks import a main-thread module moves Rolldown's chunking, not only what's new: `LeadVerdict.tsx` imports
     `metrics.ts` at run time (`basisPhrase`) and `verdict.ts` doesn't. Without the first, `prices.ts` and the city list split off the
     main chunk; with the second, `model.ts`, `protocol.ts` and `text.ts` did (2026-10-16). `npm run check-bundle` catches either.
+  - The worker's first answer waits for its script and every chunk it imports statically, all counted against 75 kB; the rest loads
+    on first use, reported (`engine.worker.ts`): the slow jobs (`slowJobs.ts`, with `leave.ts`, `breakeven.ts` and `cliffs.ts`, which
+    only they use) on the first slow request, and each optional module on the first request with an offer that has one. A lazy
+    chunk imports what it shares from the worker's script, already loaded. Engine code only the slow jobs use goes in a module of its
+    own (as `leave.ts`), or it stays in the first answer's script. 74.14 kB before the split, 70.07 after (2026-11-06).
 - **The year figures as shown:** every figure is rounded once, where it's worked out, and a subtotal is the sum of the rounded items
   above it, so every column adds up as displayed and a figure shown in two places is one figure (`footing.ts`). Every Show the work
   foots as displayed exactly (`footsAsDisplayed`); a present value's total stays the engine's, with one line taking the rounding
@@ -378,9 +388,10 @@ section 2's and the plan's in step):
   Philadelphia, a flat local rate); `schedule.ts`, `types.ts`.
 - `tax/params/`: `index.ts` (`paramsForYear`, `saltForYear`, `BASE_YEAR`), `federal2026.ts`, `states2026.ts`, `local2026.ts`;
   `federal2027.ts` (amounts published for 2027 so far) and `enacted.ts` (`ENACTED`, the list of them by year).
-- `offer/`: `types.ts` (authoritative over `docs/offer-model.md`); `project.ts` (`projectScenario`, the leave-date sweeps,
-  `keptIfLeaving`); `compare.ts` (`compareOffers`, `comparisonWindow`, `breakeven`/`breakevenSteps`, `rentFlip`/`rentFlipFrom`,
-  `horizonSweep`, annuity terms); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
+- `offer/`: `types.ts` (authoritative over `docs/offer-model.md`); `index.ts` (the engine in full, its optional modules provided);
+  `project.ts` (`projectScenario`); `leave.ts` (the leave-date sweeps, `keptIfLeaving`); `compare.ts` (`compareOffers`,
+  `comparisonWindow`, `rentFlipFrom`, `horizonSweep`, annuity terms); `breakeven.ts` (`breakeven`/`breakevenSteps`, `rentFlip`);
+  `optional.ts` (the optional modules: `optional`, `provide`, `needs`); `cliffs.ts`; `withholding.ts` (`withholdingShortfall`); `validate.ts` (`validateOffer`: problems
   as codes and paths); `streams.ts` (salary, bonus, cash); `vesting.ts`; `presets.ts` (the vesting presets, main-thread safe);
   `clawback.ts`; `benefits.ts` (401(k), health, perks); `timeOff.ts` (days off and weeks worked, the vacation-payout states, the
   payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); `commission.ts` (commission's draws,
@@ -416,9 +427,10 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `comparability.ts` (a cost counted for some offers but not others).
 - **State:** `model.ts` (the offer draft ↔ `OfferInput`, the samples), `session.ts` (the session, schema 3, in localStorage under
   `offer-calc:v1`), `exchange.ts` (JSON export and import).
-- **The worker:** `engine.worker.ts`, `compute.ts` (the fast lane: per edit; each offer's breakdown, remembered by its inputs, and with
-  two or more the comparison), `slowJobs.ts` (L-3's and L-4's jobs, A-4's cliffs, A-7's payments),
-  `jobs.ts` (the two lanes), `protocol.ts` (messages), `useEngine.ts` (debounced 200 ms, stale results dropped).
+- **The worker:** `engine.worker.ts` (what each request waits to load), `compute.ts` (the fast lane: per edit; each offer's breakdown,
+  remembered by its inputs, and with two or more the comparison), `slowJobs.ts` (L-3's and L-4's jobs, A-4's cliffs, A-7's payments;
+  loaded on first use), `jobs.ts` (the two lanes, and loading on first use in order), `protocol.ts` (messages), `useEngine.ts`
+  (debounced 200 ms, stale results dropped).
 - **Show the work:** `figures.tsx` (`Fig`, `TickButton`, `CsvButton`), `Tickmarks.tsx` (`WorkProvider`, the popover), `metrics.ts`
   (metric ids, tickmark kinds, the rent note), `derive.ts` (the derivations, loaded on first use), `sections.ts` (methodology ids).
 - **Out of the page:** `copyDoc.ts` (Copy as document: the comparison, one offer's breakdown, or both), `csv.ts`, `print.ts`, each
@@ -429,7 +441,8 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
 
 **The tests, and what each guards** (`app/src`, unless named):
 - the engine: `test/offer.test.ts` (hand-worked projections), `test/tax.test.ts`, `test/params.test.ts` (projection mechanics),
-  `test/validate.test.ts` (each problem at its path), `test/law.test.ts` (the law as published);
+  `test/validate.test.ts` (each problem at its path), `test/law.test.ts` (the law as published), `test/optional.test.ts` (an
+  offer is never projected without its optional module);
 - every figure on the page: `metrics.test.ts` (each tickmark's kind, section and derivation; the hero and the bridge against the
   design's worked examples), `l6.test.ts` (A-7, L-1 and the bridge footing and tying), `display.test.ts` and `properties.test.ts`
   (property tests over generated offers: every derivation foots as displayed, no NaN, one figure reads the same everywhere; an
@@ -439,14 +452,15 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   to A-7 against it, a breakdown that adding offers doesn't change, the step to the comparison's window);
 - each schedule and output: `l3`, `leave` (L-4), `l5` (A-6's warnings), `csv`, `copydoc` (each document's footing and stated calculations), `ticks`, `names` (buttons' names),
   `phone`;
-- inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes);
-- the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the lock, the hooks linter),
+- inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes, and loading on first use);
+- the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the worker's chunks among them, the lock, the hooks
+  linter),
   `e2e/lib/exceptions.test.ts`;
 - the docs: `scripts/lib/docs.test.ts` (every doc indexed in section 11, historical ones marked at their head, every
   `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
   here, and as v2's plan says).
 
-**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
+**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
 scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:
 `bundle.ts`, `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
 `eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { toDays } from "../../src/offer/dates";
-import { keptIfLeaving, leaveDateSweep } from "../../src/offer/project";
+import { keptIfLeaving, leaveDateSweep } from "../../src/offer/leave";
 import { derive } from "./derive";
 import { Leaving } from "./Leaving";
 import { Risk } from "./Risk";
