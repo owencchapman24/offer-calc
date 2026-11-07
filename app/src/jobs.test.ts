@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRunner } from "./jobs";
+import { createRunner, inOrder, onFirstUse } from "./jobs";
 
 // The worker's two lanes (docs/ui-design.md §3.4), stepped by hand: `tick` runs one scheduled step,
 // as the worker's event loop would between messages.
@@ -77,5 +77,58 @@ describe("priority", () => {
     h.runner.fast("edit");
     h.drain();
     expect(h.log).toEqual(["l4 1", "flip 1", "fast edit", "flip 2", "flip 3", "flip done", "l3 1", "l4 2", "l3 2", "l3 done", "l4 3", "l4 done"]);
+  });
+});
+
+// Code the worker loads on first use (engine.worker.ts): the slow jobs and the engine's optional modules.
+describe("loading on first use", () => {
+  /** A load the test settles by hand. */
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("loads once, then needs no wait; a failed load is tried again", async () => {
+    let calls = 0;
+    let fail = true;
+    const m = onFirstUse(() => (calls++, fail ? Promise.reject(new Error("offline")) : Promise.resolve("module")));
+    await expect(m.load()).rejects.toThrow("offline");
+    expect(m.value).toBeUndefined();
+    fail = false;
+    const a = m.load();
+    expect(m.load()).toBe(a); // one load at a time
+    await expect(a).resolves.toBe("module");
+    expect([m.value, m.load(), calls]).toEqual(["module", null, 2]);
+  });
+
+  it("a message with nothing to wait for goes on at once, unless one before it is still waiting", async () => {
+    const log: string[] = [];
+    const receive = inOrder<string>((m, error) => log.push(error ? `${m}: ${error.message}` : m));
+    receive("1", null);
+    expect(log).toEqual(["1"]);
+    const load = deferred<unknown>();
+    receive("2", load.promise);
+    receive("3", null); // behind 2
+    await settle();
+    expect(log).toEqual(["1"]);
+    load.resolve(undefined);
+    await settle();
+    expect(log).toEqual(["1", "2", "3"]);
+    receive("4", null); // nothing waiting now: at once
+    expect(log).toEqual(["1", "2", "3", "4"]);
+  });
+
+  it("a failed load hands its message on with the error, and those behind it go on as usual", async () => {
+    const log: string[] = [];
+    const receive = inOrder<string>((m, error) => log.push(error ? `${m}: ${error.message}` : m));
+    const load = deferred<unknown>();
+    receive("1", load.promise);
+    receive("2", Promise.resolve());
+    load.reject(new Error("offline"));
+    await settle();
+    expect(log).toEqual(["1: offline", "2"]);
   });
 });

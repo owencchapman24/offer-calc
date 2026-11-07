@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { closure, dynamicTargets, importsOf, resolveImport } from "./imports";
 
 // The source rules behind the bundle's shape (CLAUDE.md, Bundles). The build check (scripts/check-bundle.ts) fails when the
-// main thread splits into chunks or outgrows its budget; these say which import would cause it, before a build.
+// main thread splits into chunks or outgrows its budget; these say which import would cause it, before a build. Likewise for what the worker loads
+// before its first answer, and what it loads on first use.
 
 const ROOT = resolve(import.meta.dirname, "../..").replace(/\\/g, "/");
 const app = (f: string) => `${ROOT}/app/src/${f}`;
@@ -77,5 +78,21 @@ describe("the main thread's rules", () => {
       const direct = importsOf(readFileSync(f, "utf8")).filter((i) => !i.typeOnly && !i.dynamic).map((i) => resolveImport(i.specifier, f));
       expect({ schedule: rel(f), tickmarks: direct.includes(app("Tickmarks.tsx")) }).toEqual({ schedule: rel(f), tickmarks: false });
     }
+  });
+});
+
+describe("the worker's rules", () => {
+  const WORKER = closure(app("engine.worker.ts"));
+  it("loads on first use what its first answer doesn't need: the slow jobs (with what only they use), and the engine's optional modules", () => {
+    const later = ["app/src/slowJobs.ts", "src/offer/leave.ts", "src/offer/breakeven.ts", "src/offer/cliffs.ts", "src/offer/espp.ts",
+      "src/offer/commission.ts"];
+    expect([...WORKER].map(rel).filter((f) => later.includes(f))).toEqual([]);
+    expect([...dynamicTargets(WORKER)].map(rel).sort()).toEqual(["app/src/slowJobs.ts", "src/offer/commission.ts", "src/offer/espp.ts"]);
+  });
+  it("the engine imports its optional modules (src/offer/optional.ts) only in index.ts, the engine in full for scripts and tests", () => {
+    const optional = new Set([`${ROOT}/src/offer/espp.ts`, `${ROOT}/src/offer/commission.ts`]);
+    const importers = readdirSync(`${ROOT}/src/offer`).filter((f) => f.endsWith(".ts")).map((f) => `${ROOT}/src/offer/${f}`).filter((f) =>
+      importsOf(readFileSync(f, "utf8")).some((i) => !i.typeOnly && !i.dynamic && optional.has(resolveImport(i.specifier, f))));
+    expect(importers.map(rel)).toEqual(["src/offer/index.ts"]);
   });
 });

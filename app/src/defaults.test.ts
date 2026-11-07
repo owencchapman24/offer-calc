@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectOffer } from "../../src/offer/compare";
-import { leaveDaySweep } from "../../src/offer/project";
+import { leaveDaySweep } from "../../src/offer/leave";
 import { STATES_2026 } from "../../src/tax/index";
 import { asymmetries, asymmetryText } from "./comparability";
 import { DEFAULTS } from "./defaults";

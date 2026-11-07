@@ -1,7 +1,9 @@
 import { cliffs, nextCliff } from "../../src/offer/cliffs";
-import { breakevenSteps, comparisonWindow, rentFlip } from "../../src/offer/compare";
+import { breakevenSteps, rentFlip } from "../../src/offer/breakeven";
+import { comparisonWindow } from "../../src/offer/compare";
 import { addMonths, fromDays, toDays } from "../../src/offer/dates";
-import { keptIfLeaving, leaveDaySweep, projectScenario } from "../../src/offer/project";
+import { keptIfLeaving, leaveDaySweep } from "../../src/offer/leave";
+import { projectScenario } from "../../src/offer/project";
 import type { BreakevenResult, Cliff, Household, ISODate, LeaveDayRow, OfferInput, ValuedOptions, ValueBasis } from "../../src/offer/types";
 import type { TaxInput, TaxResult } from "../../src/tax/types";
 import type {
