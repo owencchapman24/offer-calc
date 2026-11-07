@@ -54,6 +54,29 @@ export function bonusText(d: OfferDraft): string {
   return basis === "percentOfSalary" ? `${rangeText(b.amount, percent)} of salary` : `${rangeText(b.amount, dollars)} a year`;
 }
 
+/** "$60,000 a year expected ($40,000 to $80,000), paid quarterly, 30 days after each quarter ends" (4h), or "None". */
+export function commissionText(d: OfferDraft): string {
+  const c = d.commission;
+  if (!c) return "None";
+  const amount = c.basis === "byEmploymentYear"
+    ? (c.amounts.some((a) => a && a.base) ? `by year: ${c.amounts.map((a) => (a ? rangeText(a, dollars) : "—")).join(", ")}; the last repeats` : "")
+    : c.amount && (c.amount.base || c.amount.bear || c.amount.bull) ? `${dollars(c.amount.base)} a year expected${c.amount.bear !== c.amount.base
+      || c.amount.bull !== c.amount.base ? ` (${dollars(c.amount.bear)} to ${dollars(c.amount.bull)})` : ""}` : "";
+  if (!amount) return "None";
+  const period = c.period === "month" ? "month" : c.period === "quarter" ? "quarter" : null;
+  const paid = period ? `paid ${period === "month" ? "monthly" : "quarterly"}, ${c.payAfterDays ?? "—"} days after each ${period} ends` : "paid —";
+  return `${amount}, ${paid}${drawText(d) ? `; ${drawText(d)}` : ""}`;
+}
+
+/** "a guaranteed draw of $2,000 a month for 3 months", or "" with none (4h). */
+export function drawText(d: OfferDraft): string {
+  const w = d.commission?.draw;
+  if (!w) return "";
+  const kind = w.recoverable === true ? "a recoverable" : w.recoverable === false ? "a guaranteed" : "a";
+  return `${kind} draw of ${w.monthly === null ? "$—" : dollars(w.monthly)} a month${w.months ? ` for ${w.months} ${w.months === 1 ? "month" : "months"}` : ""}`
+    + `${w.recoverable ? `, ${w.onLeaving === "repaid" ? "repaid" : "kept"} if not earned back when you leave` : ""}`;
+}
+
 // ---- sections not yet editable (group 2) -------------------------------------------------------------
 
 function cashText(a: CashAwardDraft): string {

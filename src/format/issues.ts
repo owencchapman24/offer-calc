@@ -41,6 +41,7 @@ export function formatIssue(i: OfferIssue): string {
         : `Enter a whole number of months, ${i.params.min} or more.`;
     case "wholeYears": return `Enter a whole number of years, ${i.params.min} or more.`;
     case "wholeDays": return `Enter a whole number of days, ${i.params.min} or more.`;
+    case "dayRange": return `Enter a whole number of days, ${i.params.min} to ${i.params.max}.`;
     case "positive": return "Each tranche must vest more than 0%.";
     case "trancheSum": {
       const { sum } = i.params;
@@ -51,7 +52,7 @@ export function formatIssue(i: OfferIssue): string {
     case "noMonths": return "Pick at least one vest month.";
     case "tierRange": return "A match tier goes up to more than 0% and at most 100% of pay, at a rate of 0% or more.";
     case "tierOrder": return "Each match tier must go higher than the one before it.";
-    case "noYears": return "Enter at least one year's bonus.";
+    case "noYears": return /commission/.test(i.path) ? "Enter at least one year's commission." : "Enter at least one year's bonus.";
     case "needsHours": return "Counting service by plan-year hours needs weekly hours for this offer.";
     case "gradedSteps": return "Graded vesting steps must rise year by year and reach 100%.";
     case "oopOrder": return "Out-of-pocket costs should rise from low to medium to high use.";

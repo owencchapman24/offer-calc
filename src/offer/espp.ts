@@ -58,7 +58,9 @@ export function esppFlows(
 
   // Contributions: each eligible paycheck in a purchase period, after tax.
   const flows: RawBenefit[] = [];
-  const eligible = pay.filter((e) => e.component === "salary" || (p.eligiblePay === "salaryAndBonus" && e.component === "bonus"))
+  // "Salary and bonus" counts commission too, draws included (4h, D26).
+  const eligible = pay.filter((e) => e.component === "salary"
+    || (p.eligiblePay === "salaryAndBonus" && (e.component === "bonus" || e.component === "commission")))
     .sort((a, b) => a.day - b.day);
   for (const e of eligible) {
     const period = periods.find((x) => x.from <= e.day && e.day <= x.to);

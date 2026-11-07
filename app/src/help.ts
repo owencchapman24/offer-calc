@@ -185,6 +185,7 @@ export function addHelpText(text: Record<string, Partial<FieldText>>): void {
 export const LEDGER_SECTIONS: Array<{ id: LedgerSection; title: string; holds: string }> = [
   { id: "pay", title: "Pay", holds: "salary, start date, raises, promotions" },
   { id: "bonus", title: "Bonus", holds: "target, timing, cutoff" },
+  { id: "commission", title: "Commission", holds: "expected a year, how often, a draw" },
   { id: "cash", title: "Sign-on and other cash", holds: "amounts, pay dates, clawbacks" },
   { id: "equity", title: "Equity", holds: "RSU grants, vesting, price growth, refreshers" },
   { id: "retirement", title: "401(k)", holds: "your deferral, the match, vesting" },

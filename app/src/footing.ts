@@ -89,6 +89,8 @@ export interface ShownYear {
   end: string;
   salary: number;
   bonus: number;
+  /** Commission: its payouts, and any draw against it paid with salary (4h). */
+  commission: number;
   cash: number;
   rsu: number;
   /** Clawbacks repaid: zero or less. */
@@ -97,7 +99,7 @@ export interface ShownYear {
   espp: number;
   /** Taxable other benefits, paid with salary (4j). */
   benefit: number;
-  /** salary + bonus + cash + rsu + clawback + espp + benefit. */
+  /** salary + bonus + commission + cash + rsu + clawback + espp + benefit. */
   gross: number;
   tax: number;
   premiums: number;
@@ -122,7 +124,7 @@ export interface ShownYear {
   hours: number | null;
   col: ShownCol | null;
   /** The offer letter's year, by component: `letter` is their sum. */
-  quoted: { salary: number; bonus: number; cash: number; rsu: number; letter: number };
+  quoted: { salary: number; bonus: number; commission: number; cash: number; rsu: number; letter: number };
   /** The payments behind the pay and tax lines, to the cent. */
   posted: OfferDetail["posted"][number];
 }
@@ -140,15 +142,17 @@ export function shownYears(d: OfferDetail): ShownYear[] {
 }
 
 function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof shownIndexes> | null): ShownYear {
-  const p = d.posted.find((q) => q.ey === y.year) ?? { ey: y.year, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
+  const p = d.posted.find((q) => q.ey === y.year)
+    ?? { ey: y.year, salary: 0, bonus: 0, commission: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
   const salary = R(p.salary);
   const bonus = R(p.bonus);
+  const commission = R(p.commission ?? 0);
   const cash = R(p.cash);
   const rsu = R(p.rsu);
   const clawback = R(p.clawback);
   const espp = R(p.espp);
   const benefit = R(p.benefit);
-  const gross = salary + bonus + cash + rsu + clawback + espp + benefit;
+  const gross = salary + bonus + commission + cash + rsu + clawback + espp + benefit;
   const tax = R(p.tax);
   const premiums = R(y.health.premiums);
   const afterTax = gross - tax - premiums;
@@ -173,11 +177,12 @@ function shownYear(d: OfferDetail, y: EmploymentYearResult, x: ReturnType<typeof
     const face = savings + yours + esppHeld + employer + hsa + perks;
     col = { savings, rent, local, atRef, oopRef, face, total: atRef - oopRef + face };
   }
-  const q = { salary: R(y.quoted.salary), bonus: R(y.quoted.bonus), cash: R(y.quoted.cash), rsu: R(y.quoted.rsu) };
+  const q = { salary: R(y.quoted.salary), bonus: R(y.quoted.bonus), commission: R(y.quoted.commission ?? 0), cash: R(y.quoted.cash), rsu: R(y.quoted.rsu) };
   return {
-    n: y.year, start: y.start, end: y.end, salary, bonus, cash, rsu, clawback, espp, benefit, gross, tax, premiums, afterTax, yours, esppHeld, takeHome,
+    n: y.year, start: y.start, end: y.end, salary, bonus, commission, cash, rsu, clawback, espp, benefit, gross, tax, premiums, afterTax, yours, esppHeld,
+    takeHome,
     credited, employer, oop, hsa, perks, totalRewards, hours: y.hours === undefined ? null : R(y.hours), col,
-    quoted: { ...q, letter: q.salary + q.bonus + q.cash + q.rsu }, posted: p,
+    quoted: { ...q, letter: q.salary + q.bonus + q.commission + q.cash + q.rsu }, posted: p,
   };
 }
 

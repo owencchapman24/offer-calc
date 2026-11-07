@@ -16,7 +16,7 @@ export type Hint = "ticks" | "afterRent";
 export type Ticks = "shown" | "hidden";
 
 /** The ledger's sections in detailed mode (docs/ui-design.md §3.3), one open at a time. */
-export type LedgerSection = "pay" | "bonus" | "cash" | "equity" | "retirement" | "health" | "perks" | "hours" | "where";
+export type LedgerSection = "pay" | "bonus" | "commission" | "cash" | "equity" | "retirement" | "health" | "perks" | "hours" | "where";
 
 /** View choices remembered in this browser. The optional ones arrived after slice 1; saved sessions without them still load. */
 export interface UiState {

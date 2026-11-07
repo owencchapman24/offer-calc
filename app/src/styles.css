@@ -769,6 +769,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .seg-saved, .seg-rsu { background: radial-gradient(var(--graphite) 1.1px, transparent 1.3px) 0 0 / 5px 5px; }
 .seg-espp { background: repeating-linear-gradient(0deg, var(--graphite) 0 1.5px, transparent 1.5px 4px); }
 .seg-benefit { background: repeating-linear-gradient(135deg, var(--graphite) 0 1.5px, transparent 1.5px 5px); }
+.seg-commission {
+  background: repeating-linear-gradient(90deg, var(--graphite) 0 1px, transparent 1px 5px), repeating-linear-gradient(0deg, var(--graphite) 0 1px, transparent 1px 5px);
+}
 .other-benefits { padding-left: 1.2em; }
 .usually { margin-top: 10px; font-size: 13px; border-collapse: collapse; max-width: 640px; }
 .usually caption { text-align: left; margin-bottom: 4px; color: var(--graphite); }

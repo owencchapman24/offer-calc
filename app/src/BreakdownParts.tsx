@@ -5,12 +5,12 @@ import { inSentence } from "./breakevenModel";
 import { bridge, notesOf, taxFreeNames } from "./byYearModel";
 import { caseChanges, changeText, hasRanges } from "./cases";
 import { CsvButton, Fig, useApi, useRovingTicks } from "./figures";
-import { firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms } from "./leaveModel";
+import { commissionForfeits, commissionPeriod, firstLastDay, forfeits, forfeitText, leaveAxis, leaveTerms } from "./leaveModel";
 import { daysOffWords, daysText, unpaidVacationText } from "./timeOffWords";
 import type { A2Part, MetricId, WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import {
-  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, otherBenefitsOf, paidTimeOff,
+  A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, commissionMonth, esppPutIn, hundredOf, otherBenefitsOf, paidTimeOff,
   payRows, rateText,
   taxYearsOf,
 } from "./partsModel";
@@ -273,10 +273,13 @@ function PayByYear({ ctx, x, open, show }: Part) {
   const salary = x.input?.salary.annual ?? 0;
   // Taxable other benefits are paid with salary, a twelfth a month (4j).
   const benefitMonth = (x.input?.otherBenefits ?? []).filter((ob) => ob.taxable).reduce((s, ob) => s + ob.annual, 0) / 12;
+  // Commission paid monthly is one line, not twelve dates a year; a draw is paid with salary (4h).
+  const cm = commissionMonth(x.input, b.detail);
   return (
     <section className="part pay-by-year" aria-labelledby={`${L}-3-title`}>
       <PartHead letter={L} n={3} title="Pay by year, and when it arrives" />
-      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, cash: y.cash, rsu: y.rsu, espp: y.espp, benefit: y.benefit }))} />
+      <PayChart years={t.years.map((y) => ({ n: y.n, salary: y.salary, bonus: y.bonus, commission: y.commission, cash: y.cash, rsu: y.rsu, espp: y.espp,
+        benefit: y.benefit }))} />
       <div className="l6-scroll" role="region" aria-label={`${L}-3, pay by year`} tabIndex={0}>
         <table className="year-table pay-table">
           <caption className="sr-only">{L}'s pay by employment year and kind, $, as paid</caption>
@@ -310,7 +313,14 @@ function PayByYear({ ctx, x, open, show }: Part) {
         <Fig id={`when.${L}.salary`} label={`${dollars(salary / 12)} a month at its starting salary`}>{dollars(salary / 12)}</Fig> a month at its starting
         salary{benefitMonth ? <>, with{" "}
           <Fig id={`when.${L}.benefit`} label={`${dollars(benefitMonth)} a month of taxable benefits, paid with salary`}>{dollars(benefitMonth)}</Fig> a month of
-          taxable benefits</> : null}.
+          taxable benefits</> : null}{cm?.draw ? <>, and a draw against commission of{" "}
+          <Fig id={`when.${L}.draw`} label={`${dollars(cm.draw.monthly)} a month of draw against commission from year 1, paid with salary`}>{dollars(cm.draw.monthly)}</Fig> a
+          month from year 1{cm.draw.until ? ` until ${longDate(cm.draw.until)}` : ", every month you're there"}</> : null}.
+        {cm?.monthly != null && (
+          <>{" "}Commission is paid monthly, {cm.lag} {cm.lag === 1 ? "day" : "days"} after each month:{" "}
+            <Fig id={`when.${L}.commission`} label={`${dollars(cm.monthly)} a month of commission expected in year 1`}>{dollars(cm.monthly)}</Fig> a month
+            expected in year 1{cm.first ? `; the first, ${longDate(cm.first.date)}, for ${commissionPeriod(cm.first)}` : ""}. {L}-7 lists each payout.</>
+        )}
       </p>
       <p className="part-more">{show}</p>
       {open && (
@@ -324,17 +334,19 @@ function PayByYear({ ctx, x, open, show }: Part) {
               </li>
             ))}
           </ol>
-        ) : <p className="note" id={`${L}-3-when`}>Nothing but salary in its stay: no bonus, cash award or RSU vest entered.</p>
+        ) : <p className="note" id={`${L}-3-when`}>{cm?.monthly != null ? `No other dated payments: its commission is paid monthly, above, and ${L}-7 lists each payout.`
+          : "Nothing but salary in its stay: no bonus, commission, cash award or RSU vest entered."}</p>
       )}
     </section>
   );
 }
 
-const KINDS = ["salary", "bonus", "cash", "rsu", "espp", "benefit"] as const;
-const KIND_LABEL = { salary: "salary", bonus: "bonus", cash: "cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "taxable benefits" };
+const KINDS = ["salary", "bonus", "commission", "cash", "rsu", "espp", "benefit"] as const;
+const KIND_LABEL = { salary: "salary", bonus: "bonus", commission: "commission", cash: "cash awards", rsu: "RSUs", espp: "ESPP gains", benefit: "taxable benefits" };
 
 /** Pay by year as stacked columns, each kind labeled in the legend: drawn, so hidden from screen readers (the table says it). */
-function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; cash: number; rsu: number; espp: number; benefit: number }> }) {
+function PayChart({ years }: { years: Array<{ n: number; salary: number; bonus: number; commission: number; cash: number; rsu: number; espp: number;
+  benefit: number }> }) {
   const max = Math.max(1, ...years.map((y) => KINDS.reduce((s, k) => s + Math.max(0, y[k]), 0)));
   const kinds = KINDS.filter((k) => years.some((y) => y[k] > 0));
   return (
@@ -444,6 +456,9 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
   const bonuses = forfeits(panel.warnings, start);
   const v = panel.vacation;
   const unpaid = unpaidVacationText(v);
+  const c = panel.commission;
+  const toCome = c ? c.after.reduce((s, x) => s + x.gross, 0) : 0;
+  const lostCommission = commissionForfeits(panel.warnings).reduce((s, w) => s + w.forfeited, 0);
   return (
     <>
       you'd keep <Fig id={`kept.${L}`} label={`${dollars(kept)} kept ${basis === "cash" ? "after tax" : "in total rewards"}, as paid, if your last day is ${longDate(panel.leaveDate)}`}>
@@ -456,6 +471,14 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
         <>get back <Fig id={`refund.${L}`} label={`${dollars(panel.esppRefund)} put toward an ESPP purchase, given back`}>{dollars(panel.esppRefund)}</Fig> put
           toward an ESPP purchase,{" "}</>
       )}
+      {toCome >= 0.5 && (
+        <>with <Fig id={`tocome.${L}`} label={`${dollars(toCome)} of commission paid after your last day, before tax`}>{dollars(toCome)}</Fig> of commission
+          paid after your last day,{" "}</>
+      )}
+      {c && c.drawBalance >= 0.5 && c.drawRepaid < 0.5 && (
+        <>keep <Fig id={`drawkept.${L}`} label={`${dollars(c.drawBalance)} of a recoverable draw not earned back, kept`}>{dollars(c.drawBalance)}</Fig> of
+          a recoverable draw not earned back,{" "}</>
+      )}
       {panel.clawbackOwed >= 0.5
         ? <span className="one-line">repay <Fig id={`repay.${L}`} label={`${dollars(panel.clawbackOwed)} of clawbacks owed`}>{dollars(panel.clawbackOwed)}</Fig>,</span> : "repay nothing,"}{" "}
       {lost.length ? <>and leave {lost.map((l, k) => <span key={k}>{k ? " and " : ""}{l}</span>)} behind</> : "and leave nothing behind"}
@@ -465,7 +488,10 @@ function LeftOn({ L, panel, basis, start }: { L: Letter; panel: LeavePanel; basi
           <span key={f.index}>; {t.before}<Fig id={`forgone.${L}.${f.index}`} label={`${dollars(f.earned)} earned toward the ${f.period} bonus, forfeited`}>{dollars(f.earned)}</Fig>{t.after}
             {" "}is forfeited</span>
         );
-      })}{unpaid && <>; {unpaid}</>}.
+      })}{lostCommission >= 0.5 && (
+        <>; <Fig id={`forgonec.${L}`} label={`${dollars(lostCommission)} of commission forfeited`}>{dollars(lostCommission)}</Fig> of commission is
+          forfeited (it's paid only to those employed on its payout date)</>
+      )}{unpaid && <>; {unpaid}</>}.
     </>
   );
 }
@@ -498,6 +524,11 @@ function CliffList({ L, terms }: { L: Letter; terms: OfferTerms }) {
         <li key={`s${c.award}`}>
           <span className="arrival-date">{longDate(c.from)} – {longDate(c.until)}</span> · the {inSentence(c.award.trim() || "award")}'s clawback shrinks{" "}
           {dollars(c.perMonth)} a month: each month worked owes less
+        </li>
+      ) : c.kind === "monthly" ? (
+        <li key="monthly">
+          <span className="arrival-date">{longDate(c.from)} – {longDate(c.until)}</span> · each month's commission, {c.count} payouts: leave before
+          one and that month's is forfeited
         </li>
       ) : (
         <li key={c.i}>
@@ -663,7 +694,7 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
       {!groups.length ? (
         <p className="warn-none">
           No warnings over its stay. Checked: the 401(k), HSA and perk limits, the bonus cutoff, an employer state's remote-work rule, and federal
-          withholding against the tax on bonuses and RSU vests.
+          withholding against the tax on bonuses, commission and RSU vests.
         </p>
       ) : WARN_KINDS.map(({ kind, icon, title }) => {
         const list = groups.filter((g) => WARNING_KIND[g[0].code] === kind);
@@ -734,7 +765,8 @@ function Shortfall({ L, years: wy, warnings }: { L: Letter; years: Array<{ year:
           </span>
         );
       })}, owed {years.length > 1 ? "each following April" : `in April ${years[0].year + 1}`}
-      {supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real rate on them" : ""}
+      {supplemental ? `: bonuses${years.some((p) => p.commission) ? ", commission" : ""} and RSU vests are withheld at the flat 22% supplemental rate, `
+        + "below the real rate on them" : ""}
       {espp ? `${supplemental ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}. Raising
       your withholding on Form W-4 spreads it out.
     </>

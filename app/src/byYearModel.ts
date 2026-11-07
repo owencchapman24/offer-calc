@@ -5,7 +5,7 @@ import {
 } from "./metrics";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
 import type { OfferDetail } from "./protocol";
-import { dollars, longDate, monthName, percent, shortDate } from "./text";
+import { dayBefore, dollars, longDate, monthName, percent, shortDate } from "./text";
 
 // The view models behind L-1, by year (docs/ui-design.md §4.3), and the bridge beside it (§5, W4): the figures ByYear.tsx draws,
 // shared with the derivations, the copied document, CSV, L-6 and the methodology. Pure: no React. Out of metrics.ts so that L-1,
@@ -147,6 +147,37 @@ export function cashName(o: AppOffer | undefined): string {
 }
 
 /**
+ * Commission's lines (4h): the letter's expected amount against what the year pays. First the payout lag, what the year's periods
+ * earned (paid in it) less the letter's amount: in year 1, the commission earned late in the year is paid in the next; then, with a
+ * draw, the draws paid beyond the commission earned (a guaranteed draw's floor, or a recoverable one not yet earned back) or the draw
+ * earned back. Each as shown, the last taking the rounding, so the lines foot; with no draw the lag takes it all.
+ */
+function commissionRows(d: OfferDetail, y: ShownYear, n: number, draw: boolean, id: (line: BridgeLine) => MetricId, rows: BridgeRow[]) {
+  const t = d.commissionTiming.find((x) => x.ey === n);
+  const q = y.quoted.commission;
+  if (!t && !y.commission) return;
+  const paidFor = draw ? Math.round(t?.paidFor ?? 0) : y.commission;
+  const lag = paidFor - q;
+  if (lag) {
+    const later = t && t.later > 0.5;
+    const before = t && t.before > 0.5;
+    const nextYear = !!t && t.laterPaid.length > 0 && t.laterPaid.every((x) => eyOfDate(d.employmentYears, x) === n + 1);
+    const label = later && !before ? `commission earned in year ${n}, paid ${nextYear ? `in year ${n + 1}` : "after it"}`
+      : before && !later ? `commission earned in year ${n - 1}, paid this year` : "the payout lag: commission paid a year after it's earned";
+    const gloss = [
+      later && t!.laterFrom ? `${shortDate(t!.laterFrom)} – ${shortDate(dayBefore(y.end))}${t!.laterPaid.length ? `, paid ${join(t!.laterPaid.map(shortDate))}` : ""}` : "",
+      before && later ? `year ${n - 1}'s paid this year` : "",
+    ].filter(Boolean).join("; ");
+    rows.push({ id: id("commission"), line: "commission", kind: "change", label, value: lag, ...(gloss ? { gloss } : {}) });
+  }
+  const drawPart = y.commission - paidFor;
+  if (drawPart) {
+    rows.push({ id: id("draw"), line: "draw", kind: "change", value: drawPart,
+      label: drawPart > 0 ? "draw paid beyond the commission earned" : "draw earned back from commission" });
+  }
+}
+
+/**
  * The bridge for one offer and employment year (docs/ui-design.md §5, W4): every line foots, as shown (footing.ts). In its breakdown
  * (A-2, `of` "own"), over its own stay, it ends after rent at the offer's own prices, then, with a comparison or Prices in a city,
  * steps to the prices picked (docs/v2-plan.md, item 5, B7). The comparison's document (`of` "comparison") sets offers side by side,
@@ -159,7 +190,8 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
   const id = (line: BridgeLine) => `br.${letter}.${n}.${line}` as MetricId;
   const rows: BridgeRow[] = [];
   const q = y.quoted;
-  const parts = [q.salary && "salary", q.bonus && "target bonus", q.cash && cashName(o), q.rsu && "RSUs due"].filter(Boolean) as string[];
+  const parts = [q.salary && "salary", q.bonus && "target bonus", q.commission && "expected commission", q.cash && cashName(o),
+    q.rsu && "RSUs due"].filter(Boolean) as string[];
   rows.push({ id: id("letter"), line: "letter", kind: "letter", label: `Offer letter: ${parts.join(" + ")}`, value: q.letter });
 
   // Where what's paid in the year differs from the letter, line by line.
@@ -177,6 +209,7 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
     !bonuses.length ? `no bonus paid in year ${n}` : n === 1 && bonuses.every(stub) && y.bonus < q.bonus ? "first bonus is a stub"
       : y.bonus < q.bonus ? "bonus paid is below the target" : "bonus paid is above the target",
     bonuses.length ? bonusGloss : nextBonus ? `the first is paid ${shortDate(nextBonus.date)}, ${nextBonus.date.slice(0, 4)}` : undefined);
+  commissionRows(d, y, n, !!o?.draft.commission.draw, id, rows);
   change("cash", "cash awards paid in another year");
   const vests = d.rsus.filter((v) => v.ey === n);
   const movedOut = d.rsus.some((v) => !v.refresher && v.nominalDate && eyOfDate(d.employmentYears, v.nominalDate) === n && v.ey > n);
