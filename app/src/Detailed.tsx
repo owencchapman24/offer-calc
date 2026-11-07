@@ -5,17 +5,17 @@ import "./detailedDefaults"; // the defaults and fields only detailed mode and t
 import "./helpText"; // detailed mode's help text, which arrives with this chunk
 import "./quickHelp"; // and the ⓘ help of quick mode's fields, which detailed mode shows too
 import {
-  BonusYearsEditor, CashAwardsEditor, GrantsEditor, MatchEditor, newCashAward, newEspp, newGrant, newHealth, newOtherBenefit, newPromotion, newRefreshers,
+  BonusYearsEditor, CashAwardsEditor, CommissionYearsEditor, GrantsEditor, MatchEditor, newCashAward, newEspp, newGrant, newHealth, newOtherBenefit, newPromotion, newRefreshers,
   newRetirement, OtherBenefitsEditor, PromotionsEditor, RefreshersEditor, VestingStepsEditor,
 } from "./editors";
 import {
   ChoiceField, DateField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings,
 } from "./controls";
 import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
-import { type AppOffer, bonusBasis, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
+import { type AppOffer, bonusBasis, hasCommission, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
 import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
-import { bonusYearsText, cashAwardsText, grantsText, matchText, otherBenefitsText, promotionsText, refreshersText } from "./summary";
+import { bonusYearsText, cashAwardsText, commissionText, grantsText, matchText, otherBenefitsText, promotionsText, refreshersText } from "./summary";
 import { percent } from "./text";
 
 // Detailed mode's sections (docs/ui-design.md §3.3), one open at a time, each a run of rows with one
@@ -25,6 +25,7 @@ export function DetailedSection({ id, rents }: { id: LedgerSection; rents: Recor
   switch (id) {
     case "pay": return <Pay />;
     case "bonus": return <Bonus />;
+    case "commission": return <Commission />;
     case "cash": return <Cash />;
     case "equity": return <Equity />;
     case "retirement": return <Retirement />;
@@ -116,6 +117,90 @@ function BonusTarget() {
   );
 }
 
+/** Commission (4h): expected a year (or by year), how often and how long after it's paid, the leaving rule, a draw. */
+function Commission() {
+  const api = useLedger();
+  return (
+    <>
+      <FieldRow k="commission.basis">
+        {(o) => <ChoiceField o={o} path="commission.basis" label="commission basis" alsoSet={{ "commission.amount": null, "commission.amounts": [] }}
+          options={[["fixed", "Dollars a year"], ["byEmploymentYear", "Dollars by year"]]} />}
+      </FieldRow>
+      <FieldRow k="commission.amount" label="Expected a year">
+        {(o) => o.draft.commission.basis === "byEmploymentYear"
+          ? <EditorCell o={o} row="commission.amounts" summary={commissionText(o.draft)} empty={!o.draft.commission.amounts.length}
+              start={() => api.set(o, { "commission.amounts": [null] })} />
+          : <span className="field">
+              <RangeField o={o} path="commission.amount" kind="money" label="commission expected, dollars a year" blank="None: no commission" />
+              <Warnings o={o} path="commission.amount" />
+            </span>}
+      </FieldRow>
+      <EditorRow row="commission.amounts" title="Commission by year">{(o) => <CommissionYearsEditor o={o} />}</EditorRow>
+      <CommissionRow k="commission.period">
+        {(o) => <ChoiceField o={o} path="commission.period" label="how often commission is paid" blank="—"
+          options={[["month", "Monthly"], ["quarter", "Quarterly"]]} />}
+      </CommissionRow>
+      <CommissionRow k="commission.payAfterDays">
+        {(o) => <NumberField o={o} path="commission.payAfterDays" kind="number" unit="days" label="days after each period ends it's paid" />}
+      </CommissionRow>
+      <CommissionRow k="commission.mustBeEmployedOnPayDate">
+        {(o) => <ChoiceField o={o} path="commission.mustBeEmployedOnPayDate" label="commission when you leave"
+          options={[[false, "Paid to your last day"], [true, "Only if employed at payout"]]} />}
+      </CommissionRow>
+      <CommissionRow k="commission.draw">{(o) => <DrawField o={o} />}</CommissionRow>
+      <DrawRow k="commission.draw.monthly">
+        {(o) => <NumberField o={o} path="commission.draw.monthly" kind="money" unit="a month" label="draw against commission a month" />}
+      </DrawRow>
+      <DrawRow k="commission.draw.months">
+        {(o) => <NumberField o={o} path="commission.draw.months" kind="number" unit="months" label="months the draw is paid" blank="Every month" />}
+      </DrawRow>
+      <DrawRow k="commission.draw.onLeaving" recoverable>
+        {(o) => <ChoiceField o={o} path="commission.draw.onLeaving" label="a recoverable draw not earned back when you leave"
+          options={[["kept", "Kept"], ["repaid", "Repaid"]]} />}
+      </DrawRow>
+    </>
+  );
+}
+
+/** The eligible-pay choice beyond salary, by what the offer has: commission counts with the bonus (4h, D26). */
+const incentivePay = (d: AppOffer["draft"]) => (!hasCommission(d) ? "Salary and bonus"
+  : d.bonus.amount || d.bonus.amounts.length ? "Salary, bonus and commission" : "Salary and commission");
+
+/** Whether there's a draw against commission, and which kind: none, guaranteed (a floor) or recoverable (an advance). */
+function DrawField({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  const w = o.draft.commission.draw;
+  const value = !w ? "none" : w.recoverable ? "recoverable" : "guaranteed";
+  return (
+    <span className="field">
+      <select id={fieldId(o.letter, "commission.draw")} aria-label={`Offer ${o.letter} draw against commission`} data-help="commission.draw"
+        aria-describedby={hintId("commission.draw")} value={value}
+        onChange={(e) => api.set(o, { "commission.draw": e.target.value === "none" ? null
+          : { monthly: w?.monthly ?? null, months: w?.months ?? null, onLeaving: w?.onLeaving ?? null, recoverable: e.target.value === "recoverable" } })}>
+        <option value="none">None</option>
+        <option value="guaranteed">Guaranteed</option>
+        <option value="recoverable">Recoverable</option>
+      </select>
+      <DefaultTick o={o} path="commission.draw" label="no draw" />
+    </span>
+  );
+}
+
+/** A row about commission's terms: a cell for each offer that has commission, a dash for the others. */
+function CommissionRow({ k, children }: { k: string; children: (o: AppOffer) => ReactNode }) {
+  return <FieldRow k={k}>{(o) => (hasCommission(o.draft) ? children(o) : <span className="sub">—</span>)}</FieldRow>;
+}
+
+/** A row about a draw's terms: offers with commission and a draw (a recoverable one, for what happens to it on leaving). */
+function DrawRow({ k, recoverable, children }: { k: string; recoverable?: boolean; children: (o: AppOffer) => ReactNode }) {
+  return (
+    <FieldRow k={k}>
+      {(o) => (hasCommission(o.draft) && o.draft.commission.draw && (!recoverable || o.draft.commission.draw.recoverable) ? children(o)
+        : <span className="sub">—</span>)}
+    </FieldRow>
+  );
+}
+
 function Equity() {
   const api = useLedger();
   return (
@@ -153,7 +238,7 @@ function Equity() {
         )}
       </EsppRow>
       <EsppRow k="espp.eligiblePay">
-        {(o) => <ChoiceField o={o} path="espp.eligiblePay" label="pay the ESPP counts" options={[["salary", "Salary"], ["salaryAndBonus", "Salary and bonus"]]} />}
+        {(o) => <ChoiceField o={o} path="espp.eligiblePay" label="pay the ESPP counts" options={[["salary", "Salary"], ["salaryAndBonus", incentivePay(o.draft)]]} />}
       </EsppRow>
       <EsppRow k="espp.discount">{(o) => <NumberField o={o} path="espp.discount" kind="percent" label="ESPP discount" />}</EsppRow>
       <EsppRow k="espp.lookback">{(o) => <ChoiceField o={o} path="espp.lookback" label="ESPP lookback" options={[[true, "Yes"], [false, "No"]]} />}</EsppRow>
@@ -269,7 +354,7 @@ function Retirement() {
       </PlanRow>
       <PlanRow k="retirement.eligiblePay" plan="retirement">
         {(o) => <ChoiceField o={o} path="retirement.eligiblePay" label="pay the 401(k) counts"
-          options={[["salary", "Salary"], ["salaryAndBonus", "Salary and bonus"]]} />}
+          options={[["salary", "Salary"], ["salaryAndBonus", incentivePay(o.draft)]]} />}
       </PlanRow>
       <PlanRow k="retirement.match" plan="retirement" issues="editor">
         {(o) => <EditorCell o={o} row="retirement.match" summary={matchText(retirementOf(o))} empty={!retirementOf(o).match.length}

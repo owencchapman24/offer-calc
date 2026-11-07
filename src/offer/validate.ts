@@ -47,6 +47,8 @@ export type OfferIssue = { path: string } & (
   | { code: "wholeMonths"; params: { min: number } }
   | { code: "wholeYears"; params: { min: number } }
   | { code: "wholeDays"; params: { min: number } }
+  /** A whole number of days outside min-max (commission's payout lag, 0 to 366). */
+  | { code: "dayRange"; params: { min: number; max: number } }
   /** A vesting tranche of 0% or less. */
   | { code: "positive"; params: NoParams }
   /** Vesting tranches that don't add up to 100%. `sum` is a fraction (0.95). */
@@ -58,7 +60,7 @@ export type OfferIssue = { path: string } & (
   | { code: "tierRange"; params: NoParams }
   /** Each match tier must go higher than the one before it. */
   | { code: "tierOrder"; params: NoParams }
-  /** A bonus by employment year with no years. */
+  /** A bonus or commission by employment year with no years. */
   | { code: "noYears"; params: NoParams }
   /** Plan-year-hours vesting service without weekly hours. */
   | { code: "needsHours"; params: NoParams }
@@ -161,6 +163,28 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     monthDay("bonus.payOn", b.payOn);
     monthDay("bonus.periodStart", b.periodStart);
     monthDay("bonus.cutoff", b.cutoff);
+  }
+
+  // ---- commission (4h) ----------------------------------------------------------------------
+  const cm = offer.commission;
+  if (cm) {
+    if (cm.basis === "byEmploymentYear") {
+      if (cm.amounts.length === 0) add("commission.amounts", "noYears", {});
+      cm.amounts.forEach((a, i) => each(`commission.amounts.${i}`, a, nonNegative));
+    } else {
+      each("commission.amount", cm.amount, nonNegative);
+    }
+    if (cm.period !== "month" && cm.period !== "quarter") add("commission.period", "required", { kind: "choice" });
+    const lag = cm.payAfterDays;
+    if (amount("commission.payAfterDays", lag, "number") && !(Number.isInteger(lag) && lag >= 0 && lag <= 366)) {
+      add("commission.payAfterDays", "dayRange", { min: 0, max: 366 });
+    }
+    const d = cm.draw;
+    if (d) {
+      nonNegative("commission.draw.monthly", d.monthly);
+      if (typeof d.recoverable !== "boolean") add("commission.draw.recoverable", "required", { kind: "choice" });
+      if (d.months !== undefined) whole("commission.draw.months", d.months, 1, "wholeMonths");
+    }
   }
 
   // ---- cash awards -------------------------------------------------------------------------

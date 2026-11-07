@@ -158,17 +158,21 @@ export function MonthDayField({ o, path, label, none }: { o: AppOffer; path: str
 }
 
 /** A choice among a few values (a select), showing its default with a D tickmark. */
-export function ChoiceField<T extends string | boolean>({ o, path, label, options, alsoSet, hint }: {
+export function ChoiceField<T extends string | boolean>({ o, path, label, options, alsoSet, hint, blank }: {
   o: AppOffer; path: string; label: string; options: Array<[T, string]>; /** Fields a new choice resets (a bonus's amount goes with its basis). */
   alsoSet?: Record<string, unknown>; /** The hint it points at, when its own isn't shown. */ hint?: string;
+  /** A choice with no default: its blank option's text ("—"), shown until one is picked (commission's period, 4h). */ blank?: string;
 }) {
   const api = useLedger();
   const v = shownValue<T>(o, path);
   const k = helpKey(path);
+  const unset = blank !== undefined && (v === null || v === undefined);
   return (
     <span className="field">
       <select id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(hint ?? k)}
-        value={String(v)} onChange={(e) => api.set(o, { [path]: options.find(([x]) => String(x) === e.target.value)![0], ...alsoSet })}>
+        aria-invalid={(unset && issuesAt(api, o.letter, path).length > 0) || undefined}
+        value={unset ? "" : String(v)} onChange={(e) => api.set(o, { [path]: e.target.value === "" ? null : options.find(([x]) => String(x) === e.target.value)![0], ...alsoSet })}>
+        {blank !== undefined && <option value="">{blank}</option>}
         {options.map(([x, text]) => <option key={String(x)} value={String(x)}>{text}</option>)}
       </select>
       <DefaultTick o={o} path={path} label={`the ${label}`} />
@@ -195,7 +199,7 @@ export function DateField({ o, path, label, fallback }: { o: AppOffer; path: str
 export const EDITOR_NAMES: Record<string, string> = {
   "salary.promotions": "promotions", "bonus.amounts": "bonus by year", "equity.grants": "RSU grants", "equity.refreshers": "refreshers",
   cashAwards: "sign-on and other cash", "retirement.match": "401(k) match", "retirement.vesting.steps": "401(k) vesting steps",
-  otherBenefits: "other benefits",
+  otherBenefits: "other benefits", "commission.amounts": "commission by year",
 };
 
 /**

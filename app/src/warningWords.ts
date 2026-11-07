@@ -62,6 +62,15 @@ export function warningWords(group: OfferWarning[]): string {
     case "taxFreeAsEntered":
       return `Counted tax-free, as entered: ${join(w.params.labels)}. A fringe benefit is wages unless the law excludes it, so one marked tax-free `
         + "that isn't makes the offer look better than it is.";
+    case "commissionEvenly":
+      return "Its commission counts as earned evenly, a twelfth of the year's amount each month. Quotas, accelerators, caps, chargebacks on "
+        + "canceled deals and commission paid only when the customer pays aren't modeled.";
+    case "drawNotEarnedBack":
+      return w.params.why === "stayEnd"
+        ? `At the end of your stay, ${dollars(w.params.balance)} of its recoverable draw isn't yet earned back: it counts as pay in your stay, and `
+          + "would come out of commission after it."
+        : `Leaving ${longDate(w.params.date)} leaves ${dollars(w.params.balance)} of its recoverable draw not earned back: ${w.params.why === "repaid"
+          ? "repaid that day, as entered" : "kept, as entered"}. Whether you'd owe it depends on the commission plan's terms and the state's law.`;
     case "esppSoldAtPurchase":
       return "Holding shares after purchase is an investment decision and isn't modeled: each ESPP lot counts as sold the day it's bought. "
         + "Resets, overlapping offerings, a cap on shares an offering, fees and plans outside section 423 aren't modeled either.";

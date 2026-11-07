@@ -112,7 +112,8 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
     s.gross += cents(e.gross);
     s.tax += cents(e.tax);
     split.set(key, s);
-    const p = posted.get(e.employmentYear) ?? { ey: e.employmentYear, salary: 0, bonus: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
+    const p = posted.get(e.employmentYear)
+      ?? { ey: e.employmentYear, salary: 0, bonus: 0, commission: 0, cash: 0, rsu: 0, clawback: 0, espp: 0, benefit: 0, tax: 0 };
     p[e.component] += cents(e.gross);
     p.tax += cents(e.tax);
     posted.set(e.employmentYear, p);
@@ -129,6 +130,29 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
   for (const e of r.events) if (e.detail.kind === "benefit") other(e.employmentYear, e.detail.index, e.detail.label, true, e.gross, e.tax);
   for (const b of r.benefitEvents) if (b.detail.kind === "otherBenefit") other(b.employmentYear, b.detail.index, b.detail.label, false, b.amount, 0);
   const dollarsOf = <T extends object>(x: T, keys: Array<keyof T>): T => ({ ...x, ...Object.fromEntries(keys.map((k) => [k, (x[k] as number) / 100])) });
+  // Commission's timing (4h): each period's earnings by the employment year earned in, against its payout's year; a period paid
+  // after the projection (or forfeited) is paid later than every year it earned in.
+  const timing = new Map<number, OfferDetail["commissionTiming"][number]>();
+  const tOf = (ey: number) => timing.get(ey)
+    ?? (timing.set(ey, { ey, earned: 0, paidFor: 0, later: 0, laterFrom: null, laterPaid: [], before: 0 }), timing.get(ey)!);
+  for (const p of r.commissionPeriods ?? []) {
+    const paidIn = p.paidOut ? p.employmentYear : Infinity;
+    if (p.paidOut) tOf(paidIn).paidFor += p.detail.earned;
+    for (const piece of p.detail.pieces) {
+      const amount = piece.monthly * piece.months;
+      tOf(piece.employmentYear).earned += amount;
+      if (piece.employmentYear >= paidIn) continue;
+      const t = tOf(piece.employmentYear);
+      t.later += amount;
+      // Where the year's commission paid later starts: this period's first day earned in the year (the period's, or the year's start).
+      if (t.laterFrom === null) {
+        const yearStart = r.employmentYears.find((y) => y.year === piece.employmentYear)?.start ?? p.detail.earnedFrom;
+        t.laterFrom = p.detail.earnedFrom > yearStart ? p.detail.earnedFrom : yearStart;
+      }
+      if (p.paidOut && !t.laterPaid.includes(p.payDate)) t.laterPaid.push(p.payDate);
+      if (p.paidOut) tOf(paidIn).before += amount;
+    }
+  }
   const detail: OfferDetail = {
     window: r.window, cases, withholding, employmentYears: r.employmentYears, costOfLiving: r.costOfLiving, assumptions: r.assumptions, warnings: r.warnings,
     taxYears: r.calendarYears.map((t) => {
@@ -145,7 +169,8 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
       };
     }),
     split: [...split.values()].map((s) => dollarsOf(s, ["gross", "tax"])),
-    posted: [...posted.values()].sort((a, b) => a.ey - b.ey).map((p) => dollarsOf(p, ["salary", "bonus", "cash", "rsu", "clawback", "espp", "benefit", "tax"])),
+    posted: [...posted.values()].sort((a, b) => a.ey - b.ey)
+      .map((p) => dollarsOf(p, ["salary", "bonus", "commission", "cash", "rsu", "clawback", "espp", "benefit", "tax"])),
     bonuses: r.events.flatMap((e) => (e.detail.kind === "bonus"
       ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo }] : [])),
     rsus: r.events.flatMap((e) => (e.detail.kind === "rsu"
@@ -153,6 +178,10 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
         tranches: e.detail.tranches, priceFactor: e.detail.priceFactor, ...(e.detail.nominalDate ? { nominalDate: e.detail.nominalDate } : {}) }] : [])),
     cash: r.events.flatMap((e) => (e.detail.kind === "cash" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, award: e.detail.award }] : [])),
     others: [...others.values()].sort((a, b) => a.ey - b.ey || a.index - b.index).map((o) => dollarsOf(o, ["amount", "tax"])),
+    commissions: r.events.flatMap((e) => (e.detail.kind === "commission" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross,
+      period: e.detail.period, periodFrom: e.detail.periodFrom, periodTo: e.detail.periodTo, earnedFrom: e.detail.earnedFrom,
+      earnedTo: e.detail.earnedTo, earned: e.detail.earned, drawn: e.detail.drawn }] : [])),
+    commissionTiming: [...timing.values()].sort((a, b) => a.ey - b.ey),
     espps: r.events.flatMap((e) => (e.detail.kind === "espp" ? [{ ey: e.employmentYear, date: e.date, gross: e.gross, offeringStart: e.detail.offeringStart,
       purchase: e.detail.purchase, purchases: e.detail.purchases }] : [])),
   };

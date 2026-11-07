@@ -131,8 +131,8 @@ export function ownView(letter: Letter, b: Breakdown, offer: OfferInput, prices:
 
 /**
  * Why the stay's figure isn't year 1's: it's in today's dollars over every year, and later years are paid differently. Only
- * what the projection shows: a first bonus for part of a year, raises, a promotion, bonuses that grow, the new-hire RSUs'
- * last vest, rent rising at each anniversary.
+ * what the projection shows: a first bonus for part of a year, commission paid after the year it's earned in (4h), raises, a
+ * promotion, bonuses or commission that grow, the new-hire RSUs' last vest, rent rising at each anniversary.
  */
 export function whyDiffers(d: OfferDetail, ys: ShownYear[], years: number, offer: OfferInput): string {
   const head = `Your stay's figure is in today's dollars, over ${years === 1 ? "its one year" : `all ${years} years`}`;
@@ -143,6 +143,8 @@ export function whyDiffers(d: OfferDetail, ys: ShownYear[], years: number, offer
   const stub = firstBonuses.length > 0 && firstBonuses.every((x) => (Date.parse(x.periodTo) - Date.parse(workedFrom(d, x.periodFrom))) / 86_400_000 < 360);
   if (stub) reasons.push("year 1's bonus is for part of a year");
   else if (!firstBonuses.length && later.some((x) => x.bonus > 0)) reasons.push("the first bonus is paid in year 2");
+  // Commission's payout lag (4h): what's earned late in year 1 is paid in year 2.
+  if ((d.commissionTiming ?? []).some((t) => t.ey === 1 && t.later > 0.5)) reasons.push("commission earned late in year 1 is paid in year 2");
   const notes = notesOf(d, years).filter((x) => x.n > 1);
   const promoted = notes.some((x) => x.text.startsWith("promotion"));
   if (!promoted && later.some((x) => x.salary > first.salary + 0.5)) reasons.push("raises");
@@ -151,6 +153,9 @@ export function whyDiffers(d: OfferDetail, ys: ShownYear[], years: number, offer
   if (bonuses.length > 1 && bonuses.every((v, i) => i === 0 || v >= bonuses[i - 1]) && bonuses[bonuses.length - 1] > bonuses[0] + 0.5) {
     reasons.push("bonuses grow each year");
   }
+  const c = offer.commission;
+  if (c?.basis === "byEmploymentYear" && c.amounts.length > 1 && c.amounts.every((a, i) => i === 0 || a.base >= c.amounts[i - 1].base)
+    && c.amounts[c.amounts.length - 1].base > c.amounts[0].base) reasons.push("commission grows each year");
   if ((offer.costOfLiving?.rentGrowth ?? 0) > 0 || d.costOfLiving!.rentGrowth > 0) reasons.push("rent rises at each anniversary");
   const sum = (x: ShownYear) => (x.col ? x.totalRewards - x.col.rent : x.totalRewards);
   const average = later.reduce((s, x) => s + sum(x), 0) / later.length;

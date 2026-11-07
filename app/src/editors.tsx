@@ -100,25 +100,35 @@ export function PromotionsEditor({ o }: { o: AppOffer }) {
 // ---- bonus by year ------------------------------------------------------------------------------
 
 export function BonusYearsEditor({ o }: { o: AppOffer }) {
+  return <YearsEditor o={o} which="bonus" note="The last year's amount repeats for every year after it. Each is prorated by the days you work in its bonus year." />;
+}
+
+/** Commission by employment year (4h): a ramp in year 1, a territory that grows. */
+export function CommissionYearsEditor({ o }: { o: AppOffer }) {
+  return <YearsEditor o={o} which="commission" note="The last year's amount repeats for every year after it. Each month earns a twelfth of its employment year's amount." />;
+}
+
+function YearsEditor({ o, which, note }: { o: AppOffer; which: "bonus" | "commission"; note: string }) {
   const api = useLedger();
-  const list = o.draft.bonus.amounts;
+  const list = o.draft[which].amounts;
+  const path = `${which}.amounts`;
   return (
     <div className="editor-table">
-      <EditorHead k="bonus.amounts" />
+      <EditorHead k={path} />
       <div className="editor-grid years">
         {list.map((_, i) => (
-          <Trace key={i} id={inputMetric(o.letter, `bonus.amounts.${i}`)} className="editor-grid-row">
+          <Trace key={i} id={inputMetric(o.letter, `${path}.${i}`)} className="editor-grid-row">
             <span className="year-label">Year {i + 1}{i === list.length - 1 ? ", and after" : ""}</span>
-            <RangeField o={o} path={`bonus.amounts.${i}`} kind="money" label={`bonus, year ${i + 1}`} />
+            <RangeField o={o} path={`${path}.${i}`} kind="money" label={`${which}, year ${i + 1}`} />
             <button type="button" className="link remove-row" aria-label={`Remove year ${i + 1}`}
-              onClick={() => api.set(o, { "bonus.amounts": remove(list, i) })}>Remove</button>
-            <span className="editor-row-issues"><Issues letter={o.letter} path={`bonus.amounts.${i}`} /></span>
+              onClick={() => api.set(o, { [path]: remove(list, i) })}>Remove</button>
+            <span className="editor-row-issues"><Issues letter={o.letter} path={`${path}.${i}`} /></span>
           </Trace>
         ))}
       </div>
-      <Issues letter={o.letter} path="bonus.amounts" exact />
-      <button type="button" className="link add-row" onClick={() => api.set(o, { "bonus.amounts": [...list, null] })}>+ Add a year</button>
-      <p className="sub">The last year's amount repeats for every year after it. Each is prorated by the days you work in its bonus year.</p>
+      <Issues letter={o.letter} path={path} exact />
+      <button type="button" className="link add-row" onClick={() => api.set(o, { [path]: [...list, null] })}>+ Add a year</button>
+      <p className="sub">{note}</p>
     </div>
   );
 }

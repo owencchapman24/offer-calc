@@ -8,6 +8,7 @@ import type { OfferWarning } from "../../src/offer/types";
 export const WARNING_AT: Partial<Record<OfferWarning["code"], string>> = {
   convenienceRule: "employerState", hsaCap: "health.employeeHsa", section127Cap: "perks.section127", commuterCap: "perks.commuterMonthly",
   k401Cap: "retirement.contributionPct", bonusCutoff: "bonus.cutoff", unlimitedVacation: "timeOff.policy", esppCap: "espp.contributionPct",
+  commissionEvenly: "commission.amount", drawNotEarnedBack: "commission.draw.recoverable",
 };
 
 /** A year's withholding rounded as displayed, and what it falls short by (so L-5's figure and its derivation foot). */

@@ -29,7 +29,7 @@ import { verdictModule } from "./Later";
 import { detailedModule, Ledger } from "./Ledger";
 import {
   type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type EsppDraft, firstYear, type Letter, type Missing, sampleOffers,
-  toHousehold, toOfferInput,
+  toHousehold, toOfferInput, blankCommission,
 } from "./model";
 import { type Derivation, type MetricId, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
@@ -70,6 +70,21 @@ export const withBenefits = (o: AppOffer, list: AppOffer["draft"]["otherBenefits
 
 /** The samples with other benefits entered for A (taxable and tax-free), entered as none for B, and not entered for C (4j). */
 export const BENEFITS = (os: AppOffer[]) => os.map((o) => (o.letter === "A" ? withBenefits(o) : o.letter === "B" ? withBenefits(o, []) : o));
+
+/** An offer with commission (4h): the design's example 1 unless other terms are given, $60,000 a year ($40,000 to $80,000), quarterly, 30 days after. */
+export const withCommission = (o: AppOffer, terms: Partial<AppOffer["draft"]["commission"]> = {}): AppOffer =>
+  ({ ...o, draft: { ...o.draft, commission: { ...blankCommission(), amount: { bear: 40_000, base: 60_000, bull: 80_000 }, period: "quarter",
+    payAfterDays: 30, ...terms } } });
+
+/**
+ * The samples with commission: A's quarterly (example 1); B's monthly, 15 days after, $36,000 a year ($12,000 low) with a guaranteed $2,000
+ * draw for 3 months (example 2); C's by year, $20,000 then $40,000, quarterly, with a recoverable $1,000 draw repaid on leaving.
+ */
+export const COMMISSIONS = (os: AppOffer[]) => os.map((o) => (o.letter === "A" ? withCommission(o)
+  : o.letter === "B" ? withCommission(o, { amount: { bear: 12_000, base: 36_000, bull: 36_000 }, period: "month", payAfterDays: 15,
+    draw: { monthly: 2_000, recoverable: false, months: 3, onLeaving: null } })
+  : withCommission(o, { basis: "byEmploymentYear", amount: null, amounts: [{ bear: 20_000, base: 20_000, bull: 20_000 }, { bear: 40_000, base: 40_000, bull: 40_000 }],
+    draw: { monthly: 1_000, recoverable: true, months: null, onLeaving: "repaid" } })));
 
 /** The offers compared, by letter, and the comparison's work context. `about` changes About you (Prices in, say). */
 export function context(basis: Basis = "colAdjustedTotal", tweak: (o: AppOffer[]) => AppOffer[] = (o) => o, stay = 4,
