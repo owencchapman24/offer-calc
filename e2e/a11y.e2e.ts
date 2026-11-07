@@ -263,6 +263,23 @@ test.describe("detailed mode", () => {
     await settled(page);
     await scan(page, "detailed: equity, with an ESPP");
   });
+  // Commission's terms show once an offer has some (4h): A's, quarterly, 30 days after, with a recoverable draw; then by year, its editor open.
+  test("section: commission, entered", async ({ page }) => {
+    await openCompare(page);
+    await openSection(page, "commission");
+    await page.locator("#in-A-commission-amount").fill("60000");
+    await page.locator("#in-A-commission-period").selectOption("quarter");
+    await page.locator("#in-A-commission-payAfterDays").fill("30");
+    await page.locator("#in-A-commission-draw").selectOption("recoverable");
+    await page.locator("#in-A-commission-draw-monthly").fill("1000");
+    await expect(page.locator("#in-A-commission-draw-onLeaving")).toBeVisible();
+    await settled(page);
+    await scan(page, "detailed: commission, entered");
+    await page.locator("#in-A-commission-basis").selectOption("byEmploymentYear");
+    await page.getByRole("button", { name: /commission by year/i }).first().click();
+    await expect(page.locator("#in-A-commission-amounts-0")).toBeVisible();
+    await scan(page, "detailed: commission by year, its editor open");
+  });
   for (const e of EDITORS) {
     test(`row editor: ${e.title}`, async ({ page }) => {
       await openCompare(page);

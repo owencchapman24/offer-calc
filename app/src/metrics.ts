@@ -22,11 +22,12 @@ export type AboutField = "filing" | "stay" | "wages" | "spouse" | "healthUsage" 
 export type PvPart = "gross" | "tax" | "premiums" | "takeHome" | "retirement" | "perks" | "healthExtra" | "savings" | "rent" | "faceValue";
 /** The bridge's lines, offer letter to after rent (docs/ui-design.md §5, W4). */
 export type BridgeLine =
-  | "letter" | "salary" | "bonus" | "cash" | "rsu" | "espp" | "benefit" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
+  | "letter" | "salary" | "bonus" | "commission" | "draw" | "cash" | "rsu" | "espp" | "benefit" | "clawback" | "paid" | "tax" | "premiums" | "afterTax"
   | "retirement" | "perks" | "hsa" | "oop" | "totalRewards" | "rent" | "own" | "prices" | "total" | "spend" | "saved" | "inEspp" | "taxFree";
 /** L-6's employment-year lines (docs/ui-design.md §4.8): cash; total rewards and hours; after rent. workpaper.ts numbers them. */
 export type L6Line =
-  | "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "benefit" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "esppHeld" | "takeHome"
+  | "salary" | "bonus" | "commission" | "cash" | "rsu" | "clawback" | "espp" | "benefit" | "gross" | "tax" | "premiums" | "afterTax" | "yours" | "esppHeld"
+  | "takeHome"
   | "employer" | "oop" | "hsa" | "perks" | "totalRewards" | "hours" | "afterTaxHour" | "totalRewardsHour"
   | "savings" | "rent" | "local" | "atRef" | "oopRef" | "face" | "total" | "totalHour";
 /** L-6's calendar-year tax lines: what goes in, then each tax. `rate` is the offer's share ÷ its pay (the offer's column only). */
@@ -34,7 +35,8 @@ export type TaxLine =
   | "wages" | "statutory" | "spouse" | "pretax401k" | "section125" | "taxable" | "federal" | "ss" | "medicare" | "state" | "statePayroll" | "local" | "total" | "rate";
 /** Each L-6 year line's tickmark: inputs traced, sums footed, the rest worked out. */
 const L6_KIND: Record<L6Line, TickKind> = {
-  salary: "recomputed", bonus: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", espp: "recomputed", benefit: "recomputed", gross: "footed",
+  salary: "recomputed", bonus: "recomputed", commission: "recomputed", cash: "recomputed", rsu: "recomputed", clawback: "recomputed", espp: "recomputed",
+  benefit: "recomputed", gross: "footed",
   tax: "recomputed", premiums: "traced", afterTax: "footed", yours: "recomputed", esppHeld: "recomputed", takeHome: "footed", employer: "recomputed",
   oop: "traced", hsa: "traced", perks: "traced", totalRewards: "footed", hours: "recomputed", afterTaxHour: "recomputed", totalRewardsHour: "recomputed",
   savings: "recomputed", rent: "traced", local: "footed", atRef: "recomputed", oopRef: "recomputed", face: "recomputed", total: "footed",
@@ -74,6 +76,9 @@ export type MetricId =
   | `forfeit.${L}.${"rsu" | "k401"}` // L-4: RSUs or employer 401(k) money not vested by then
   | `vac.${L}` // L-4 and A-4: unused vacation paid on the last day picked (4a)
   | `refund.${L}` // L-4 and A-4: ESPP money that comes back on the last day picked (4i)
+  | `tocome.${L}` // L-4 and A-4: commission earned by the last day picked, paid after it (4h)
+  | `forgonec.${L}` // L-4 and A-4: commission that leaving then forfeits (4h)
+  | `drawkept.${L}` // L-4 and A-4: a recoverable draw not earned back by then, kept (4h)
   | `next.${L}` // L-4: what staying until the next cliff is worth
   | `nextown.${L}` // L-4: the next cliff's own part of that
   | `stayafter.${L}` // L-4: your stay after tax, as paid (what L-1 counts on the after-tax basis)
@@ -101,6 +106,7 @@ export type MetricId =
   | `a5.${L}.esppIn` // A-5: what goes into its ESPP over its stay (4i)
   | `a5.${L}.ob.${number}.${"stay" | "afterTax"}` // A-5: an other benefit over its stay, and a taxable one's after tax (4j)
   | `when.${L}.benefit` // A-3: taxable benefits a month, paid with salary (4j)
+  | `when.${L}.${"commission" | "draw"}` // A-3: commission expected a month, paid monthly; a draw against it a month, paid with salary (4h)
   | `a6.${L}.${number}.${A6Line}`; // A-6: a calendar year's pay, tax, rate and tax by kind
 // L-5 and L-6 retired at stop 5B (docs/v2-plan.md, item 5, B8): each offer's warnings are in its A-6, and the `l6*` ids are A-7's
 // figures, each offer's tables over its own stay. The ids kept their names; the page calls the tables A-7.

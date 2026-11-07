@@ -23,6 +23,23 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
       return `Leaving on ${p.leaveDate} forfeits ${usd(p.earned)} earned toward the bonus for ${p.periodFrom} to ${p.periodTo} `
         + `(it pays ${usd(p.full)} on ${p.payDate}, to those employed that day).`;
     }
+    case "commissionForfeited": {
+      const p = w.params;
+      return `Leaving on ${p.leaveDate} forfeits ${usd(p.forfeited)} of commission for ${p.periodFrom} to ${p.periodTo} (paid ${p.payDate}, `
+        + "to those employed that day).";
+    }
+    case "drawNotEarnedBack": {
+      const p = w.params;
+      if (p.why === "stayEnd") {
+        return `At your stay's end (${p.date}), ${usd(p.balance)} of a recoverable draw isn't yet earned back: it counts as pay in your stay, `
+          + "and would come out of commission after it.";
+      }
+      return `Leaving on ${p.date} leaves ${usd(p.balance)} of a recoverable draw not earned back: ${p.why === "repaid"
+        ? "repaid that day, as entered" : "counted as kept"}. Whether you'd owe it depends on the commission plan's terms and the state's law.`;
+    }
+    case "commissionEvenly":
+      return "Commission counts as earned evenly, a twelfth of the year's amount each month. Quotas, accelerators, caps, chargebacks on "
+        + "canceled deals and commission paid only when the customer pays aren't modeled.";
     case "k401Cap":
       return `Your ${w.params.year} 401(k) deferrals reach the 402(g) limit of ${usd(round2(w.params.limit))} before `
         + "year-end: deferrals and any match stop for the rest of that year (no true-up assumed).";
@@ -53,7 +70,8 @@ export function formatWarning(w: OfferWarning | TaxWarning): string {
         + "a benefit marked tax-free that isn't makes the offer look better than it is.";
     case "withholdingShortfall":
       return `Federal withholding on ${w.params.year} pay falls about ${usd(Math.round(w.params.balanceDue))} short of `
-        + `its federal income tax${w.params.supplemental ? ": bonuses and RSU vests are withheld at the flat 22% supplemental rate" : ""}`
+        + `its federal income tax${w.params.supplemental ? `: bonuses${w.params.commission ? ", commission" : ""} and RSU vests are withheld at `
+          + "the flat 22% supplemental rate" : ""}`
         + `${w.params.espp ? `${w.params.supplemental ? ", and" : ":"} an ESPP purchase's gain isn't withheld at all` : ""}. `
         + `Expect to owe it in April ${w.params.year + 1}, or raise your withholding on Form W-4.`;
     case "itemizing":

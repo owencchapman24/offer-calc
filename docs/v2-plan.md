@@ -9,7 +9,8 @@ testers' first answer at the user's word), 5B (#65) and 5C (#66, both 2026-10-16
 extended (sick days, unlimited vacation, paying out unused vacation on leaving) and two new parts, 4i (an employee stock purchase plan,
 each lot sold at purchase) and 4j (other benefits), built next at the user's word, in that order (4a, 4i, 4j), a review stop each,
 ahead of item 2; their decisions are D16-D23. 4a is built (stop 4a, pull request #70, approved 2026-10-22), 4i (stop 4i, #71, approved
-2026-10-23) and 4j (stop 4j, #72, approved 2026-10-23); all three are live.
+2026-10-23) and 4j (stop 4j, #72, approved 2026-10-23); all three are live. **4h, commission, designed in pull request #74, was
+approved on 2026-11-05 with the user's changes to D24 and D28,** and is built (stop 4h, pull request #78, 2026-11-05), for review.
 What to build after v1
 (UI slices 1-8 and Copy as document), in the priority order approved with item 5 (item numbers are stable IDs; before item 5 the order
 was 1, 2, 3, 4):
@@ -18,7 +19,8 @@ was 1, 2, 3, 4):
 2. **Item 2, market benchmarks:** where each offer's base salary sits among BLS's wage percentiles for its occupation and metro area
    (OEWS, May 2025), as a part of that offer's breakdown.
 3. **Items 4a-4c, accuracy, the small parts:** days off, commuting and relocation costs. **Approved 2026-10-19:** 4a (extended), 4i
-   (the ESPP) and 4j (other benefits) move ahead of item 2, at the user's word; 4b and 4c keep their place.
+   (the ESPP) and 4j (other benefits) move ahead of item 2, at the user's word; 4b and 4c keep their place. **Approved 2026-11-05:**
+   4h (commission) too, next.
 4. **Item 3, negotiation help:** what each lever (salary, sign-on) is worth to you, from one offer; L-3's ties once there are two;
    the published wages; an optional draft email. Facts, not advice.
 5. **Item 1, beyond the money:** what else each offer is worth to you, in dollars you name, and whether (and at what figure) that flips
@@ -383,7 +385,8 @@ one projection, so a later-starting offer's own stay and the comparison's window
 - **Accuracy (item 4) feeds the breakdown with no new layout:** days off and commuting time into per hour (A-1); commuting's cost into
   A-2 (a "getting to work" share of the $100); relocation into year 1 (A-2, A-3); startup options into A-3 and A-4's bad case; Public
   Service Loan Forgiveness beside A-1; vacation paid out on leaving into A-4 (approved 2026-10-19); an ESPP into A-3's pay and
-  payments, A-4's cliffs and A-5 (4i); other benefits into A-2's $100 or beside it, and A-5 (4j). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
+  payments, A-4's cliffs and A-5 (4i); other benefits into A-2's $100 or beside it, and A-5 (4j); commission into A-2's pay and
+  bridge, A-3's payments and A-4's terms, cliffs and bad case (4h, built 2026-11-05). It also matters more here: in a comparison, an error common to every offer (two weeks off assumed
   for each) partly cancels out, but in one offer's bottom line nothing cancels. Hence 4a-4c move up.
 
 ### Re-ranked priority (approved 2026-10-15)
@@ -392,7 +395,7 @@ Item numbers are stable IDs; the order is separate.
 1. **Item 5, the offer breakdown** (this section), with quick mode from one offer and §1's new wording.
 2. **Item 2, market benchmarks,** as A-8: the context a one-offer evaluator lacks (finding 2), still context only.
 3. **Items 4a-4c, days off, commuting and relocation:** small, and a standalone bottom line has nothing to cancel their errors.
-   (Approved 2026-10-19, at the user's word: 4a, 4i and 4j move ahead of item 2.)
+   (Approved 2026-10-19, at the user's word: 4a, 4i and 4j move ahead of item 2; and 2026-11-05, 4h.)
 4. **Item 3, negotiation help,** as A-9: lever values from one offer, ties from two.
 5. **Item 1, beyond the money:** comparison-only, so it waits for the comparison's users.
 6. **Items 4d-4f:** large, and each still set by the testers' answers (D10).
@@ -928,7 +931,8 @@ the clipboard in the smoke tests, the scan.
 Ten parts, each its own pull request (4d and 4e two), in this order (D10): the two small ones that feed "per hour of your life"
 first, then relocation, then the large ones. The order is meant to be reset by the testers' answers. 4g, Philadelphia's wage tax for
 commuters, was added to the backlog on 2026-10-15, unranked: it's small and its engine is built, so the testers' answers (question 4)
-place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked.
+place it. 4h, commission, was added on 2026-10-16 from the owner's own use (`docs/user-testing.md`, finding 3), unranked; designed
+in pull request #74 (2026-10-23) and approved on 2026-11-05 (decisions D24-D28), it's built (stop 4h, pull request #78), before item 2.
 
 **Approved 2026-10-19 (pull request #69), with the user's changes to D20 and D22 (D21 moot):** 4a gains sick days, an "unlimited"
 vacation policy and paying out unused vacation on leaving; two parts are new, 4i (an employee stock purchase plan, each lot sold at
@@ -946,7 +950,7 @@ the breakdown (A-1 to A-7, where it applies: each part's table says where and wh
 | 4e Startup options | Medium-large | an option grant, exit scenarios, its tax | 0 (detailed mode) |
 | 4f Public Service Loan Forgiveness | Large, volatile | loans, payment plans, AGI by year | under 0.3 kB (a closed About-you row) |
 | 4g Philadelphia's wage tax for commuters | Small | none: the nonresident rate is in (`resident: false`) | 0 (detailed mode) |
-| 4h Commission | Small-medium | a pay stream: an expected annual amount with a range, paid monthly or quarterly | 0 (detailed mode) |
+| 4h Commission | Small-medium | a pay stream: an expected annual amount with a range, paid monthly or quarterly after a lag; a draw against it; what's paid when you leave. No tax-engine change | 0 (detailed mode) |
 | 4i Employee stock purchase plan | Medium | an ESPP stream (contributions, purchases, the $25,000 limit, each lot sold at purchase); tax engine: income that isn't FICA wages | 0 (detailed mode) |
 | 4j Other benefits | Small | named benefits, each a yearly amount, taxable (a pay stream) or tax-free (a benefit flow) | 0 (detailed mode) |
 
@@ -1220,29 +1224,195 @@ per-edit time, so each stop reports `npm run bench` side by side with `main` and
 - **Bundle:** detailed mode; nothing in the worker beyond the input.
 - **Risk:** small. Philadelphia's rates change each July 1 (CLAUDE.md, the data refresh calendar, already covers it).
 
-### 4h. Commission (added 2026-10-16)
+### 4h. Commission (added 2026-10-16; approved 2026-11-05, with changes to D24 and D28)
+
+**At the user's review of pull request #74 (2026-11-05):** D24-D27 as recommended, D24 in the user's words: how often commission is
+paid is a simple choice, monthly or quarterly, and the lag a number of days, both required, each one's help pointing to the commission
+plan as where to find them. So quarters are calendar quarters, with no "Quarters start in". **D28 changed:** a recoverable draw's
+balance on leaving is an input, "If you leave owing a recoverable draw: kept / repaid", default kept. Stein v. hhgregg is cited only
+as read in the opinion itself, which it now is (below). **4h is built next, before item 2,** at the user's word: one pull request and
+one review stop, no tax-engine change, the sources marked unchecked re-read first.
+
+**Built: stop 4h** (2026-11-05, pull request #78), as below, with these differences (`docs/ui-design.md` §12 has the stop's notes):
+- **The engine's stream** is a module of its own, `src/offer/commission.ts`, beside the ESPP's, not `streams.ts`; and the projection reports
+  each period that reconciled (`commissionPeriods`, a draw-covered $0 one included), its commission split at anniversaries, so A-2's
+  bridge can say how much of a year's commission is paid in the next.
+- **The draw's presence and kind are one choice,** None (`D`), Guaranteed (non-recoverable) or Recoverable, so a draw's kind is never
+  blank; then its dollars a month (required), its months (`D` every month) and, recoverable, "If you leave owing a recoverable draw"
+  (`D` Kept, or Repaid).
+- **A-2's lag is one line,** "commission earned in year 1, paid in year 2" (in a later year that differs, one net line), its gloss in
+  short dates as the bonus's ("Apr 1 – Jul 12, paid Jul 30 and Oct 30"); with a draw, "draw paid beyond the commission earned" or "draw
+  earned back from commission".
+- **"If you left on"** (A-4, L-4, the document) gains three ticked figures: commission paid after your last day, commission forfeited,
+  and a recoverable draw kept; one repaid is in "repay", with the clawbacks.
+- **Two rules the design left open:** under "Only if employed on the payout date", a forfeited period's commission doesn't earn back a
+  recoverable draw (its draws join what's owed); and a repaid draw is handed back by the calendar year of the draws still owed (the oldest
+  are earned back first): this year's reverse their wages, an earlier year's are repaid pay (the IRC 1341 credit over $3,000).
+- **Method 1b** (withholding with no regular wages) applies to commission payouts only; a bonus or RSU vest with neither salary nor a draw
+  keeps the flat 22%, as before 4h.
+- **Eligible pay (D26):** the 401(k)'s and the ESPP's second choice reads "Salary and commission" or "Salary, bonus and commission" when
+  the offer has commission, and the assumption's words say so.
+- **The sources marked unchecked, re-read first:** Stein v. hhgregg from the court's own slip opinion (File Name 17a0232p.06; Moore, J.;
+  Sutton, J., concurring in part and dissenting in part): a policy holding departing employees liable for draws "requires a repayment of
+  wages already delivered", so violates the free-and-clear rule, while recovering draws from later commission is lawful; Cal. Lab. Code
+  §2751 in FindLaw's copy (current as of Jan 1, 2026; the legislature's site and Justia refuse automated reads); IRS Pub. 15 (2026) and
+  Pub. 15-T (2026) read in full: neither names a draw or an advance against commission, so the draw as regular wages stays our reading.
+- **Measured** (2026-11-05, side by side with `main`): the main thread 112.59 to 113.02 kB gzip (+0.43, within v2's 0.5 kB); the worker
+  71.92 to 74.14 kB (+2.22, over the design's estimate of under 1 kB, and 0.86 kB under its 75 kB budget); the stylesheet 11.56 to 11.60 kB;
+  LCP 1.96 s, CLS 0 (the fonts on time and late), TBT 40 ms, the first answer 0.45 s; `npm run bench` within noise; the grid and
+  `npm run offers` byte-identical; the scan without violations in 71 states, the Commission section entered and by year among them.
 
 - **Today:** there's no commission field. The owner's own offer includes commission (finding 3): it can go in as a bonus in dollars
   with a range, but a bonus is paid once a year, on its payout date, and commission is usually paid monthly or quarterly. So its
   timing is wrong in every figure that depends on when money arrives: A-3's payments, the present values, the employment-year split,
   the withholding estimate (each payout is supplemental wages), and what you'd keep if you left early (A-4, L-4), where a year's
-  commission earned but not yet paid is all forfeited under the bonus's rule.
-- **Scope:** a "commission" pay type in detailed mode, beside the bonus: an expected annual amount with a range (bear, base and bull,
-  as a bonus's), paid monthly or quarterly, each payout for the period just ended and paid a set number of days after it (a default
-  to decide at the stop, shown with its `D`). The first period prorated from the start date, as salary is; raises don't move it
-  unless entered. In the bear case it's the low amount, so L-2 and A-4's bad case carry it.
-- **Leaving early:** commission earned through the last day and not yet paid is paid, by default, with a choice for a plan that
-  requires employment on the payout date (as `mustBeEmployedOnPayDate` is for a bonus). The leave-date sweep and the cliffs see each
-  payout as a dated event.
-- **Words and figures:** A-2's $100 counts it in pay; A-3 shows it as its own line and its own kind in "when each payment arrives";
-  the bridge gains a "commission" line; the copied document and the CSVs name it. Quoted total compensation (the offer letter) counts
-  the expected annual amount.
-- **Validation:** hand-checked tests at the edges: a start mid-quarter, a last day the day before and the day of a payout, a range's
-  bear and bull, and a session with both a bonus and commission. The tax engine doesn't change, so the 2026 oracle report stays
-  byte-identical.
-- **Bundle:** detailed mode, and a stream in the worker beside the bonus; nothing on the main thread.
-- **Risk:** small to medium: commission plans vary (draws against commission, accelerators, quotas), and those stay out of scope;
-  the help says so.
+  commission earned but not yet paid is all forfeited under the bonus's rule. A draw against commission can't be entered at all.
+- **Inputs,** per offer, a "Commission" section in detailed mode after the bonus (blank: no commission, as the bonus):
+  - **"Expected a year"**: dollars, the commission at target ("If the offer quotes on-target earnings, it's that less the base
+    salary"). "+ range" adds a low and a high a year, the bear and bull cases, as the bonus's `RangeField` does. Or, as the bonus's
+    "Dollars by year", an amount for each employment year, the last repeating (D27): a ramp in year 1, a territory that grows.
+  - **"Paid"**: monthly or quarterly, a simple choice (quarters are calendar quarters: January to March, and so on). **"Days after
+    each period ends"**: a whole number, 0 to 366. Both are required (D24): neither has a default, and each is a problem at the field
+    until it's entered, as the ESPP's offering start is; each one's help says where to find it, the commission plan (California and New
+    York require a written one), since no published survey of plans gives either.
+  - **"When you leave"**: "Paid for work to your last day" (`D`, D25) or "Only if employed on the payout date" (the bonus's rule).
+  - **"Draw against commission"**: none (`D`), or dollars a month, with "Guaranteed (non-recoverable)" or "Recoverable" (required with
+    a draw) and "For the first … months" (blank: every month you're there). With a recoverable draw, **"If you leave owing a recoverable
+    draw"**: "Kept" (`D`) or "Repaid" (D28).
+  - Under them, the note: "Commission counts as earned evenly over the year. Quotas, accelerators, caps, chargebacks on canceled deals
+    and commission paid only when the customer pays aren't modeled."
+- **How it counts:**
+  - **Earned evenly while employed,** a twelfth of the year's amount each calendar month, a partial month by its days, as salary is
+    (M-2's monthly accrual), so the period you start in counts from your start date and the one you leave in to your last day. Flat in
+    dollars: raises don't move it; by year, each month's twelfth is the amount for the employment year the month's piece is in.
+  - **Paid after each period:** a calendar month, or a calendar quarter, is paid on its last day plus the days entered, as
+    one payment: what the period earned, less the draws paid for it, and for a recoverable draw less the balance carried in, never
+    below zero. A payment is pay on its date: its calendar year for tax, its employment year by the payment rule (a payment on an
+    anniversary is the year just ended), as a bonus is.
+  - **A draw** is paid with salary each month (a partial month by its days), from your start for its months, and like salary belongs
+    to the employment year its days are in. **Guaranteed:** a floor;
+    each period pays the larger of its commission and its draws. **Recoverable:** what commission doesn't cover is a balance that
+    comes out of later periods' commission before they pay anything; it moves money earlier, not more.
+  - **Quoted total compensation** (the offer letter): the expected amount a year (that year's, by year), like the bonus's target, with
+    no proration or lag; the bridge reconciles it to what's paid.
+  - **Example 1** (illustrative, at the samples' dates; the stop checks it in the engine): a start on Jul 13, 2026, $60,000 a year
+    expected ($5,000 a month; a range of $40,000 to $80,000, for the bad case below), paid quarterly (calendar quarters), 30 days after
+    each quarter ends:
+    - Q3 2026 earns $5,000 × 19/31 for Jul 13-31, $3,064.52, plus August and September, $13,064.52, paid Oct 30, 2026: 2026's only
+      payout, withheld at 22%, $2,874.19 (below);
+    - Q4 earns $15,000, paid Jan 30, 2027 (2027's tax), and Q1 2027 $15,000, paid Apr 30;
+    - so year 1 (Jul 13, 2026 – Jul 12, 2027) earns $60,000.00 and pays $43,064.52: the $16,935.48 earned Apr 1 – Jul 12, 2027
+      ($15,000 + $5,000 × 12/31) is paid Jul 30 and Oct 30, 2027, in year 2. Later years earn and pay $60,000 each;
+    - over a 4-year stay, $240,000 is earned and $223,064.52 is paid inside it: the $16,935.48 earned Apr 1 – Jul 12, 2030 is paid
+      after the stay, so it isn't counted (the stay rule, M-7.3, as a bonus paid after it).
+  - **Example 2, a draw** (the same start, paid monthly, 15 days after each month, $36,000 a year expected and $12,000 low, a draw of
+    $2,000 a month for the first 3 months, Jul 13 – Oct 12, 2026: $1,225.81 in July (19/31), $2,000 in August and September, $774.19
+    in October (12/31), $6,000.00 in all):
+    - **Base case,** guaranteed or recoverable alike (commission covers each month's draw): July earns $1,838.71, less its $1,225.81
+      draw, so $612.90 is paid Aug 15; August and September pay $1,000 each; October earns $3,000, less $774.19, so $2,225.81 is paid
+      Nov 15; from November, $3,000 a month. Through October: $6,000.00 of draws + $4,838.71 of payouts = the $10,838.71 earned.
+    - **Bear case, guaranteed:** $612.90, $1,000, $1,000 and $1,000 are earned, so nothing is paid for July to September and $225.81 for
+      October ($1,000 − $774.19): $6,225.81 through October against $3,612.90 earned; the floor adds $2,612.90.
+    - **Bear case, recoverable:** the same $6,000 of draws, then a balance of $612.90, $1,612.90 and $2,612.90 after July, August and
+      September; October's $225.81, November's and December's $1,000 each pay it down to $387.10, and January 2027's $1,000 pays
+      $612.90 on Feb 15. Through January, pay then equals commission earned: $6,000 of draws + $612.90 = $6,612.90 ($612.90 + 6 ×
+      $1,000).
+- **Tax and withholding:**
+  - **Taxed as wages** (W-2 boxes 1, 3 and 5): income tax (federal, state, local), Social Security and Medicare, and the states'
+    payroll taxes, as salary is, on the cash basis, in the calendar year each payment is made. No tax-engine change: commission joins
+    the offer's wages that the engine already taxes, so the grid and the 2026 oracle report stay byte-identical.
+  - **Withheld as supplemental wages.** Commissions are named as supplemental wages in the regulation, Treas. Reg.
+    §31.3402(g)-1(a)(1)(i), and are excluded from regular wages by (a)(1)(ii): "wages that vary from payroll period to payroll period
+    (such as commissions, reported tips, bonuses, or overtime pay) are not regular wages"; IRS Pub. 15 (2026) §7 lists "bonuses,
+    commissions, overtime pay". Identified apart from salary on the pay stub, as payroll systems pay them, they may be withheld at the
+    optional flat rate, 22% (37% on a calendar year's supplemental wages over $1 million), when income tax was withheld from regular
+    wages in the current or the preceding calendar year (§7, method 1a). That's the rule `withholding.ts` already applies to bonuses, so
+    each payout joins its supplemental pay. Example 1's Oct 30 payout: $13,064.52 × 22% = $2,874.19 withheld.
+  - **Commission only** (no salary and no draw): no regular wages, so §7 requires the aggregate procedure (method 1b), and the estimate
+    withholds each payout as a month's regular pay, by the percentage method.
+  - **A draw** is "a predetermined fixed determinable amount for the current payroll period", regular wages under (a)(1)(ii), so it's
+    withheld with each paycheck by the percentage method, as taxable benefits are (4j). Neither the regulation nor Pub. 15 names a
+    draw; this is our reading, and stop 4h re-reads Pub. 15 and 15-T for one.
+  - **Eligible pay:** the 401(k)'s and the ESPP's "pay that counts" choices gain commission (D26). Commission is W-2 compensation, which
+    plans count unless their document excludes it (IRC 415(c)(3); Treas. Reg. §1.415(c)-2(b)(1) names commissions); the help says
+    check the plan.
+  - **What A-6 says:** the shortfall line names commission with bonuses ("bonuses, commission and RSU vests are withheld at the flat 22%
+    supplemental rate"); at a lower bracket the flat 22% withholds more than is owed, and A-6's year shows the refund.
+- **Leaving early:**
+  - **Paid for work to your last day, by default** (D25): the period you leave in counts its commission to your last day, less its
+    draws, and is paid on its usual date, after you've gone; every earlier period still pays on its date. Commission earned is wages,
+    and the plan's written terms say when it's earned and how it's paid when you leave: California requires a written commission
+    contract setting out "the method by which the commissions shall be computed and paid" (Lab. Code §2751), and New York requires one
+    with "details pertinent to payment of wages" on termination of employment (Labor Law §191(1)(c)). Hence the choice, "Only if
+    employed on the payout date", for a plan that says so: then commission unpaid by your last day is forfeited, as a bonus is
+    (`mustBeEmployedOnPayDate`).
+  - **Example 1, the last day around Q4's payout:** leaving Jan 29, 2027, by default Q4's $15,000 is still paid Jan 30 and Jan 1-29's
+    $4,677.42 on Apr 30 (a day's more work adds $161.29: no cliff). Under "only if employed", both are forfeited; leaving Jan 30, Q4's
+    $15,000 is paid and Jan 1-30's $4,838.71 forfeited. So each payout date is a cliff under that rule alone.
+  - **A recoverable draw's balance** not earned back by your last day is kept by default, or under "Repaid" (D28) handed back on your
+    last day, gross, as a clawback is (M-9): in the same calendar year the draws' wages are reversed; from a later year's draws, their
+    wages stay, with the IRC 1341 credit over $3,000, and no FICA back. Whether you'd owe it depends on the plan's terms and the state's
+    law; the help says so. One federal limit, for a draw that brings commission pay up to the minimum wage: the Sixth Circuit held that
+    recovering draws from later commission is lawful, but that a written policy holding departing employees liable for unearned draws
+    states a claim under the FLSA, since it "requires a repayment of wages already delivered" (29 C.F.R. § 531.35; Stein v. hhgregg,
+    Inc., No. 16-3364, 6th Cir. Oct. 12, 2017, read in the court's own slip opinion, 17a0232p.06). A-6 says how much was kept or repaid
+    (example 2's bear case leaving Sep 30, 2026: $2,612.90).
+  - **Your stay's end** isn't a leave date (M-7.3): commission earned in the stay and paid after it isn't counted, as above, and a
+    recoverable draw's balance at the stay's end stays counted as pay in the stay (it would come out of commission after it); A-6 names
+    the amount.
+- **The range and the bad case:**
+  - **Bear and bull are the low and the high a year** (each year's, by year), inside the joint scenarios: in the bear case commission is
+    low together with the bonus, the raises, the share price and the promotions that don't come (M-8). A guaranteed draw floors the bear
+    case's months, as example 2 shows; a recoverable one doesn't.
+  - **A-4's bad case and L-2** (`cases.ts`): `caseChanges` gains `commission` and `commissionByYear`, as the bonus has; `changeText`
+    says "commission $40,000 a year instead of $60,000" or "commission differs in years 2 and 3", and with a guaranteed draw "(at
+    least the $2,000 a month draw until Oct 12, 2026)"; `riskCarriers` names it ("its commission carries the risk"), `hasRanges` counts
+    its range, and L-2's no-range text lists commission among what can take a range.
+- **Where it shows:**
+
+  | Where | What |
+  |---|---|
+  | A-1 | Commission is pay, so after tax it's in "to spend", year 1's too. Why year 1 differs (`whyDiffers`): "commission earned late in year 1 is paid in year 2", and with by-year amounts "commission grows each year". The bad case's line carries its low amount; per hour, its pay |
+  | A-2 | Inside the $100, as pay. The bridge: the offer letter's head gains "expected commission"; then, each when it isn't zero, "commission earned in year 1, paid in year 2" (`(16,935)`, "Apr 1 – Jul 12, 2027, paid Jul 30 and Oct 30"), and in later years "commission from the year before, paid this year"; "draw paid beyond commission earned" (a guaranteed draw's floor, or a recoverable draw not yet earned back) or "draw earned back"; "commission paid is below/above the expected" for a by-year difference |
+  | A-3 | "Commission" as a row of gross pay by year, after the bonus, and a kind in the chart. "When it arrives": each quarterly payout, dated ("Oct 30, 2026 · Commission for Jul 13 – Sep 30, 2026 (for part of a quarter): $13,065, in year 1"); monthly commission in one line a year ("Commission is paid monthly, 15 days after each month: $3,000 a month expected; the first, Aug 15, 2026, for Jul 13-31"), each payout in A-7; a draw in the monthly note ("with a $2,000 draw against commission a month until Oct 12, 2026") |
+  | A-4 | The terms: "Commission: $60,000 a year expected ($40,000 to $80,000), paid quarterly, 30 days after each quarter ends; leaving before a payout still pays the part earned by your last day" (or "you must be employed on each payout date"), and the draw's terms. The cliffs, under "only if employed": each quarterly payout ("the commission for Oct 1 – Dec 31, 2026: leave the day before and it's forfeited"), monthly ones in one line; the next cliff as now. "If you left on": the commission still to come after your last day, after tax, and when; or what's forfeited; a recoverable draw's balance, kept or repaid. The bad case, as above |
+  | A-5 | Nothing of its own: it's pay, not a benefit. The 401(k)'s money and the ESPP's grow with it where their eligible pay counts it (D26) |
+  | A-6 | Tax by year includes it (income tax and FICA). The withholding line, as above (a draw with salary; commission only by method 1b). Warnings: a standing "Not modeled" note (quotas, accelerators, caps, chargebacks, paid on collection: `commissionEvenly`); a recoverable draw's balance kept or repaid on leaving, or counted at the stay's end (`drawNotEarnedBack`); commission forfeited on leaving (`commissionForfeited`, in the leave-date views only, as `bonusForfeited`) |
+  | A-7 | The employment years' "Commission" row. The payments table: a "Commission" group a year, each payout with its arithmetic ("5,000 a month × (19/31 + 2) months earned − 0 of draws = 13,064.52", with a recoverable draw's balance in and out), each month's draw ("Draw, Jul 2026: 2,000 × 19/31 days"), and their tax at the year's rate |
+  | The comparison | L and L-1 through the totals; L-2's scenarios (the low and high); L-3's ties are on salary and sign-on, which don't move commission, and its note says so as for a bonus by year; L-4: payouts after the last day on their dates, and under "only if employed" each payout's cliff, its marker ("payment (bonus, commission, sign-on, ESPP purchase)") and the forfeit warning. No comparability warning: commission is pay, and blank means none, as for a bonus |
+  | The copied document | The offer as entered ("commission $60,000 a year expected ($40,000 to $80,000), paid quarterly, 30 days after each quarter ends; a guaranteed draw of $2,000 a month for 3 months"); the bottom line's year 1; A-2's bridge lines; A-3's table and dates; A-4's terms, cliffs and "if you left on"; leaving early ("Commission earned but not paid" in its table under "only if employed", and commission still to come after the last day otherwise); A-6's warnings |
+  | The CSVs | A-3's "Commission" row; A-7's payments ("Commission", and its draws) and years; the bridge's lines |
+  | Quick mode | "commission" in the "Also counted" row (`alsoCounted`), as the ESPP is |
+- **Engine:**
+  - **The offer model:** `commission?: Commission` beside `bonus`: `({ basis: "fixed"; amount: ByScenario } | { basis:
+    "byEmploymentYear"; amounts: ByScenario[] }) & { period: "month" | "quarter"; payAfterDays: number; mustBeEmployedOnPayDate?:
+    boolean; draw?: { monthly: number; recoverable: boolean; months?: number; onLeaving?: "kept" | "repaid" } }`. A stream in
+    `src/offer/streams.ts` beside the bonus (`commissionEvents`: the accrual, the periods, the draws and the balance), a component
+    `commission` (with `quoted.commission`), event details `commission` (the period, the days earned, the months' worth, the draws, the
+    balance in and out) and `commissionDraw`, a cliff kind `commission`, the leave result's commission still to come, forfeited and the
+    draw's balance kept or repaid, and the warnings above. Validated in `validateOffer` (amounts at least 0; the period and the days
+    required; a draw at least 0, its kind required, its months a whole number at least 1), in `docs/offer-model.md`.
+    JSON exports and the session carry it as an optional field, as the ESPP's: schema 3 still.
+  - **Withholding** (`withholding.ts`): payouts with the supplemental pay, draws with the regular pay, method 1b with neither salary nor
+    a draw.
+  - **The tax engine:** no change. The grid and the 2026 oracle report stay byte-identical; the samples have no commission, so
+    `npm run offers`' figures don't move.
+- **Hand-checked tests,** at the edges: example 1 (a start mid-quarter, year 1's lag, Dec 31 crossed by Q4's payout, the stay's end);
+  the last day the day before and the day of a payout under each leaving rule; a payout lag of 0 days; example 2's draw (guaranteed
+  and recoverable, base and bear), its last month, and leaving with a balance, kept and repaid (in the draws' calendar year and a
+  later one); the bear and bull of a
+  range; by-year amounts across an anniversary mid-month; withholding at 22%, past $1 million of supplemental pay, a draw's, and
+  commission only by method 1b; 401(k) and ESPP eligible pay with commission; a session with both a bonus and commission. The
+  property tests generate commission (amounts, ranges, periods, lags, draws, both leaving rules), and every figure foots as displayed.
+- **Methodology:** M-2 (commission: earned evenly, the periods and the lag, the draw, the offer letter's figure); M-4 (supplemental
+  withholding, the draw, method 1b); M-8 (its range); M-9 (leaving: the two rules, the draw's balance, the written plan); M-7.3 (the
+  stay's end); M-10 (what isn't modeled, above); M-12 (the assumption line).
+- **Bundle:** detailed mode's section (an estimated 1-1.5 kB gzip in its chunk); the worker under 1 kB gzip (the stream); the main
+  thread a word in quick mode's "Also counted". The derivations and words in their lazy chunks.
+- **Risks:** small to medium. Plans vary: quotas, accelerators, caps, splits, chargebacks and commission on collection stay out of
+  scope and are said; "earned evenly" smooths a lumpy year, which the range is for; whether earned commission is paid after you leave
+  is the plan's and the state's, hence the choice; the draw's withholding is a reading of the regulation, re-read at the stop.
+- **Stop:** one pull request and one review stop: the stream, the inputs, every part above, the document, M-2, M-4, M-9 and M-10.
 
 ### 4i. Employee stock purchase plan (approved 2026-10-19: sold at each purchase)
 
@@ -1498,16 +1668,22 @@ used it, how many offers did you actually have?", before anything else.
 7. Does any offer include an employee stock purchase plan? Do you know its discount, whether it has a lookback, and when its offerings
    start? Would you sell the shares as soon as you bought them, or hold them?
 8. Which other benefits does each offer list (stipends, wellness money, insurance, dependent care)? Do you know which are taxed?
+9. Does any offer pay commission? How much a year at target, and in a bad year and a good one? How often is it paid, and how long after
+   each month or quarter? Is there a draw, and is it recoverable? Does the plan say what happens to commission you've earned when you
+   leave?
 - **Would change it:** the answers set item 4's order (D10); a part no tester needs waits. 4a, 4i and 4j are built first at the user's
   word (2026-10-19), so for them the answers check the design rather than set the order: testers who'd hold their ESPP shares (then 4i's
-  note on holding says more), or benefits the help's table lacks (then it gains rows).
+  note on holding says more), or benefits the help's table lacks (then it gains rows). For 4h: plans paid on a schedule the two periods
+  don't fit (twice a month, or yearly), or plans whose quota or accelerators testers can state (then 4h's scope grows, or they wait).
 
 ## Decisions for you
 
 Recorded 2026-10-13: **D1 and D14 approved.** D2-D13 and D15 stand as recommended unless the user comments on pull request #29;
 a comment there that disagrees replaces the row. Item 5's decisions, B1-B13, are in its section: approved 2026-10-15, with conditions
 on B4, B5 and B8, and B13 added at review. **D16-D23, proposed 2026-10-19 with 4a's extension, 4i and 4j, decided at the user's review
-of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 changed (their rows say how); D21 moot.
+of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 changed (their rows say how); D21 moot. **D24-D28,
+proposed 2026-10-23 with 4h's design, decided at the user's review of pull request #74 on 2026-11-05:** D24-D27 as recommended (D24
+in the user's words), D28 changed.
 
 | # | Decision | Recommended | The alternative |
 |---|---|---|---|
@@ -1534,6 +1710,11 @@ of pull request #69 the same day:** D16-D19 and D23 as recommended; D20 and D22 
 | D21 | 4i's stops | **Moot (the user's review):** with no capital gains, 4i is one pull request and one review stop, the tax engine's change in its own commits | — |
 | D22 | Where tax-free benefits count (4j) | **Decided (the user's review): at face value on their own line in A-1 and the breakdown ("+ $x … in tax-free benefits"), not in "saved", which stays for actual savings; taxable benefits are pay.** **At stop 4j (2026-10-23) the user moved today's perks to that line too.** (Recommended was with the perks, in "saved, at face value") | — |
 | D23 | Other benefits' tax choices (4j) | Two, taxable or tax-free, as asked, with the help's table | Three, adding "free of income tax, not of FICA" (adoption assistance); or named kinds with the law's limits applied |
+| D24 | Commission's period and payout lag (4h) | **Approved (the user's review, 2026-11-05), in the user's words:** how often a simple choice, monthly or quarterly (calendar quarters), and the lag a number of days, both required, each one's help pointing to the commission plan. (Recommended was the same with a "Quarters start in" month, `D` January) | Monthly, 30 days after (`D`s), so an amount alone gives results |
+| D25 | Commission unpaid when you leave (4h) | **Approved:** paid for the work to your last day, on its usual date (`D`), with "Only if employed on the payout date" for a plan that says so | The bonus's default: forfeited unless you're employed on the payout date |
+| D26 | Commission in the 401(k)'s and the ESPP's eligible pay (4h) | **Approved:** counted with the bonus under the existing choice, which reads by what the offer has ("Salary and commission", "Salary, bonus and commission"); the default stays salary. A plan counting one but not the other isn't modeled, said | A choice of its own on each plan, "counts commission" |
+| D27 | A ramp, or commission that grows (4h) | **Approved:** "Dollars by year", as the bonus's (by employment year, the last repeating) | One amount a year only; a ramp through the draw or the range |
+| D28 | A recoverable draw not earned back when you leave (4h) | **Decided (the user's review, 2026-11-05): an input, "If you leave owing a recoverable draw: kept / repaid", default kept; repaid is handed back on the last day as a clawback (same-year reversal or IRC 1341, as M-9 has them); A-6 says how much.** (Recommended was kept, with no input) | — |
 
 ## Order and stops
 
@@ -1549,6 +1730,7 @@ approved on 2026-10-19, at the user's word.
 | 4a | Days off: vacation, holidays and sick days in hours; an unlimited policy; unused vacation paid out on leaving. **Done** (pull request #70, 2026-10-19) | D14, D16-D19 (approved), the secondary state sources re-read |
 | 4i | The ESPP, each lot sold at purchase: the tax engine's income that isn't FICA wages (in its own commits), the plan, its inputs, every part, the document; one pull request, one stop. **Done** (pull request #71, 2026-10-22) | 4a, D20 |
 | 4j | Other benefits: named, taxable or tax-free, in every part and the document. **Done** (pull request #72, 2026-10-23) | 4i, D22, D23 |
+| 4h | Commission: the stream (monthly or quarterly, the lag, the range, a draw, the leaving rule), its inputs, every part, the document; one pull request, one stop. Designed (pull request #74) and approved 2026-11-05. **Built** (pull request #78, 2026-11-05), for review | D24-D28 (decided) |
 | 2A | OEWS data: `fetch-oews`, the files, the area match, the samples' figures | testers (item 2), D7, D8 |
 | 2B | Published wages, A-8: picker, ranges, caveats, M-15, the copied document | 2A, B9 |
 | 4b-4c | Accuracy, the small parts: commuting, relocation, a stop each | testers (item 4), D10, D15 |
@@ -1563,7 +1745,8 @@ control, before launch. The data refresh calendar (`docs/data-refresh.md`) gains
 spring), BLS's paid-leave figures (yearly, September, if D14's defaults use them), the IRS mileage rates (each December, and mid-year
 when the IRS changes them, as in 2026), each convenience rule and cross-state pair's sources (each January), and, if 4f is built, the
 repayment plans' rules; with 4a, 4i and 4j: the ten vacation-payout states' rules (each January), each state's treatment of ESPP
-income (each January), and Pub. 15-B's limits for the help's table (each January).
+income (each January), and Pub. 15-B's limits for the help's table (each January). 4h adds no dataset: the supplemental withholding
+rates it uses are already rechecked each December.
 
 ## Backlog beyond v2
 

@@ -31,6 +31,8 @@ export interface OfferInput {
   leaveDate?: ISODate;
   salary: Salary;
   bonus?: AnnualBonus;
+  /** Commission, paid after each month or quarter, with a draw against it if any (commission.ts). */
+  commission?: Commission;
   /** Sign-on, year-2 sign-on, relocation: anything paid as a lump of cash. */
   cashAwards?: CashAward[];
   equity?: Equity;
@@ -67,7 +69,7 @@ export interface Retirement {
   contributionPct: number;
   /** "pretax" (traditional: lowers taxable wages, not FICA) or "roth" (after tax). Default "pretax". */
   type?: "pretax" | "roth";
-  /** Pay that counts for deferrals and the match. Default "salary"; "salaryAndBonus" adds bonuses. */
+  /** Pay that counts for deferrals and the match. Default "salary"; "salaryAndBonus" adds bonuses and commission (draws included). */
   eligiblePay?: "salary" | "salaryAndBonus";
   /**
    * Match tiers on your deferral rate, applied per paycheck (no year-end true-up), e.g.
@@ -172,7 +174,7 @@ export interface TimeOff {
 export interface Espp {
   /** Your contribution, a fraction of eligible pay, e.g. 0.1. */
   contributionPct: number;
-  /** Pay that counts. Default "salary"; "salaryAndBonus" adds bonuses. */
+  /** Pay that counts. Default "salary"; "salaryAndBonus" adds bonuses and commission (draws included). */
   eligiblePay?: "salary" | "salaryAndBonus";
   /** The discount, 0 to 0.15 (IRC 423(b)(6)). */
   discount: number;
@@ -272,6 +274,44 @@ export interface BonusTiming {
   mustBeEmployedOnPayDate?: boolean;
 }
 
+/**
+ * Commission (docs/v2-plan.md, 4h): dollars a year, earned evenly while employed, a twelfth each calendar month (a partial month by
+ * its days, as salary), flat unless entered by employment year (the year each month's piece is in; the last entry repeats). Each
+ * calendar month or quarter is paid `payAfterDays` after its last day, as one payment: what it earned, less the draws paid for it,
+ * and for a recoverable draw less the balance carried in, never below zero.
+ */
+export type Commission = CommissionTerms & (
+  | { basis: "fixed"; amount: ByScenario }
+  | { basis: "byEmploymentYear"; amounts: ByScenario[] }
+);
+
+export interface CommissionTerms {
+  /** Calendar months, or calendar quarters (January to March, and so on). */
+  period: "month" | "quarter";
+  /** Days after a period's last day that it's paid: a whole number, 0 to 366. */
+  payAfterDays: number;
+  /**
+   * Default false: commission earned by your last day is paid on its usual date, after you've gone. true: commission not paid by
+   * your last day is forfeited, as a bonus is.
+   */
+  mustBeEmployedOnPayDate?: boolean;
+  draw?: CommissionDraw;
+}
+
+/** A draw against commission: dollars a month paid with salary (a partial month by its days), from your start. */
+export interface CommissionDraw {
+  monthly: number;
+  /**
+   * false (guaranteed, non-recoverable): a floor, each period pays the larger of its commission and its draws. true: what commission
+   * doesn't cover is a balance taken from later periods' commission before they pay anything.
+   */
+  recoverable: boolean;
+  /** For the first this many months from your start. Default: every month you're there. */
+  months?: number;
+  /** A recoverable draw's balance not earned back by your last day: "kept" (default) or "repaid" on the last day, gross. */
+  onLeaving?: "kept" | "repaid";
+}
+
 export interface CashAward {
   label: string;
   amount: number;
@@ -343,9 +383,9 @@ export type ValuedOptions = Omit<ProjectionOptions, "scenario"> & { valuationDat
 
 /**
  * "espp": an ESPP purchase's spread, sold the same day: wages for income tax, not FICA (IRC 3121(a)(22)). "benefit": a taxable other
- * benefit, paid with salary (4j).
+ * benefit, paid with salary (4j). "commission": a commission payout, or a draw against commission paid with salary (4h).
  */
-export type Component = "salary" | "bonus" | "cash" | "rsu" | "clawback" | "espp" | "benefit";
+export type Component = "salary" | "bonus" | "commission" | "cash" | "rsu" | "clawback" | "espp" | "benefit";
 
 /** A new-hire grant (its label), or a refresher (the policy's label, its number and grant date). */
 export type RsuGrantRef =
@@ -354,6 +394,8 @@ export type RsuGrantRef =
 
 /** How a bonus payment was worked out. */
 export type BonusDetail = Extract<EventDetail, { kind: "bonus" }>;
+/** How a commission payout was worked out. */
+export type CommissionDetail = Extract<EventDetail, { kind: "commission" }>;
 
 /** How a payment was worked out. */
 export type EventDetail =
@@ -365,13 +407,26 @@ export type EventDetail =
   /** amount x daysEmployed / periodDays; employmentYear says whose amount (byEmploymentYear only). */
   | { kind: "bonus"; basis: "fixed" | "byEmploymentYear"; periodFrom: ISODate; periodTo: ISODate; proratedToLeave: boolean;
       amount: number; employmentYear?: number; daysEmployed: number; periodDays: number }
+  /**
+   * A commission payout (4h): the period's commission earned on [earnedFrom, earnedTo] (inclusive), each run of months at one monthly
+   * rate in one employment year (`pieces`: monthly x months, a partial month counting its days), less the draws paid for the period and the recoverable
+   * balance carried in, never below zero: paid = max(0, earned - drawn - balanceIn); balanceOut = max(0, balanceIn + drawn - earned).
+   */
+  | { kind: "commission"; period: "month" | "quarter"; periodFrom: ISODate; periodTo: ISODate; earnedFrom: ISODate; earnedTo: ISODate;
+      pieces: Array<{ monthly: number; months: number; employmentYear: number }>; earned: number; drawn: number; balanceIn: number;
+      balanceOut: number; recoverable?: boolean; proratedToLeave: boolean }
+  /** A draw against commission, paid with salary: monthly x days / daysInMonth, for [from, to] (inclusive). */
+  | { kind: "commissionDraw"; from: ISODate; to: ISODate; monthly: number; days: number; daysInMonth: number; recoverable: boolean }
   | { kind: "cash"; award: string; amount: number }
   /** grantValue x fraction x priceFactor. nominalDate: set when a company vest date moved the tranche. */
   | { kind: "rsu"; grant: RsuGrantRef; tranche: number; tranches: number; grantValue: number; fraction: number;
       priceFactor: number; nominalDate?: ISODate }
-  /** -amount x fraction (after tax for a later-year repayment on a net basis). */
+  /**
+   * -amount x fraction (after tax for a later-year repayment on a net basis). `draw`: a recoverable draw not earned back, repaid on
+   * your last day (4h), `amount` the draws of `paidYear` still outstanding.
+   */
   | { kind: "clawback"; award: string; amount: number; fraction: number; basis: "gross" | "net"; sameYear: boolean;
-      paidYear: number; repaidYear: number }
+      paidYear: number; repaidYear: number; draw?: boolean }
   /**
    * An ESPP purchase, sold the same day: the gain is used x priceRatio / pricePaid - used, where priceRatio is the purchase-day
    * value over the offering's first-day value and pricePaid the price over that first-day value ((1 - discount) x the lower of 1
@@ -421,6 +476,16 @@ export type OfferWarning =
    *  through the payout (a first period counts from your start); each with how it was worked out. */
   | { code: "bonusForfeited"; params: { leaveDate: ISODate; periodFrom: ISODate; periodTo: ISODate; payDate: ISODate; earned: number;
       full: number; detail: BonusDetail; fullDetail: BonusDetail } }
+  /** Commission not paid by your last day, forfeited under a plan that pays only those employed on the payout date (4h). */
+  | { code: "commissionForfeited"; params: { leaveDate: ISODate; periodFrom: ISODate; periodTo: ISODate; payDate: ISODate;
+      forfeited: number; detail: CommissionDetail } }
+  /**
+   * A recoverable draw not earned back (4h): on leaving, kept or repaid on the last day; or at the stay's end ("stayEnd"), still
+   * counted as pay in the stay, as it would come out of commission after it.
+   */
+  | { code: "drawNotEarnedBack"; params: { date: ISODate; balance: number; why: "kept" | "repaid" | "stayEnd" } }
+  /** Commission counts as earned evenly: quotas, accelerators, caps, chargebacks and payment on collection aren't modeled (4h). */
+  | { code: "commissionEvenly"; params: Record<string, never> }
   | { code: "k401Cap"; params: { year: number; limit: number } }
   | { code: "hsaCap"; params: { year: number; limit: number } }
   | { code: "section127Cap"; params: { year: number; limit: number } }
@@ -430,7 +495,7 @@ export type OfferWarning =
   /** Every ESPP lot counts as sold the day it's bought: holding, resets, overlapping offerings and fees aren't modeled. */
   | { code: "esppSoldAtPurchase"; params: Record<string, never> }
   | { code: "clawbackFica"; params: { award: string; paidYear: number; repaidYear: number } }
-  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean; espp?: boolean } }
+  | { code: "withholdingShortfall"; params: { year: number; balanceDue: number; supplemental: boolean; espp?: boolean; commission?: boolean } }
   /** An unlimited vacation policy where the state requires paying out vacation: assumed to accrue nothing (McPherson, in CA). */
   | { code: "unlimitedVacation"; params: { state: string } }
   /** Other benefits counted tax-free because they were entered so (4j): the engine can't check an exclusion. */
@@ -452,11 +517,14 @@ export type Assumption =
   | { code: "bonus"; params: { scenario: Scenario; basis: "percentOfSalary"; rate: number } }
   | { code: "bonus"; params: { scenario: Scenario; basis: "fixed"; amount: number } }
   | { code: "bonus"; params: { scenario: Scenario; basis: "byEmploymentYear"; amounts: number[] } }
+  /** Commission (4h): this scenario's amount a year (by employment year, the last repeating), its period and lag, the leaving rule. */
+  | { code: "commission"; params: { scenario: Scenario; amounts: number[]; byEmploymentYear: boolean; period: "month" | "quarter";
+      payAfterDays: number; mustBeEmployedOnPayDate: boolean; draw?: CommissionDraw } }
   | { code: "presentValue"; params: { valuationDate: ISODate; discountRate: number } }
   | { code: "rsu"; params: { scenario: Scenario; priceGrowth: number } }
   | { code: "leaveDate"; params: { leaveDate: ISODate } }
   | { code: "retirement"; params: { contributionPct: number; type: "pretax" | "roth"; eligiblePay: "salary" | "salaryAndBonus";
-      vestedShare: number; completedYears: number } }
+      vestedShare: number; completedYears: number; commission?: boolean } }
   | { code: "health"; params: { usage: "low" | "medium" | "high" } }
   | { code: "perks"; params: NoParams }
   /** Other benefits as entered (4j): each a yearly amount, taxable or tax-free. */
@@ -466,7 +534,7 @@ export type Assumption =
       daysOff?: { vacation: number; holidays: number; sick: number } } }
   /** The ESPP's terms, and the share price's growth this scenario. */
   | { code: "espp"; params: { contributionPct: number; eligiblePay: "salary" | "salaryAndBonus"; discount: number; lookback: boolean;
-      offeringMonths: number; purchasesPerOffering: number; priceGrowth: number } }
+      offeringMonths: number; purchasesPerOffering: number; priceGrowth: number; commission?: boolean } }
   /** The vacation policy: what banks a year and whether it's paid when you leave (`required`: by the employer state's law). */
   | { code: "vacation"; params: { policy: "days" | "unlimited"; gives: number; taken: number; cap?: number; payout: "state" | "always";
       employerState: string; required: boolean; afterYears?: number } }
@@ -651,7 +719,7 @@ export interface EmploymentYearResult {
    *  proration, payout lag, vest-date snapping, price growth or refreshers. */
   quotedTC: number;
   /** quotedTC by component, so the offer letter can be bridged to what's paid, line by line. Sums to quotedTC. */
-  quoted: { salary: number; bonus: number; cash: number; rsu: number };
+  quoted: { salary: number; bonus: number; commission: number; cash: number; rsu: number };
   retirement: { employee: number; employerCredited: number; employerVested: number };
   health: { premiums: number; outOfPocket: number; employerHsa: number; employeeHsa: number; net: number };
   perks: { face: number; preTaxEquivalent: number };
@@ -680,6 +748,8 @@ export interface ClawbackResult {
   basis: "gross" | "net";
   /** Cash you hand back. */
   owed: number;
+  /** A recoverable draw against commission repaid on the last day (4h), not a cash award. */
+  draw?: boolean;
   /** Same-year wage reversal, the IRC 1341 credit, or no relief (a later-year repayment of $3,000 or less). */
   treatment: "sameYearReversal" | "irc1341Credit" | "noRelief";
   /** Tax you get back: the reversed year's tax (same year) or the federal 1341 credit (later year). */
@@ -699,10 +769,15 @@ export interface LeaveResult {
   vacation: { banked: number; paid: number; rule: VacationPayoutRule | null };
   /** ESPP money put aside for a purchase not yet made, refunded on the last day. */
   esppRefund: number;
+  /**
+   * Commission (4h), gross: paid after your last day for work done by it; forfeited (under "only if employed on the payout date");
+   * a recoverable draw's balance not earned back, and how much of it is repaid on the last day (0 when it's kept).
+   */
+  commission?: { toCome: number; forfeited: number; drawBalance: number; drawRepaid: number };
 }
 
 export type CliffKind = "bonus" | "rsuVest" | "cashAward" | "clawbackStep" | "clawbackCleared" | "retirementVest" | "vacationPayout"
-  | "esppPurchase";
+  | "esppPurchase" | "commission";
 
 /** A date where your last day starts to matter: leave on or after it to keep what it brings. */
 export interface Cliff {
@@ -739,7 +814,10 @@ export interface WithholdingYear {
   year: number;
   /** The offer's federal income tax: household tax with the offer minus without it. */
   federalIncomeTax: number;
-  /** Estimated federal withholding: salary by the percentage method; bonuses, RSU vests and cash awards at supplemental rates. */
+  /**
+   * Estimated federal withholding: salary (and a draw against commission) by the percentage method; bonuses, commission payouts, RSU
+   * vests and cash awards at supplemental rates, or with no regular wages, commission payouts by the percentage method too.
+   */
   withheld: { regular: number; supplemental: number; total: number };
   /** federalIncomeTax - withheld.total: owed the next April if positive, refunded if negative. */
   balanceDue: number;
@@ -791,6 +869,11 @@ export interface ScenarioResult {
   leave?: LeaveResult;
   /** Present when the offer has costOfLiving. */
   costOfLiving?: CostOfLivingInfo;
+  /**
+   * Commission's periods (4h), each that reconciled: its payout's date and employment year (the payment rule), what it paid (0 when
+   * its draws covered it), and whether that was paid in the projection (not forfeited, not after its end). Present with commission.
+   */
+  commissionPeriods?: Array<{ payDate: ISODate; employmentYear: number; paid: number; paidOut: boolean; detail: CommissionDetail }>;
   /** Input-specific warnings, as codes and numbers; src/format writes them out. */
   warnings: OfferWarning[];
   /** Assumptions behind these numbers, for the methodology page. */

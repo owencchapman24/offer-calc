@@ -65,11 +65,13 @@ export function scalesText(letter: Letter, o: OfferInput, basis: ValueBasis): st
   if (basis !== "cash" && r && ((r.contributionPct > 0 && (r.match?.length ?? 0) > 0) || (r.nonElectivePct ?? 0) > 0)) {
     scales.push(r.match?.length ? "the 401(k) match" : "employer 401(k) money");
   }
-  const not = b?.basis === "fixed" && b.amount.base > 0 ? "its bonus, entered in dollars,"
-    : b?.basis === "byEmploymentYear" ? "its bonus, entered by year," : null;
+  const not = [
+    ...(b?.basis === "fixed" && b.amount.base > 0 ? ["its bonus, entered in dollars,"] : b?.basis === "byEmploymentYear" ? ["its bonus, entered by year,"] : []),
+    ...(o.commission ? ["its commission"] : []),
+  ];
   const lead = scales.length ? `${join(scales)} ${scales.length === 1 && scales[0] !== "raises" && scales[0] !== "promotions" ? "scales" : "scale"} with ${letter}'s salary`
     : `Only ${letter}'s salary itself moves`;
-  const text = `${lead}${not ? `; ${not} doesn't` : ""}.`;
+  const text = `${lead}${not.length ? `; ${not.length > 1 ? `${not[0].replace(/,$/, "")} and ${not[1]} don't` : `${not[0]} doesn't`}` : ""}.`;
   return text[0].toUpperCase() + text.slice(1);
 }
 

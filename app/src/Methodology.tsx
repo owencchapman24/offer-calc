@@ -138,13 +138,29 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             the most common pattern, and you must still work there on the pay date to receive it.
           </p>
           <p>
+            <strong>Commission</strong> is earned evenly, like salary: each calendar month earns a twelfth of the year's expected amount
+            (or, entered by year, its employment year's), a part month by its days. Each calendar month or quarter is paid as one payment the
+            number of days after it ends that you enter, both from your commission plan: what it earned, less any draws paid for it. So
+            year 1 pays less than the offer letter's year, since what's earned at its end is paid in year 2, and each later year pays the
+            year before's last stretch. Over your stay, commission earned at its end and paid after it isn't counted (<Ref id="M-7.3" />).
+            Quotas, accelerators, caps, chargebacks on canceled deals and commission paid only when the customer pays aren't modeled.
+          </p>
+          <p>
+            A <strong>draw against commission</strong> is paid with salary each month, for the months you enter. A guaranteed
+            (non-recoverable) draw is a floor: each month or quarter pays at least its draws, so a lean one pays more than its commission. A
+            recoverable draw is an advance: what commission doesn't cover is a balance that later commission pays down, oldest draws first,
+            before any of it is paid, so it moves pay earlier, not up. A balance still owed at your stay's end counts as pay in your stay, and
+            its A-6 says how much.
+          </p>
+          <p>
             <strong>Cash awards</strong>, such as a sign-on or relocation payment, count on the day they're paid. If you leave
             early, a clawback may take some back (<Ref id="M-9" />).
           </p>
           <p>
             The bridge, in each offer's A-2, starts from what an <strong>offer letter</strong> quotes for a year: the salary at the year's start,
-            the target bonus on it, cash awards paid in the year and new-hire RSUs due in it at grant value. Each line under it
-            is a reason what's paid differs: a stub first bonus, RSUs that vest on the company's dates, a raise during the year.
+            the target bonus on it, the expected commission, cash awards paid in the year and new-hire RSUs due in it at grant value. Each
+            line under it is a reason what's paid differs: a stub first bonus, commission paid after the year it's earned in, a draw paid
+            beyond the commission earned, RSUs that vest on the company's dates, a raise during the year.
           </p>
         </Section>
 
@@ -209,9 +225,17 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             largest, takes the rounding, so the kinds add to the tax as shown.
           </p>
           <p>
-            <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses and RSU vests at
-            a flat 22%, often less than you owe, so a balance can come due in April: each offer's A-6 says when federal withholding falls
-            short by $1,000 or more in a year, and by how much. State, other jobs' and a spouse's withholding aren't estimated.
+            <strong>What you owe, not what's withheld.</strong> Totals are the tax you owe. Employers withhold bonuses, commission and RSU
+            vests at a flat 22%, often less than you owe, so a balance can come due in April: each offer's A-6 says when federal withholding
+            falls short by $1,000 or more in a year, and by how much. State, other jobs' and a spouse's withholding aren't estimated.
+          </p>
+          <p>
+            <strong>Commission</strong> is wages, taxed with Social Security and Medicare. The regulation names commissions as
+            supplemental wages and says pay that varies from one period to the next, "such as commissions", isn't regular wages (Treas. Reg.
+            §31.3402(g)-1(a)(1)); paid apart from salary, as payroll systems pay it, it may be withheld at the flat 22% where income tax was
+            withheld from regular wages this year or last (IRS Pub. 15 §7). With no salary and no draw there are none, so each payout is
+            withheld as a month's regular pay (Pub. 15's aggregate method). A draw is a fixed amount for its payroll period, so it's taken as
+            regular wages, withheld with the paycheck: neither the regulation nor Pub. 15 names a draw, so that's our reading.
           </p>
           <h3 className="method-sub">Validated against PolicyEngine-US</h3>
           <p>
@@ -477,7 +501,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
 
         <Section id="M-8">
           <p>
-            Uncertain inputs (bonus, raises, share price, refreshers, promotions) can have a bear, base and bull value. The three
+            Uncertain inputs (bonus, commission, raises, share price, refreshers, promotions) can have a bear, base and bull value. The three
             are joint scenarios: the bear case sets every uncertain input to its bear value at once, a coherent bad story rather
             than the worst case. The verdict uses the base case. Each offer's A-4 states its bear and bull cases a month over your stay,
             and which of its inputs differ in the bear case; L-2, If things go badly, sets the offers side by side: which holds up best,
@@ -500,6 +524,16 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             employed on the pay date: no) pays the earned part instead of forfeiting it.
           </p>
           <p>
+            <strong>Commission.</strong> By default, commission earned by your last day is still paid, on its usual date: the period you
+            leave in counts its commission to that day, less its draws. Earned commission is wages, and the commission plan says when it's
+            earned and how it's paid on leaving: California requires a written commission contract (Lab. Code §2751), and New York one that
+            covers payment on termination (Labor Law §191(1)(c)). A plan that pays only those employed on the payout date forfeits what's
+            unpaid, and then each payout is a cliff. A recoverable draw not earned back is kept by default, or, if the plan says so, repaid on
+            your last day as a clawback is (below): whether you'd owe it depends on the plan's terms and the state's law. For a draw that
+            brought pay up to the minimum wage, the Sixth Circuit held that a policy making departing employees repay it violates the
+            FLSA's minimum wage (Stein v. hhgregg, 2017).
+          </p>
+          <p>
             A repayment in the same calendar year reverses the wages, so its tax comes back exactly. A repayment in a later year over
             $3,000 gets the federal IRC 1341 credit; Social Security and Medicare on it usually aren't refunded, and state relief
             isn't modeled. Layoffs, severance and waived clawbacks aren't modeled: the leave date is a voluntary exit.
@@ -515,7 +549,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           </p>
           <p>
             <strong>An offer's terms (A-4).</strong> Each offer's A-4 lists, in words, what leaving early or starting late can cost under
-            its terms: when its first bonus is paid and whether you must be employed on the payout date, a start on or after a bonus
+            its terms: when its first bonus is paid and whether you must be employed on the payout date, how its commission is paid and any
+            draw, a start on or after a bonus
             cutoff, a guaranteed first payout, each cash award's clawback window, the first RSU vest, the employer 401(k) money's
             vesting, and unused vacation. Then every cliff inside its stay, dated by the first last day that keeps it, with what leaving the day before
             gives up, before tax; and the next cliff from its start (from today, once it has started), with what staying until it is
@@ -560,6 +595,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <h3 className="method-sub">Pay and benefits</h3>
           <ul>
             <li>RSUs are assumed sold at vest; options and private-company equity count as $0.</li>
+            <li>Commission counts as earned evenly through the year, with a range for a lean or a strong one: quotas, accelerators, caps,
+              splits, chargebacks on canceled deals and commission paid only when the customer pays aren't modeled. It's paid each calendar
+              month or quarter; a plan paid twice a month or yearly, or on fiscal quarters, isn't. A draw is taken as regular wages for
+              withholding.</li>
             <li>Other benefits marked tax-free are counted tax-free as entered: the tool doesn't check the law's exclusions or limits for
               them, and a benefit that's free of income tax but not of Social Security and Medicare (adoption assistance) fits neither
               choice. Each accrues evenly while you work there.</li>
@@ -601,6 +640,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
                 23:631(D); 26 M.R.S. §626; M.G.L. c. 149 §148; Langager v. Crazy Creek Products, 1998 MT 44; Neb. Rev. Stat. §48-1229(6);
                 N.D.C.C. §34-14-09.2; R.I. Gen. Laws §28-14-4(b)</th>
                 <td>Which states require unused vacation to be paid when you leave</td><td>Read Oct 19, 2026</td></tr>
+              <tr><th scope="row">Treas. Reg. §31.3402(g)-1(a)(1); IRS Pub. 15 (2026) §7; Treas. Reg. §1.415(c)-2(b)(1); Cal. Lab. Code §2751;
+                N.Y. Labor Law §191(1)(c); Stein v. hhgregg, Inc., No. 16-3364 (6th Cir. 2017)</th>
+                <td>Commission: supplemental wages and their withholding, a draw, plan pay, the written plan, a draw on leaving</td>
+                <td>Read Nov 5, 2026</td></tr>
               <tr><th scope="row">IRC 421, 423 and 3121(a)(22); Treas. Reg. §1.423-2; IRS Pub. 525 and Pub. 15-B</th>
                 <td>An ESPP: the discount and lookback, the 27-month offering, the $25,000 limit, the ordinary income on a sale at
                   purchase, and no FICA or withholding on it</td><td>Read Oct 2026</td></tr>

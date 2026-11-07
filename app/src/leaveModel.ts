@@ -25,6 +25,23 @@ export function addMonthsIso(date: ISODate, months: number): ISODate {
   const month = total - year * 12;
   return iso(Date.UTC(year, month, Math.min(d, new Date(Date.UTC(year, month + 1, 0)).getUTCDate())));
 }
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const parts = (date: string) => date.split("-").map(Number) as [number, number, number];
+
+/**
+ * A commission period as earned: "October 2026", "Q4 2026", or the part worked, "Jul 13 – Sep 30, 2026" (a period you start or leave in).
+ */
+export function commissionPeriod(d: { period: "month" | "quarter"; periodFrom: string; periodTo: string; earnedFrom: string; earnedTo: string }): string {
+  if (d.earnedFrom !== d.periodFrom || d.earnedTo !== d.periodTo) {
+    const [ya, ma, a] = parts(d.earnedFrom);
+    const [yb, mb, b] = parts(d.earnedTo);
+    return ya === yb ? `${SHORT[ma - 1]} ${a} – ${ma === mb ? "" : `${SHORT[mb - 1]} `}${b}, ${ya}` : `${longDate(d.earnedFrom)} – ${longDate(d.earnedTo)}`;
+  }
+  const [y, m] = parts(d.periodFrom);
+  return d.period === "month" ? `${MONTHS[m - 1]} ${y}` : `Q${(m + 2) / 3} ${y}`;
+}
+
 export const daysBetween = (from: ISODate, to: ISODate) => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
 export const addDays = (date: ISODate, days: number) => iso(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS);
 
@@ -60,7 +77,7 @@ export function worked(start: ISODate, last: ISODate): { months: number; days: n
 
 export type MarkKind = "payment" | "vest" | "clawbackEnds" | "retirement";
 export const MARKS: Record<MarkKind, { glyph: string; name: string }> = {
-  payment: { glyph: "$", name: "payment (bonus, sign-on, ESPP purchase)" },
+  payment: { glyph: "$", name: "payment (bonus, commission, sign-on, ESPP purchase)" },
   vest: { glyph: "▲", name: "RSU vest" },
   clawbackEnds: { glyph: "✓", name: "clawback ends" },
   retirement: { glyph: "◆", name: "401(k) vests" },
@@ -75,7 +92,7 @@ export const isProratedStep = (c: Cliff) => c.detail.kind === "clawbackStep" && 
 
 function markKind(c: Cliff): MarkKind | null {
   switch (c.kind) {
-    case "bonus": case "cashAward": case "vacationPayout": case "esppPurchase": return "payment";
+    case "bonus": case "cashAward": case "vacationPayout": case "esppPurchase": case "commission": return "payment";
     case "rsuVest": return "vest";
     case "retirementVest": return "retirement";
     case "clawbackCleared": return "clawbackEnds";
@@ -150,6 +167,7 @@ export function cliffText(c: Cliff): string {
     return `your ${calendar ? `${year} ` : ""}bonus${calendar ? "" : ` for ${longDate(d.periodFrom)} – ${longDate(d.periodTo)}`} (${gross} before tax)`;
   }
   if (d.kind === "cash") return `the ${inSentence(d.award)} (${gross} before tax)`;
+  if (d.kind === "commission") return `your commission for ${commissionPeriod(d)} (${gross} before tax)`;
   if (d.kind === "vacationPayout") return `unused vacation paid when you leave (${daysText(d.days)}, ${gross} before tax)`;
   if (d.kind === "espp") return `an ESPP purchase (a gain of ${gross} before tax)`;
   if (d.kind === "rsu") return `an RSU vest of ${gross} (${d.grant.kind === "grant" ? d.grant.label : `refresher ${d.grant.number}`})`;
@@ -215,6 +233,9 @@ export function forfeitText(f: Forfeit): { before: string; after: string } {
     + `${dollars(f.full)}, paid ${longDate(f.payDate)})` };
 }
 
+/** Commission forfeited on leaving (4h), each period's: the panel ticks their sum. */
+export const commissionForfeits = (warnings: OfferWarning[]) => warnings.flatMap((w) => (w.code === "commissionForfeited" ? [w.params] : []));
+
 /** The leave-date warnings other than forfeited bonuses (which the panel ticks): FICA on a later-year clawback. */
 export function leaveWarningTexts(warnings: OfferWarning[]): string[] {
   const out: string[] = [];
@@ -250,6 +271,21 @@ export function leaveTerms(o: OfferInput, d: OfferDetail): string[] {
   if (bonus) {
     facts.push(`its first bonus is paid ${longDate(bonus.date)}; ${o.bonus?.mustBeEmployedOnPayDate === false
       ? "leaving before a payout still pays the part earned by your last day" : "you must be employed on each payout date"}`);
+  }
+  const c = o.commission;
+  if (c) {
+    const first = d.commissions[0];
+    facts.push(`its commission is paid ${c.period === "month" ? "monthly" : "quarterly"}, ${c.payAfterDays} days after each ${c.period} ends`
+      + `${first ? `, the first ${longDate(first.date)}` : ""}; ${c.mustBeEmployedOnPayDate ? "you must be employed on each payout date"
+        : "leaving before a payout still pays the part earned by your last day"}`);
+    const w = c.draw;
+    if (w && w.monthly > 0) {
+      const until = w.months !== undefined ? ` until ${longDate(dayBefore(addMonthsIso(o.startDate, w.months)))}` : "";
+      facts.push(w.recoverable
+        ? `its draw of ${dollars(w.monthly)} a month${until} is recoverable: what commission doesn't cover comes out of later commission, and on `
+          + `leaving what's not earned back is ${w.onLeaving === "repaid" ? "repaid" : "kept"}`
+        : `its draw of ${dollars(w.monthly)} a month${until} is guaranteed: each ${c.period} pays at least its draws`);
+    }
   }
   for (const a of o.cashAwards ?? []) {
     if (!a.clawback) continue;

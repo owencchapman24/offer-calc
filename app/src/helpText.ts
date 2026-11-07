@@ -90,6 +90,55 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
     help: "Most firms pay a bonus only if you still work there on the payout date: yes, the default. If yours prorates the bonus "
       + "when you leave, choose no. It matters if you leave early; the comparison over your stay assumes you stay.",
   },
+  "commission.basis": {
+    hint: "An amount a year, or one for each year.",
+    help: "Most offers quote commission as an amount a year at target. Pick dollars by year for a ramp in year 1, or a territory that "
+      + "grows. Dollars a year is the default.",
+  },
+  "commission.amount": {
+    hint: "Expected commission a year; + range for a lean and strong year.",
+    help: "What the offer expects you to earn in commission a year: if it quotes on-target earnings, that less the base salary. It's "
+      + "earned evenly, a twelfth a month while you work there. A range sets the bear and bull cases.",
+  },
+  "commission.amounts": {
+    hint: "Dollars for each employment year; the last repeats.",
+    help: "For a ramp, or commission that grows: each month earns a twelfth of its employment year's amount. After the last year you "
+      + "enter, its amount repeats.",
+  },
+  "commission.period": {
+    hint: "Monthly or quarterly: your commission plan says.",
+    help: "How often commission is paid: each calendar month, or each calendar quarter (January to March, and so on). There's no "
+      + "default: your commission plan says, and California and New York require a written one.",
+  },
+  "commission.payAfterDays": {
+    hint: "How long after each month or quarter it's paid.",
+    help: "Days from the end of each month or quarter to its payout: about 30 for one paid at the end of the next month. There's no "
+      + "default: your commission plan says. A payout after a year ends is the next year's pay, and the next year's tax.",
+  },
+  "commission.mustBeEmployedOnPayDate": {
+    hint: "Leave before a payout: is what you earned still paid?",
+    help: "By default, commission earned by your last day is still paid on its usual date. Some plans pay only those employed on the "
+      + "payout date, so leaving forfeits what's unpaid: choose that if yours says so. It matters only if you leave early.",
+  },
+  "commission.draw": {
+    hint: "Pay advanced against commission each month, if any.",
+    help: "A draw is paid with salary each month. Guaranteed, it's a floor: each period pays at least its draws. Recoverable, it's an "
+      + "advance: what commission doesn't cover comes out of later commission before it's paid.",
+  },
+  "commission.draw.monthly": {
+    hint: "The draw paid with salary each month.",
+    help: "The draw's dollars a month, paid with salary; a part month gets its share by days. It's regular pay, withheld with your "
+      + "paycheck.",
+  },
+  "commission.draw.months": {
+    hint: "How long the draw lasts; blank for every month.",
+    help: "Many draws cover a ramp, say your first 3 months. Blank, the default, pays it every month you're there.",
+  },
+  "commission.draw.onLeaving": {
+    hint: "Kept or repaid, if you leave owing it.",
+    help: "What happens to a recoverable draw not yet earned back when you leave. Kept is the default: you'd owe it only under an "
+      + "agreement to repay, so check the plan. Repaid hands it back on your last day, as a clawback is.",
+  },
   "equity.grants": {
     hint: "Stock units: the value at grant and the vesting.",
     help: "Enter each grant at its dollar value on the grant date, as the offer quotes it. Each tranche counts as pay the day it "
@@ -208,8 +257,8 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
       + "back in cash.",
   },
   "espp.eligiblePay": {
-    hint: "Salary, or salary and bonuses.",
-    help: "The pay the percent comes out of. Plans count base salary; some count bonuses too. Check your plan's document.",
+    hint: "Salary, or salary and bonuses (and commission).",
+    help: "The pay the percent comes out of. Plans count base salary; some count bonuses and commission too. Check your plan's document.",
   },
   "espp.discount": {
     hint: "Off the share price; at most 15%.",
@@ -311,9 +360,9 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
       + "come out after tax. Tax on withdrawal and investment growth aren't modeled either way.",
   },
   "retirement.eligiblePay": {
-    hint: "Salary only, or salary and bonus.",
-    help: "The pay your deferral and the match apply to. Most plans count base salary, the default; some count bonuses too. Your "
-      + "plan summary says which.",
+    hint: "Salary only, or salary and bonus (and commission).",
+    help: "The pay your deferral and the match apply to. Most plans count base salary, the default; some count bonuses and commission "
+      + "too. Your plan summary says which.",
   },
   "retirement.match": {
     hint: "The employer's match on what you defer.",

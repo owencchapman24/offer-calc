@@ -52,8 +52,8 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
       </header>
       {!v.anyRange ? (
         <p className="risk-none">
-          No ranges entered, so there's no downside to show. Add a range (+ range) to a bonus, raise, share price or refreshers, or limit a
-          promotion to some scenarios, in detailed mode.
+          No ranges entered, so there's no downside to show. Add a range (+ range) to a bonus, commission, raise, share price or refreshers, or
+          limit a promotion to some scenarios, in detailed mode.
         </p>
       ) : (
         <>

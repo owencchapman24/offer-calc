@@ -23,8 +23,12 @@ const round2 = (x: number) => Math.round(x * 100) / 100;
  *   status and no other entries). It withholds each month's taxable pay, annualized, at the tax on that
  *   annual amount with the standard deduction, divided by 12. A partial first year is over-withheld,
  *   since each paycheck is treated as a full year's pay.
- * - Bonuses, RSU vests and cash awards: supplemental wages, flat 22%, and 37% on the year's supplemental
- *   pay over $1 million.
+ * - Bonuses, commission payouts (4h), RSU vests and cash awards: supplemental wages (Treas. Reg. 31.3402(g)-1(a)(1)(i) names
+ *   commissions), flat 22%, and 37% on the year's supplemental pay over $1 million. The flat rate needs income tax withheld from
+ *   regular wages this calendar year or the one before (Pub. 15 section 7, method 1a); commission with no salary or draw has none, so
+ *   its payouts are withheld by the aggregate procedure (method 1b), each month's as a month's regular pay.
+ * - A draw against commission: "a predetermined fixed determinable amount for the current payroll period", regular wages under
+ *   31.3402(g)-1(a)(1)(ii) (neither it nor Pub. 15 names a draw: our reading), withheld with salary.
  * - Pre-tax 401(k) deferrals and cafeteria-plan amounts come out of the pay they're taken from.
  */
 export function withholdingShortfall(offer: OfferInput, household: Household, options: ProjectionOptions = {}): WithholdingResult {
@@ -34,21 +38,34 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
   const bonusDeferrals = offer.retirement?.eligiblePay === "salaryAndBonus";
   const years: WithholdingYear[] = [];
   const warnings: OfferWarning[] = [];
+  const isDraw = (e: (typeof r.events)[number]) => e.detail.kind === "commissionDraw";
+  // Regular wages: salary, taxable benefits paid with it (Pub. 15 section 7) and a draw against commission.
+  const isRegular = (e: (typeof r.events)[number]) => e.component === "salary" || e.component === "benefit" || isDraw(e);
+  const hasRegular = (year: number) => r.events.some((e) => e.calendarYear === year && isRegular(e) && e.gross > 0);
   for (const cy of r.calendarYears) {
     const inYear = r.events.filter((e) => e.calendarYear === cy.year);
     const salary = inYear.filter((e) => e.component === "salary");
-    // Taxable other benefits are paid with salary, so withheld as part of each paycheck (Pub. 15 section 7).
-    const regularPay = inYear.filter((e) => e.component === "salary" || e.component === "benefit");
-    const supplemental = inYear.filter((e) => e.component === "bonus" || e.component === "rsu" || e.component === "cash");
+    // Commission payouts with no regular wages this year or last are withheld as regular pay (method 1b).
+    const aggregate = !hasRegular(cy.year) && !hasRegular(cy.year - 1);
+    const isPayout = (e: (typeof inYear)[number]) => e.component === "commission" && !isDraw(e);
+    const regularPay = inYear.filter((e) => isRegular(e) || (aggregate && isPayout(e)));
+    const supplemental = inYear.filter((e) => e.component === "bonus" || e.component === "rsu" || e.component === "cash"
+      || (!aggregate && isPayout(e)));
     if (regularPay.length + supplemental.length === 0) continue;
     const sum = (list: typeof inYear) => list.reduce((s, e) => s + e.gross, 0);
     const salaryPay = sum(salary);
-    const bonusPay = sum(supplemental.filter((e) => e.component === "bonus"));
+    // Pay the deferrals come from: salary, and where it counts (the bonus's choice, D26) bonuses and commission, draws included.
+    const counts = (e: (typeof inYear)[number]) => bonusDeferrals && (e.component === "bonus" || e.component === "commission");
+    const drawPay = sum(regularPay.filter((e) => counts(e)));
+    const bonusPay = sum(supplemental.filter(counts));
 
-    // Deferrals come from salary (and bonuses, if they're eligible pay); cafeteria-plan amounts from salary.
+    // Deferrals come from salary (and bonuses and commission, if they're eligible pay) in proportion; cafeteria-plan amounts from
+    // salary.
     const deferrals = cy.withOffer.input.pretax401k ?? 0;
-    const fromSalary = deferrals * (salaryPay / (salaryPay + (bonusDeferrals ? bonusPay : 0) || 1));
-    const fromBonus = deferrals - fromSalary;
+    const eligible = salaryPay + drawPay + bonusPay;
+    const fromSalary = eligible > 0 ? deferrals * (salaryPay / eligible) : deferrals;
+    const fromDraws = eligible > 0 ? deferrals * (drawPay / eligible) : 0;
+    const fromBonus = deferrals - fromSalary - fromDraws;
     const salaryTaxableShare = salaryPay > 0
       ? Math.max(0, salaryPay - fromSalary - (cy.withOffer.input.section125 ?? 0)) / salaryPay : 0;
 
@@ -57,7 +74,8 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
       federalIncomeTax(params.federal, wages, status, params.federal.standardDeduction[status]).tax;
     const byMonth = new Map<string, number>();
     for (const e of regularPay) {
-      const taxable = e.component === "salary" ? e.gross * salaryTaxableShare : e.gross;
+      const taxable = e.component === "salary" ? e.gross * salaryTaxableShare
+        : counts(e) && drawPay > 0 ? e.gross - fromDraws * (e.gross / drawPay) : e.gross;
       byMonth.set(e.date.slice(0, 7), (byMonth.get(e.date.slice(0, 7)) ?? 0) + taxable);
     }
     let regular = 0;
@@ -66,7 +84,7 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
     let supplementalWithheld = 0;
     let soFar = 0;
     for (const e of supplemental) {
-      const taxable = e.gross - (e.component === "bonus" && bonusPay > 0 ? fromBonus * (e.gross / bonusPay) : 0);
+      const taxable = e.gross - (counts(e) && bonusPay > 0 ? fromBonus * (e.gross / bonusPay) : 0);
       const over = Math.max(0, soFar + taxable - SUPPLEMENTAL_HIGH_THRESHOLD) - Math.max(0, soFar - SUPPLEMENTAL_HIGH_THRESHOLD);
       supplementalWithheld += SUPPLEMENTAL_RATE * (taxable - over) + SUPPLEMENTAL_HIGH_RATE * over;
       soFar += taxable;
@@ -84,8 +102,9 @@ export function withholdingShortfall(offer: OfferInput, household: Household, op
     if (balanceDue >= WARN_AT) {
       // An ESPP purchase's gain needs no withholding (IRC 421(b)): it's in what's owed, not in what's withheld.
       const espp = inYear.some((e) => e.component === "espp");
+      const commission = supplemental.some(isPayout);
       warnings.push({ code: "withholdingShortfall", params: { year: cy.year, balanceDue, supplemental: supplementalWithheld > 0,
-        ...(espp ? { espp } : {}) } });
+        ...(espp ? { espp } : {}), ...(commission ? { commission } : {}) } });
     }
   }
   return {

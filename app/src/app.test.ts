@@ -4,10 +4,11 @@ import type { OfferInput } from "../../src/offer/types";
 import { VESTING_PRESETS } from "../../src/offer/vesting";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import {
-  type AppOffer, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
+  type AppOffer, blankCommission, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
   toOfferInput, withBase,
 } from "./model";
 import { newEspp } from "./editors";
+import { validateOffer } from "../../src/offer/validate";
 import { copyBlock } from "./App";
 import { readImport } from "./exchange";
 import { PRESETS, presetOf } from "./presets";
@@ -369,6 +370,24 @@ describe("a slice-1 or slice-2 save (schema 1) migrates to drafts", () => {
     // Its terms left blank are the plan's defaults: 15% off with a lookback, 6-month offerings, here from Feb 1.
     expect(toOfferInput({ ...s0.offers[0], draft: read(now) })).toMatchObject({ offer: { espp: { contributionPct: 0.1, discount: 0.15, lookback: true,
       offeringMonths: 6, offeringsStart: { month: 2, day: 1 } } } });
+  });
+  it("a save from before commission (2026-11-05) has none; one saved with it reads back, its blank terms at their defaults", () => {
+    const s0 = initialSession(TODAY);
+    const read = (x: unknown) => loadSession({ getItem: () => JSON.stringify(x), setItem: () => {} }, TODAY).offers[0].draft;
+    const old = { ...s0, offers: s0.offers.map((o) => { const { commission: _, ...draft } = o.draft; return { ...o, draft }; }) };
+    expect(read(old).commission).toEqual(blankCommission());
+    expect(toOfferInput({ ...s0.offers[0], draft: read(old) })).not.toHaveProperty("offer.commission");
+    const commission = { ...blankCommission(), amount: { bear: 40_000, base: 60_000, bull: 80_000 }, period: "quarter" as const, payAfterDays: 30,
+      draw: { monthly: 1_000, recoverable: true, months: null, onLeaving: null } };
+    const now = { ...s0, offers: s0.offers.map((o) => ({ ...o, draft: { ...o.draft, commission } })) };
+    expect(read(now).commission).toEqual(commission);
+    // A recoverable draw's rule on leaving left blank is kept, the engine's default; the leaving rule left blank, paid to the last day.
+    expect(toOfferInput({ ...s0.offers[0], draft: read(now) })).toMatchObject({ offer: { commission: { basis: "fixed", amount: commission.amount,
+      period: "quarter", payAfterDays: 30, draw: { monthly: 1_000, recoverable: true } } } });
+    // The period and the lag have no default (D24): blank, they're problems at their fields.
+    const blank = { ...s0, offers: s0.offers.map((o) => ({ ...o, draft: { ...o.draft, commission: { ...commission, period: null, payAfterDays: null } } })) };
+    const r = toOfferInput({ ...s0.offers[0], draft: read(blank) });
+    expect("offer" in r && validateOffer(r.offer).map((x) => x.path)).toEqual(["commission.period", "commission.payAfterDays"]);
   });
   it("anything else starts fresh", () => {
     expect(loadSession({ getItem: () => JSON.stringify({ schemaVersion: 9, offers: [], household: {}, ui: {} }), setItem: () => {} }, TODAY)
