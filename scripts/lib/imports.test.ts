@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { closure, dynamicTargets, importsOf, resolveImport } from "./imports";
 
 // The source rules behind the bundle's shape (CLAUDE.md, Bundles). The build check (scripts/check-bundle.ts) fails when the
-// main thread splits into chunks or outgrows its budget; these say which import would cause it, before a build. Likewise for what the worker loads
-// before its first answer, and what it loads on first use.
+// main thread splits into chunks or outgrows its budget; these say which import would cause it, before a build. Likewise for
+// what the worker loads before its first answer, and what it loads on first use.
 
 const ROOT = resolve(import.meta.dirname, "../..").replace(/\\/g, "/");
 const app = (f: string) => `${ROOT}/app/src/${f}`;

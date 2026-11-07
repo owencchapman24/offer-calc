@@ -57,7 +57,9 @@ function waitFor(m: EngineRequest | SlowRequest): Promise<unknown> | null {
 function dispatch(m: EngineRequest | SlowRequest, error?: Error) {
   if (isEdit(m)) return runner.fast(m);
   const s = slowJobs.value;
-  if (!s || error) return post({ lane: m.lane, gen: m.gen, ok: false, error: (error ?? new Error("The slow jobs didn't load.")).message, ms: 0 });
+  if (!s || error) {
+    return post({ lane: m.lane, gen: m.gen, ok: false, error: (error ?? new Error("The slow jobs didn't load.")).message, ms: 0 });
+  }
   if (m.lane === "leave") runner.slow("leave", s.leaveJob(m, post));
   else if (m.lane === "cursor") runner.slow("cursor", s.cursorJob(m, post));
   else if (m.lane === "work") runner.slow("work", s.paymentsJob(m, post));

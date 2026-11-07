@@ -105,8 +105,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
   const others = otherBenefitStreams(offer.otherBenefits ?? [], start, workEnd, cuts);
   // Commission (4h): draws with salary, each period's payout after it; a piece's employment year follows its first day.
   const commission = offer.commission
-    ? optional("commission").commissionFlows(offer.commission, scenario, start, until, leave, cuts, (day) => anniversaries.findIndex((d) => d > day), windowEnd,
-      warnings)
+    ? optional("commission").commissionFlows(offer.commission, scenario, start, until, leave, cuts,
+      (day) => anniversaries.findIndex((d) => d > day), windowEnd, warnings)
     : undefined;
   const raw: RawEvent[] = [
     ...salaryEvents(path, start, workEnd, cuts),
