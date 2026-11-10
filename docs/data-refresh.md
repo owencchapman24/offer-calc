@@ -88,11 +88,15 @@ Until then, amounts published for 2027 go in `FEDERAL_2027` and the rest of 2027
 
 ## Prices and rent
 - **BEA Regional Price Parities** (`src/col/rpp.json`): annually, usually December, for the year two before (the 2024 RPPs came out
-  Feb 19, 2026, late). `npm run fetch-rpp` (it rebuilds the city list). The 16% housing weight (`HOUSING_WEIGHT` in
-  `scripts/fetch-rpp.ts`, baked into `rpp.json`, and in `app/src/footing.ts`; BEA SCB March 2022) changes only if BEA publishes new
-  weights.
+  Feb 19, 2026, late). `npm run fetch-rpp` (it rebuilds the engine's table, `rpp.engine.json`, and the city list). The 16% housing
+  weight (`HOUSING_WEIGHT` in `scripts/fetch-rpp.ts`, baked into `rpp.json` and copied to `rpp.engine.json`, and in
+  `app/src/footing.ts`; BEA SCB March 2022) changes only if BEA publishes new weights.
 - **HUD Fair Market Rents** (`src/col/fmr.json`): each August or September for the fiscal year starting Oct 1 (FY2027 was published
-  Aug 26, 2026). `npm run fetch-fmr -- <FY>`, or `--file` with a copy downloaded in a browser when HUD USER answers with an empty 202.
+  Aug 26, 2026). `npm run fetch-fmr -- <FY>`, or `--file` with a copy downloaded in a browser when HUD USER answers with an empty 202
+  (either rebuilds the engine's table, `fmr.engine.json`, and the city list).
+- **The engine's tables** (`src/col/rpp.engine.json`, `fmr.engine.json`): the fields of `rpp.json` and `fmr.json` the engine reads
+  (all items and housing; the 1-bedroom rent), which is all the worker bundles. The fetch scripts rebuild them; `npm run
+  build-tables` does it from the files as they are. `rpp.json` and `fmr.json` stay the record, every component and size.
 - **The rent fallback's anchor, the U.S. median gross rent** (`US_MEDIAN_GROSS_RENT` in `src/col/rent.ts`, $1,487, ACS 2024 1-year,
   table B25064): the Census's ACS 1-year estimates, usually mid-September (2024's: Sep 11, 2025). By hand from data.census.gov, with
   the table and date in its comment; it matters only for places without an FMR (BEA state nonmetro portions).
