@@ -105,13 +105,15 @@ Until then, amounts published for 2027 go in `FEDERAL_2027` and the rest of 2027
 
 ## The oracle's Python environment
 `requirements.txt` pins PolicyEngine-US to 2.30.3, and `requirements-lock.txt` locks every package of the `.venv` the baseline was
-taken with (a `pip freeze`: Windows, Python 3.14.7, pip 26.2.1, 2026-10-12; `policyengine-core` 3.32.21 among them). Install with
+taken with (a `pip freeze`: Windows, Python 3.14.7, pip 26.2.1, 2026-10-12; `policyengine-core` 3.32.21 among them), with the
+security bumps since (below; `git log requirements-lock.txt` lists them). Install with
 `python -m pip install -r requirements.txt -c requirements-lock.txt`, so setting up a `.venv` never moves the baseline; `npm run
 oracle` warns before it runs if the environment has drifted from the lock. The lock is from Windows: packages only macOS or Linux
 need (IPython's `pexpect`, `ptyprocess`) aren't in it, install unpinned there, and the runner lists them as not in the lock.
 
 Upgrading PolicyEngine-US is a deliberate step, a change of its own (its own branch and pull request), never folded into a data or
-engine change, and the lock is regenerated with it, never on its own (a Python upgrade takes the same steps):
+engine change, and the lock is regenerated with it, never on its own (a Python upgrade takes the same steps; a security bump, below,
+changes one package's line and regenerates nothing):
 1. Take the old report from `main` in the locked `.venv` (`npm run oracle`, saved aside).
 2. Bump the pin in `requirements.txt`. In a fresh `.venv` (nothing of the old environment left), install without the lock,
    `python -m pip install -r requirements.txt`, so the dependencies resolve afresh.
@@ -124,6 +126,21 @@ engine change, and the lock is regenerated with it, never on its own (a Python u
    dependency alone can move the report too. Update CLAUDE.md's baseline (date, version, the match counts), M-4's figures, and the
    intentional differences and known gaps as they move.
 6. Only then use the new baseline for engine changes.
+
+**A security bump** to a package in the lock (Dependabot's pull request for an advisory, as certifi 2026.10.18 in #77 and filelock
+4.2.1 in #75, 2026-11-06) may land on its own, with no PolicyEngine-US upgrade, when the oracle shows it changes nothing:
+1. It changes that package's line in `requirements-lock.txt` and nothing else: not `requirements.txt`, and not PolicyEngine-US or
+   `policyengine-core`, whose upgrades always take the steps above.
+2. Take the report from `main` in the locked `.venv` (`npm run oracle`, saved aside).
+3. On the pull request's branch, in a fresh `.venv` (nothing of the old environment left), install with the bumped lock:
+   `python -m pip install -r requirements.txt -c requirements-lock.txt`.
+4. Run `npm run oracle` there. It should say the environment matches the lock, and its report must be byte-identical to `main`'s
+   (`cmp` in Git Bash, or `fc.exe /b`).
+5. Say so in the pull request (the package, its advisory, the fresh `.venv`, the report unchanged), then merge. The lock's header,
+   CLAUDE.md's baseline and M-4 stay as they are.
+
+If the report moves at all, the bump doesn't land on its own: leave it for the next PolicyEngine-US upgrade, or take it as one (the
+steps above, every difference explained).
 
 ## As v2 adds data
 v2's plan adds datasets as their items are built (`docs/v2-plan.md`, "On approval"): BLS OEWS (yearly, spring), BLS's paid-leave
