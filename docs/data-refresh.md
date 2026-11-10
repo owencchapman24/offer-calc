@@ -96,7 +96,9 @@ Until then, amounts published for 2027 go in `FEDERAL_2027` and the rest of 2027
   (either rebuilds the engine's table, `fmr.engine.json`, and the city list).
 - **The engine's tables** (`src/col/rpp.engine.json`, `fmr.engine.json`): the fields of `rpp.json` and `fmr.json` the engine reads
   (all items and housing; the 1-bedroom rent), which is all the worker bundles. The fetch scripts rebuild them; `npm run
-  build-tables` does it from the files as they are. `rpp.json` and `fmr.json` stay the record, every component and size.
+  build-tables` does it from the files as they are. `rpp.json` and `fmr.json` stay the record, every component and size. In
+  `npm test`, so in CI, `scripts/lib/tables.test.ts` builds both tables from the record as `build-tables` does and fails unless the
+  committed files are those bytes, so a refresh that skips the rebuild can't leave them stale.
 - **The rent fallback's anchor, the U.S. median gross rent** (`US_MEDIAN_GROSS_RENT` in `src/col/rent.ts`, $1,487, ACS 2024 1-year,
   table B25064): the Census's ACS 1-year estimates, usually mid-September (2024's: Sep 11, 2025). By hand from data.census.gov, with
   the table and date in its comment; it matters only for places without an FMR (BEA state nonmetro portions).

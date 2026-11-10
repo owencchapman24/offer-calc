@@ -1,21 +1,34 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { engineFmr, engineRpp, type FmrFile, type RppFile, tableJson } from "./tables";
+import { engineFmr, engineRpp, engineTables, type FmrFile, type RppFile, tableJson } from "./tables";
 
 // The engine's BEA and HUD tables against the record they're taken from (scripts/lib/tables.ts). If the first test fails,
 // run `npm run build-tables`.
-const read = <T>(name: string) => JSON.parse(readFileSync(new URL(`../../src/col/${name}`, import.meta.url), "utf8")) as T;
+const text = (name: string) => readFileSync(new URL(`../../src/col/${name}`, import.meta.url), "utf8");
+const read = <T>(name: string) => JSON.parse(text(name)) as T;
 const rppFile = read<RppFile>("rpp.json");
 const fmrFile = read<FmrFile>("fmr.json");
 const rpp = read<ReturnType<typeof engineRpp>>("rpp.engine.json");
 const fmr = read<ReturnType<typeof engineFmr>>("fmr.engine.json");
 
 describe("the engine's tables, src/col/rpp.engine.json and fmr.engine.json", () => {
-  it("are in step with rpp.json and fmr.json, their areas in the record's order (the engine walks them in it)", () => {
-    expect(rpp).toEqual(engineRpp(rppFile));
-    expect(fmr).toEqual(engineFmr(fmrFile));
+  it("are what build-tables writes from rpp.json and fmr.json, byte for byte (a Windows checkout's CRLF aside)", () => {
+    const built = Object.entries(engineTables(text("rpp.json"), text("fmr.json")));
+    expect(built.map(([name]) => name)).toEqual(["rpp.engine.json", "fmr.engine.json"]);
+    for (const [name, json] of built) expect(text(name).replace(/\r\n/g, "\n"), `${name}: run npm run build-tables`).toBe(json);
+  });
+  it("keep the record's order of areas (the engine walks them in it)", () => {
     expect(Object.keys(rpp.areas)).toEqual(Object.keys(rppFile.areas));
     expect(Object.keys(fmr.areas)).toEqual(Object.keys(fmrFile.areas));
+  });
+  it("are rebuilt by fetch-rpp and fetch-fmr, each after it writes the record", () => {
+    const { scripts } = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as
+      { scripts: Record<string, string> };
+    expect(scripts["fetch-rpp"]).toBe("tsx scripts/fetch-rpp.ts && tsx scripts/build-tables.ts");
+    expect(scripts["build-tables"]).toBe("tsx scripts/build-tables.ts");
+    // fetch-fmr runs it from its last line, so `npm run fetch-fmr -- <FY> --file <xlsx>` passes its arguments to fetch-fmr.
+    const fetchFmr = readFileSync(new URL("../fetch-fmr.ts", import.meta.url), "utf8");
+    expect(fetchFmr.trimEnd()).toMatch(/\nawait import\("\.\/build-tables"\);$/);
   });
   it("keep every row and every figure the engine reads, as the record has it", () => {
     for (const [code, a] of Object.entries(rppFile.areas)) {

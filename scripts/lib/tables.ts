@@ -70,3 +70,11 @@ export function tableJson(t: { areas: Record<string, unknown> }): string {
     .map(([code, a]) => `  ${JSON.stringify(code)}: ${JSON.stringify(a)}`);
   return `${JSON.stringify(head, null, 1).slice(0, -2)},\n "areas": {\n${lines.join(",\n")}\n }\n}\n`;
 }
+
+/** The engine's tables, file name to contents, from the record's files as text: what build-tables writes, and its test reads. */
+export function engineTables(rppJson: string, fmrJson: string): Record<"rpp.engine.json" | "fmr.engine.json", string> {
+  return {
+    "rpp.engine.json": tableJson(engineRpp(JSON.parse(rppJson) as RppFile)),
+    "fmr.engine.json": tableJson(engineFmr(JSON.parse(fmrJson) as FmrFile)),
+  };
+}
