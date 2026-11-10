@@ -1,7 +1,8 @@
 // Writes src/col/cities.json: the slim city list the UI's main thread loads (code, name, states,
-// and the data vintages it shows), so the full BEA and HUD tables ship only in the engine worker.
-// Usage: npm run build-cities. fetch-rpp and fetch-fmr run it after updating their data; a test
-// fails if the file is out of step with rpp.json and fmr.json.
+// and the data vintages it shows), so the BEA and HUD tables ship only in the engine worker. It reads
+// the engine's tables (rpp.engine.json, fmr.engine.json). Usage: npm run build-cities; build-tables runs
+// it after writing those tables, and fetch-rpp and fetch-fmr run build-tables. A test fails if the file
+// is out of step with the tables.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { cityOptions, RPP } from "../src/col/index";

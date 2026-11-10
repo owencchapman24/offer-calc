@@ -37,7 +37,7 @@ export function compute(req: Omit<EngineRequest, "gen">, cache: OwnCache = new M
   const rents: Record<string, RentEstimate> = {};
   for (const { area, state } of req.rents) {
     try {
-      rents[rentKey(area, state)] = estimateRent(area, state, { bedrooms: 1 });
+      rents[rentKey(area, state)] = estimateRent(area, state);
     } catch { /* an unknown area just shows no estimate */ }
   }
   const c = req.offers;

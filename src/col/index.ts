@@ -1,8 +1,9 @@
-import data from "./rpp.json";
+import data from "./rpp.engine.json";
 
-// BEA Regional Price Parities, baked into rpp.json by `npm run fetch-rpp` (no runtime fetching).
-// Index scale: U.S. all items = 100; components are price levels on the same scale, so areas are
-// always compared through ratios to a reference row.
+// BEA Regional Price Parities, baked into rpp.json by `npm run fetch-rpp` (no runtime fetching), and the fields
+// of it the engine reads into rpp.engine.json (`npm run build-tables`, scripts/lib/tables.ts), which is what the
+// worker bundles. Index scale: U.S. all items = 100; components are price levels on the same scale, so areas
+// are always compared through ratios to a reference row.
 
 export type RppKind = "national" | "nationalNonmetro" | "msa" | "state" | "stateMetro" | "stateNonmetro";
 
@@ -10,20 +11,15 @@ export interface RppArea {
   name: string;
   kind: RppKind;
   allItems: number;
-  goods: number;
   /** Services: housing (rents). */
   housing: number;
-  utilities: number;
-  otherServices: number;
 }
 
 export interface RppData {
   source: string;
-  files: string[];
   vintage: string;
   dataYear: number;
-  fetchedOn: string;
-  nonHousing: { formula: string; housingWeight: number; source: string; crossCheck: string };
+  nonHousing: { formula: string; housingWeight: number };
   areas: Record<string, RppArea>;
 }
 

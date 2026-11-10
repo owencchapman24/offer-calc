@@ -234,12 +234,10 @@ export function formatAssumption(a: Assumption): string {
 
 export const rppVintage = (v: { dataYear: number; release: string }) => `${v.dataYear} RPPs. ${v.release}`;
 
-const BEDROOMS = ["studio", "1 bedroom", "2 bedrooms", "3 bedrooms", "4 bedrooms"];
-
 /** Where a rent came from: "as entered", "HUD FY2027 Fair Market Rent, 1 bedroom, New York, NY HUD Metro FMR Area". */
 export function rentSource(source: "input" | "fmr" | "derived", estimate?: RentEstimate): string {
   if (source === "input" || !estimate) return source === "derived" ? "derived from the housing RPPs" : "as entered";
   return estimate.source === "fmr"
-    ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${BEDROOMS[estimate.bedrooms]}, ${estimate.hudAreaName}`
+    ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${estimate.bedrooms} bedroom, ${estimate.hudAreaName}`
     : `derived from the housing RPPs: ${usd(estimate.anchorRent)} x ${estimate.housingRatio.toFixed(4)}`;
 }

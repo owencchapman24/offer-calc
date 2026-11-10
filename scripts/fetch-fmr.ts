@@ -1,5 +1,5 @@
 // Fetches HUD Fair Market Rents and bakes the metro areas into src/col/fmr.json (the app never
-// fetches at runtime). HUD publishes the next fiscal year's FMRs each August or September, effective
+// fetches at runtime), the record: every size (build-tables then writes the 1 bedroom the engine reads). HUD publishes the next fiscal year's FMRs each August or September, effective
 // October 1: re-run then.
 //
 //   npm run fetch-fmr [-- <fiscal year>]                          download it (default FY 2027)
@@ -107,6 +107,6 @@ const lines = Object.entries(areas).sort(([a], [b]) => a.localeCompare(b))
 writeFileSync(OUT, `${JSON.stringify(meta, null, 1).slice(0, -2)},\n "areas": {\n${lines.join(",\n")}\n }\n}\n`);
 console.log(`Wrote ${count} metro FMR areas (FY${fiscalYear}) to ${OUT}`);
 
-// Then the slim city list, which carries the FMR vintage. It runs from here (not chained in package.json)
-// so that `npm run fetch-fmr -- <fiscal year> --file <path>` passes its arguments to this script.
-await import("./build-cities");
+// Then the engine's tables and the slim city list, which carries the FMR vintage. They run from here (not chained in
+// package.json) so that `npm run fetch-fmr -- <fiscal year> --file <path>` passes its arguments to this script.
+await import("./build-tables");

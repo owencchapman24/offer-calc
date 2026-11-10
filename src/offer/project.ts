@@ -449,10 +449,8 @@ export function projectScenario(offer: OfferInput, household: Household, options
     let monthlyRent = offer.costOfLiving.monthlyRent;
     let rentEstimate: RentEstimate | undefined;
     if (monthlyRent === undefined) {
-      rentEstimate = estimateRent(area.code, offer.residence.state, {
-        bedrooms: hc.fmrBedrooms ?? 1,
-        ...(hc.referenceMonthlyRent !== undefined ? { anchorRent: hc.referenceMonthlyRent, anchorArea: ref.code } : {}),
-      });
+      rentEstimate = estimateRent(area.code, offer.residence.state,
+        hc.referenceMonthlyRent !== undefined ? { anchorRent: hc.referenceMonthlyRent, anchorArea: ref.code } : {});
       monthlyRent = rentEstimate.monthlyRent;
     }
     const rentSource: CostOfLivingInfo["rentSource"] = rentEstimate?.source ?? "input";

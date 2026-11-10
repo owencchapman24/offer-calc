@@ -1,5 +1,6 @@
 // Fetches BEA Regional Price Parities and bakes them into src/col/rpp.json (the app never
-// fetches at runtime). Usage: npm run fetch-rpp
+// fetches at runtime), the record: every component. Usage: npm run fetch-rpp (then build-tables
+// writes the fields the engine reads, rpp.engine.json, and the city list).
 //
 // Source: U.S. Bureau of Economic Analysis regional data downloads, RPPs by MSA (MARPP), by
 // state metro/nonmetro portion (PARPP) and by state (SARPP). Each zip holds CSVs with line
