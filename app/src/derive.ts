@@ -1006,7 +1006,7 @@ function rentNoteWork(ctx: WorkContext, letter: L): Work {
   const leadPV = apart * f.nonHousingFactor * f.rentFactor;
   const name = estimateName(note);
   const estLabel = est.source === "fmr"
-    ? `HUD's Fair Market Rent for ${note.city}, ${est.bedrooms === 0 ? "a studio" : `${est.bedrooms} bedroom${est.bedrooms === 1 ? "" : "s"}`} (FY${est.fiscalYear})`
+    ? `HUD's Fair Market Rent for ${note.city}, ${est.bedrooms} bedroom (FY${est.fiscalYear})`
     : `The estimate for ${note.city}: BEA housing prices × the U.S. median rent`;
   const inputs = fromInputs(ctx, letter, ["costOfLiving.monthlyRent"]);
   const totals: WorkLine[] = [

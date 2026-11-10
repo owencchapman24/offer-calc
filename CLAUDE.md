@@ -134,8 +134,9 @@ section 2's and the plan's in step):
 - `npm run oracle`: the grid against PolicyEngine-US, 2026, about 3-4 minutes, in the locked `.venv` (`docs/data-refresh.md`).
 - `npm run offers`: the sample offers' tables, with FMR and BEA-derived rent estimates.
 - `npm run bench`: engine timings on the samples (median of warm runs); compare branches side by side.
-- `npm run fetch-rpp`, `npm run fetch-fmr [-- <FY>] [--file <xlsx>]`, `npm run build-cities`: refresh BEA's RPPs, HUD's FMRs and the
-  city list (`docs/data-refresh.md`).
+- `npm run fetch-rpp`, `npm run fetch-fmr [-- <FY>] [--file <xlsx>]`: refresh BEA's RPPs and HUD's FMRs, then the engine's tables
+  and the city list (`docs/data-refresh.md`). `npm run build-tables` redoes the engine's tables from the files as fetched, then the
+  city list; `npm run build-cities`, the city list alone.
 
 ## 6. Conventions
 **The engine** (`src/tax`, `src/offer`, `src/col`):
@@ -159,7 +160,10 @@ section 2's and the plan's in step):
   through `optional(name)`, never an import, so the worker can load it on first use; an offer whose module isn't loaded throws.
   `index.ts` provides every one for scripts and tests (`test/setup.ts`). A new one goes in `OptionalModules` and `needs`, `index.ts`
   and the worker's `modules`; `imports.test.ts` fails if another engine module imports it.
-- Generated data isn't edited by hand: `src/col/rpp.json`, `fmr.json` and `cities.json` (a test fails if the city list is stale).
+- Generated data isn't edited by hand: `src/col/rpp.json` and `fmr.json` (the record, as fetched: BEA's five components, HUD's five
+  sizes), `rpp.engine.json` and `fmr.engine.json` (the engine's tables: the fields of the record it reads, all items and housing and
+  the 1-bedroom rent, and all it imports; `scripts/lib/tables.ts`), and `cities.json`. A test fails if the engine's tables or the city
+  list are stale. A field the engine starts to read goes in `tables.ts` first.
 
 **The app:**
 - **Bundles** (`npm run check-bundle` and `scripts/lib/imports.test.ts` check each):
@@ -190,6 +194,8 @@ section 2's and the plan's in step):
     only they use) on the first slow request, and each optional module on the first request with an offer that has one. A lazy
     chunk imports what it shares from the worker's script, already loaded. Engine code only the slow jobs use goes in a module of its
     own (as `leave.ts`), or it stays in the first answer's script. 74.14 kB before the split, 70.07 after (2026-11-06).
+  - The worker's BEA and HUD tables are the engine's (`rpp.engine.json`, `fmr.engine.json`): only the fields it reads, every row.
+    70.07 kB before, 57.05 after (2026-11-09).
 - **The year figures as shown:** every figure is rounded once, where it's worked out, and a subtotal is the sum of the rounded items
   above it, so every column adds up as displayed and a figure shown in two places is one figure (`footing.ts`). Every Show the work
   foots as displayed exactly (`footsAsDisplayed`); a present value's total stays the engine's, with one line taking the rounding
@@ -397,8 +403,9 @@ section 2's and the plan's in step):
   payout rule); `espp.ts` (an ESPP's contributions, purchases, the $25,000 limit and refunds); `commission.ts` (commission's draws,
   payouts and a recoverable draw's balance); other benefits' streams are in
   `benefits.ts` (`otherBenefitStreams`); `location.ts` (the convenience-of-employer rule); `dates.ts` (civil dates as UTC day numbers).
-- `col/`: `index.ts` (BEA RPPs, `rpp.json`), `rent.ts` (HUD FMRs, `fmr.json`, and the fallback), `cities.ts` (the slim city list,
-  `cities.json`, for the main thread).
+- `col/`: `index.ts` (BEA RPPs, `rpp.engine.json`), `rent.ts` (HUD FMRs, `fmr.engine.json`, and the fallback), `cities.ts` (the
+  slim city list, `cities.json`, for the main thread); `rpp.json` and `fmr.json`, the record those tables are taken from
+  (`scripts/build-tables.ts`).
 - `format/`: the words for the engine's numbers and codes (`numbers`, `issues`, `schedule`, `warnings`). Not part of the engine.
 - `samples.ts`: the three sample offers (illustrative), shared by the scripts, the tests and the app.
 
@@ -454,7 +461,7 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes, and loading on first use);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the worker's chunks among them, the lock, the hooks
-  linter),
+  linter, the engine's tables against the record),
   `e2e/lib/exceptions.test.ts`;
 - the docs: `scripts/lib/docs.test.ts` (every doc indexed in section 11, historical ones marked at their head, every
   `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
@@ -462,7 +469,7 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
 
 **Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
 scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:
-`bundle.ts`, `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
+`bundle.ts`, `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `tables.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
 `eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).
 
 ## 10. Known gaps

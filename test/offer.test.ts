@@ -834,9 +834,6 @@ describe("cost of living (BEA RPPs)", () => {
     expect(r.costOfLiving).toMatchObject({ monthlyRent: 1_640, rentSource: "fmr",
       rentEstimate: { source: "fmr", hudArea: "METRO16740M16740", bedrooms: 1, fiscalYear: 2027 } });
     expect(r.employmentYears[0].costOfLiving!.rent).toBe(12 * 1_640);
-    const studio = projectScenario({ ...clt, costOfLiving: { area: "16740" } },
-      { filingStatus: "single", costOfLiving: { fmrBedrooms: 0 } }, { years: 1 });
-    expect(studio.costOfLiving!.monthlyRent).toBe(1_574);
     // An entered rent always wins.
     expect(projectScenario(clt, single, { years: 1 }).costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input" });
   });
@@ -846,7 +843,6 @@ describe("cost of living (BEA RPPs)", () => {
     expect(estimateRent("35620", "NY")).toMatchObject({ monthlyRent: 2_729, hudAreaName: "New York, NY HUD Metro FMR Area" });
     expect(estimateRent("35620", "NJ")).toMatchObject({ monthlyRent: 1_850, hudAreaName: "Newark, NJ HUD Metro FMR Area" });
     expect(estimateRent("42660", "WA")).toMatchObject({ monthlyRent: 2_180, hudAreaName: "Seattle-Bellevue, WA HUD Metro FMR Area" });
-    expect(estimateRent("42660", "WA", { bedrooms: 0 }).monthlyRent).toBe(2_091);
     // Charlotte's main FMR area includes York County, SC, so it's the largest one for an SC resident too.
     expect(fmrArea("16740", "SC")!.name).toBe("Charlotte-Concord-Gastonia, NC-SC HUD Metro FMR Area");
   });
@@ -858,7 +854,8 @@ describe("cost of living (BEA RPPs)", () => {
     // With your own rent at a reference location: 1,500 in Charlotte (housing 97.635) -> 1,500 x 59.625 / 97.635.
     expect(estimateRent("37999", "NC", { anchorRent: 1_500, anchorArea: "16740" }).monthlyRent).toBeCloseTo(916.04, 2);
     expect(US_MEDIAN_GROSS_RENT).toBe(1_487);
-    expect(FMR).toMatchObject({ fiscalYear: 2027, effective: "2026-10-01" });
+    // FY2027, effective 2026-10-01: the record's date is checked with the engine's tables (scripts/lib/tables.test.ts).
+    expect(FMR.fiscalYear).toBe(2027);
   });
   it("with Charlotte as the reference, the factor is 1 and dollars stay local", () => {
     const r = projectScenario(clt, { filingStatus: "single", costOfLiving: { reference: "16740" } }, { years: 1 });

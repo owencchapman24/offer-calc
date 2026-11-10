@@ -1,5 +1,5 @@
 import type { FilingStatus, Locality, TaxInput, TaxResult } from "../tax/types";
-import type { Bedrooms, RentEstimate } from "../col/rent";
+import type { RentEstimate } from "../col/rent";
 
 // Offer model types, authoritative over docs/offer-model.md (the design). projectScenario runs one scenario;
 // projectOffer runs bear/base/bull together; compareOffers puts offers on one window.
@@ -55,8 +55,7 @@ export interface OfferCostOfLiving {
   area: string;
   /**
    * Your expected rent there when you move in. If omitted, it's estimated: HUD's Fair Market Rent for the
-   * metro (household `fmrBedrooms`, default 1), or for areas without one, an anchor rent scaled by the
-   * housing RPPs.
+   * metro, 1 bedroom, or for areas without one, an anchor rent scaled by the housing RPPs.
    */
   monthlyRent?: number;
   /** Annual rent increase, applied at each lease anniversary (your start date), e.g. 0.04. Default: the inflation option. */
@@ -355,8 +354,6 @@ export interface HouseholdCostOfLiving {
    * areas without a HUD Fair Market Rent. Default: the U.S. median gross rent (ACS 2024), at U.S. prices.
    */
   referenceMonthlyRent?: number;
-  /** Bedrooms for HUD Fair Market Rent estimates: 0 (studio) to 4. Default 1. */
-  fmrBedrooms?: Bedrooms;
 }
 
 export interface ProjectionOptions {

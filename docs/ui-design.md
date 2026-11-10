@@ -6,7 +6,8 @@ build differs, §12 says so slice by slice, and the code is what runs (`app/src`
 current). Differences §12 doesn't record:
 - **About you** as built: filing status, the stay, other wages, your spouse's wages (when filing jointly, since audit C1), health
   use and "Prices in", with the assumptions as one line under them, not a panel. Not built: your current rent (decision 2's
-  estimate from it gave way to HUD's Fair Market Rents, §13.2), a savings rate (held at 0%) and a bedrooms setting (always 1).
+  estimate from it gave way to HUD's Fair Market Rents, §13.2), a savings rate (held at 0%) and a bedrooms setting (always 1;
+  the engine's household `fmrBedrooms`, which §3.3's Bedrooms line names, went with the worker's data trim, 2026-11-09).
 - **L-5's convenience rule** (§4.7) doesn't list Nebraska: it dropped its rule from tax year 2025 (pull request #30).
   `src/offer/location.ts` has the states.
 - **The worked figures** (W4, W8, §9.1's 62,595) are the engine's, from before the year figures as shown. Under that rule

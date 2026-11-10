@@ -1,25 +1,29 @@
-import fmrData from "./fmr.json";
+import fmrData from "./fmr.engine.json";
 import { NATIONAL, rppArea } from "./index";
 
 // Rent estimates for an offer's area when you haven't entered your rent: HUD's Fair Market Rent for
 // the metro first, BEA's housing price level as the fallback (areas without FMRs: state nonmetro
 // portions). Both are labeled estimates in the UI.
 
-export interface FmrArea { name: string; cbsa: string; states: string[]; pop: number; fmr: number[] }
+export interface FmrArea {
+  name: string;
+  cbsa: string;
+  states: string[];
+  pop: number;
+  /** HUD's Fair Market Rent for 1 bedroom, a month. */
+  oneBedroom: number;
+}
 
 export interface FmrData {
   source: string;
-  url: string;
   fiscalYear: number;
-  effective: string;
-  published: string | null;
-  fetchedOn: string;
-  definition: string;
-  bedrooms: string[];
   areas: Record<string, FmrArea>;
 }
 
-/** HUD Fair Market Rents, metro areas, baked into fmr.json by `npm run fetch-fmr`. */
+/**
+ * HUD Fair Market Rents, metro areas, baked into fmr.json by `npm run fetch-fmr`; the fields of it the engine
+ * reads (1 bedroom of its five sizes) are in fmr.engine.json (`npm run build-tables`), which the worker bundles.
+ */
 export const FMR = fmrData as unknown as FmrData;
 
 /**
@@ -28,9 +32,6 @@ export const FMR = fmrData as unknown as FmrData;
  * sizes, utilities included. The anchor for BEA-derived estimates when you give no rent of your own.
  */
 export const US_MEDIAN_GROSS_RENT = 1_487;
-
-/** Bedrooms for an FMR: 0 is a studio. */
-export type Bedrooms = 0 | 1 | 2 | 3 | 4;
 
 /**
  * The HUD FMR area for a BEA metro (GeoFIPS = CBSA code). Big metros span several FMR areas (New York
@@ -47,23 +48,22 @@ export function fmrArea(beaCode: string, residenceState?: string): (FmrArea & { 
 }
 
 export type RentEstimate =
-  | { monthlyRent: number; source: "fmr"; hudArea: string; hudAreaName: string; bedrooms: Bedrooms; fiscalYear: number }
+  | { monthlyRent: number; source: "fmr"; hudArea: string; hudAreaName: string; bedrooms: 1; fiscalYear: number }
   /** anchorRent in anchorArea, times the area's housing (rents) RPP / the anchor area's. */
   | { monthlyRent: number; source: "derived"; anchorRent: number; anchorArea: string; housingRatio: number };
 
 /**
- * Rent for an area when you haven't entered yours. HUD's FMR (1 bedroom by default) when the metro has
- * one; otherwise an anchor rent scaled by the housing RPPs. The anchor is the rent you give for a
- * reference location, or the U.S. median gross rent.
+ * Rent for an area when you haven't entered yours. HUD's FMR for 1 bedroom when the metro has one;
+ * otherwise an anchor rent scaled by the housing RPPs. The anchor is the rent you give for a reference
+ * location, or the U.S. median gross rent.
  */
 export function estimateRent(
   beaCode: string, residenceState: string | undefined,
-  opts: { bedrooms?: Bedrooms; anchorRent?: number; anchorArea?: string } = {},
+  opts: { anchorRent?: number; anchorArea?: string } = {},
 ): RentEstimate {
-  const bedrooms = opts.bedrooms ?? 1;
   const hud = fmrArea(beaCode, residenceState);
   if (hud) {
-    return { monthlyRent: hud.fmr[bedrooms], source: "fmr", hudArea: hud.code, hudAreaName: hud.name, bedrooms,
+    return { monthlyRent: hud.oneBedroom, source: "fmr", hudArea: hud.code, hudAreaName: hud.name, bedrooms: 1,
       fiscalYear: FMR.fiscalYear };
   }
   const anchorArea = opts.anchorRent !== undefined ? opts.anchorArea ?? NATIONAL : NATIONAL;

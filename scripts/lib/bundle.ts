@@ -11,7 +11,8 @@ import { gzipSync } from "node:zlib";
 //
 // The worker (the engine and the BEA and HUD tables) is fetched on every visit and the first answer waits for
 // it, so it has a budget of its own: 75 kB gzip (68.1 kB on 2026-10-15; 74.14 kB on 2026-11-06, before its slow jobs
-// and the engine's optional modules loaded on first use, 70.07 kB after). What the first answer waits for is the
+// and the engine's optional modules loaded on first use, 70.07 kB after; 57.05 kB on 2026-11-09, once it bundled only
+// the fields of the BEA and HUD tables the engine reads, scripts/lib/tables.ts). What the first answer waits for is the
 // worker's script and every chunk it imports statically (workerChunks); the chunks it imports dynamically load on first
 // use, reported, not budgeted. The stylesheet blocks rendering; it's reported, not budgeted (10.2 kB gzip on 2026-10-15).
 //
