@@ -10,8 +10,10 @@ import { gzipSync } from "node:zlib";
 // that keep it so, where a split would come from.
 //
 // The worker (the engine and the BEA and HUD tables) is fetched on every visit and the first answer waits for
-// it, so it has a budget of its own: 75 kB gzip (68.1 kB on 2026-10-15). The stylesheet blocks rendering; it's
-// reported, not budgeted (10.2 kB gzip on 2026-10-15).
+// it, so it has a budget of its own: 75 kB gzip (68.1 kB on 2026-10-15; 74.14 kB on 2026-11-06, before its slow jobs
+// and the engine's optional modules loaded on first use, 70.07 kB after). What the first answer waits for is the
+// worker's script and every chunk it imports statically (workerChunks); the chunks it imports dynamically load on first
+// use, reported, not budgeted. The stylesheet blocks rendering; it's reported, not budgeted (10.2 kB gzip on 2026-10-15).
 //
 // This check catches regressions in what we ship; Lighthouse (scripts/lib/lighthouse.ts) measures what
 // users feel, the Largest Contentful Paint on a throttled phone. The budget was 110 kB until 2026-10-09,
@@ -46,6 +48,45 @@ export function stylesheets(html: string): string[] {
 /** The workers a chunk starts, as Vite writes them: `new Worker(new URL("/assets/engine.worker-….js", import.meta.url), …)`. */
 export function workerScripts(js: string): string[] {
   return [...new Set([...js.matchAll(/new Worker\(\s*new URL\(\s*[`"']([^`"']+)[`"']/g)].map((m) => m[1]))];
+}
+
+/**
+ * A chunk's imports of other chunks, as Rolldown writes them (`import{a as b}from"./x.js"`, `export{…}from"./x.js"`,
+ * `import"./x.js"`, and `import(\`./x.js\`)`), resolved against the chunk's own path: the static ones load with it, the
+ * dynamic ones on first use.
+ */
+export function chunkImports(file: string, js: string): { static: string[]; dynamic: string[] } {
+  const at = (spec: string) => new URL(spec, `https://x${file}`).pathname;
+  const quoted = "[`\"'](\\.{1,2}/[^`\"']+)[`\"']";
+  const statics = [...js.matchAll(new RegExp(`(?:^|[;}\\s])(?:import|export)\\s*(?:[^;()\`"']*?from\\s*)?${quoted}`, "g"))].map((m) => at(m[1]));
+  const dynamics = [...js.matchAll(new RegExp(`\\bimport\\(\\s*${quoted}\\s*\\)`, "g"))].map((m) => at(m[1]));
+  return { static: [...new Set(statics)], dynamic: [...new Set(dynamics)] };
+}
+
+/**
+ * A worker's chunks: `first`, what its first answer waits for (its script and every chunk reached from it by static imports),
+ * and `later`, what it loads on first use (the dynamic imports from those, and what they load in turn but `first` doesn't have).
+ */
+export function workerChunks(entry: string, read: (file: string) => string): { first: string[]; later: string[] } {
+  const walk = (roots: string[], seen: Set<string>) => {
+    const out: string[] = [];
+    const visit = (f: string) => {
+      if (seen.has(f)) return;
+      seen.add(f);
+      out.push(f);
+      for (const s of chunkImports(f, read(f)).static) visit(s);
+    };
+    roots.forEach(visit);
+    return out;
+  };
+  const seen = new Set<string>();
+  const first = walk([entry], seen);
+  const later: string[] = [];
+  for (let i = 0; i < first.length + later.length; i++) {
+    const f = i < first.length ? first[i] : later[i - first.length];
+    later.push(...walk(chunkImports(f, read(f)).dynamic, seen));
+  }
+  return { first, later };
 }
 
 export interface Measured { file: string; rawKb: number; gzipKb: number }

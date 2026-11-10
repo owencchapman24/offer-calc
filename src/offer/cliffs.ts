@@ -1,7 +1,8 @@
 import { serviceYears, vestedFraction } from "./benefits";
 import { clawbackFraction } from "./clawback";
 import { addMonths, fromDays, toDays } from "./dates";
-import { keptIfLeaving, projectScenario } from "./project";
+import { keptIfLeaving } from "./leave";
+import { projectScenario } from "./project";
 import { cashEvents } from "./streams";
 import { VACATION_PAYOUT_STATES, weeksWorked } from "./timeOff";
 import type { Cliff, Household, NextCliffResult, OfferInput, ProjectionOptions } from "./types";

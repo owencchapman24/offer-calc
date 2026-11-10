@@ -7,6 +7,8 @@
 //   different keys take turns, except that a job with a higher priority runs first (the close-call
 //   line's breakeven, ahead of L-3 and L-4). A job posts its own result when it finishes.
 // Pure apart from the scheduler, which tests replace.
+// Before either lane, a request may wait for code the worker loads on first use (onFirstUse, inOrder): the slow jobs, and
+// the engine's optional modules (src/offer/optional.ts).
 
 export interface Runner<F> {
   /** Every edit's request: replaces any request still waiting. */
@@ -52,5 +54,45 @@ export function createRunner<F>(runFast: (req: F) => void, schedule: (step: () =
       jobs.set(key, { job, priority });
       wake();
     },
+  };
+}
+
+/** A module loaded on first use. */
+export interface OnFirstUse<T> {
+  /** The module, once it has loaded. */
+  readonly value: T | undefined;
+  /** Loads it: null once it has loaded, so a request needing nothing else goes on at once. A failed load is tried again. */
+  load(): Promise<T> | null;
+}
+
+export function onFirstUse<T>(importer: () => Promise<T>): OnFirstUse<T> {
+  let value: T | undefined;
+  let pending: Promise<T> | null = null;
+  return {
+    get value() { return value; },
+    load() {
+      if (value !== undefined) return null;
+      return pending ??= importer().then((v) => (value = v), (e: unknown) => {
+        pending = null;
+        throw e;
+      });
+    },
+  };
+}
+
+/**
+ * Hands each message on in the order it came, after what it waits for (`wait`: null for nothing), so a message never overtakes
+ * one still waiting. With nothing to wait for and nothing waiting, it's handed on at once. A failed wait hands it on with the
+ * error.
+ */
+export function inOrder<M>(handle: (m: M, error?: Error) => void): (m: M, wait: Promise<unknown> | null) => void {
+  let line: Promise<void> | null = null;
+  return (m, wait) => {
+    if (!wait && !line) return handle(m);
+    const mine: Promise<void> = (line ?? Promise.resolve())
+      .then(() => wait, () => wait)
+      .then(() => handle(m), (e: unknown) => handle(m, e instanceof Error ? e : new Error(String(e))))
+      .finally(() => { if (line === mine) line = null; });
+    line = mine;
   };
 }

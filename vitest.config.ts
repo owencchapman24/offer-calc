@@ -22,14 +22,16 @@ function frozenLaw(): Plugin {
 // - "law": test/law.test.ts alone, on the law as published (src/tax/params/enacted.ts). It pins what's published, so it's
 //   the test meant to fail at a data refresh.
 // - "frozen law": every other test, on test/frozen-enacted.ts, so a refresh moves none of the figures they pin.
+// Both run on the engine in full (test/setup.ts): its optional modules provided up front, as the worker provides them on first use.
 const UNIT = ["test/**/*.test.ts", "app/src/**/*.test.ts", "scripts/**/*.test.ts", "e2e/lib/**/*.test.ts"];
 const LAW = "test/law.test.ts";
+const SETUP = ["test/setup.ts"];
 
 export default defineConfig({
   test: {
     projects: [
-      { test: { name: "law", include: [LAW] } },
-      { plugins: [frozenLaw()], test: { name: "frozen law", include: UNIT, exclude: [LAW] } },
+      { test: { name: "law", include: [LAW], setupFiles: SETUP } },
+      { plugins: [frozenLaw()], test: { name: "frozen law", include: UNIT, exclude: [LAW], setupFiles: SETUP } },
     ],
   },
 });
