@@ -402,8 +402,7 @@ Item numbers are stable IDs; the order is separate.
 
 **Before stop 5A:** the audit's "fix before v2" items this item leans on (`docs/audit-2026-10.md`; IDs prefixed "audit" where they'd
 read as this plan's decisions). Each is done, so 5A waits only on the testers' first question. The audit's other open "fix before v2"
-items (T1, D4) don't block it; CLAUDE.md's "Now" lists them. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md
-agreeing.
+item (D4) doesn't block it; CLAUDE.md's "Now" lists it. `scripts/lib/plan.test.ts` keeps this table and CLAUDE.md agreeing.
 
 | Audit | What item 5 needs from it | Done |
 |---|---|---|

@@ -22,8 +22,11 @@ CLAUDE.md on 2026-10-15; CLAUDE.md keeps the next checks.)
   that does means the change reached beyond `enacted.ts`.
 - A change to 2026 data can move hand-checked values in `test/tax.test.ts`, `test/params.test.ts` and `test/offer.test.ts`: redo
   their arithmetic.
-- Then `npm run typecheck` and `npm run grid` (2026 only: byte-identical unless 2026 law changed).
-- Then `npm run oracle`: 2026 against PolicyEngine-US, byte-identical or the difference explained, with M-4's match statistics and
+- Among them is the grid's baseline (`test/grid.test.ts`, against the committed `test/baselines/grid-2026.json`), which moves only
+  with a change to 2026 data. When one is meant to move it, update it (`npx vitest run test/grid.test.ts -u`) and explain the diff
+  in the pull request. Then `npm run typecheck`.
+- Then `npm run oracle`: 2026 against PolicyEngine-US. It rewrites the committed report (`test/baselines/oracle-2026.json`), so
+  `git diff` shows it unchanged, or the difference is explained, with M-4's match statistics and
   CLAUDE.md's baseline updated with it. For a later year's amounts, compare with PolicyEngine-US's own parameters for that year
   where it has them.
 - `npm run offers` shows what the samples do. Tax-engine changes go in separate commits, each passing the above.
@@ -80,7 +83,8 @@ list), but some dates are typed in. Update them with the data:
 ## Moving the base year
 From 2026 to 2027, once the Tax Foundation's 2027 table is out (about February 2027):
 - new `federal2027` and `states2027` data, and `BASE_YEAR`;
-- the oracle's year and baseline;
+- the oracle's year (`YEAR` in `scripts/oracle.py`, `GRID_YEAR` in `scripts/lib/grid.ts`) and both baselines, taken afresh and
+  named for the year (`test/baselines/grid-2027.json` and `oracle-2027.json`, the test's path with them; the 2026 files deleted);
 - the tests' hand-checked values, and the tests' frozen law (`test/frozen-enacted.ts`, which moves only then);
 - the base year typed as a literal in the engine and the UI (audit C28 lists them; `BASE_YEAR` is exported but not yet used).
 
@@ -114,13 +118,14 @@ need (IPython's `pexpect`, `ptyprocess`) aren't in it, install unpinned there, a
 Upgrading PolicyEngine-US is a deliberate step, a change of its own (its own branch and pull request), never folded into a data or
 engine change, and the lock is regenerated with it, never on its own (a Python upgrade takes the same steps; a security bump, below,
 changes one package's line and regenerates nothing):
-1. Take the old report from `main` in the locked `.venv` (`npm run oracle`, saved aside).
+1. The old report is `main`'s, committed (`test/baselines/oracle-2026.json`).
 2. Bump the pin in `requirements.txt`. In a fresh `.venv` (nothing of the old environment left), install without the lock,
    `python -m pip install -r requirements.txt`, so the dependencies resolve afresh.
 3. Regenerate the lock from that `.venv`: `python -m pip freeze` under the lock's header comment, with its date and the Python and
    pip versions updated. `scripts/lib/lock.test.ts` checks that it pins the same PolicyEngine-US as `requirements.txt`. Commit the
    two files together.
-4. Re-run `npm run oracle` with nothing else changed (it should say the environment matches the lock), and compare the reports.
+4. Re-run `npm run oracle` with nothing else changed (it should say the environment matches the lock). It rewrites the committed
+   report, so `git diff` shows what moved; commit the new report with the lock.
 5. Explain every difference in the pull request: PolicyEngine fixed or updated something (then our engine may be the one that's off:
    fix it, or add it to the known gaps), or changed how it models something (an intentional difference, or a gap); a change in a
    dependency alone can move the report too. Update CLAUDE.md's baseline (date, version, the match counts), M-4's figures, and the
@@ -131,12 +136,11 @@ changes one package's line and regenerates nothing):
 4.2.1 in #75, 2026-11-06) may land on its own, with no PolicyEngine-US upgrade, when the oracle shows it changes nothing:
 1. It changes that package's line in `requirements-lock.txt` and nothing else: not `requirements.txt`, and not PolicyEngine-US or
    `policyengine-core`, whose upgrades always take the steps above.
-2. Take the report from `main` in the locked `.venv` (`npm run oracle`, saved aside).
-3. On the pull request's branch, in a fresh `.venv` (nothing of the old environment left), install with the bumped lock:
+2. On the pull request's branch, in a fresh `.venv` (nothing of the old environment left), install with the bumped lock:
    `python -m pip install -r requirements.txt -c requirements-lock.txt`.
-4. Run `npm run oracle` there. It should say the environment matches the lock, and its report must be byte-identical to `main`'s
-   (`cmp` in Git Bash, or `fc.exe /b`).
-5. Say so in the pull request (the package, its advisory, the fresh `.venv`, the report unchanged), then merge. The lock's header,
+3. Run `npm run oracle` there. It should say the environment matches the lock, and the report it rewrites must be `main`'s, the
+   committed one: `git diff --exit-code test/baselines/oracle-2026.json` shows nothing.
+4. Say so in the pull request (the package, its advisory, the fresh `.venv`, the report unchanged), then merge. The lock's header,
    CLAUDE.md's baseline and M-4 stay as they are.
 
 If the report moves at all, the bump doesn't land on its own: leave it for the next PolicyEngine-US upgrade, or take it as one (the
