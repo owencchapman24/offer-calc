@@ -28,7 +28,8 @@ behind every figure.
   differs from the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
-  recovery from a bad or newer saved session (C22, C23), the e2e shards (T3), the property tests (T4), frozen law for the tests
+  recovery from a bad or newer saved session (C22, C23), the tax baselines committed and the grid's checked in CI (T1), the e2e
+  shards (T3), the property tests (T4), frozen law for the tests
   (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
   part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8), per hour documented
   as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and the `main` ruleset is on (S1, in
@@ -56,10 +57,8 @@ actually have?"), at the user's word; record the answer when it comes. After 4h,
 as A-8) next, after the testers' answers to its questions (`docs/v2-plan.md`, "Questions for testers"). 4h came from the owner's own
 use (finding 3).
 
-**The audit's other open "fix before v2" items**, none of which blocks the breakdown (`scripts/lib/plan.test.ts` keeps this list,
+**The audit's other open "fix before v2" item**, which doesn't block the breakdown (`scripts/lib/plan.test.ts` keeps this list,
 section 2's and the plan's in step):
-- **T1** (a committed grid baseline in CI): the breakdown changes no tax code. It guards each tax change: the data refreshes below,
-  the base-year move, v2's item 4d.
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
@@ -90,15 +89,15 @@ section 2's and the plan's in step):
   3. CI must pass (`gh pr checks --watch`, or the desktop app's PR monitor);
   4. `gh pr merge --merge --delete-branch`, then `git switch main` and `git pull --ff-only`.
 
-  Before opening it: tests, the typecheck and the hooks linter pass locally; the grid is unchanged (`npm run grid`; `grid_ts.json`
-  is ignored, so compare with `main`'s output); `npm run build` for UI work.
+  Before opening it: tests, the typecheck and the hooks linter pass locally (the tests include the grid's baseline, section 8);
+  `npm run build` for UI work.
 - **Merging to `main` deploys to production** (Vercel). Keep `main` green.
 - **Tests:** hand-check at the edges: the day before and the day of a vest, payout or window end; thresholds; bracket crossings.
   Hand-checked values carry their arithmetic in comments.
 - **Review stops:** stop after each slice (or each v2 stop) for review. Engine slices: show the `npm run offers` tables. UI slices:
   light and dark screenshots of the live site, what differs from the design, and the methodology checked against the code (D3).
-- **Tax-engine changes:** their own branch, separate commits; after each, tests pass and the 2026 oracle report is byte-identical
-  (or the difference is explained).
+- **Tax-engine changes:** their own branch, separate commits; after each, tests pass and the 2026 oracle report is unchanged (or
+  the difference is explained): section 8.
 - **Windows PowerShell 5.1:** pass multi-line commit messages with `git commit -F <file>`; embedded double quotes break native
   argument passing.
 - **Live screenshots:** headless Edge (`msedge --headless=new --remote-debugging-port=<port>`) driven over the DevTools protocol with
@@ -130,8 +129,11 @@ section 2's and the plan's in step):
   4180): the accessibility scan, then the smoke, keyboard and phone/tablet tests. Locally it drives the installed Edge; CI runs
   Chromium in four shards. One project: `npm run e2e -- --project=phone-dark`. Don't pass `--reporter` (it drops the scan's).
   Reports: `.a11y/report.md`, `.playwright/report/`.
-- `npm run grid`: the tax engine over the oracle's grid, to `grid_ts.json` (compare with `main`'s before merging).
-- `npm run oracle`: the grid against PolicyEngine-US, 2026, about 3-4 minutes, in the locked `.venv` (`docs/data-refresh.md`).
+- `npm run grid`: the tax engine over the oracle's grid, to `grid_ts.json` (git-ignored), the oracle's input. `test/grid.test.ts`
+  checks the same rows, and more, against the committed baseline in every `npm test`; `npx vitest run test/grid.test.ts -u`
+  updates it (section 8).
+- `npm run oracle`: the grid against PolicyEngine-US, 2026, about 3-4 minutes, in the locked `.venv` (`docs/data-refresh.md`). It
+  rewrites the committed report, `test/baselines/oracle-2026.json`, so `git diff` shows what moved.
 - `npm run offers`: the sample offers' tables, with FMR and BEA-derived rent estimates.
 - `npm run bench`: engine timings on the samples (median of warm runs); compare branches side by side.
 - `npm run fetch-rpp`, `npm run fetch-fmr [-- <FY>] [--file <xlsx>]`: refresh BEA's RPPs and HUD's FMRs, then the engine's tables
@@ -366,16 +368,20 @@ section 2's and the plan's in step):
   recommended.
 
 ## 8. The validation gate (after any tax change)
-1. `npm test`: hand-checked values, and the frozen-law tests unchanged.
-2. `npm run grid`, compared with `main`'s: byte-identical unless 2026 law changed.
-3. `npm run oracle`: our engine and PolicyEngine-US 2.30.3 over $40k-$320k, every state, single and joint, 2026 only (projected
-   years are `test/params.test.ts`'s).
-   - **Baseline** (`oracle_report.json`, 2026-10-12; the same report on 2026-10-15): FICA exact; state payroll taxes within $0.01;
-     NYC within $0.48 (−$0.48 single, −$0.06 joint at every income).
+1. `npm test`: hand-checked values, and the frozen-law tests unchanged. Among them, in CI too, the grid's baseline
+   (`test/grid.test.ts`): the engine over the oracle's grid, 2027 and 2030 in four states, and Philadelphia, against
+   `test/baselines/grid-2026.json`. It moves only with 2026's law or with how a later year is projected: a data refresh moves none
+   of it (it runs on the frozen law). A change meant to move it updates it (`npx vitest run test/grid.test.ts -u`), and the pull
+   request explains the diff; a change to its `grid` rows is one the oracle can show.
+2. `npm run oracle`: our engine and PolicyEngine-US 2.30.3 over $40k-$320k, every state, single and joint, 2026 only (projected
+   years are `test/params.test.ts`'s and the grid baseline's). It rewrites the committed report: `git diff` shows it unchanged, or
+   the pull request explains each difference.
+   - **Baseline** (`test/baselines/oracle-2026.json`: taken 2026-10-12, the same report on 2026-10-15 and 2026-11-09, committed
+     2026-11-10): FICA exact; state payroll taxes within $0.01; NYC within $0.48 (−$0.48 single, −$0.06 joint at every income).
    - **Federal income tax, single, $60k-$200k:** 50 of 51 within $5 (Alaska is lower: its dividend, a known gap).
    - **State income tax, single, $60k-$200k:** 42 of 51 within $5, 44 within $6; the 7 over $10 are VT, CO, ND, OR, CT, AR and MO,
      each in the known gaps. A new state over $10 is a regression.
-   - The report prints whole dollars; read cents from `oracle_report.json` (audit S5).
+   - The report prints whole dollars; read cents from `test/baselines/oracle-2026.json` (audit S5).
    - M-4 and the README quote these figures: update them with the baseline.
 
 **Intentional differences from PolicyEngine** (don't "fix"):
@@ -449,7 +455,8 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
 **The tests, and what each guards** (`app/src`, unless named):
 - the engine: `test/offer.test.ts` (hand-worked projections), `test/tax.test.ts`, `test/params.test.ts` (projection mechanics),
   `test/validate.test.ts` (each problem at its path), `test/law.test.ts` (the law as published), `test/optional.test.ts` (an
-  offer is never projected without its optional module);
+  offer is never projected without its optional module), `test/grid.test.ts` (every state's tax over the oracle's grid, a few
+  projected years and Philadelphia, against `test/baselines/grid-2026.json`);
 - every figure on the page: `metrics.test.ts` (each tickmark's kind, section and derivation; the hero and the bridge against the
   design's worked examples), `l6.test.ts` (A-7, L-1 and the bridge footing and tying), `display.test.ts` and `properties.test.ts`
   (property tests over generated offers: every derivation foots as displayed, no NaN, one figure reads the same everywhere; an
@@ -467,9 +474,11 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
   here, and as v2's plan says).
 
-**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`); `e2e/` (Playwright: the
-scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test:
-`bundle.ts`, `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `tables.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
+**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`;
+`baselines/`, the grid's and the oracle's report, `grid-2026.json` and `oracle-2026.json`); `e2e/` (Playwright: the
+scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test,
+and what they share with the tests: `bundle.ts`, `grid.ts` (the grid's loop), `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`,
+`tables.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
 `eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).
 
 ## 10. Known gaps

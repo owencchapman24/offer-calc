@@ -10,12 +10,16 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8").replace(/\r\n/g, "\n");
-const between = (text: string, from: string, to: string) => {
-  const i = text.indexOf(from);
+/** The text after the first `from` (a string, or a pattern) up to the next `to`. */
+const between = (text: string, from: string | RegExp, to: string) => {
+  const i = typeof from === "string" ? text.indexOf(from) : text.search(from);
   expect(i, `"${from}"`).toBeGreaterThanOrEqual(0);
-  const j = text.indexOf(to, i + from.length);
-  return text.slice(i + from.length, j === -1 ? undefined : j);
+  const start = i + (typeof from === "string" ? from : from.exec(text)![0]).length;
+  const j = text.indexOf(to, start);
+  return text.slice(start, j === -1 ? undefined : j);
 };
+// Where the open items are named, "item" or "items", as their count has it.
+const OPEN_ITEMS = String.raw`The audit's other open "fix before v2" items?`;
 
 /** Audit IDs in `text`, ranges spelled out: "C3-C5" is C3, C4 and C5. */
 function ids(text: string): string[] {
@@ -30,7 +34,7 @@ const plan = read("docs/v2-plan.md");
 const BEFORE_V2 = between(audit, "**Fix before v2**", "**Fix before going public**").split("\n")
   .flatMap((l) => /^\| ([A-Z]\d+) \|/.exec(l)?.[1] ?? []);
 const MERGED = ids(between(claude, "- **The October 2026 audit**", "What's left"));
-const OPEN = between(claude, "**The audit's other open \"fix before v2\" items**", "\n\n").split("\n")
+const OPEN = between(claude, new RegExp(String.raw`\*\*${OPEN_ITEMS}\*\*`), "\n\n").split("\n")
   .flatMap((l) => /^- \*\*([A-Z]\d+)\*\*/.exec(l)?.[1] ?? []);
 const PLAN_ROWS = between(plan, "| Audit | What item 5 needs from it | Done |\n|---|---|---|\n", "\n\n").split("\n")
   .filter((l) => l.startsWith("| "));
@@ -58,7 +62,7 @@ describe("the audit's fix-before-v2 items", () => {
   });
 
   it("the plan names as open are CLAUDE.md's open ones", () => {
-    const sentence = between(plan.replace(/\s+/g, " "), "The audit's other open \"fix before v2\" items (", ")");
+    const sentence = between(plan.replace(/\s+/g, " "), new RegExp(String.raw`${OPEN_ITEMS} \(`), ")");
     expect(ids(sentence)).toEqual(OPEN);
   });
 });

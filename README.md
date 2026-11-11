@@ -88,7 +88,10 @@ The code: `src/tax` (the tax engine), `src/offer` (offers to dated, taxed paymen
   married filing jointly. Social Security, Medicare and state payroll taxes match exactly; New York
   City within $0.48. For single filers from $60,000 to $200,000, federal income tax is within $5 in 50
   of 51 places and state income tax in 42 of 51 (44 within $6). The differences that remain, and the
-  ones that are intentional, are listed in the methodology (M-4, M-10).
+  ones that are intentional, are listed in the methodology (M-4, M-10). The comparison's report is
+  committed, and every test run checks the engine over the same grid (with later years and
+  Philadelphia) against a committed baseline, so a change that moves any state's tax fails the tests
+  unless its pull request updates the baseline too.
 - **Unit tests** check hand-worked values at the edges: the day before and the day of a vest, a payout
   or a window's end; tax thresholds and bracket crossings. The app's tests fail if any figure lacks a
   tickmark, a methodology section or a derivation, if any input lacks its help, if a default shown
@@ -96,7 +99,8 @@ The code: `src/tax` (the tax engine), `src/offer` (offers to dated, taxed paymen
 - **Accessibility:** an axe scan for WCAG 2.2 A and AA covers each state of the page (one offer and its parts, the comparison, the
   editors, Show the work, print, the copy choice) on a desktop, a tablet and a phone, in light and dark.
 
-To run the comparison yourself (a few minutes; it writes `oracle_report.json`), install PolicyEngine
+To run the comparison yourself (a few minutes; it rewrites the committed report,
+`test/baselines/oracle-2026.json`, so `git diff` shows any difference), install PolicyEngine
 into a virtual environment named `.venv`, which `npm run oracle` uses automatically. `requirements-lock.txt`
 holds every package at the version the comparison's baseline was taken with (Python 3.14 on Windows), so
 install with it as constraints; `npm run oracle` warns if your environment differs from it.
