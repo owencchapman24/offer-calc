@@ -16,7 +16,8 @@ behind every figure.
 
 ## 2. Current state (2026-10-16)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
-  years are projected from it, except amounts published for them (so far 2027's HSA limits and Social Security wage base).
+  years are projected from it, except amounts published for them (so far 2027's brackets, standard deduction, 127 and 132(f)
+  limits, HSA limits and Social Security wage base).
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
   A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test),
   stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
@@ -62,8 +63,9 @@ section 2's and the plan's in step):
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
-- The IRS's 2027 inflation revenue procedure and 402(g) notice (neither out on 2026-10-15; any day, weekly from 2026-11-16). Each
-  goes in `FEDERAL_2027`, and `test/law.test.ts` is the one test it should move. SSA's 2027 wage base ($192,300) is in.
+- The IRS's 2027 402(g) notice (not out on 2026-11-10; weekly from 2026-11-16). It goes in `FEDERAL_2027`, and `test/law.test.ts`
+  is the one test it should move. The 2027 inflation revenue procedure (Rev. Proc. 2026-35, Nov 5, 2026) and SSA's 2027 wage base
+  ($192,300) are in.
 - December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027.
 
 **Pre-launch checklist** (before the public launch):
@@ -529,7 +531,8 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 - 401(k): no catch-up, no 415(c) or 401(a)(17) limit; employer HSA money isn't capped at the HSA limit (audit C10); deferrals at face
   value; vesting service from a constant weekly rate.
 - Health costs are flat and accrued monthly; the HSA limit isn't prorated for a partial year.
-- One 132(f) input, capped at $340 a month, though transit and parking each have a limit (v2 item 4b splits them).
+- One 132(f) input, capped at the year's limit ($340 a month in 2026, $350 in 2027), though transit and parking each have a limit
+  (v2 item 4b splits them).
 - Breakeven can overstate the change needed where tax jumps at a cliff (audit C8).
 - Layoffs, severance and waived clawbacks aren't modeled; a leave date is a voluntary exit.
 - Unused vacation follows the employer's state as where you work (a remote job's is where you live: not asked yet); it banks and is

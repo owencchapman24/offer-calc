@@ -451,8 +451,8 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   // ---- perks ----
   "perks.section127": {
     hint: "Tuition or student-loan help, tax-free to $5,250.",
-    help: "Education assistance or student loan payments under Section 127, tax-free up to $5,250 a year; above that, only the "
-      + "limit counts. It counts at face value. $0 is the default.",
+    help: "Education assistance or student loan payments under Section 127, tax-free up to $5,250 a year in 2026 and $5,400 in "
+      + "2027 (rising with inflation after that); above that, only the limit counts. It counts at face value. $0 is the default.",
   },
   otherBenefits: {
     hint: "Stipends, wellness money, insurance: each named, taxable or tax-free.",
@@ -478,8 +478,8 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
   },
   "perks.commuterMonthly": {
     hint: "Transit or parking the employer pays, a month.",
-    help: "Commuter benefits under Section 132(f), tax-free up to $340 a month; above that, only the limit counts. They count at "
-      + "face value, though they buy local transit. $0 is the default.",
+    help: "Commuter benefits under Section 132(f), tax-free up to $340 a month in 2026 and $350 in 2027 (rising with inflation "
+      + "after that); above that, only the limit counts. They count at face value, though they buy local transit. $0 is the default.",
   },
 
   // ---- where you'd live ----
