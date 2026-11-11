@@ -3,12 +3,15 @@ Oracle check: run PolicyEngine-US over the same grid as scripts/grid.ts and repo
 per-state differences. Usage:
   npm run oracle    # writes grid_ts.json, then runs this file via scripts/run-oracle.ts
                     # (which picks .venv's Python if present, else python3/python)
+It rewrites the committed baseline, test/baselines/oracle-<YEAR>.json, so `git diff` shows
+what moved: nothing, or a difference the pull request explains (CLAUDE.md section 8).
 """
-import json, sys, warnings
+import json, os, sys, warnings
 warnings.filterwarnings("ignore")
 from policyengine_us import Simulation
 
-YEAR = 2026
+YEAR = 2026  # scripts/lib/grid.ts' GRID_YEAR: both move with the base year
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "test", "baselines", f"oracle-{YEAR}.json")
 STATE_NAMES = {"DC": "DC"}
 
 def situation(state, status, in_nyc=False):
@@ -78,7 +81,7 @@ out = {"incomes": incomes, "fica_max_abs_diff": fica_max,
        "federal": {f"{k[0]}|{k[1]}": v for k, v in fed_report.items()},
        "state_payroll": {f"{k[0]}|{k[1]}": v for k, v in pay_report.items()},
        "nyc": nyc, "nyc_federal": nyc_fed}
-json.dump(out, open("oracle_report.json", "w"), indent=1)
+json.dump(out, open(OUT, "w"), indent=1)
 print("\nFICA max abs diff:", round(fica_max, 2))
 def show(title, rep, thresh=1):
     print(f"\n== {title}: rows with max|diff| >= ${thresh} (ours - PolicyEngine) at 40k..320k")

@@ -1,5 +1,7 @@
 node_modules/
+# The oracle's input (npm run grid). Its report and the grid's baseline are committed, in test/baselines/.
 grid_ts.json
+# Where the oracle wrote its report before 2026-11-10, so a copy may be left on disk.
 oracle_report.json
 __pycache__/
 .venv/
