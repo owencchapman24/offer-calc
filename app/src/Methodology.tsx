@@ -211,9 +211,11 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <strong>Later years.</strong> Tax law after 2026 isn't known yet, so it's projected: federal brackets, deductions and
             limits rise with the inflation assumption ({percent(ASSUMPTIONS.inflation)} a year), and the SALT cap follows its
             statutory schedule (101% a year through 2029, $10,000 from 2030). Where a later year's amount has already been
-            published, it's used as published and projected on from there: so far, the 2027 HSA limits ($4,500 self-only, $9,000
-            family; the IRS's Rev. Proc. 2026-24) and the 2027 Social Security wage base ($192,300; the Social Security
-            Administration, October 14, 2026). State law is held at 2026 rules, except California, which indexes by statute, and
+            published, it's used as published and projected on from there: so far, the 2027 federal brackets, standard deduction
+            ($16,600 single, $33,200 joint, $24,925 head of household), educational assistance limit ($5,400) and commuter limit
+            ($350 a month; the IRS's Rev. Proc. 2026-35, November 5, 2026), the 2027 HSA limits ($4,500 self-only, $9,000 family;
+            the IRS's Rev. Proc. 2026-24) and the 2027 Social Security wage base ($192,300; the Social Security Administration,
+            October 14, 2026). The 2027 401(k) limit isn't published yet, so it's projected. State law is held at 2026 rules, except California, which indexes by statute, and
             amounts tied to federal ones.
           </p>
           <p>
@@ -295,8 +297,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         </Section>
         <Section id="M-5.3">
           <p>
-            Tax-free perks, such as education assistance (up to $5,250 a year) and commuter benefits (up to $340 a month), count
-            at face value.
+            Tax-free perks, such as education assistance (up to $5,250 a year in 2026, $5,400 in 2027) and commuter benefits (up
+            to $340 a month in 2026, $350 in 2027), count at face value, each year up to that year's limit.
           </p>
           <p>
             <strong>Other benefits</strong> (a stipend, wellness money, employer-paid insurance) are each a yearly amount you enter,
@@ -655,6 +657,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">IRC 164(b)(7), as added by Pub. L. 119-21 §70120</th><td>The SALT cap: $40,400 in 2026, phased down above
                 $505,000, $10,000 from 2030</td><td>Statute</td></tr>
               <tr><th scope="row">IRS Notice 2025-67; Rev. Proc. 2025-19</th><td>401(k) deferral limit ($24,500); HSA limits</td><td>2026</td></tr>
+              <tr><th scope="row">IRS Rev. Proc. 2026-35</th><td>Federal brackets, standard deductions ($16,600 single, $33,200
+                joint, $24,925 head of household), the educational assistance ($5,400) and commuter ($350 a month) limits</td><td>2027</td></tr>
               <tr><th scope="row">IRS Rev. Proc. 2026-24</th><td>HSA limits ($4,500 self-only, $9,000 family)</td><td>2027</td></tr>
               <tr><th scope="row">SSA 2026 and 2027 COLA fact sheets; IRC 3101(b)(2)</th><td>Social Security wage base ($184,500; $192,300
                 in 2027) and rates; Additional Medicare Tax</td><td>2026, 2027</td></tr>
