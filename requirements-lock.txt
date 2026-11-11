@@ -1,9 +1,13 @@
 # The oracle's full Python environment, locked: `pip freeze` of the .venv its baseline was taken with
-# (Windows, Python 3.14.7, pip 26.2.1; 2026-10-12). A constraints file, used with requirements.txt:
+# (Windows, Python 3.14.7, pip 26.2.1; 2026-10-12), and the security bumps since (git log lists them).
+# A constraints file, used with requirements.txt:
 #   python -m pip install -r requirements.txt -c requirements-lock.txt
-# Don't edit it by hand, and regenerate it only together with a PolicyEngine-US upgrade (CLAUDE.md,
-# "Data refresh calendar"). Packages only macOS or Linux need (pexpect, ptyprocess for IPython) aren't in it, so
-# they install unpinned there; the oracle doesn't use them.
+# Don't edit it by hand. Regenerate it only together with a PolicyEngine-US upgrade, with one exception: a
+# security bump to one package's line (Dependabot's, as certifi's and filelock's in pull requests #75 and #77)
+# may land on its own when the oracle, re-run in a fresh .venv installed with the bumped lock, gives a report
+# byte-identical to main's. docs/data-refresh.md, "The oracle's Python environment", has both procedures.
+# Packages only macOS or Linux need (pexpect, ptyprocess for IPython) aren't in it, so they install unpinned
+# there; the oracle doesn't use them.
 annotated-types==0.8.0
 anyio==4.15.1
 asttokens==3.0.2
