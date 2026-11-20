@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareOffers, projectScenario } from "../src/offer/index";
+import type { OfferInput } from "../src/offer/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import { ENACTED as PUBLISHED } from "../src/tax/params/enacted";
@@ -95,15 +96,36 @@ describe("the law as published", () => {
     expect(p27.federal.salt.cap).toBeCloseTo(40_804, 6);
   });
 
-  it("caps 2027's 401(k) deferrals at $25,500, the 402(g) limit, with a warning for the year", () => {
-    // Sample A from 2027-01-01, its first year the calendar year: $300,000 at 10% wants 300,000 × 0.10 = 30,000 of deferrals;
-    // the limit stops them at 25,500 (2026's $24,500 would have stopped them $1,000 sooner).
-    const a = SAMPLE_OFFERS[0];
-    const offer = { ...a, startDate: "2027-01-01", salary: { ...a.salary, annual: 300_000 },
-      retirement: { ...a.retirement!, contributionPct: 0.1 } };
-    const r = projectScenario(offer, SAMPLE_HOUSEHOLD, { years: 1, inflation: 0.025 });
-    expect(r.employmentYears[0]).toMatchObject({ start: "2027-01-01", end: "2028-01-01", retirement: { employee: 25_500 } });
-    expect(r.warnings.filter((w) => w.code === "k401Cap")).toEqual([{ code: "k401Cap", params: { year: 2027, limit: 25_500 } }]);
+  it("caps 2027's 401(k) deferrals at $25,500 at any inflation, and 2028's at the limit projected from it", () => {
+    // $600,000 from 2027-01-01 in Texas, 6% deferred; the match 100% of the first 3% and 50% of the next 2%. A month's pay,
+    // 50,000, comes on its last day, and its deferral is 6% × 50,000 = 3,000: January to August 8 × 3,000 = 24,000, then
+    // September 30 the 1,500 left to reach 25,500, and nothing after. (Projected from 2026's $24,500 at 2.5%, the limit was
+    // 25,112.50, so September's was 1,112.50.) The match, per paycheck: 4% × 50,000 = 2,000 for 8 months, 16,000, then
+    // September's rate 1,500 ÷ 50,000 = 3%, all matched: 3% × 50,000 = 1,500. 17,500.
+    const offer: OfferInput = {
+      label: "J", residence: { state: "TX" }, employerState: "TX", startDate: "2027-01-01", salary: { annual: 600_000 },
+      retirement: { contributionPct: 0.06, match: [{ upToPct: 0.03, rate: 1 }, { upToPct: 0.05, rate: 0.5 }] },
+    };
+    const deferred = (r: ReturnType<typeof projectScenario>, date: string) =>
+      r.benefitEvents.filter((b) => b.kind === "employee401k" && b.date === date).reduce((s, b) => s + b.amount, 0);
+    for (const inflation of [0, 0.025, 0.1]) {
+      const r = projectScenario(offer, { filingStatus: "single" }, { years: 2, inflation });
+      expect(r.employmentYears[0].retirement).toEqual({ employee: 25_500, employerCredited: 17_500, employerVested: 17_500 });
+      // The paycheck before the limit binds, the one it binds on, and the one after.
+      expect(["2027-08-31", "2027-09-30", "2027-10-31"].map((d) => deferred(r, d))).toEqual([3_000, 1_500, 0]);
+      expect(r.warnings).toContainEqual({ code: "k401Cap", params: { year: 2027, limit: 25_500 } });
+    }
+    // 2028 at 2.5%: 25,500 × 1.025 = 26,137.50; 24,000 by August, then September 2,137.50. Its match: 16,000, then September's
+    // rate 2,137.50 ÷ 50,000 = 4.275%, matched 3% + 50% × 1.275% = 3.6375%, × 50,000 = 1,818.75: 17,818.75.
+    const r28 = projectScenario(offer, { filingStatus: "single" }, { years: 2, inflation: 0.025 }).employmentYears[1].retirement;
+    expect(r28.employee).toBeCloseTo(26_137.5, 6);
+    expect(r28.employerCredited).toBeCloseTo(17_818.75, 6);
+    // The tax engine's own check: deferring exactly $25,500 in 2027 is within the limit; a cent more isn't.
+    const over = (pretax401k: number) =>
+      computeTaxes({ year: 2027, filingStatus: "single", wages: 200_000, state: "TX", pretax401k }, at(2027, 0.025))
+        .warnings.filter((w) => w.code === "k401OverLimit");
+    expect(over(25_500)).toEqual([]);
+    expect(over(25_500.01)).toEqual([{ code: "k401OverLimit", params: { year: 2027, limit: 25_500 } }]);
   });
 
   it("taxes 2027 wages for Social Security up to $192,300, and caps the states' paid leave there too", () => {
