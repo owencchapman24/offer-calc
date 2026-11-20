@@ -17,6 +17,8 @@ import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { marginText, verdict } from "./verdict";
 import { priceWords } from "./prices";
+import { taxYearsOf } from "./partsModel";
+import { taxTables } from "./workpaper";
 
 // Properties of what the page shows, over generated offers and households (arbitrary.ts): the whole page as the app would
 // render it, with L-3, L-4 and L-6 worked out as the worker would, each offer's breakdown (A-1) and the ledger's "On its own"
@@ -145,6 +147,18 @@ describe("the page, for any offers", () => {
       const [hero, base] = [shown.get("hero")?.[0], shown.get("win.base")?.[0]];
       const r = p.ctx.results!;
       if (hero && base && r.view.basis !== "perHour") expect(sameFigure(hero, base), `the verdict says ${hero}; L-2's base case ${base}`).toBe(true);
+      // A calendar year's tax in A-6 and in A-7's tax table: different ids, one figure (audit F1, 2026-11).
+      for (const o of p.ctx.offers) {
+        const b = p.ctx.own?.breakdowns[o.letter];
+        if (!b) continue;
+        const tables = taxTables(p.ctx, o.letter);
+        for (const y of taxYearsOf(b.detail, b.window)) {
+          const rows = tables.find((t) => t.year === y.year)?.rows ?? [];
+          const offer = (...lines: string[]) => rows.filter((l) => lines.includes(l.line)).reduce((s, l) => s + l.offer!, 0);
+          expect(y.values, `${o.letter}'s ${y.year} in A-6 and A-7`).toEqual({ gross: offer("wages"), tax: offer("total"), federal: offer("federal"),
+            fica: offer("ss", "medicare"), state: offer("state", "statePayroll"), local: offer("local") });
+        }
+      }
     }), runs(6, false));
   }, 600_000);
 

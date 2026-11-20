@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withCommission, withEspp } from "./testing";
+import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withCommission, withEspp, withWork } from "./testing";
 import { bridge } from "./byYearModel";
-import { taxTable, yearTable } from "./workpaper";
+import { taxTable, taxTables, yearTable } from "./workpaper";
 
 // An offer's breakdown, A-2 to A-7 (docs/v2-plan.md, item 5, stop 5B), against the plan's worked example: sample A at the samples'
 // fixed dates (start Jul 13, 2026, valued that day, a 4-year stay). Hand-checked values carry their arithmetic.
@@ -307,6 +307,23 @@ describe("A-6: tax by calendar year", () => {
       }
     }
   });
+  // Audit F1 (2026-11): A-6 rounded the engine's year figures, A-7 the payments to the cent and each line with and without the
+  // offer, so sample A on its own showed 2028's federal income tax as 32,947 in A-6 and 32,949 in A-7, and joint filers' B its
+  // tax as 29,232 against 29,231. One figure is one figure (CLAUDE.md, "The year figures as shown").
+  it("each year's pay, tax and tax by kind read the same as in A-7's tax table: alone, and filing jointly", () => {
+    for (const ctx of [alone("A"), context("colAdjustedTotal", undefined, 4, { filingStatus: "joint" })].map((c) => withWork(c).ctx)) {
+      for (const o of ctx.offers) {
+        const b = own(ctx, o.letter);
+        const tables = taxTables(ctx, o.letter);
+        for (const r of taxYearsOf(b.detail, b.window)) {
+          const rows = tables.find((t) => t.year === r.year)!.rows;
+          const offer = (...lines: string[]) => rows.filter((x) => lines.includes(x.line)).reduce((s, x) => s + x.offer!, 0);
+          expect([r.year, r.values]).toEqual([r.year, { gross: offer("wages"), tax: offer("total"), federal: offer("federal"),
+            fica: offer("ss", "medicare"), state: offer("state", "statePayroll"), local: offer("local") }]);
+        }
+      }
+    }
+  }, 30_000); // renders every offer's breakdown and runs A-7's job: a few seconds, longer on a busy runner
 });
 
 describe("B3: a breakdown is its offer's alone", () => {
