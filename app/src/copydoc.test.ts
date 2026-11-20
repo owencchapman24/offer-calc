@@ -5,7 +5,7 @@ import { type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import type { AppOffer, Letter } from "./model";
 import { dollars, figure, longDate } from "./text";
-import { alone, BENEFITS, COMMISSIONS, compareOf, context, ESPPS, requestOf, withBenefits, withCommission, withEspp, withLeave, withTies } from "./testing";
+import { alone, BENEFITS, COMMISSIONS, compareOf, context, ESPPS, renderAlone, renderWork, requestOf, withBenefits, withCommission, withEspp, withLeave, withTies } from "./testing";
 import { verdictSentence } from "./verdict";
 
 // "Copy as document" (docs/copy-as-document-plan.md): every total in the document adds up as displayed, every calculation it
@@ -360,4 +360,23 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
     const body = (t: string) => t.slice(t.indexOf("1. THE ANSWER"), t.lastIndexOf("Worked out in your browser"));
     expect(body(b.text).endsWith(body(comparison.text))).toBe(true);
   });
+});
+
+// Audit C16 and the owner's own use (docs/user-testing.md, finding 3): living at home, rent $0. A unary minus on a zero rent printed
+// "-0" in A-7's rent row, the bridge and the document ("less rent ... -0").
+describe("a rent of $0: no minus zero on the page or in the document", () => {
+  const zeroRent = () => alone("A", (o) => ({ ...o, draft: { ...o.draft, costOfLiving: { ...o.draft.costOfLiving, monthlyRent: 0 } } }));
+  // A minus (hyphen or true minus), maybe a $, then a zero that isn't the start of a longer number; not inside a word or a date.
+  const minusZero = /(?<![\w.,])[-−]\$?0(?![\d.,])/;
+  it("its breakdown, its A-7 tables and its document, in full and in summary", () => {
+    const ctx = zeroRent();
+    const shown = (s: string) => s.match(new RegExp(`.{0,40}${minusZero.source}.{0,20}`))?.[0];
+    expect(shown(textOf(renderAlone(ctx)))).toBeUndefined();
+    expect(shown(textOf(renderWork(ctx)))).toBeUndefined();
+    for (const detail of ["full", "summary"] as const) {
+      const { html, text } = made(ctx, undefined, "breakdown", "A", detail);
+      expect(shown(textOf(html))).toBeUndefined();
+      expect(shown(text)).toBeUndefined();
+    }
+  }, 30_000); // renders the breakdown, A-7 and the document: a few seconds, longer on a busy runner
 });

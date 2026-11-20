@@ -4,14 +4,19 @@ const DOLLARS = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Each rounds first and takes its sign from what it shows, so what rounds to zero is zero: never "-0" or "−$0" (audit C16).
+/** Rounded to the dollar, never −0. */
+const whole = (x: number) => Math.round(x) + 0;
+/** Rounded to the cent, never −0. */
+const toCents = (x: number) => Math.round(x * 100) / 100 + 0;
 /** "$1,234" (whole dollars). */
-export const dollars = (x: number) => `${x < 0 ? "−" : ""}$${DOLLARS.format(Math.abs(Math.round(x)))}`;
+export const dollars = (x: number) => `${whole(x) < 0 ? "−" : ""}$${DOLLARS.format(Math.abs(whole(x)))}`;
 /** "1,234" with no sign or symbol, for tables whose unit is in the header. */
-export const figure = (x: number) => DOLLARS.format(Math.round(x));
+export const figure = (x: number) => DOLLARS.format(whole(x));
 /** "1,234" or "−1,234" (a true minus sign), for derivations where a figure can go either way. */
-export const signed = (x: number) => `${Math.round(x) < 0 ? "−" : ""}${DOLLARS.format(Math.abs(Math.round(x)))}`;
+export const signed = (x: number) => `${whole(x) < 0 ? "−" : ""}${DOLLARS.format(Math.abs(whole(x)))}`;
 /** "$19.47" */
-export const cents = (x: number) => `${x < 0 ? "−" : ""}$${CENTS.format(Math.abs(x))}`;
+export const cents = (x: number) => `${toCents(x) < 0 ? "−" : ""}$${CENTS.format(Math.abs(toCents(x)))}`;
 /** A rate as a percent: 0.05 -> "5%", 0.025 -> "2.5%". */
 export const percent = (x: number) => `${+(x * 100).toFixed(2)}%`;
 /** "45 hours", "9,000 hours" */

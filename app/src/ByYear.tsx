@@ -24,8 +24,12 @@ const unit = (basis: Basis, ctx: WorkContext): string => (basis === "colAdjusted
 const said = (ctx: WorkContext, basis: Basis, v: number, n?: number) =>
   `${placeOf(ctx.results!.view, basis)} ${basis === "perHour" ? `${cents(v)} an hour${n ? ` in year ${n}` : " over your stay"}` : dollars(v)}`.trim();
 
-const short = (x: number, perHour: boolean) =>
-  perHour ? `$${Math.round(x)}` : x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
+/** An axis label: "120k", "$40"; a negative one with a true minus, "−$40", never "$-40" (audit C16). */
+const short = (x: number, perHour: boolean) => {
+  const a = Math.abs(x);
+  const text = perHour ? `$${Math.round(a)}` : a >= 1_000_000 ? `${+(a / 1e6).toFixed(1)}M` : a >= 1000 ? `${Math.round(a / 1000)}k` : `${Math.round(a)}`;
+  return `${x < 0 && /[1-9]/.test(text) ? "−" : ""}${text}`;
+};
 
 export interface ByYearProps {
   ctx: WorkContext; ui: UiState; sample: boolean; dispatch: Dispatch<Action>; /** Its figures are from earlier inputs. */ status?: Stale;

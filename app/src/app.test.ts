@@ -17,7 +17,9 @@ import {
   BACKUP_KEY, clearSession, type KeyValueStore, initialSession, loadSession as load, readBackup, reducer, savedFile, saveSession, STORAGE_KEY, type V1Offer,
   type V1Session,
 } from "./session";
-import { localToday, parseMoney, parsePercent } from "./text";
+import { cents, dollars, figure, localToday, parseMoney, parsePercent, percent, signed } from "./text";
+import { usd } from "../../src/format/numbers";
+import { dropText, type RiskRow } from "./cases";
 import { disagreement, type StepView, totalsCaption, verdict } from "./verdict";
 
 const TODAY = "2026-10-08";
@@ -443,6 +445,17 @@ describe("text", () => {
   });
   it("today is the local date", () => {
     expect(localToday(new Date(2026, 9, 8, 23, 59))).toBe("2026-10-08");
+  });
+  it("never writes a minus zero: what rounds to zero is zero, and a minus sign is a true minus (audit C16)", () => {
+    for (const x of [-0, -0.4]) expect([figure(x), dollars(x), signed(x)]).toEqual(["0", "$0", "0"]);
+    for (const x of [-0, -0.004]) expect(cents(x)).toBe("$0.00");
+    for (const x of [-0, -0.00001]) expect(percent(x)).toBe("0%");
+    // Math.round takes a half up (−0.5 to −0, so "$0", as everywhere else); just past it is a dollar, or a cent.
+    expect([dollars(-0.5), dollars(-0.51), dollars(-5), cents(-0.0051), cents(-1.5), signed(-5)]).toEqual(["$0", "−$1", "−$5", "−$0.01", "−$1.50", "−5"]);
+    expect(usd(-0)).toBe("$0");
+    // L-2's drop: an offer without ranges loses nothing in its bear case, "0%".
+    const drop = (share: number) => dropText({ share } as RiskRow);
+    expect([0, -0, 0.004, -0.004, 0.17, -0.05].map(drop)).toEqual(["0%", "0%", "0%", "0%", "−17%", "+5%"]);
   });
 });
 

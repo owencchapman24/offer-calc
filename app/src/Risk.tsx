@@ -15,8 +15,12 @@ import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } fro
 
 const CASE_WORD: Record<Scenario, string> = { bear: "Bear", base: "Base", bull: "Bull" };
 
-const short = (x: number, perHour: boolean) =>
-  perHour ? `$${Math.round(x)}` : Math.abs(x) >= 1_000_000 ? `${+(x / 1e6).toFixed(2)}M` : Math.abs(x) >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`;
+/** An axis label: "120k", "$40"; a negative one with a true minus, "−$40", never "$-40" (audit C16). */
+const short = (x: number, perHour: boolean) => {
+  const a = Math.abs(x);
+  const text = perHour ? `$${Math.round(a)}` : a >= 1_000_000 ? `${+(a / 1e6).toFixed(2)}M` : a >= 1000 ? `${Math.round(a / 1000)}k` : `${Math.round(a)}`;
+  return `${x < 0 && /[1-9]/.test(text) ? "−" : ""}${text}`;
+};
 
 const Who = ({ l }: { l: Letter }) => <strong className={`who offer-${l}`}>{l}</strong>;
 
@@ -39,7 +43,8 @@ export function Risk({ ctx, sample, tableOpen = false, status = null }: {
   }
   const basis = r.view.basis;
   // A figure with its dollars (condition 1): the prices picked after rent ("U.S.-avg $1,265"), "$" before rent and prices.
-  const at = (x: string) => `${placeOf(r.view, basis)} ${/^[−+(]?\$/.test(x) ? x : `$${x}`}`.trim();
+  // A negative figure ("-135,490") takes its minus before the dollar sign: "−$135,490", never "$-135,490" (audit C16).
+  const at = (x: string) => `${placeOf(r.view, basis)} ${/^[−+(]?\$/.test(x) ? x : /^[-−]/.test(x) ? `−$${x.slice(1)}` : `$${x}`}`.trim();
   const title = v.perHour ? `Per hour worked over your stay (${v.years} ${v.years === 1 ? "year" : "years"}), ${r.sweep.perHourOf === "colAdjustedTotal"
     ? `${pricesOf(ctx).phrase}, ` : ""}nominal`
     : `${basisPhrase(pricesOf(ctx))[basis][0].toUpperCase()}${basisPhrase(pricesOf(ctx))[basis].slice(1)}, ${v.years}-year total, present value`;
