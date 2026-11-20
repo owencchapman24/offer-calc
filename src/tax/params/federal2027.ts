@@ -24,9 +24,14 @@ import type { EnactedAmounts } from "./index";
  *   https://www.ssa.gov/oact/cola/cbb.html ("For earnings in 2027, this base is $192,300"), both read 2026-10-15. State payroll
  *   taxes capped at it (`wageCap: "ssWageBase"`) follow. PolicyEngine-US 2.30.3 has $192,600 for 2027, a CBO forecast (its
  *   gov/irs/payroll/social_security/cap.yaml), not SSA's determination.
+ * - Elective deferral limit, IRC 402(g)(1) (401(k), 403(b) and the Thrift Savings Plan): $25,500. Source: IRS Notice 2026-66,
+ *   "Amounts Relating to Retirement Plans and IRAs, as Adjusted for Changes in Cost-of-Living", for 2027 ("is increased from
+ *   $24,500 to $25,500"; dated Nov 12, 2026; https://www.irs.gov/pub/irs-drop/n-26-66.pdf, read 2026-11-20). PolicyEngine-US
+ *   2.30.3 has no 2027 value (its gov/irs/gross_income/retirement_contributions/limit/401k.yaml ends at 2026's $24,500). The
+ *   notice's catch-up, 415(c) and 401(a)(17) amounts aren't used: none of them is modeled (CLAUDE.md, known gaps).
  *
- * Not yet published (checked 2026-11-10: the IRS's newsroom and irs-drop listing; see docs/data-refresh.md): the 402(g) notice,
- * the 401(k) elective deferral limit, which Rev. Proc. 2026-35 doesn't set.
+ * With it, every amount `EnactedAmounts` holds is published for 2027. (Pub. 15-T's 2027 withholding tables come in December:
+ * docs/data-refresh.md.)
  */
 export const FEDERAL_2027: EnactedAmounts = {
   standardDeduction: { single: 16_600, joint: 33_200, headOfHousehold: 24_925 },
@@ -46,6 +51,7 @@ export const FEDERAL_2027: EnactedAmounts = {
   },
   section127Limit: 5_400,
   commuterMonthlyLimit: 350,
+  k401Limit: 25_500,
   hsaLimit: { self: 4_500, family: 9_000 },
   socialSecurityWageBase: 192_300,
 };

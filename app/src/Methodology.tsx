@@ -208,15 +208,15 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             before your 401(k).
           </p>
           <p>
-            <strong>Later years.</strong> Tax law after 2026 isn't known yet, so it's projected: federal brackets, deductions and
+            <strong>Later years.</strong> Tax law after 2026 is projected until it's published: federal brackets, deductions and
             limits rise with the inflation assumption ({percent(ASSUMPTIONS.inflation)} a year), and the SALT cap follows its
             statutory schedule (101% a year through 2029, $10,000 from 2030). Where a later year's amount has already been
-            published, it's used as published and projected on from there: so far, the 2027 federal brackets, standard deduction
-            ($16,600 single, $33,200 joint, $24,925 head of household), educational assistance limit ($5,400) and commuter limit
-            ($350 a month; the IRS's Rev. Proc. 2026-35, November 5, 2026), the 2027 HSA limits ($4,500 self-only, $9,000 family;
-            the IRS's Rev. Proc. 2026-24) and the 2027 Social Security wage base ($192,300; the Social Security Administration,
-            October 14, 2026). The 2027 401(k) limit isn't published yet, so it's projected. State law is held at 2026 rules, except California, which indexes by statute, and
-            amounts tied to federal ones.
+            published, it's used as published and projected on from there. For 2027, every federal amount the tool takes from the
+            IRS and the Social Security Administration is published: the brackets and standard deduction ($16,600 single, $33,200
+            joint, $24,925 head of household), the educational assistance ($5,400) and commuter ($350 a month) limits (the IRS's
+            Rev. Proc. 2026-35, November 5, 2026), the 401(k) limit ($25,500; the IRS's Notice 2026-66, November 12, 2026), the HSA
+            limits ($4,500 self-only, $9,000 family; Rev. Proc. 2026-24) and the Social Security wage base ($192,300; October 14,
+            2026). State law is held at 2026 rules, except California, which indexes by statute, and amounts tied to federal ones.
           </p>
           <p>
             <strong>The effective tax rate.</strong> A-1 and A-6 state an offer's tax as a share of its pay: the offer's tax over your
@@ -280,7 +280,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
         </Section>
         <Section id="M-5.1">
           <p>
-            Your own 401(k) deferrals are a percent of pay, capped each calendar year at the federal limit ($24,500 in 2026).
+            Your own 401(k) deferrals are a percent of pay, capped each calendar year at the federal limit ($24,500 in 2026,
+            $25,500 in 2027).
             Pre-tax deferrals lower income tax but not Social Security and Medicare. They stay your money, so they count at face
             value; growth and the tax you'd pay on withdrawal aren't modeled. The employer's match follows each paycheck's
             deferral rate with no year-end true-up, so maxing out early loses match. Employer money counts only once it's vested:
@@ -659,6 +660,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">IRS Notice 2025-67; Rev. Proc. 2025-19</th><td>401(k) deferral limit ($24,500); HSA limits</td><td>2026</td></tr>
               <tr><th scope="row">IRS Rev. Proc. 2026-35</th><td>Federal brackets, standard deductions ($16,600 single, $33,200
                 joint, $24,925 head of household), the educational assistance ($5,400) and commuter ($350 a month) limits</td><td>2027</td></tr>
+              <tr><th scope="row">IRS Notice 2026-66</th><td>401(k) deferral limit ($25,500)</td><td>2027</td></tr>
               <tr><th scope="row">IRS Rev. Proc. 2026-24</th><td>HSA limits ($4,500 self-only, $9,000 family)</td><td>2027</td></tr>
               <tr><th scope="row">SSA 2026 and 2027 COLA fact sheets; IRC 3101(b)(2)</th><td>Social Security wage base ($184,500; $192,300
                 in 2027) and rates; Additional Medicare Tax</td><td>2026, 2027</td></tr>
