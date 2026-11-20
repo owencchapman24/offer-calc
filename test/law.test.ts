@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareOffers } from "../src/offer/index";
+import { compareOffers, projectScenario } from "../src/offer/index";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../src/samples";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
 import { ENACTED as PUBLISHED } from "../src/tax/params/enacted";
@@ -19,9 +19,9 @@ describe("the law as published", () => {
     expect(ENACTED).not.toBe(FROZEN);
   });
 
-  it("published for years after 2026: 2027's brackets, standard deduction, 127 and 132(f) limits, HSA limits and wage base", () => {
+  it("published for 2027: brackets, standard deduction, the 127, 132(f), 401(k) and HSA limits, and the wage base", () => {
     expect(ENACTED.map(([year, amounts]) => [year, Object.keys(amounts)])).toEqual([[2027, ["standardDeduction", "brackets",
-      "section127Limit", "commuterMonthlyLimit", "hsaLimit", "socialSecurityWageBase"]]]);
+      "section127Limit", "commuterMonthlyLimit", "k401Limit", "hsaLimit", "socialSecurityWageBase"]]]);
     for (const inflation of [0, 0.025, 0.1]) {
       const f = at(2027, inflation).federal;
       // IRS Rev. Proc. 2026-35 (Nov 5, 2026): sec. 3.15(1), the standard deduction; sec. 3.01, Tables 1-3, the brackets
@@ -34,14 +34,18 @@ describe("the law as published", () => {
           [661_350, 0.37]],
       });
       expect([f.section127Limit, f.commuterMonthlyLimit]).toEqual([5_400, 350]);
+      // $25,500: IRS Notice 2026-66 (Nov 12, 2026), 402(g)(1) "is increased from $24,500 to $25,500".
+      expect(f.k401Limit).toBe(25_500);
       // $4,500 and $9,000: IRS Rev. Proc. 2026-24. $192,300: SSA's 2027 COLA fact sheet (Oct 14, 2026).
       expect(f.hsaLimit).toEqual({ self: 4_500, family: 9_000 });
       expect(at(2027, inflation).payroll.socialSecurityWageBase).toBe(192_300);
     }
     // Projected from there, 2028 at 2.5%: the standard deduction 16,600 × 1.025 = 17,015, 33,200 × 1.025 = 34,030 and 24,925 ×
     // 1.025 = 25,548.125; the top single bracket from 661,375 × 1.025 = 677,909.375; 127's 5,400 × 1.025 = 5,535; 132(f)'s
-    // 350 × 1.025 = 358.75; the wage base 192,300 × 1.025 = 197,107.50. (From 2026's $184,500, 2027 at 2.5% was 189,112.50.)
+    // 350 × 1.025 = 358.75; 402(g)'s 25,500 × 1.025 = 26,137.50; the wage base 192,300 × 1.025 = 197,107.50. (From 2026's
+    // $184,500, 2027 at 2.5% was 189,112.50.)
     const f28 = at(2028, 0.025).federal;
+    expect(f28.k401Limit).toBeCloseTo(26_137.5, 6);
     expect(f28.standardDeduction.single).toBeCloseTo(17_015, 6);
     expect(f28.standardDeduction.joint).toBeCloseTo(34_030, 6);
     expect(f28.standardDeduction.headOfHousehold).toBeCloseTo(25_548.125, 6);
@@ -80,15 +84,26 @@ describe("the law as published", () => {
   it("with 0% inflation, 2027 differs from 2026 only in the SALT schedule and the amounts published for it", () => {
     const p26 = paramsForYear(2026);
     const p27 = at(2027, 0);
+    // Every federal amount is published for 2027 now, so what's left to compare is that there's nothing else.
     const published = { salt: null, hsaLimit: null, standardDeduction: null, brackets: null, section127Limit: null,
-      commuterMonthlyLimit: null };
+      commuterMonthlyLimit: null, k401Limit: null };
     expect({ ...p27.federal, ...published }).toEqual({ ...p26.federal, ...published });
-    // The 402(g) notice isn't out, so 2027's limit is projected from 2026's $24,500 (at 0%, unchanged).
-    expect(p27.federal.k401Limit).toBe(24_500);
+    expect(p27.federal.k401Limit).toBe(25_500);
     expect(p27.federal.hsaLimit).toEqual({ self: 4_500, family: 9_000 });
     expect({ ...p27.payroll, socialSecurityWageBase: null }).toEqual({ ...p26.payroll, socialSecurityWageBase: null });
     expect(p27.payroll.socialSecurityWageBase).toBe(192_300);
     expect(p27.federal.salt.cap).toBeCloseTo(40_804, 6);
+  });
+
+  it("caps 2027's 401(k) deferrals at $25,500, the 402(g) limit, with a warning for the year", () => {
+    // Sample A from 2027-01-01, its first year the calendar year: $300,000 at 10% wants 300,000 × 0.10 = 30,000 of deferrals;
+    // the limit stops them at 25,500 (2026's $24,500 would have stopped them $1,000 sooner).
+    const a = SAMPLE_OFFERS[0];
+    const offer = { ...a, startDate: "2027-01-01", salary: { ...a.salary, annual: 300_000 },
+      retirement: { ...a.retirement!, contributionPct: 0.1 } };
+    const r = projectScenario(offer, SAMPLE_HOUSEHOLD, { years: 1, inflation: 0.025 });
+    expect(r.employmentYears[0]).toMatchObject({ start: "2027-01-01", end: "2028-01-01", retirement: { employee: 25_500 } });
+    expect(r.warnings.filter((w) => w.code === "k401Cap")).toEqual([{ code: "k401Cap", params: { year: 2027, limit: 25_500 } }]);
   });
 
   it("taxes 2027 wages for Social Security up to $192,300, and caps the states' paid leave there too", () => {
