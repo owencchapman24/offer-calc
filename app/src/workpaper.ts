@@ -1,5 +1,5 @@
 import type { Component, ValueBasis } from "../../src/offer/types";
-import { shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
+import { addCents, shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { type L6Line, offerByLetter, ownOf, pricesOf, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { cashName, taxFreeNames } from "./byYearModel";
 import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
@@ -266,8 +266,7 @@ export function stayRows(ctx: WorkContext, letter: L): StayRow[] {
 
 // ---- every payment --------------------------------------------------------------------------------------
 
-/** Adds amounts to the cent, exactly. */
-export const addCents = (xs: number[]) => xs.reduce((s, x) => s + Math.round(x * 100), 0) / 100;
+export { addCents };
 /** "9,166.67", "−10,000.00": a payment's figure (the table's unit is dollars). */
 const TO_CENT = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const toCent = (x: number) => `${x < 0 ? "−" : ""}${TO_CENT.format(Math.abs(x))}`;

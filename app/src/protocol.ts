@@ -49,9 +49,12 @@ export interface OfferDetail {
   costOfLiving?: CostOfLivingInfo;
   assumptions: Assumption[];
   warnings: OfferWarning[];
-  /** Each calendar year with pay: the offer's gross and tax, its rate, and the tax by kind (with the offer minus without). */
+  /**
+   * Each calendar year with pay: the offer's gross and tax, its rate, and the tax by kind (with the offer minus without); and the
+   * tax lines with the offer and without it, which A-6 rounds as A-7's tax table does, so a year's figures are one figure in both.
+   */
   taxYears: Array<{ year: number; gross: number; tax: number; rate: number; projectedLaw: boolean;
-    parts: { federal: number; fica: number; state: number; local: number } }>;
+    parts: { federal: number; fica: number; state: number; local: number }; lines: { with: TaxLines; without: TaxLines } }>;
   /** Gross and tax by employment year and calendar year: how a year's tax splits across tax years. Payments as posted, to the cent, added. */
   split: Array<{ ey: number; year: number; gross: number; tax: number }>;
   /**
@@ -257,6 +260,8 @@ export interface TaxRun {
   medicare: number;
   stateIncome: number; statePayroll: number; local: number; total: number;
 }
+/** A run's tax lines other than federal income tax, which takes the rounding where they're shown (A-6, A-7). */
+export type TaxLines = Pick<TaxRun, "ss" | "medicare" | "stateIncome" | "statePayroll" | "local">;
 /** A calendar year's tax: with the offer and without it; the offer's share is the difference, spread over its payments at `offerTaxRate`. */
 export interface WorkTaxYear {
   year: number; projectedLaw: boolean; offerGross: number; offerTax: number; offerTaxRate: number; with: TaxRun; without: TaxRun;

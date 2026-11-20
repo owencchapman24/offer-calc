@@ -5,10 +5,15 @@ import { withholdingShortfall } from "../../src/offer/withholding";
 import { changingWarnings } from "./warningKinds";
 import { type OfferIssue, validateOffer } from "../../src/offer/validate";
 import type { Household, HorizonSweep, ISODate, OfferInput, ScenarioResult, ValuedOptions } from "../../src/offer/types";
-import { type Breakdown, type CompareRequest, type EngineRequest, type OfferDetail, rentKey, type StayDetail } from "./protocol";
+import type { TaxResult } from "../../src/tax/types";
+import { type Breakdown, type CompareRequest, type EngineRequest, type OfferDetail, rentKey, type StayDetail, type TaxLines } from "./protocol";
 
 // What the worker computes for each request. Engine values: import this only from the worker (and
 // tests), never from the main thread, or the engine and its tables land in the main bundle.
+
+/** A run's tax lines as A-7's tax table shows them, Medicare with the additional 0.9% (slowJobs.ts' taxRun). */
+const taxLines = (r: TaxResult): TaxLines => ({ ss: r.socialSecurity, medicare: r.medicare + r.additionalMedicare,
+  stateIncome: r.stateIncomeTax, statePayroll: r.statePayrollTax, local: r.localIncomeTax });
 
 /** An offer's breakdown and its base-case projection (the comparison's rent lever reads it), as the worker keeps them. */
 export interface Own { key: string; breakdown: Breakdown; base: ScenarioResult }
@@ -166,6 +171,7 @@ function offerDetail(o: OfferInput, household: Household, options: ValuedOptions
           state: w.stateIncomeTax + w.statePayrollTax - (wo.stateIncomeTax + wo.statePayrollTax),
           local: w.localIncomeTax - wo.localIncomeTax,
         },
+        lines: { with: taxLines(w), without: taxLines(wo) },
       };
     }),
     split: [...split.values()].map((s) => dollarsOf(s, ["gross", "tax"])),

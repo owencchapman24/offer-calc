@@ -2,10 +2,10 @@ import type { Cliff, ISODate, OfferInput } from "../../src/offer/types";
 import { daysOff, WORKDAYS_A_YEAR } from "../../src/offer/timeOff";
 import { inSentence } from "./breakevenModel";
 import { workedFrom } from "./byYearModel";
-import { shownYears } from "./footing";
+import { addCents, shownYears } from "./footing";
 import { addMonthsIso, commissionPeriod, isProratedStep, periodText } from "./leaveModel";
 import type { A2Part, A6Line } from "./metrics";
-import type { OfferDetail } from "./protocol";
+import type { OfferDetail, TaxLines } from "./protocol";
 import { dayBefore, longDate } from "./text";
 import type { YearTable } from "./workpaper";
 
@@ -279,16 +279,22 @@ export interface TaxYearRow {
   rate: number;
 }
 
-/** The offer's tax by calendar year over its own stay (the calendar years its stay touches), by kind, each column footing as shown. */
+/**
+ * The offer's tax by calendar year over its own stay (the calendar years its stay touches), by kind, each column footing as shown,
+ * by A-7's rule, so a year's figures are one figure in both (audit F1, 2026-11): its pay and tax are its payments that year, added to
+ * the cent and rounded once; each kind is its lines with the offer less without, each rounded; federal income tax takes the rounding.
+ */
 export function taxYearsOf(d: OfferDetail, window: { start: ISODate; end: ISODate }): TaxYearRow[] {
   const first = Number(window.start.slice(0, 4));
   const last = Number(lastDayOf(window).slice(0, 4));
   return d.taxYears.filter((t) => t.year >= first && t.year <= last && t.gross > 0).map((t) => {
-    const tax = R(t.tax);
-    const fica = R(t.parts.fica);
-    const state = R(t.parts.state);
-    const local = R(t.parts.local);
-    const gross = R(t.gross);
+    const paid = d.split.filter((s) => s.year === t.year);
+    const gross = R(addCents(paid.map((s) => s.gross)));
+    const tax = R(addCents(paid.map((s) => s.tax)));
+    const offer = (...keys: Array<keyof TaxLines>) => keys.reduce((s, k) => s + R(t.lines.with[k]) - R(t.lines.without[k]), 0);
+    const fica = offer("ss", "medicare");
+    const state = offer("stateIncome", "statePayroll");
+    const local = offer("local");
     return { year: t.year, projectedLaw: t.projectedLaw, rate: gross ? tax / gross : 0,
       values: { gross, tax, federal: tax - fica - state - local, fica, state, local } };
   });

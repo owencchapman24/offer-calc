@@ -14,6 +14,9 @@ import type { OfferDetail } from "./protocol";
 /** Rounded to the dollar, never −0. */
 const R = (x: number) => Math.round(x) + 0;
 
+/** Adds amounts to the cent, exactly. */
+export const addCents = (xs: number[]) => xs.reduce((s, x) => s + Math.round(x * 100), 0) / 100;
+
 // ---- BEA's indexes, with enough decimals to foot -----------------------------------------------------
 
 /** BEA's weight for housing rents: non-housing prices are (all items − 0.16 × housing) ÷ 0.84. */
