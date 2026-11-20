@@ -44,7 +44,7 @@ describe("a row editor's button names its offer and row", () => {
     expect(pay).toContain('aria-label="Add B&#x27;s promotions"');
     const open = renderLedger(ctx, { mode: "detailed", section: "retirement", editor: { row: "retirement.match", letter: "B" } });
     expect(open).toMatch(/aria-expanded="true"[^>]*aria-label="Close B&#x27;s 401\(k\) match"/);
-  });
+  }, 30_000); // every detailed section, and each row editor open for each offer: about a second alone, several on a busy runner
 });
 
 describe("L-4's slider says what each offer keeps at the last day", () => {

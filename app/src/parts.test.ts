@@ -88,7 +88,7 @@ describe("A-4: the terms that can bite", () => {
     // repays it in full. The engine's value of staying is the same, before rounding.
     expect(Math.abs(t.kept!.at - t.kept!.from - t.next!.valueOfStaying.afterTaxComp)).toBeLessThan(0.01);
     expect(derive("nextup.A", ctx).lines.map((l) => l.op ?? "")).toEqual(["", "−", "="]);
-  });
+  }, 30_000); // every breakdown, as the next test renders it: about a second alone, several on a busy runner
   it("the bad case: bear and bull a month over the stay at New York prices, and what goes wrong", () => {
     const text = words(renderBreakdowns(context()));
     expect(text).toMatch(/Bad case, in New York dollars: \$6,245 a month over your stay, 17% under the base case; in the bull case, \$[\d,]+ a month over your stay\./);
@@ -331,15 +331,16 @@ describe("B3: a breakdown is its offer's alone", () => {
 
 describe("the comparison without L-5 and L-6 (B8)", () => {
   it("their schedules are gone; each offer's warnings and tables are in its A-6 and A-7", () => {
-    const page = renderPage(context());
+    const ctx = context();
+    const page = renderPage(ctx);
     expect(page).not.toContain('id="l5-title"');
     expect(page).not.toContain('id="l6-title"');
-    const parts = renderBreakdowns(context());
+    const parts = renderBreakdowns(ctx);
     for (const l of ["A", "B", "C"]) {
       expect(parts).toContain(`id="${l}-6-title"`);
       expect(parts).toContain(`id="${l}-7-title"`);
     }
-  });
+  }, 30_000); // the page and every breakdown: under a second alone, several on a busy runner
 });
 
 describe("while an input has a problem", () => {

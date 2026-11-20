@@ -233,7 +233,7 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
     expect(parts).toContain("In the bear case, bonuses 20% under target; no promotion in 2029.");
     expect(parts).toContain("In the bear case, bonus 5% of each year's salary instead of 10%.");
     expect(parts).toContain("In the bear case, bonus 10% of each year's salary instead of 15%; refreshers $10,000 instead of $25,000.");
-  });
+  }, 30_000); // the page and every breakdown: under a second alone, longer on a busy runner
 
   it("only what can move the figure: a promotion after your stay, price growth without equity, hours off the per-hour basis", () => {
     const base: OfferInput = { label: "T", residence: { state: "TX" }, employerState: "TX", startDate: "2026-07-13", salary: { annual: 100_000,
@@ -255,7 +255,7 @@ describe("L-2 if things go badly (docs/ui-design.md §4.4)", () => {
     expect(html).toContain('data-metric="risk.B.base"');
     expect(html).not.toContain('data-metric="risk.B.bear"');
     expect(text(renderBreakdowns(flat))).toContain("Bad case: no ranges entered, so the bear and bull cases are the base case.");
-  });
+  }, 30_000); // the samples worked out again, the page and every breakdown: under a second alone, longer on a busy runner
 
   it("with no ranges anywhere, L-2 is one line pointing to + range", () => {
     const none = context("colAdjustedTotal", (os) => os.map((o) => ({ ...o, sample: null, draft: quickOnly(o.draft) })));
