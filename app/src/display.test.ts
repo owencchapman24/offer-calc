@@ -106,6 +106,13 @@ describe("the page, for any offers", () => {
       const p = built(x);
       const text = [p.html, ...[...p.derivations.values()].map((d) => JSON.stringify(d)), ...p.csv, p.doc.html, p.doc.text].join("\n");
       for (const bad of ["NaN", "Infinity", "undefined"]) expect(text.includes(bad), `"${bad}" on the page`).toBe(false);
+      // A minus zero ("-0", "−$0") or a minus after the dollar sign ("$-40") is a figure misspelled (audit C16).
+      const shown = [p.html, ...[...p.derivations.values()].flatMap((d) => [...d.lines.map((l) => l.value ?? ""), ...d.notes]), ...p.csv, p.doc.html,
+        p.doc.text].join("\n");
+      for (const [what, bad] of [["a minus zero", /.{0,60}(?<![\w.,])[-−]\$?0(?![\d.,]).{0,30}/], ["a minus after the dollar sign", /.{0,60}\$-\d.{0,30}/]] as const) {
+        const m = shown.match(bad)?.[0];
+        expect(m, `${what}: ${m}`).toBeUndefined();
+      }
     }), runs(6, false));
   }, 600_000);
 

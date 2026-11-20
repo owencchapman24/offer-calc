@@ -201,7 +201,11 @@ export interface RiskView {
 }
 
 /** A bear case against its base, as shown: "−17%" (a drop), "+3%". */
-export const dropText = (x: RiskRow) => `${x.share >= 0 ? "−" : "+"}${Math.round(Math.abs(x.share) * 100)}%`;
+export const dropText = (x: RiskRow) => {
+  // A share that rounds to 0% is "0%", not "−0%" (an offer without ranges: audit C16).
+  const p = Math.round(Math.abs(x.share) * 100);
+  return p === 0 ? "0%" : `${x.share > 0 ? "−" : "+"}${p}%`;
+};
 
 export function riskView(ctx: WorkContext): RiskView {
   const r = res(ctx);

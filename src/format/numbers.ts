@@ -7,8 +7,8 @@ export const PLAIN = new Intl.NumberFormat("en-US");
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const round2 = (x: number) => Math.round(x * 100) / 100;
 
-/** "$150,000" or "$62,054.79" */
-export const usd = (x: number) => `$${(Number.isInteger(x) ? WHOLE : CENTS).format(x)}`;
+/** "$150,000" or "$62,054.79"; never "$-0". */
+export const usd = (x: number) => `$${(Number.isInteger(x) ? WHOLE : CENTS).format(x + 0)}`;
 /** A fraction as a percent with up to `digits` decimals: pct(0.06125) = "6.125%". */
 export const pct = (x: number, digits = 4) => `${+(x * 100).toFixed(digits)}%`;
 /** "Mar 15" */
