@@ -6,14 +6,15 @@ import { convenienceRuleWarning } from "./location";
 import { bonusEvents, cashEvents, rateAt, type RawEvent, salaryEarned, salaryEvents, salaryPath } from "./streams";
 import { checkSchedule, type GrantInstance, nominalVestDays, refresherGrants, rsuEvents, vestDays } from "./vesting";
 import {
-  healthFlows, monthlyPieces, otherBenefitStreams, perkFlows, type RawBenefit, retirementFlows, serviceYears, vestedFraction,
+  healthFlows, monthlyPieces, otherBenefitStreams, perkFlows, type RawBenefit, retirementFlows, serviceYears, TAX_FREE_KINDS,
+  vestedFraction,
 } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
 import { estimateRent, type RentEstimate } from "../col/rent";
 import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
 import { optional } from "./optional";
 import type {
-  Assumption, BenefitEvent, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
+  Assumption, BenefitEvent, BenefitKind, BenefitTotals, ByComponent, CalendarYearResult, CashTotals, ClawbackResult, CompEvent, Component,
   CostOfLivingInfo, CostOfLivingTotals, EmploymentYearResult, OfferWarning, Household, LeaveResult, OfferInput, ProjectionOptions,
   ScenarioResult,
 } from "./types";
@@ -367,7 +368,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     hours ? hours.weekly[scenario] * weeks : undefined, start, workEnd, vestingDay, anniversaries);
   const vestedShare = vestedFraction(offer.retirement?.vesting, completedYears);
   // Tax-free benefits: the perks, and other benefits entered as tax-free (4j), counted alike.
-  const isPerk = (k: string) => k === "section127" || k === "commuter" || k === "otherBenefit";
+  const isPerk = (k: BenefitKind) => TAX_FREE_KINDS.includes(k);
   const benefits = benefitRaw.sort((a, b) => a.day - b.day).map((b) => ({
     ...b,
     ey: b.accruedFrom !== undefined ? anniversaries.findIndex((d) => d > b.accruedFrom!) : yearOfPayment(b.day),

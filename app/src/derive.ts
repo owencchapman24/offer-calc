@@ -1093,18 +1093,33 @@ function keptWork(ctx: WorkContext, letter: L): Work {
     return { title: `${letter} · after-tax pay kept`, scope, lines: [...afterTax, { op: "=", label: "After-tax pay kept", value: figure(p.afterTaxCompKept), rule: "double" }],
       notes, ties: [], uses: repaid ? [`repay.${letter}`] : [] };
   }
+  // The total is L-4's figure and after-tax pay kept is its cash figure, each rounded once; each benefit is rounded on its own,
+  // and the largest takes the rounding, as on a rounded schedule (shownPv), so the lines add up to the total as displayed.
   const b = p.benefits;
+  const items = [
+    { label: "Employer 401(k), vested by then", name: "the employer 401(k)", sign: 1, raw: p.retirementVested },
+    { label: "Perks", name: "the perks", sign: 1, raw: b.perks },
+    { label: "Employer HSA money", name: "the employer's HSA money", sign: 1, raw: b.employerHsa },
+    { label: "Expected out-of-pocket health costs", name: "out-of-pocket health costs", sign: -1, raw: b.outOfPocket },
+  ];
+  const shown = items.map((x) => R(x.raw) + 0);
+  const taker = items.reduce((a, x, i) => (x.raw > items[a].raw ? i : a), 0);
+  shown[taker] = items[taker].sign
+    * (R(p.totalRewardsKept) - R(p.afterTaxCompKept) - items.reduce((s, x, i) => (i === taker ? s : s + x.sign * shown[i]), 0)) + 0;
+  const tookRounding = shown[taker] !== R(items[taker].raw);
   return {
     title: `${letter} · total rewards kept`, scope,
     lines: [
       { label: "After-tax pay kept", value: figure(p.afterTaxCompKept), note: "pay received, less clawbacks, tax and premiums" },
-      ...(p.retirementVested >= 0.5 ? [{ op: "+" as const, label: "Employer 401(k), vested by then", value: figure(p.retirementVested) }] : []),
-      ...(b.perks >= 0.5 ? [{ op: "+" as const, label: "Perks", value: figure(b.perks) }] : []),
-      ...(b.employerHsa >= 0.5 ? [{ op: "+" as const, label: "Employer HSA money", value: figure(b.employerHsa) }] : []),
-      ...(b.outOfPocket >= 0.5 ? [{ op: "−" as const, label: "Expected out-of-pocket health costs", value: figure(b.outOfPocket) }] : []),
+      ...items.flatMap((x, i): WorkLine[] => (shown[i] ? [{ op: x.sign > 0 ? "+" : "−", label: x.label, value: figure(shown[i]) }] : [])),
       { op: "=", label: "Total rewards kept", value: figure(p.totalRewardsKept), rule: "double" },
     ],
-    notes, ties: [], uses: [],
+    notes: [
+      ...notes,
+      ...(tookRounding ? [`Each figure is rounded once and the total is L-4's, so the largest line, ${items[taker].name}, takes the rounding, `
+        + `as on a rounded schedule (its own figure is ${cents(items[taker].raw)}).`] : []),
+    ],
+    ties: [], uses: [],
   };
 }
 

@@ -26,7 +26,11 @@ import { priceWords } from "./prices";
 const BASES: Basis[] = ["cash", "totalRewards", "colAdjustedTotal", "perHour"];
 
 /** Everything the page shows for a case, or null when the engine finds a problem with the generated inputs. */
-interface Page { ctx: WorkContext; html: string; derivations: Map<MetricId, Derivation>; csv: string[]; doc: { html: string; text: string } }
+interface Page {
+  ctx: WorkContext; html: string; derivations: Map<MetricId, Derivation>; csv: string[]; doc: { html: string; text: string };
+  /** L-4's figures on total rewards: the page is drawn on cash, and the same panels add up differently on the other basis. */
+  leaveOnTotalRewards: Array<[MetricId, Derivation]>;
+}
 
 function page(c: Case, basis: Basis): Page | null {
   const first = contextOf(appOffers(c), aboutYou(c.household), c.today, basis);
@@ -47,6 +51,8 @@ function page(c: Case, basis: Basis): Page | null {
     + renderBreakdowns(ctx);
   const ids = [...new Set([...html.matchAll(/data-metric="([^"]+)"/g)].map((m) => m[1] as MetricId))];
   const derivations = new Map(ids.map((id) => [id, derive(id, ctx)]));
+  const onTotalRewards: WorkContext = { ...ctx, results: { ...r, leave: { ...r.leave!, basis: "totalRewards" } } };
+  const leaveOnTotalRewards = ids.filter((id) => /^(kept|next)\./.test(id)).map((id): [MetricId, Derivation] => [id, derive(id, onTotalRewards)]);
   // L-2's table (and its CSV) is there only when some offer has a range.
   const ranges = compareOf(ctx).offers.some(hasRanges);
   const tables: CsvTable[] = [{ kind: "l1", running: false }, { kind: "l1", running: true }, ...(ranges ? [{ kind: "l2" as const }] : []),
@@ -54,7 +60,7 @@ function page(c: Case, basis: Basis): Page | null {
   const csv = tables.map((t) => JSON.stringify(csvBuild(ctx, t)));
   const at = firstLastDay(leaveAxis(r.view.row.window.start, r.view.row.years));
   const doc = buildDoc(ctx, { offers: compareOf(ctx).offers, at, picked: false });
-  return { ctx, html, derivations, csv, doc: { html: toHtml(doc), text: toText(doc) } };
+  return { ctx, html, derivations, csv, doc: { html: toHtml(doc), text: toText(doc) }, leaveOnTotalRewards };
 }
 
 /** Cases with a basis; the inputs valid for the engine. */
@@ -109,6 +115,13 @@ describe("the page, for any offers", () => {
       const p = built(x);
       expect(p.derivations.size).toBeGreaterThan(100);
       for (const [id, d] of p.derivations) footsAsDisplayed(id, d);
+      expect(p.leaveOnTotalRewards.length).toBeGreaterThan(0);
+      for (const [id, d] of p.leaveOnTotalRewards) footsAsDisplayed(id, d);
+      // Its largest line takes the rounding, so it would foot even if a part were missing from the total: check the parts unrounded.
+      for (const q of p.ctx.results!.leave!.panels) {
+        if (q) expect(q.totalRewardsKept).toBeCloseTo(q.afterTaxCompKept + q.retirementVested + q.benefits.perks + q.benefits.employerHsa
+          - q.benefits.outOfPocket, 6);
+      }
     }), runs(6, false));
   }, 600_000);
 

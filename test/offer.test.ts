@@ -1579,6 +1579,12 @@ describe("other benefits, taxable or tax-free (v2 4j)", () => {
     // The gym money likewise, half of it: 50 x 17/31 + 50 + 50 x 10/30 = 94.09.
     expect(r.benefitEvents.filter((b) => b.kind === "otherBenefit").reduce((s, b) => s + b.amount, 0)).toBeCloseTo(94.09, 2);
   });
+  it("leaving, the tax-free one is in the total rewards you keep, as in staying's: Sep 10 keeps 94.09 more, and no more after tax", () => {
+    // The gym money to Sep 10, as above: 27.42 + 50 + 16.67 = 94.09, tax-free, so after-tax pay kept is the same with it or without.
+    const [g, z] = [keptIfLeaving(tx({ otherBenefits: [gym] }), single, toDays("2026-09-10")), keptIfLeaving(tx(), single, toDays("2026-09-10"))];
+    expect(g.totalRewardsKept - z.totalRewardsKept).toBeCloseTo(94.09, 6);
+    expect(g.afterTaxCompKept).toBe(z.afterTaxCompKept);
+  });
 });
 
 describe("commission, paid after each month or quarter (v2 4h)", () => {

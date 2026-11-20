@@ -11,7 +11,7 @@ import { shownStay } from "./footing";
 import type { WorkContext } from "./metrics";
 import type { LeaveCurve, LeavePanel } from "./protocol";
 import { cursorJob, leaveJob, sweepDays } from "./slowJobs";
-import { compareOf, context, footsAsDisplayed, runJob, VALUATION, withLeave } from "./testing";
+import { BENEFITS, compareOf, context, footsAsDisplayed, runJob, VALUATION, withLeave } from "./testing";
 import { dayBefore } from "./text";
 import { WorkProvider } from "./Tickmarks";
 
@@ -131,6 +131,12 @@ describe("L-4's panel (W6)", () => {
     const tr = derive("kept.C", withLeave(ctx, undefined, "totalRewards").ctx);
     expect(tr.title).toBe("C · total rewards kept");
   });
+  it("total rewards kept counts tax-free other benefits (4j) among the perks, and foots as displayed", () => {
+    // A's $600 a year of gym money, tax-free: Jul 13, 2026 to Jan 12, 2027 is 50 × 19/31 + 5 × 50 + 50 × 12/31 = 300.
+    const tr = derive("kept.A", withLeave(context("colAdjustedTotal", BENEFITS), undefined, "totalRewards").ctx);
+    expect(tr.lines.find((l) => l.label === "Perks")?.value).toBe("300");
+    footsAsDisplayed("kept.A", tr);
+  }, 30_000); // renders the page and runs L-4's jobs: a few seconds, longer on a busy runner
   it("what staying until the next cliff is worth foots as displayed, for every offer and both bases", () => {
     const num = (v: string | undefined) => Number((v ?? "").replace(/[,+]/g, "").replace("−", "-"));
     for (const basis of ["cash", "totalRewards"] as const) {
