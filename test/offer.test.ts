@@ -1135,6 +1135,25 @@ describe("cliffs and the next cliff (roadmap 7)", () => {
     expect(Math.round(r.next!.valueOfStaying.afterTaxComp)).toBe(29_970);
     expect(Math.round(r.next!.cliffValue)).toBe(26_057);
   });
+  it("a payment on a cliff's day that leaving the day before still gets isn't the cliff's own value", () => {
+    // The $12,000 bonus cliff on Mar 15, 2027, as above, with $12,000 a year of commission paid monthly 15 days after each month
+    // ends, by default even after you leave: February's 1,000 is paid Mar 15 (Feb 28 + 15), whether your last day is Mar 14 or 15.
+    const bonus = { basis: "fixed" as const, amount: { bear: 12_000, base: 12_000, bull: 12_000 }, payOn: { month: 3, day: 15 } };
+    const o = tx({ bonus, commission: { basis: "fixed", amount: { bear: 12_000, base: 12_000, bull: 12_000 }, period: "month", payAfterDays: 15 } });
+    const onMar15 = (x: OfferInput, last: string) =>
+      keptIfLeaving(x, single, toDays(last), flat).result.events.filter((e) => e.date === "2027-03-15");
+    expect(onMar15(o, "2027-03-14").map((e) => [e.component, e.gross])).toEqual([["commission", 1_000]]);
+    const n = nextCliff(o, single, "2027-03-01", flat).next!;
+    expect(n.cliffs.map((c) => c.kind)).toEqual(["bonus"]);
+    expect(n.cliffValue).toBe(onMar15(o, "2027-03-15").find((e) => e.component === "bonus")!.afterTax);
+    // A bonus paid whether or not you're there, on a retention award's day, likewise: only the award is the cliff's.
+    const anyway = tx({ bonus: { ...bonus, mustBeEmployedOnPayDate: false },
+      cashAwards: [{ label: "Retention", amount: 5_000, paidOn: "2027-03-15" }] });
+    expect(onMar15(anyway, "2027-03-14").map((e) => e.component)).toEqual(["bonus"]);
+    const m = nextCliff(anyway, single, "2027-03-01", flat).next!;
+    expect(m.cliffs.map((c) => c.kind)).toEqual(["cashAward"]);
+    expect(m.cliffValue).toBe(onMar15(anyway, "2027-03-15").find((e) => e.component === "cash")!.afterTax);
+  });
 });
 
 describe("withholding vs liability (roadmap 5)", () => {

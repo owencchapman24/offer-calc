@@ -5,12 +5,26 @@ import { keptIfLeaving } from "./leave";
 import { projectScenario } from "./project";
 import { cashEvents } from "./streams";
 import { VACATION_PAYOUT_STATES, weeksWorked } from "./timeOff";
-import type { Cliff, Household, NextCliffResult, OfferInput, ProjectionOptions } from "./types";
+import type { Cliff, CompEvent, Household, NextCliffResult, OfferInput, ProjectionOptions } from "./types";
 
 // Cliffs: dates where your last day starts to matter (roadmap 7). Each cliff's date is the first
 // last day that keeps it, by the same rules the projection uses for a leave date (docs/offer-model.md §4).
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
+
+/** The kind of cliff a payment would be: by its detail first, as unused vacation is paid as cash and a draw as commission. */
+function cliffKindOf(e: CompEvent): Cliff["kind"] | null {
+  if (e.detail.kind === "vacationPayout") return "vacationPayout";
+  if (e.detail.kind === "commission") return "commission";
+  if (e.detail.kind === "commissionDraw") return null;
+  switch (e.component) {
+    case "bonus": return "bonus";
+    case "rsu": return "rsuVest";
+    case "cash": return "cashAward";
+    case "espp": return "esppPurchase";
+    default: return null;
+  }
+}
 
 /**
  * Every cliff in the projection, in date order (one scenario, default base):
@@ -111,8 +125,9 @@ export function cliffs(offer: OfferInput, household: Household, options: Project
 /**
  * The next cliff after `leaveDate` (your last day) and what staying until it is worth, nominal:
  * after-tax comp kept and total rewards kept if you leave on the cliff date instead. `cliffValue`
- * is the cliffs' own part: payments after tax, the clawback no longer owed (net of tax relief),
- * and employer 401(k) money that vests. The rest of the value is pay for the extra days.
+ * is the cliffs' own part: the payments they gate, after tax (not one paid that day that you'd get
+ * anyway), the clawback no longer owed (net of tax relief), and employer 401(k) money that vests.
+ * The rest of the value is pay for the extra days.
  * `skip` passes over cliffs (L-4 skips a prorated clawback's monthly steps): the value of staying
  * until the next one still counts everything on the way, those steps included.
  */
@@ -128,11 +143,12 @@ export function nextCliff(
   const onDate = upcoming.filter((c) => c.date === date);
   const now = keptIfLeaving(offer, household, leave, options);
   const then = keptIfLeaving(offer, household, day, options);
-  // Unused vacation paid on a last day isn't the cliff's own, unless the cliff is the day it starts being paid.
-  const payoutCliff = onDate.some((c) => c.kind === "vacationPayout");
+  // The cliffs' own payments: those of a kind that's a cliff that day, which leaving the day before forfeits. One you'd get anyway
+  // isn't, though it's paid that day: commission paid after you leave, a bonus paid whether or not you're there, unused vacation
+  // paid on any last day (unless the cliff is the day it starts being paid).
+  const kinds = new Set(onDate.map((c) => c.kind));
   const payments = then.result.events
-    .filter((e) => e.date === date && (e.component === "bonus" || e.component === "rsu" || e.component === "cash" || e.component === "espp"
-      || e.detail.kind === "commission") && (e.detail.kind !== "vacationPayout" || payoutCliff))
+    .filter((e) => { const k = cliffKindOf(e); return e.date === date && k !== null && kinds.has(k); })
     .reduce((s, e) => s + e.afterTax, 0);
   const clawbackSaved = onDate.some((c) => c.kind === "clawbackStep" || c.kind === "clawbackCleared")
     ? keptIfLeaving(offer, household, day - 1, options).clawbackNetCost - then.clawbackNetCost : 0;
