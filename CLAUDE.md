@@ -16,8 +16,8 @@ behind every figure.
 
 ## 2. Current state (2026-10-16)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
-  years are projected from it, except amounts published for them (so far 2027's brackets, standard deduction, 127 and 132(f)
-  limits, HSA limits and Social Security wage base).
+  years are projected from it, except amounts published for them (every federal amount for 2027: the brackets, standard
+  deduction, 127, 132(f), 401(k) and HSA limits, and the Social Security wage base).
 - **UI:** v1 complete: UI slices 1-8, Copy as document, and v2's step 0 (the bundle trim); v2's item 5, stop 5A (one offer works:
   A-1 pinned, the per-offer worker job, the ledger's "On its own" row, the breakdowns' section, the label rules and their test),
   stop 5B (every offer's A-2 to A-7; L-5 and L-6 folded in and retired, the bridge in A-2) and stop 5C (Copy as document for one
@@ -63,10 +63,9 @@ section 2's and the plan's in step):
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
-- The IRS's 2027 402(g) notice (not out on 2026-11-10; weekly from 2026-11-16). It goes in `FEDERAL_2027`, and `test/law.test.ts`
-  is the one test it should move. The 2027 inflation revenue procedure (Rev. Proc. 2026-35, Nov 5, 2026) and SSA's 2027 wage base
-  ($192,300) are in.
-- December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027.
+- December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027. Every federal
+  amount for 2027 is in `FEDERAL_2027` (Rev. Proc. 2026-35, Notice 2026-66, Rev. Proc. 2026-24 and SSA's wage base), each pinned in
+  `test/law.test.ts`.
 
 **Pre-launch checklist** (before the public launch):
 1. **Visibility and settings:** decide public or private now (section 2). For public: `docs/slice-3-plan.md`, "Public-repo prep",

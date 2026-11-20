@@ -4,12 +4,12 @@ Every dataset the tool depends on: when it's usually published, how to refresh i
 parentheses are the last ones seen. A refresh is a change like any other: its own branch and pull request. (Moved here from
 CLAUDE.md on 2026-10-15; CLAUDE.md keeps the next checks.)
 
-## Next checks (set 2026-10-12; checked 2026-11-10)
+## Next checks (set 2026-10-12; checked 2026-11-20)
 - **Done 2026-10-15: SSA's 2027 wage base**, $192,300 (announced Oct 14, 2026, with the 3.6% COLA), in `FEDERAL_2027`.
 - **Done 2026-11-10: the IRS's 2027 inflation revenue procedure**, Rev. Proc. 2026-35 (IR-2026-133, Nov 5, 2026): the brackets,
   the standard deduction, 127's $5,400 and 132(f)'s $350 a month, in `FEDERAL_2027`.
-- **Now: the IRS's 402(g) notice for 2027** (the 401(k) elective deferral limit). Not out on 2026-11-10 (the IRS's newsroom and
-  irs-drop listing). Add it to `FEDERAL_2027`. If it isn't out by **2026-11-16**, check weekly.
+- **Done 2026-11-20: the IRS's 402(g) notice for 2027**, Notice 2026-66 (Nov 12, 2026): the 401(k) elective deferral limit,
+  $25,500, in `FEDERAL_2027`. Every amount `EnactedAmounts` holds is now published for 2027.
 - **December 2026 to February 2027: BEA's 2025 RPPs, Pub. 15 and 15-T for 2027, the states' 2027 payroll caps, then the Tax
   Foundation's 2027 state table** (the start of moving the base year to 2027, below).
 - **The Census's 2025 ACS 1-year estimates:** delayed with no date (the Census Bureau's advisory of Aug 4, 2026; still none in
@@ -51,7 +51,7 @@ list), but some dates are typed in. Update them with the data:
   tax items by tax year". Its sec. 3.01 tables print the tax at each bracket's lower bound: `test/law.test.ts` checks the engine
   against them to the cent.
 - **401(k) elective deferral limit, IRC 402(g):** an IRS notice on retirement plan limits, usually in November (2026's: Notice
-  2025-67, IR-2025-111, Nov 13, 2025).
+  2025-67, IR-2025-111, Nov 13, 2025; 2027's: Notice 2026-66, Nov 12, 2026, in `federal2027.ts`).
 - **HSA contribution limits, IRC 223:** their own revenue procedure, in May for the next year (2027's: Rev. Proc. 2026-24, May 29,
   2026; in `federal2027.ts`).
 - **SALT cap and phase-down, and the other OBBBA schedules (Pub. L. 119-21):** statutory, so nothing to fetch: the SALT cap is
