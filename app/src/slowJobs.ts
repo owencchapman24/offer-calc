@@ -1,3 +1,4 @@
+import { TAX_FREE_KINDS } from "../../src/offer/benefits";
 import { cliffs, nextCliff } from "../../src/offer/cliffs";
 import { breakevenSteps, rentFlip } from "../../src/offer/breakeven";
 import { comparisonWindow } from "../../src/offer/compare";
@@ -99,7 +100,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
   const k = keptIfLeaving(o, req.household, day, options);
   const r = k.result;
   const gross = (clawback: boolean) => r.events.filter((e) => (e.component === "clawback") === clawback).reduce((s, e) => s + e.gross, 0);
-  const sum = (kinds: string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
+  const sum = (kinds: readonly string[]) => r.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
   const paid = gross(false);
   const repaid = -gross(true);
   const payout = r.events.find((e) => e.detail.kind === "vacationPayout");
@@ -116,7 +117,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     clawbacks: r.leave!.clawbacks,
     afterTaxCompKept: k.afterTaxCompKept,
     totalRewardsKept: k.totalRewardsKept,
-    benefits: { perks: sum(["section127", "commuter", "otherBenefit"]), employerHsa: sum(["employerHsa"]), outOfPocket: sum(["outOfPocket"]) },
+    benefits: { perks: sum(TAX_FREE_KINDS), employerHsa: sum(["employerHsa"]), outOfPocket: sum(["outOfPocket"]) },
     retirementVested: k.retirementVested,
     retirementForfeited: r.leave!.retirementForfeited,
     unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,

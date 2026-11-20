@@ -17,7 +17,13 @@ export interface RawBenefit {
 
 const add = (m: Map<number, number>, k: number, v: number) => m.set(k, (m.get(k) ?? 0) + v);
 
-// ---- 401(k) ------------------------------------------------------------------------------
+/**
+ * The tax-free benefits, counted at face value in total rewards: the perks, and other benefits entered as tax-free (4j). One
+ * list, so staying (project.ts), leaving (leave.ts) and L-4's panel count the same ones.
+ */
+export const TAX_FREE_KINDS: readonly BenefitKind[] = ["section127", "commuter", "otherBenefit"];
+
+// ---- 401(k)------------------------------------------------------------------------------
 
 /**
  * Deferrals and employer money per eligible paycheck, in date order. Deferrals stop for the

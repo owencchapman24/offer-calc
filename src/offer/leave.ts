@@ -1,6 +1,7 @@
+import { TAX_FREE_KINDS } from "./benefits";
 import { addMonths, fromDays, toDays } from "./dates";
 import { projectScenario } from "./project";
-import type { Household, ISODate, LeaveDayRow, LeaveSweepRow, OfferInput, ProjectionOptions } from "./types";
+import type { BenefitKind, Household, ISODate, LeaveDayRow, LeaveSweepRow, OfferInput, ProjectionOptions } from "./types";
 
 // Leaving early (L-4, A-4's cliffs): what you keep for a last day, and the sweeps over many, each a projection with a leave
 // date. Apart from project.ts so the worker loads it with its slow jobs, after the first answer (CLAUDE.md, Bundles).
@@ -61,7 +62,8 @@ export function keptIfLeaving(offer: OfferInput, household: Household, leaveDay:
   while (addMonths(start, 12 * years) <= leaveDay) years++;
   const result = projectScenario({ ...offer, leaveDate: fromDays(leaveDay) }, household,
     { ...options, years: Math.max(options.years ?? 5, years) });
-  const sumOf = (kinds: string[]) => result.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
+  const sumOf = (kinds: readonly BenefitKind[]) =>
+    result.benefitEvents.filter((b) => kinds.includes(b.kind)).reduce((s, b) => s + b.amount, 0);
   const afterTaxCompKept = result.events.reduce((s, e) => s + e.afterTax, 0) - sumOf(["premium"]);
   const retirementVested = result.benefitEvents.reduce((s, b) => s + (b.vested ?? 0), 0);
   return {
@@ -71,6 +73,8 @@ export function keptIfLeaving(offer: OfferInput, household: Household, leaveDay:
     clawbackNetCost: result.leave!.clawbacks.reduce((s, c) => s + c.netCost, 0),
     afterTaxCompKept,
     retirementVested,
-    totalRewardsKept: afterTaxCompKept + retirementVested + sumOf(["section127", "commuter", "employerHsa"]) - sumOf(["outOfPocket"]),
+    // Total rewards, as staying counts them (project.ts): after-tax comp + vested employer 401(k) + the tax-free benefits (the
+    // perks and other benefits entered as tax-free) + employer HSA - out-of-pocket.
+    totalRewardsKept: afterTaxCompKept + retirementVested + sumOf([...TAX_FREE_KINDS, "employerHsa"]) - sumOf(["outOfPocket"]),
   };
 }
