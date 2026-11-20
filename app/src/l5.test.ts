@@ -68,7 +68,7 @@ describe("A-6: every warning for an offer's stay", () => {
     const t = a6(ctx, "A");
     expect(t).toContain("Not modeled: may cost you");
     expect(t).toContain("You'd live in NJ and work for an employer in NY. NY's convenience-of-employer rule may tax your remote days there too");
-  });
+  }, 30_000); // the samples worked out again with A in NJ, and its A-6: under a second alone, longer on a busy runner
 });
 
 describe("the methodology's live numbers: M-8 and M-9", () => {

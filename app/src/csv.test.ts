@@ -205,14 +205,14 @@ describe("CSV: the formula guard, on text cells only", () => {
 });
 
 describe("Print: every schedule expanded; a summary or the full workpaper", () => {
-  const ctx = withWork(context()).ctx;
+  // The samples with A-7's payments worked out, once for the block: each test renders from it.
+  const w = withWork(context());
+  const { ctx } = w;
   const provide = (printing: PrintScope | null, el: ReturnType<typeof createElement>) =>
     renderToStaticMarkup(createElement(WorkProvider, { ctx, children: createElement(Printing.Provider, { value: printing, children: el }) }));
   // Each offer's A-7, as its breakdown prints it, closed on screen.
-  const work = (scope: PrintScope) => {
-    const w = withWork(context());
-    return LETTERS.map((l) => provide(scope, createElement(TheWork, { ...w.props, ctx: w.ctx, letter: l, open: false }))).join("");
-  };
+  const work = (scope: PrintScope) =>
+    LETTERS.map((l) => provide(scope, createElement(TheWork, { ...w.props, ctx: w.ctx, letter: l, open: false }))).join("");
   it("the full workpaper: each offer's A-7 open, every payment listed", () => {
     const html = work("full");
     for (const l of LETTERS) {

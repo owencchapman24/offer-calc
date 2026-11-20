@@ -141,7 +141,7 @@ describe("L-4's panel (W6)", () => {
         expect(v[2] - v[3]).toBe(v[4]); // = the cliff itself + pay for the days between
       }
     }
-  });
+  }, 30_000); // L-4's panel worked out on two bases: under a second alone, longer on a busy runner
 });
 
 describe("L-4 at your stay's last day: the reconciliation with the stay", () => {

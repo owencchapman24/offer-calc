@@ -59,7 +59,7 @@ describe("the comparability warning", () => {
     for (const c of Object.keys(CATEGORY_INPUT) as Category[]) {
       expect(enterable(c), c).toBe(html.includes(`data-help="${CATEGORY_INPUT[c]}"`));
     }
-  });
+  }, 30_000); // every view of the inputs (renderAllInputs): about a second alone, several on a busy runner
 });
 
 describe("per hour only when every offer has hours", () => {
