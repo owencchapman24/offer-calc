@@ -111,6 +111,25 @@ const cases: Case[] = [
   ["a local tax's name over 40 characters", C, (o) => { o.residence.locality = { kind: "flat", label: "x".repeat(41), rate: 0.02, base: "wages" }; },
     "residence.locality.label", "tooLong", false],
   ["an unknown employer state", C, (o) => { o.employerState = "XX"; }, "employerState", "unknownState", false],
+  // A range in order (audit C7): bear <= base <= bull, and weekly hours the other way (the bear case works the most). Each case
+  // passes its own check; only the order is wrong, which the engine doesn't notice.
+  ["a bear raise above the base", C, (o) => { o.salary.raise = { bear: 0.1, base: 0.03, bull: 0.03 }; }, "salary.raise.bear", "caseOrder", false],
+  ["a bull bonus below the base", C, (o) => { if (o.bonus?.basis === "percentOfSalary") o.bonus.amount = { bear: 0.1, base: 0.15, bull: 0.1 }; },
+    "bonus.amount.bull", "caseOrder", false],
+  ["a by-year bonus with its bear above the base", A, (o) => {
+    if (o.bonus?.basis === "byEmploymentYear") o.bonus.amounts[0] = { ...o.bonus.amounts[0], bear: o.bonus.amounts[0].base + 1 };
+  }, "bonus.amounts.0.bear", "caseOrder", false],
+  ["a bull commission below the base", C, (o) => { o.commission = { ...COMMISSION, amount: { bear: 40_000, base: 60_000, bull: 50_000 } }; },
+    "commission.amount.bull", "caseOrder", false],
+  ["a by-year commission with its bear above the base", C, (o) => {
+    o.commission = { period: "quarter", payAfterDays: 30, basis: "byEmploymentYear", amounts: [{ bear: 70_000, base: 60_000, bull: 80_000 }] };
+  }, "commission.amounts.0.bear", "caseOrder", false],
+  ["share-price growth with its bear above the base", C, (o) => { o.equity!.priceGrowth = { bear: 0.1, base: 0, bull: 0.1 }; },
+    "equity.priceGrowth.bear", "caseOrder", false],
+  ["a bull refresher below the base", C, (o) => { o.equity!.refreshers!.value = { bear: 10_000, base: 20_000, bull: 15_000 }; },
+    "equity.refreshers.value.bull", "caseOrder", false],
+  ["bear-case hours fewer than the base", C, (o) => { o.hours!.weekly = { bear: 40, base: 45, bull: 45 }; }, "hours.weekly.bear", "caseOrder", false],
+  ["bull-case hours more than the base", C, (o) => { o.hours!.weekly = { bear: 45, base: 45, bull: 50 }; }, "hours.weekly.bull", "caseOrder", false],
 ];
 
 describe("validateOffer: each problem at its field", () => {
@@ -150,8 +169,29 @@ describe("validateOffer: the edges", () => {
   });
   it("168 hours a week is fine; 168.5 isn't (above); 1 is the least", () => {
     const o = clone(C);
-    o.hours!.weekly = { bear: 168, base: 1, bull: 168 };
+    o.hours!.weekly = { bear: 168, base: 1, bull: 1 };
     expect(validateOffer(o)).toEqual([]);
+  });
+  it("a range's cases may equal its base; each case on the wrong side is a problem of its own", () => {
+    const o = clone(C);
+    o.salary.raise = { bear: 0.03, base: 0.03, bull: 0.03 };
+    o.hours!.weekly = { bear: 45, base: 45, bull: 45 };
+    expect(validateOffer(o)).toEqual([]);
+    o.salary.raise = { bear: 0.05, base: 0.03, bull: 0.01 };
+    o.hours!.weekly = { bear: 40, base: 45, bull: 50 };
+    const order = (i: ReturnType<typeof validateOffer>[number]) => i.code === "caseOrder" ? `${i.params.scenario} ${i.params.side}` : "";
+    expect(validateOffer(o).map((i) => `${i.path} ${i.code} ${order(i)}`)).toEqual([
+      "salary.raise.bear caseOrder bear above", "salary.raise.bull caseOrder bull below",
+      "hours.weekly.bull caseOrder bull above", "hours.weekly.bear caseOrder bear below",
+    ]);
+  });
+  it("a case that fails its own check isn't also called out of order", () => {
+    const o = clone(C);
+    o.hours!.weekly = { bear: 0, base: 45, bull: 45 };
+    expect(validateOffer(o).map((i) => `${i.path} ${i.code}`)).toEqual(["hours.weekly.bear hours"]);
+    o.hours!.weekly = { bear: 45, base: 45, bull: 45 };
+    o.salary.raise = { bear: -1, base: 0.03, bull: 0 };
+    expect(validateOffer(o).map((i) => `${i.path} ${i.code}`)).toEqual(["salary.raise.bear rate"]);
   });
   it("33.33 / 33.33 / 33.34 is exactly 100%; 99.99% says what's missing", () => {
     const o = clone(C);
@@ -175,6 +215,12 @@ describe("validateOffer: the edges", () => {
     expect(msg("cashAwards.0.paidOn", "before2026", { what: "payment" })).toBe("Payments before 2026 aren't supported: tax data starts in 2026.");
     expect(msg("bonus.payOn", "monthDay", { month: 2, day: 30 })).toBe("February has no 30th.");
     expect(msg("bonus.cutoff", "monthDay", { month: 4, day: 31 })).toBe("April has no 31st.");
+    expect(msg("salary.raise.bear", "caseOrder", { scenario: "bear", side: "above" })).toBe("The bear case can't be above the base case.");
+    expect(msg("commission.amount.bull", "caseOrder", { scenario: "bull", side: "below" })).toBe("The bull case can't be below the base case.");
+    expect(msg("hours.weekly.bear", "caseOrder", { scenario: "bear", side: "below" }))
+      .toBe("The bear case can't be fewer hours than the base case: it's the case where you work the most.");
+    expect(msg("hours.weekly.bull", "caseOrder", { scenario: "bull", side: "above" }))
+      .toBe("The bull case can't be more hours than the base case: it's the case where you work the least.");
   });
   it("Feb 29 is a real month and day (it falls on Feb 28 in other years)", () => {
     const o = clone(C);

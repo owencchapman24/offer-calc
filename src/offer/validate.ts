@@ -70,6 +70,11 @@ export type OfferIssue = { path: string } & (
   | { code: "gradedSteps"; params: NoParams }
   /** Out-of-pocket estimates that don't rise from low to medium to high. */
   | { code: "oopOrder"; params: NoParams }
+  /**
+   * A range's bear or bull case on the wrong side of its base case (audit C7): `side` is the side it can't be on. Money and rates
+   * run bear <= base <= bull; weekly hours the other way, bear >= base >= bull, since the bear case is the one where you work most.
+   */
+  | { code: "caseOrder"; params: { scenario: "bear" | "bull"; side: "above" | "below" } }
   | { code: "unknownArea"; params: { code: string } }
   | { code: "unknownState"; params: { state: string } }
   | { code: "savingsRate"; params: NoParams }
@@ -108,8 +113,19 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   const share = (path: string, v: unknown) => {
     if (amount(path, v, "percent") && !((v as number) >= 0 && (v as number) <= 1)) add(path, "share", {});
   };
-  const each = (path: string, s: ByScenario | undefined, check: (path: string, v: unknown) => void) => {
-    if (s) for (const k of SCENARIOS) check(`${path}.${k}`, s[k]);
+  /**
+   * A range: each case on its own, then, if all three pass, their order (audit C7): bear <= base <= bull, or with `fewerIsBetter`
+   * (weekly hours) bear >= base >= bull. A case on the wrong side gets the problem; the base is the value you entered first.
+   */
+  const each = (path: string, s: ByScenario | undefined, check: (path: string, v: unknown) => void, fewerIsBetter = false) => {
+    if (!s) return;
+    const before = out.length;
+    for (const k of SCENARIOS) check(`${path}.${k}`, s[k]);
+    if (out.length > before) return;
+    const low = fewerIsBetter ? "bull" : "bear";
+    const high = fewerIsBetter ? "bear" : "bull";
+    if (s[low] > s.base) add(`${path}.${low}`, "caseOrder", { scenario: low, side: "above" });
+    if (s[high] < s.base) add(`${path}.${high}`, "caseOrder", { scenario: high, side: "below" });
   };
   const whole = (path: string, v: unknown, min: number, code: "wholeMonths" | "wholeYears" | "wholeDays") => {
     if (!amount(path, v, "number")) return false;
@@ -318,7 +334,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   if (offer.hours) {
     each("hours.weekly", offer.hours.weekly, (path, v) => {
       if (amount(path, v, "number") && !((v as number) >= 1 && (v as number) <= 168)) add(path, "hours", { min: 1, max: 168 });
-    });
+    }, true);
     const weeks = offer.hours.weeksPerYear;
     if (weeks !== undefined && amount("hours.weeksPerYear", weeks, "number") && !(weeks >= 1 && weeks <= 52)) {
       add("hours.weeksPerYear", "weeks", { min: 1, max: 52 });

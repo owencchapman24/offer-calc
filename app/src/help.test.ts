@@ -5,7 +5,7 @@ import { ResetFields } from "./controls";
 import { LedgerProvider } from "./fields";
 import { type AppOffer, blankCommission, type RetirementDraft } from "./model";
 import { DEFAULTS } from "./defaults";
-import { HELP, helpKey } from "./help";
+import { fieldName, HELP, helpKey } from "./help";
 import { SECTIONS } from "./sections";
 import { context, renderAllInputs, withEspp } from "./testing";
 
@@ -36,6 +36,14 @@ describe("help on every input", () => {
   } } })));
   const html = renderAllInputs(custom);
   const fields = [...html.matchAll(/<(input|select|textarea)\b[^>]*>/g)].map((m) => m[0]);
+
+  it("a problem at a range's bear or bull case names the field and the case (audit C7), not \"Input\"", () => {
+    expect(fieldName("salary.raise.bear")).toBe(`${HELP["salary.raise"].label}, bear case`);
+    expect(fieldName("hours.weekly.bull")).toBe(`${HELP["hours.weekly"].label}, bull case`);
+    expect(fieldName("equity.refreshers.value.bear")).toBe(`${fieldName("equity.refreshers.value")}, bear case`);
+    expect(fieldName("hours.weekly.base")).toBe(HELP["hours.weekly"].label);
+    expect(fieldName("salary.raise.bear")).toBe("Merit raise, bear case");
+  });
 
   it("every rendered input names its help, and the help is there", () => {
     expect(fields.length).toBeGreaterThan(20);
