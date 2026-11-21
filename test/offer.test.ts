@@ -1792,3 +1792,54 @@ describe("commission, paid after each month or quarter (v2 4h)", () => {
     });
   });
 });
+
+// Audit C6 (2026-10) and its commission twin (2026-11): with a leave date, the projection stopped at the January 1 after its last
+// tracked year, so a bonus or commission payout due after that, for work up to the last day, was never paid, counted to come or
+// forfeited. A stay of 5 years or more, leaving in its last year, is where L-4 met it.
+describe("pay due after the last day is followed to its date (audit C6)", () => {
+  const tx = (o: Partial<OfferInput> = {}): OfferInput => ({ label: "T", residence: { state: "TX" }, employerState: "TX",
+    startDate: "2026-07-13", salary: { annual: 120_000 }, ...o });
+  const bonus = { basis: "fixed" as const, amount: { bear: 20_000, base: 20_000, bull: 20_000 }, payOn: { month: 3, day: 15 } };
+  const kept = (o: OfferInput, last: string, years?: number) => keptIfLeaving(o, single, toDays(last), years ? { years } : {}).result;
+
+  it("a bonus for the year you leave in: paid Mar 15, 2032, prorated, or forfeited with its warning, as a year earlier", () => {
+    // Calendar 2031 to Jun 30 is 181 days: 20,000 x 181/365 = 9,917.81.
+    const prorated = kept(tx({ bonus: { ...bonus, mustBeEmployedOnPayDate: false } }), "2031-06-30");
+    expect(prorated.events.filter((e) => e.component === "bonus").map((e) => [e.date, e.gross]).slice(-2))
+      .toEqual([["2031-03-15", 20_000], ["2032-03-15", 9_917.81]]);
+    const forfeited = (last: string) => kept(tx({ bonus }), last).warnings.filter((w) => w.code === "bonusForfeited")
+      .map((w) => w.code === "bonusForfeited" && [w.params.payDate, w.params.earned]);
+    expect(forfeited("2031-06-30")).toEqual([["2032-03-15", 9_917.81]]);
+    // A year earlier, as before: calendar 2030 to Jun 30 is 181 days too.
+    expect(forfeited("2030-06-30")).toEqual([["2031-03-15", 9_917.81]]);
+  });
+
+  it("commission for the month you leave in, paid after the stay's last tracked year: $3,225.81 to come", () => {
+    // From Dec 28, 2026, $60,000 a year ($5,000 a month), monthly, 15 days after: a 4-year stay's last day Dec 20, 2030 earns
+    // December's 5,000 x 20/31 = 3,225.81, paid Jan 15, 2031 (Dec 31 + 15).
+    const o = tx({ startDate: "2026-12-28", commission: { basis: "fixed", amount: { bear: 60_000, base: 60_000, bull: 60_000 }, period: "month",
+      payAfterDays: 15 } });
+    const r = kept(o, "2030-12-20", 4);
+    expect(r.events.filter((e) => e.component === "commission").at(-1)).toMatchObject({ date: "2031-01-15", gross: 3_225.81 });
+    expect(r.leave!.commission!.toCome).toBe(3_225.81);
+  });
+
+  it("a long lag: three quarters to come, $45,000, or forfeited under 'only if employed', with a warning each", () => {
+    // Quarterly, 200 days after, $60,000 a year: leaving Jun 30, 2031 leaves Q4 2030 (paid Jul 19, 2031), Q1 2031 (Oct 17, 2031)
+    // and Q2 2031 (Jan 16, 2032) unpaid, $15,000 each.
+    const quarterly = { basis: "fixed" as const, amount: { bear: 60_000, base: 60_000, bull: 60_000 }, period: "quarter" as const, payAfterDays: 200 };
+    const r = kept(tx({ salary: { annual: 60_000 }, commission: quarterly }), "2031-06-30");
+    expect(r.events.filter((e) => e.component === "commission").slice(-3).map((e) => [e.date, e.gross]))
+      .toEqual([["2031-07-19", 15_000], ["2031-10-17", 15_000], ["2032-01-16", 15_000]]);
+    expect(r.leave!.commission!.toCome).toBe(45_000);
+    const strict = kept(tx({ salary: { annual: 60_000 }, commission: { ...quarterly, mustBeEmployedOnPayDate: true } }), "2031-06-30");
+    expect(strict.leave!.commission!.forfeited).toBe(45_000);
+    expect(strict.warnings.filter((w) => w.code === "commissionForfeited")).toHaveLength(3);
+  });
+
+  it("without a leave date, or with nothing paid after the last day, the projection ends where it did", () => {
+    const plain = (o: OfferInput) => projectScenario(o, single, { years: 5 }).calendarYears.at(-1)!.year;
+    expect([plain(tx()), plain(tx({ bonus }))]).toEqual([2031, 2031]);
+    expect(kept(tx(), "2031-06-30").calendarYears.at(-1)!.year).toBe(2031);
+  });
+});
