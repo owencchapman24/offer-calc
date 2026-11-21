@@ -227,9 +227,10 @@ to pick.
 - **Inputs:** every input has its hint, its ⓘ help and "How this is used →" (`help.ts`; `help.test.ts` fails on one without); a
   default with its `D` and its reason, or a blank where that was decided (`defaults.ts`; `defaults.test.ts` checks each against the
   engine); its problems at the field (`validateOffer`, in the worker). While any input has a problem, the results are the last valid
-  ones, said so in the lead with "Fix it". Ranges are opt-in ("+ range"). A 401(k) or health plan is not entered (not counted),
-  entered, or none; a cost or benefit counted for some offers but not others is named under the verdict. Per hour shows only when
-  every offer has hours.
+  ones, said so in the lead with "Fix it". Ranges are opt-in ("+ range") and run one way: bear <= base <= bull, weekly hours
+  bear >= base >= bull (the bear case works the most; `caseOrder`, the user's word, 2026-11-21). A 401(k) or health plan is not
+  entered (not counted), entered, or none; a cost or benefit counted for some offers but not others is named under the verdict. Per
+  hour shows only when every offer has hours.
 - **Type:** Atkinson Hyperlegible Next for text and figures, `font-variant-numeric: tabular-nums` wherever numbers align
   (proportional on the hero number); Atkinson Hyperlegible Mono only for formulas and derivations. Each has a size-matched local
   fallback (`styles.css`: Arial or its metric twins, Courier New or its twins, scaled to Atkinson's widths and given its ascent and

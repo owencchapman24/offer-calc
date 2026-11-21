@@ -57,6 +57,13 @@ export function formatIssue(i: OfferIssue): string {
     case "needsHours": return "Counting service by plan-year hours needs weekly hours for this offer.";
     case "gradedSteps": return "Graded vesting steps must rise year by year and reach 100%.";
     case "oopOrder": return "Out-of-pocket costs should rise from low to medium to high use.";
+    case "caseOrder": {
+      const { scenario, side } = i.params;
+      return /^hours\./.test(i.path)
+        ? `The ${scenario} case can't be ${side === "below" ? "fewer" : "more"} hours than the base case: it's the case where you work the `
+          + `${scenario === "bear" ? "most" : "least"}.`
+        : `The ${scenario} case can't be ${side} the base case.`;
+    }
     case "unknownArea": return "We don't have prices for this area: pick a city from the list.";
     case "unknownState": return i.params.state ? `"${i.params.state}" isn't a state we can tax: pick a U.S. state or DC.` : "Pick a state.";
     case "savingsRate": return "A savings rate is at least 0% and below 100%.";

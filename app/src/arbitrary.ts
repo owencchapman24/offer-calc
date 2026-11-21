@@ -92,7 +92,8 @@ export function draft(place: Place, start: string, opts: { simple?: boolean } = 
     health: simple ? fc.constant(null) : fc.oneof(fc.constant(null), fc.constant("none" as const), fc.record({
       premium: dollars(0, 6_000, 100), oop: dollars(0, 3_000, 100), employerHsa: maybe(dollars(0, 1_500, 100)),
     })),
-    hours: maybe(ordered(fc.integer({ min: 35, max: 80 })), 1),
+    // Hours run the other way (audit C7): the bear case works the most.
+    hours: maybe(ordered(fc.integer({ min: 35, max: 80 })).map(({ bear, base, bull }) => ({ bear: bull, base, bull: bear })), 1),
     // Days off and the vacation policy (4a): any days, a policy that banks (gives more than you take) or doesn't, a cap, unlimited,
     // a policy that pays out anywhere; the places include states that require a payout (CA, CO, IL, MA) and some that don't.
     timeOff: maybe(fc.record({

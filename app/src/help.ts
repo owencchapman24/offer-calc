@@ -34,13 +34,18 @@ export type FieldHelp = FieldMeta & FieldText;
 /** An input path's help key: the path without its array indexes. */
 export const helpKey = (path: string) => path.split(".").filter((k) => !/^\d+$/.test(k)).join(".");
 
-/** An input's name out of context ("Promotions, date"): a field inside an editor is named with its editor. */
+/**
+ * An input's name out of context ("Promotions, date"): a field inside an editor is named with its editor, and a range's bear or
+ * bull case with its case ("Merit raise, bear case"; the base case is the field's own name).
+ */
 export function fieldName(path: string): string {
-  const key = helpKey(path);
+  const scenario = /\.(bear|base|bull)$/.exec(path)?.[1];
+  const key = helpKey(scenario ? path.slice(0, -scenario.length - 1) : path);
   // A field whose name loads with detailed mode is named by its part (an ESPP's terms) until then.
   const h = HELP[key] ?? HELP[key.split(".")[0]];
   if (!h) return "Input";
-  return h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
+  const name = h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
+  return scenario && scenario !== "base" ? `${name}, ${scenario} case` : name;
 }
 
 const tranches = (owner: string, editor: string): Record<string, FieldMeta> => ({
