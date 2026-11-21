@@ -417,6 +417,9 @@ function offersSection(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     const where = city ? CITY_TAX[city].place : info ? `${shortCity(info.area.name)}, ${o.residence.state}` : o.residence.state;
     const rent = info ? `, rent ${dollars(info.monthlyRent)} a month${info.rentSource === "fmr" ? " (HUD's estimate)" : info.rentSource === "derived" ? " (an estimate)" : ""}` : "";
     parts.push(`${where}${rent}`);
+    const loc = o.residence.locality;
+    if (loc?.kind === "flat") parts.push(`${loc.label === "Local" ? "a local" : loc.label} income tax at ${percent(loc.rate)} of `
+      + `${loc.base === "wages" ? "wages" : `${o.residence.state} taxable income`}, as entered`);
     if (!together) parts.push(`starts ${longDate(o.startDate)}`);
     return `${l}${draft?.label ? `, ${draft.label}` : ""}: ${parts.join("; ")}.`;
   }) });

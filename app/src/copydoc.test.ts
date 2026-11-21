@@ -380,3 +380,15 @@ describe("a rent of $0: no minus zero on the page or in the document", () => {
     }
   }, 30_000); // renders the breakdown, A-7 and the document: a few seconds, longer on a busy runner
 });
+
+// A flat local income tax (2026-11-20): the document's offer terms say it, as the page's work does.
+describe("a flat local income tax in the document's terms", () => {
+  it("Columbus's 2.5% of wages; Baltimore County's 3.2% of Maryland taxable income", () => {
+    const at = (state: string, area: string, rate: number, label: string) => alone("B", (o) => ({ ...o, draft: { ...o.draft,
+      residence: { state, nyc: false, locality: { rate, label } }, employerState: null, costOfLiving: { ...o.draft.costOfLiving, area } } }));
+    expect(made(at("OH", "18140", 0.025, "Columbus"), undefined, "breakdown").text.replace(/\s+/g, " "))
+      .toContain("Columbus income tax at 2.5% of wages, as entered");
+    expect(made(at("MD", "12580", 0.032, "Baltimore County"), undefined, "breakdown").text.replace(/\s+/g, " "))
+      .toContain("Baltimore County income tax at 3.2% of MD taxable income, as entered");
+  }, 30_000); // builds two documents: a few seconds, longer on a busy runner
+});

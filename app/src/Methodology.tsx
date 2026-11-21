@@ -204,8 +204,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             lower, with state and local tax capped at the 2026 SALT limit); Social Security (6.2% up to the wage base) and Medicare
             (1.45%, plus 0.9% above $200,000 single); state income tax for all 50 states and DC, and state payroll taxes such as
             California's SDI; New York City's income tax and Philadelphia's wage tax, for residents (you say whether you'd live inside
-            the city). Your 401(k) deferrals and health premiums come out before income tax; Philadelphia's wage tax is on pay
-            before your 401(k).
+            the city); and any other local income tax you enter, at its flat rate. Your 401(k) deferrals and health premiums come out
+            before income tax; Philadelphia's wage tax, and a local tax you enter, are on pay before your 401(k), except in Maryland and
+            Indiana, whose county taxes are on state taxable income.
           </p>
           <p>
             <strong>Later years.</strong> Tax law after 2026 is projected until it's published: federal brackets, deductions and
@@ -579,7 +580,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               computed, nor the rules that can tax you for working from home for an employer in another state: New York's, Delaware's
               and Pennsylvania's, and Connecticut's and New Jersey's for residents of states with such a rule. Where one could apply,
               the offer gets a warning.</li>
-            <li>Maryland county, Ohio city and Pennsylvania local wage taxes aren't included unless entered.</li>
+            <li>Local income taxes other than New York City's and Philadelphia's (Maryland's counties, Ohio's and Michigan's cities,
+              Pennsylvania's earned income tax) aren't counted unless you enter the rate, under Where you'd live in detailed mode. It's
+              then a flat rate on wages, or in Maryland and Indiana on state taxable income: Anne Arundel's and Frederick's brackets,
+              and a school district's separate tax, are left to you to fold in.</li>
             <li>No dependents or credits such as the child tax credit or EITC, and no alternative minimum tax. Head of household
               uses single filers' state rules.</li>
             <li>State law after 2026 is held at 2026 rules except California's indexing; states that index by law may be
@@ -682,6 +686,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
                 Most were read as modeled in PolicyEngine-US.</td><td>2026</td></tr>
               <tr><th scope="row">NYS IT-201 instructions; City of Philadelphia Department of Revenue, Wage Tax rates</th><td>New York City and Philadelphia
                 resident tax</td><td>2026</td></tr>
+              <tr><th scope="row">Comptroller of Maryland, resident income tax booklet (local tax brackets); Indiana Department of Revenue,
+                Departmental Notice #1</th><td>A local tax you enter: Maryland's and Indiana's county taxes are on state taxable income, not
+                wages</td><td>2025; 2026</td></tr>
               <tr><th scope="row">BEA Regional Price Parities (MARPP, PARPP, SARPP)</th><td>Price levels for every metro area, state and
                 state nonmetro area</td><td>{DATA_YEARS.rpp}, released Feb 19, 2026</td></tr>
               <tr><th scope="row">BEA, Survey of Current Business, March 2022</th><td>Housing rents' 16% share of the price weights</td><td>2022</td></tr>

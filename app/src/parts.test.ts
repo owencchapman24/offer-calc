@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { arrivalsOf, centsText, cliffLines, hundredOf, taxYearsOf } from "./partsModel";
 import { derive } from "./derive";
 import type { WorkContext } from "./metrics";
-import { alone, context, footsAsDisplayed, renderAlone, renderBreakdowns, renderPage, withBenefits, withCommission, withEspp, withWork } from "./testing";
+import { alone, context, footsAsDisplayed, renderAllInputs, renderAlone, renderBreakdowns, renderPage, withBenefits, withCommission, withEspp, withWork } from "./testing";
 import { bridge } from "./byYearModel";
 import { taxTable, taxTables, yearTable } from "./workpaper";
 
@@ -377,4 +377,33 @@ describe("while an input has a problem", () => {
     expect([busy(html, 4), busy(html, 7)]).toEqual([true, true]);
     expect(words(html)).toContain("If you left on : working it out…");
   });
+});
+
+// A flat local income tax (2026-11-20): Ohio's cities tax wages; entered in detailed mode's "Where you'd live", it's a resident's tax.
+describe("a flat local income tax: sample B in Columbus, OH, at 2.5%", () => {
+  const ctx = alone("B", (o) => ({ ...o, draft: { ...o.draft, residence: { state: "OH", nyc: false, locality: { rate: 0.025, label: "Columbus" } },
+    employerState: null, costOfLiving: { ...o.draft.costOfLiving, area: "18140" } } }));
+  it("A-7's tax table has a Columbus income tax line, 2.5% of the year's FICA wages, and A-6 says the same", () => {
+    const w = withWork(ctx).ctx;
+    const b = own(w, "A");
+    const a6 = taxYearsOf(b.detail, b.window);
+    for (const t of taxTables(w, "A").filter((x) => a6.some((r) => r.year === x.year))) {
+      const local = t.rows.find((r) => r.line === "local")!;
+      expect(local.label).toBe("Columbus income tax");
+      // FICA wages: the wages less pre-tax health (no commuter benefits or ESPP here), each year with the offer; none without it.
+      expect(local.offer).toBe(Math.round(0.025 * (t.t.with.wages - t.t.with.section125)));
+      expect(local.without).toBe(0);
+      expect(a6.find((r) => r.year === t.year)!.values.local).toBe(local.offer);
+    }
+  }, 30_000); // runs A-7's job: a few seconds, longer on a busy runner
+  it("the city's work says how it's taxed; New York City's offer has no such field", () => {
+    expect(derive("in.A.costOfLiving.area", ctx).notes.join(" ")).toContain("Taxed as a full-year resident of OH, with Columbus's income tax at 2.5% of wages, as entered;");
+    const text = words(renderAlone(ctx));
+    expect(text).toMatch(/tax federal, FICA, OH, Columbus/);
+    // The samples in detailed mode: A, in New York City, says its city's tax is worked out; B and C get the field.
+    const inputs = renderAllInputs(context());
+    expect(words(inputs)).toContain("New York City's tax, worked out for you");
+    expect([...inputs.matchAll(/id="in-([ABC])-residence-locality-rate"/g)].map((m) => m[1])).toEqual(expect.arrayContaining(["B", "C"]));
+    expect(inputs).not.toContain('id="in-A-residence-locality-rate"');
+  }, 30_000); // renders every input: a few seconds, longer on a busy runner
 });

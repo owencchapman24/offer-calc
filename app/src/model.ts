@@ -2,7 +2,7 @@ import { statesOf } from "../../src/col/cities";
 import type {
   AnnualBonus, ByScenario, CashAward, Clawback, Commission, CommissionTerms, Espp, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
 } from "../../src/offer/types";
-import type { FilingStatus } from "../../src/tax/types";
+import type { FilingStatus, Locality } from "../../src/tax/types";
 import { SAMPLE_HOUSEHOLD, SAMPLE_OFFERS } from "../../src/samples";
 import { DEFAULT_PRESET, PRESETS } from "./presets";
 import { US_PRICES } from "./prices";
@@ -32,6 +32,12 @@ export interface OfferDraft {
      * 2026-10-14): inside, the default, as for New York City.
      */
     philadelphia?: boolean;
+    /**
+     * A local income tax at a flat rate (a Maryland county's, an Ohio city's, a Pennsylvania earned income tax), where the city isn't
+     * one whose tax the tool works out itself (New York City, Philadelphia). Absent (drafts from before 2026-11-20), null, or a blank
+     * rate: none. The name is for its tax line ("Columbus income tax"); blank, "Local".
+     */
+    locality?: { rate: number | null; label: string | null } | null;
   };
   /** Null: the state you'd live in. */
   employerState: string | null;
@@ -359,6 +365,32 @@ export const CITY_TAX = {
   philadelphia: { line: "Philadelphia", place: "Philadelphia" },
 } as const;
 
+/**
+ * Where a local income tax is on state taxable income, not wages:
+ * - Maryland's counties: the rate applies to Maryland taxable net income (the Comptroller's 2025 resident booklet sets its local
+ *   brackets by "a taxable net income of at least $1 ..."; PolicyEngine-US's md_flat_rate_county_tax is the rate x md_taxable_income).
+ * - Indiana's counties: on the state's base (the Department of Revenue's Departmental Notice #1, 2026: taxable income "is the amount
+ *   on which state and county tax should be calculated").
+ * Elsewhere (Ohio's cities, Pennsylvania's earned income tax, Michigan's cities, Kentucky's occupational taxes, Missouri's earnings
+ * taxes) it's on wages.
+ */
+export const LOCAL_ON_STATE_INCOME: ReadonlySet<string> = new Set(["MD", "IN"]);
+
+/** A flat local income tax as the engine takes it: entered, with a rate, where the city's own tax isn't worked out instead. */
+export function flatLocality(d: OfferDraft): Extract<Locality, { kind: "flat" }> | null {
+  const l = d.residence.locality;
+  if (cityTax(d) || !l || l.rate === null) return null;
+  // Its tax line adds "income tax": "Baltimore County income tax" entered as the name is "Baltimore County".
+  return { kind: "flat", label: l.label?.trim().replace(/\s*\b(income\s+)?tax$/i, "") || "Local", rate: l.rate,
+    base: LOCAL_ON_STATE_INCOME.has(d.residence.state ?? "") ? "stateTaxableIncome" : "wages" };
+}
+
+/** The local tax an offer pays, by its name on a tax line ("NYC" income tax, "Columbus" income tax), or null. */
+export const localTaxName = (d: OfferDraft): string | null => {
+  const city = cityTax(d);
+  return city ? CITY_TAX[city].line : flatLocality(d)?.label ?? null;
+};
+
 /** The bonus basis, with its default. */
 export const bonusBasis = (b: BonusDraft): AnnualBonus["basis"] => b.basis ?? "percentOfSalary";
 
@@ -395,7 +427,8 @@ export function toOfferInput(o: AppOffer): { offer: OfferInput } | { missing: Mi
   const state = d.residence.state!;
   const offer: OfferInput = {
     label: d.label || `Offer ${o.letter}`,
-    residence: { state, ...(inNyc(d) ? { locality: { kind: "nyc" } } : inPhiladelphia(d) ? { locality: { kind: "philadelphia", resident: true } } : {}) },
+    residence: { state, ...(inNyc(d) ? { locality: { kind: "nyc" } } : inPhiladelphia(d) ? { locality: { kind: "philadelphia", resident: true } }
+      : flatLocality(d) ? { locality: flatLocality(d)! } : {}) },
     employerState: d.employerState ?? state,
     startDate: d.startDate!,
     salary: {
@@ -596,7 +629,8 @@ export function fromOfferInput(o: OfferInput, label = o.label): OfferDraft {
   return {
     label,
     residence: { state: o.residence.state, nyc: o.residence.locality?.kind === "nyc",
-      ...(o.residence.locality?.kind === "philadelphia" ? { philadelphia: o.residence.locality.resident } : {}) },
+      ...(o.residence.locality?.kind === "philadelphia" ? { philadelphia: o.residence.locality.resident } : {}),
+      ...(o.residence.locality?.kind === "flat" ? { locality: { rate: o.residence.locality.rate, label: o.residence.locality.label } } : {}) },
     employerState: o.employerState === o.residence.state ? null : o.employerState,
     startDate: o.startDate,
     salary: {

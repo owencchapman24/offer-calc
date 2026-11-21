@@ -2,7 +2,7 @@ import type { Component, ValueBasis } from "../../src/offer/types";
 import { addCents, shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { type L6Line, offerByLetter, ownOf, pricesOf, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { cashName, taxFreeNames } from "./byYearModel";
-import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
+import { type AppOffer, type Letter, localTaxName } from "./model";
 import type { OfferDetail, TaxRun, WorkOffer, WorkPayment, WorkTaxYear } from "./protocol";
 import { cents, dayBefore, dollars, figure, longDate, percent } from "./text";
 import { commissionPeriod } from "./leaveModel";
@@ -65,8 +65,8 @@ export interface YearTable {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-/** "NYC" or "Philadelphia", for an offer taxed by the city it's in; null otherwise. */
-const cityLine = (o: AppOffer | undefined) => (o && cityTax(o.draft) ? CITY_TAX[cityTax(o.draft)!].line : null);
+/** "NYC" or "Philadelphia", for an offer taxed by the city it's in, or a flat local tax's name ("Columbus"); null otherwise. */
+const cityLine = (o: AppOffer | undefined) => (o ? localTaxName(o.draft) : null);
 
 /** A-7's employment-year table for one offer, over its own stay. */
 export function yearTable(ctx: WorkContext, letter: L): YearTable {

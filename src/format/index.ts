@@ -121,7 +121,7 @@ export const clawbackTreatment = (t: ClawbackResult["treatment"]) =>
 
 const reason = (r: SalaryChangeReason) => (r.kind === "merit" ? `${pct(r.rate)} merit raise` : `+${pct(r.stepUp)} promotion`);
 
-const LOCALITY = { nyc: "New York City", philadelphia: "Philadelphia", flat: "its local wage tax" } as const;
+const LOCALITY = { nyc: "New York City", philadelphia: "Philadelphia" } as const;
 
 export function formatAssumption(a: Assumption): string {
   switch (a.code) {
@@ -131,7 +131,10 @@ export function formatAssumption(a: Assumption): string {
     case "incrementalTax":
       return "The offer's tax is household tax with the offer minus without it, per calendar year, spread over that "
         + "year's payments in proportion to their size.";
-    case "residence": return `Taxed as a full-year resident of ${a.params.state}${a.params.locality ? ` and ${LOCALITY[a.params.locality]}` : ""}.`;
+    case "residence": {
+      const l = a.params.locality;
+      return `Taxed as a full-year resident of ${a.params.state}${l === "flat" ? ", with a local income tax at the flat rate entered" : l ? ` and ${LOCALITY[l]}` : ""}.`;
+    }
     case "projectedLaw":
       return `Tax years after 2026 are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed from the latest `
         + "published (2026's, or a later year's where the IRS has published it), state law held at 2026 except statutory indexing (CA) "
