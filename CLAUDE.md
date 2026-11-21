@@ -14,7 +14,7 @@ behind every figure.
   A-1 (its bottom line) to A-7 (the work), and Copy as document copies one offer's breakdown, the comparison or both.
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
-## 2. Current state (2026-10-16)
+## 2. Current state (2026-11-21)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (every federal amount for 2027: the brackets, standard
   deduction, 127, 132(f), 401(k) and HSA limits, and the Social Security wage base).
@@ -25,9 +25,9 @@ behind every figure.
   vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
   2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22); v2's 4j (other benefits,
   taxable or tax-free, and tax-free benefits, the perks among them, on a line of their own, 2026-10-23); v2's 4h (commission, paid
-  monthly or quarterly after a lag, with a range, a draw against it and what's paid when you leave, 2026-11-05, for review); and a
-  flat local income tax, entered under Where you'd live (2026-11-20, from the November audit). How each differs from the design:
-  `docs/ui-design.md` §12.
+  monthly or quarterly after a lag, with a range, a draw against it and what's paid when you leave, merged 2026-11-06; its review
+  stop, section 3); and a flat local income tax, entered under Where you'd live (2026-11-20, from the November audit). How each
+  differs from the design: `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the tax baselines committed and the grid's checked in CI (T1), the e2e
@@ -36,6 +36,11 @@ behind every figure.
   part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8), per hour documented
   as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and the `main` ruleset is on (S1, in
   part). What's left: section 3.
+- **The November 2026 audit** (`docs/audit-2026-11.md`, of `main` at `09c2ea6`, 2026-11-10; its table keeps each finding's
+  status): fixed in #83-#95, all merged by 2026-11-21, are the IRS's 2027 amounts (N1), tax-free benefits when leaving early (N2),
+  pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
+  with one offer (N6, part of October's C24), the minus zero (N7, October's C16), the flat local tax (N10) and the ESPP after the
+  last day (N14). What's left: its table; the fix-before-launch items are in section 3's checklist.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -47,12 +52,12 @@ behind every figure.
 **Ask before starting anything new.** The user is putting the tool, and v2's tester questions, in front of testers; record each
 finding in `docs/user-testing.md` as it comes in.
 
-**4h, commission, is built and waits on the user's review** (stop 4h, pull request #78; `docs/v2-plan.md`, item 4h, approved on
+**4h, commission, is merged and live** (stop 4h, pull request #78, merged 2026-11-06; `docs/v2-plan.md`, item 4h, approved on
 2026-11-05 at the user's review of pull request #74: D24-D27 as recommended, D24 in the user's words; D28 changed: a recoverable draw
-kept or repaid on leaving is an input). Then item 2 (market benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`,
-"Questions for testers"). Stops 4a (days off, #70), 4i (the ESPP, #71) and 4j (other benefits, #72) are approved and live (approved
-2026-10-22, 23 and 23). Decisions D16-D23 are recorded in the plan; at stop 4j the user moved today's perks to the tax-free line too
-(D22).
+kept or repaid on leaving is an input). Whether that merge was the stop's review is the user's word: ask. Then item 2 (market
+benchmarks, as A-8), waiting on testers' answers (`docs/v2-plan.md`, "Questions for testers"). Stops 4a (days off, #70), 4i (the
+ESPP, #71) and 4j (other benefits, #72) are approved and live (approved 2026-10-22, 23 and 23). Decisions D16-D23 are recorded in
+the plan; at stop 4j the user moved today's perks to the tax-free line too (D22).
 
 v2's item 5 is built (stops 5A-5C, 2026-10-15 and 16), before the testers' answer to its first question ("how many offers did you
 actually have?"), at the user's word; record the answer when it comes. After 4h, the plan's order puts item 2 (market benchmarks,
@@ -63,7 +68,13 @@ use (finding 3).
 section 2's and the plan's in step):
 - **D4** (data vintages typed in: `docs/data-refresh.md` now lists where): due before BEA's refresh, December to February.
 
+**The November audit's open items** (`docs/audit-2026-11.md`, its table): the fix-before-launch ones are in the pre-launch
+checklist (item 4); the should-fix ones (the engine, tax data, commission's UI, the app's robustness, CI hygiene) wait for the user
+to pick.
+
 **The next data checks** (`docs/data-refresh.md` has the calendar):
+- Now: Massachusetts' 2026 surtax threshold, published at $1,107,750 (the November audit's N26). December: FTB's 2026 amounts for
+  California (N27).
 - December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027. Every federal
   amount for 2027 is in `FEDERAL_2027` (Rev. Proc. 2026-35, Notice 2026-66, Rev. Proc. 2026-24 and SSA's wage base), each pinned in
   `test/law.test.ts`.
@@ -76,9 +87,11 @@ section 2's and the plan's in step):
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
-4. **The audit's "fix before going public" items** (its table): C7, C17-C19, C24, C25, C27, C28, T6, T7, T9, S1, S2's
-   `npm audit` step, D9, D11, P5-P7. (D10, the README's drift, was fixed 2026-10-17 with the README's refresh; C16, the minus
-   zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like case.)
+4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C7, C17-C19, C24 (in part:
+   #91 did the engine's error and a missing chunk), C25, C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7;
+   November's N8 (C7, commission's range too), N9 (C25), N11 (the owner's offer in `docs/user-testing.md`, with item 1) and N12
+   (S1). (D10, the README's drift, was fixed 2026-10-17 with the README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay
+   due after the last day, 2026-11-20 with commission's like case.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
    `.claude/review/readme/shots.e2e.ts`), and check the README and M-4 against the oracle report, and the docs against the code.
 
@@ -555,8 +568,9 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 ## 11. Docs
 | Doc | What it is | Status |
 |---|---|---|
-| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D28, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i, 4j and 4h built (4h for review); the rest planned |
+| `docs/v2-plan.md` | v2: the offer breakdown (item 5) first, market benchmarks, accuracy, negotiation help, beyond the money; decisions D1-D28, B1-B13 | Current. Step 0, item 5 (stops 5A-5C), 4a (extended), 4i, 4j and 4h built (4h merged; its review, section 3); the rest planned |
 | `docs/audit-2026-10.md` | The October 2026 audit: findings ranked fix before v2, before going public, nice to have | A report as of 2026-10-13; section 2 here says which are fixed |
+| `docs/audit-2026-11.md` | The November 2026 audit, of `main` at `09c2ea6`: findings ranked fix before launch, should fix, nice to have | A report as of 2026-11-10; its Status column says which are fixed |
 | `docs/user-testing.md` | Testers' findings, one row each | Current; add to it |
 | `docs/data-refresh.md` | Every dataset's calendar, refresh steps, the base-year move, the oracle's environment | Current |
 | `docs/ui-design.md` | The UI design (rev 4: §1 evaluator-first) and §12, how each slice and stop was built | Historical, except §1 (current); §12 as built |
