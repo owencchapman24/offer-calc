@@ -1411,15 +1411,18 @@ function reconWork(ctx: WorkContext, letter: L): Work {
 
 /** A-6: federal tax a year's withholding falls short of: due the next April. */
 function withholdingWork(ctx: WorkContext, letter: L, year: number): Work {
-  const y = breakdownOf(ctx, letter).detail.withholding.years.find((x) => x.year === year);
+  const b = breakdownOf(ctx, letter);
+  const y = b.detail.withholding.years.find((x) => x.year === year);
   if (!y) throw new Error(`No ${year} withholding for ${letter} in your stay.`);
-  const p = withholdingParts(y);
+  const rows = taxYearsOf(b.detail, b.window);
+  const p = withholdingParts(y, rows);
   const status = { single: "single", joint: "married filing jointly", headOfHousehold: "head of household" }[ctx.household.filingStatus];
   const espp = breakdownOf(ctx, letter).detail.espps.some((x) => Number(x.date.slice(0, 4)) === year);
   return {
     title: `${letter} · federal withholding on ${year} pay`, scope: `Base case · ${year} · federal income tax only`,
     lines: [
-      { label: `Federal income tax on the offer's ${year} pay`, note: "household tax with the offer, less without it", value: figure(p.tax) },
+      { label: `Federal income tax on the offer's ${year} pay`, note: "household tax with the offer, less without it", value: figure(p.tax),
+        ...(rows.some((r) => r.year === year) ? { ref: `a6.${letter}.${year}.federal` as MetricId } : {}) },
       { op: "−", label: "Withheld from salary", note: `the IRS percentage method, a ${status} Form W-4 with nothing else on it`, value: figure(p.regular) },
       { op: "−", label: "Withheld from bonuses, RSU vests and cash awards", note: "22% (37% on supplemental pay over $1 million)",
         value: figure(p.supplemental) },

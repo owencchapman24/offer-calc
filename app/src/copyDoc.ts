@@ -14,7 +14,7 @@ import { bridge, cashName as cashNameOf, notesOf, ownShownYear, shownYearOf, tax
 import {
   A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, esppPutIn, hundredOf, otherBenefitsOf, payRows,
   rateText,
-  taxYearsOf,
+  type TaxYearRow, taxYearsOf,
 } from "./partsModel";
 import { ASSUMPTIONS, CITY_TAX, cityTax, hasEspp, type Letter } from "./model";
 import { type Breakdown, type CompareRequest, cursorJobFor, type LeavePanel, type OfferDetail, type OfferTerms, termsJob, tieJob, type Ties } from "./protocol";
@@ -1142,11 +1142,11 @@ function benefitsSection(ctx: WorkContext, x: Own, add: Add, worked: Worked[]) {
 // ---- 6. Tax by year, and warnings (A-6)
 
 /** "Federal withholding falls short of the federal income tax on its pay by $1,109 for 2029 and $1,656 for 2030, …": A-6's line. */
-function shortfallText(d: OfferDetail, warnings: OfferWarning[]): string {
+function shortfallText(d: OfferDetail, rows: TaxYearRow[], warnings: OfferWarning[]): string {
   const ys = warnings.flatMap((w) => (w.code === "withholdingShortfall" ? [w.params] : []));
   const shorts = ys.map((p) => {
     const y = d.withholding.years.find((q) => q.year === p.year);
-    return `${dollars(y ? withholdingParts(y).short : p.balanceDue)} for ${p.year}`;
+    return `${dollars(y ? withholdingParts(y, rows).short : p.balanceDue)} for ${p.year}`;
   });
   return `Federal withholding falls short of the federal income tax on its pay by ${join(shorts)}, owed ${ys.length > 1 ? "each following April"
     : `in April ${ys[0].year + 1}`}${ys.some((y) => y.supplemental) ? `: bonuses${ys.some((y) => y.commission) ? ", commission" : ""} and RSU vests are `
@@ -1186,7 +1186,7 @@ function taxSection(x: Own, add: Add, worked: Worked[]) {
   const items: string[] = [];
   for (const kind of ["changes", "notModeled", "cash"] as const) {
     for (const g of groups.filter((y) => WARNING_KIND[y[0].code] === kind)) {
-      items.push(`${KIND_TITLE[kind]}: ${g[0].code === "withholdingShortfall" ? shortfallText(d, g) : warningWords(g)}`);
+      items.push(`${KIND_TITLE[kind]}: ${g[0].code === "withholdingShortfall" ? shortfallText(d, rows, g) : warningWords(g)}`);
     }
   }
   add({ kind: "para", runs: ["Warnings over its stay:"] });

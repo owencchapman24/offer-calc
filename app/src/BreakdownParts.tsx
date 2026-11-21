@@ -12,7 +12,7 @@ import type { Letter } from "./model";
 import {
   A2_LABEL, arrivalShown, arrivalsOf, benefitsOf, bonusTerms, centsText, cliffCost, cliffLines, cliffName, commissionMonth, esppPutIn, hundredOf, otherBenefitsOf, paidTimeOff,
   payRows, rateText,
-  taxYearsOf,
+  type TaxYearRow, taxYearsOf,
 } from "./partsModel";
 import type { PriceWords } from "./prices";
 import { type CompareRequest, cursorJobFor, type LeavePanel, type OfferTerms, termsJob, workJob, type WorkOffer } from "./protocol";
@@ -707,7 +707,7 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
                 const path = WARNING_AT[group[0].code];
                 return (
                   <li key={k} className="warn-item">
-                    {group[0].code === "withholdingShortfall" ? <Shortfall L={L} years={d.withholding.years} warnings={group} /> : warningWords(group)}
+                    {group[0].code === "withholdingShortfall" ? <Shortfall L={L} years={d.withholding.years} rows={rows} warnings={group} /> : warningWords(group)}
                     {path && <>{" "}<button type="button" className="link" onClick={() => edit({ letter: L, path })}>Show at the field</button></>}
                   </li>
                 );
@@ -747,8 +747,9 @@ function TaxAndWarnings({ x, open, show, ctx, prices }: Part) {
   );
 }
 
-/** "Federal withholding falls short of the federal income tax on its pay by $1,173 for 2028…": L-5's line, for this offer. */
-function Shortfall({ L, years: wy, warnings }: { L: Letter; years: Array<{ year: number; federalIncomeTax: number; withheld: { regular: number; supplemental: number } }>; warnings: OfferWarning[] }) {
+/** "Federal withholding falls short of the federal income tax on its pay by $1,174 for 2028…": A-6's line, for this offer. */
+function Shortfall({ L, years: wy, rows, warnings }: { L: Letter; years: Array<{ year: number; federalIncomeTax: number; withheld: { regular: number; supplemental: number } }>;
+  rows: TaxYearRow[]; warnings: OfferWarning[] }) {
   const years = warnings.flatMap((w) => (w.code === "withholdingShortfall" ? [w.params] : []));
   const supplemental = years.some((y) => y.supplemental);
   const espp = years.some((y) => y.espp);
@@ -757,7 +758,7 @@ function Shortfall({ L, years: wy, warnings }: { L: Letter; years: Array<{ year:
       Federal withholding falls short of the federal income tax on its pay by{" "}
       {years.map((p, i) => {
         const y = wy.find((q) => q.year === p.year);
-        const short = dollars(y ? withholdingParts(y).short : p.balanceDue);
+        const short = dollars(y ? withholdingParts(y, rows).short : p.balanceDue);
         return (
           <span key={p.year}>
             {i ? (i === years.length - 1 ? " and " : ", ") : ""}

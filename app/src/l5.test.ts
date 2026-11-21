@@ -6,8 +6,11 @@ import { Lead } from "./Lead";
 import Methodology from "./Methodology";
 import type { WorkContext } from "./metrics";
 import type { AppOffer } from "./model";
+import { taxYearsOf } from "./partsModel";
 import { context, renderBreakdowns, withLeave } from "./testing";
+import { figure } from "./text";
 import { WorkProvider } from "./Tickmarks";
+import { withholdingParts } from "./warningAt";
 import { changingWarnings } from "./warningKinds";
 
 // Each offer's warnings, in its breakdown's A-6 (L-5 until stop 5B: docs/ui-design.md §4.7, docs/v2-plan.md item 5, B8), the lead's
@@ -30,17 +33,35 @@ describe("A-6: every warning for an offer's stay", () => {
     const ctx = context();
     const a = a6(ctx, "A");
     expect(a).toContain("Cash timing");
-    expect(a).toContain("Federal withholding falls short of the federal income tax on its pay by $1,173 for 2028, $1,075 for 2029 and $3,284 for "
+    expect(a).toContain("Federal withholding falls short of the federal income tax on its pay by $1,174 for 2028, $1,074 for 2029 and $3,284 for "
       + "2030, owed each following April: bonuses and RSU vests are withheld at the flat 22% supplemental rate, below the real rate on them.");
-    expect(a6(ctx, "C")).toContain("Federal withholding falls short of the federal income tax on its pay by $1,084 for 2029 and $1,219 for 2030");
+    expect(a6(ctx, "C")).toContain("Federal withholding falls short of the federal income tax on its pay by $1,085 for 2029 and $1,219 for 2030");
     expect(a).not.toContain("Changes your numbers");
     expect(changingWarnings(context().results!.detail!.offers, 2030)).toBe(0);
   }, 30_000);
   it("a year's shortfall foots as displayed: the offer's federal tax - withheld from salary - withheld at 22% (M-4)", () => {
     const d = derive("wh.A.2028", context());
-    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "32,948"], ["−", "13,075"], ["−", "18,700"], ["=", "1,173"]]);
+    // 32,949 - 13,075 - 18,700 = 1,174. The estimate's own tax is 32,947.66, which rounds to 32,948; A-6 and A-7 show 32,949, the
+    // year's tax as paid (to the cent, rounded once) less FICA, state and local, each rounded (audit F1): one figure, theirs.
+    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "32,949"], ["−", "13,075"], ["−", "18,700"], ["=", "1,174"]]);
+    expect(d.lines[0].ref).toBe("a6.A.2028.federal");
     expect(d.section).toBe("M-4");
   });
+  it("a year's federal tax in the withholding is A-6's, every year of every offer's stay, and the line foots with it", () => {
+    const ctx = context();
+    for (const o of ctx.offers) {
+      const b = ctx.own!.breakdowns[o.letter]!;
+      const rows = taxYearsOf(b.detail, b.window);
+      expect(b.detail.withholding.years.length).toBeGreaterThan(3);
+      for (const y of b.detail.withholding.years) {
+        const r = rows.find((x) => x.year === y.year)!;
+        const p = withholdingParts(y, rows);
+        expect(p.tax, `${o.letter} ${y.year}`).toBe(r.values.federal);
+        expect(p.short).toBe(r.values.federal - Math.round(y.withheld.regular) - Math.round(y.withheld.supplemental));
+        expect(derive(`wh.${o.letter}.${y.year}`, ctx).lines[0].value).toBe(figure(r.values.federal));
+      }
+    }
+  }, 30_000);
   it("a limit reached changes your numbers: listed first, with Show at the field, and the lead points to it", () => {
     // C deferring 30% of pay reaches the 402(g) limit every year of the stay.
     const ctx = context("colAdjustedTotal", tweak("C", (o) => ({ ...o, draft: { ...o.draft,
