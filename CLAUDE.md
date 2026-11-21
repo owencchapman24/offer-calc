@@ -40,7 +40,8 @@ behind every figure.
   status): fixed in #83-#95, all merged by 2026-11-21, are the IRS's 2027 amounts (N1), tax-free benefits when leaving early (N2),
   pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
   with one offer (N6, part of October's C24), the minus zero (N7, October's C16), the flat local tax (N10) and the ESPP after the
-  last day (N14). What's left: its table; the fix-before-launch items are in section 3's checklist.
+  last day (N14); and the ranges' order (N8, October's C7) in #97. What's left: its table; the fix-before-launch items are in
+  section 3's checklist.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
@@ -87,11 +88,11 @@ to pick.
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
-4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C7, C17-C19, C24 (in part:
-   #91 did the engine's error and a missing chunk), C25, C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7;
-   November's N8 (C7, commission's range too), N9 (C25), N11 (the owner's offer in `docs/user-testing.md`, with item 1) and N12
-   (S1). (D10, the README's drift, was fixed 2026-10-17 with the README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay
-   due after the last day, 2026-11-20 with commission's like case.)
+4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C17-C19, C24 (in part: #91
+   did the engine's error and a missing chunk), C25, C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7; November's
+   N9 (C25), N11 (the owner's offer in `docs/user-testing.md`, with item 1) and N12 (S1). (D10, the README's drift, was fixed
+   2026-10-17 with the README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with
+   commission's like case; C7 and N8, the ranges' order, 2026-11-21 in #97.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
    `.claude/review/readme/shots.e2e.ts`), and check the README and M-4 against the oracle report, and the docs against the code.
 
