@@ -130,6 +130,28 @@ const cases: Case[] = [
     "equity.refreshers.value.bull", "caseOrder", false],
   ["bear-case hours fewer than the base", C, (o) => { o.hours!.weekly = { bear: 40, base: 45, bull: 45 }; }, "hours.weekly.bear", "caseOrder", false],
   ["bull-case hours more than the base", C, (o) => { o.hours!.weekly = { bear: 45, base: 45, bull: 50 }; }, "hours.weekly.bull", "caseOrder", false],
+  // Bounds (audit C25): every amount at most $100 million, a rate 100% a year, a list 120 rows; an area with prices, a state by
+  // its own key. Each of these made NaN of the results, or a throw, with no problem at the field.
+  ["a salary of 1e308", C, (o) => { o.salary.annual = 1e308; }, "salary.annual", "tooLarge", false],
+  ["an infinite salary", C, (o) => { o.salary.annual = Number.POSITIVE_INFINITY; }, "salary.annual", "tooLarge", false],
+  ["a salary of $100,000,000.01", C, (o) => { o.salary.annual = 100_000_000.01; }, "salary.annual", "tooLarge", false],
+  ["a rent of 1e308 a month", C, (o) => { o.costOfLiving!.monthlyRent = 1e308; }, "costOfLiving.monthlyRent", "tooLarge", false],
+  ["a grant of $1 billion", C, (o) => { o.equity!.grants[0].value = 1e9; }, "equity.grants.0.value", "tooLarge", false],
+  ["a bull bonus of 1,001% of salary", C, (o) => { if (o.bonus?.basis === "percentOfSalary") o.bonus.amount.bull = 10.01; },
+    "bonus.amount.bull", "tooLarge", false],
+  ["a bull raise of 101%", C, (o) => { o.salary.raise = { bear: 0.03, base: 0.03, bull: 1.01 }; }, "salary.raise.bull", "tooLarge", false],
+  ["rent growth of 1e308", C, (o) => { o.costOfLiving!.rentGrowth = 1e308; }, "costOfLiving.rentGrowth", "tooLarge", false],
+  ["a match rate over 1,000%", C, (o) => { o.retirement!.match = [{ upToPct: 0.04, rate: 11 }]; }, "retirement.match.0", "tierRange", false],
+  ["a non-elective contribution over 100%", C, (o) => { o.retirement!.nonElectivePct = 1.5; }, "retirement.nonElectivePct", "tooLarge", false],
+  ["261 vacation days given a year", C, (o) => { o.timeOff = { gives: 261 }; }, "timeOff.gives", "tooLarge", false],
+  ["121 promotions", A, (o) => { o.salary.promotions = Array.from({ length: 121 }, () => ({ ...o.salary.promotions![0] })); }, "salary.promotions", "tooMany", false],
+  ["121 tranches", C, (o) => {
+    o.equity!.grants[0].schedule = { tranches: Array.from({ length: 121 }, (_, i) => ({ month: i + 1, fraction: i ? 0.5 / 120 : 0.5 })) };
+  }, "equity.grants.0.schedule.tranches", "tooMany", false],
+  ["a BEA area with no prices", C, (o) => { o.costOfLiving!.area = "10999"; }, "costOfLiving.area", "unknownArea", true],
+  ["an area named constructor", C, (o) => { o.costOfLiving!.area = "constructor"; }, "costOfLiving.area", "unknownArea", true],
+  ["a state named toString", C, (o) => { o.residence = { state: "toString" }; }, "residence.state", "unknownState", true],
+  ["an employer state named constructor", C, (o) => { o.employerState = "constructor"; }, "employerState", "unknownState", true],
 ];
 
 describe("validateOffer: each problem at its field", () => {
@@ -150,6 +172,20 @@ describe("validateOffer: each problem at its field", () => {
     const issues = validateOffer(C, { ...hh, costOfLiving: { savingsRate: 1 } });
     expect(issues).toEqual([{ path: "household.costOfLiving.savingsRate", code: "savingsRate", params: {} }]);
     expect(engineThrows(C, { ...hh, costOfLiving: { savingsRate: 1 } })).toBe(true);
+  });
+  it("other wages or a spouse's over $100 million are the household's problem", () => {
+    expect(validateOffer(C, { ...hh, otherWages: { 2027: 1e308 } })).toEqual([
+      { path: "household.otherWages", code: "tooLarge", params: { max: 100_000_000, unit: "dollars" } }]);
+    expect(validateOffer(C, { ...hh, filingStatus: "joint", spouseWages: { 2026: 50_000, 2027: Number.POSITIVE_INFINITY } }).map((i) => i.path))
+      .toEqual(["household.spouseWages"]);
+    expect(validateOffer(C, { ...hh, otherWages: { 2027: 100_000_000 } })).toEqual([]);
+  });
+  it("$100,000,000 is the most an amount can be; 100% the most a rate; 120 the most rows", () => {
+    const o = clone(A);
+    o.salary.annual = 100_000_000;
+    o.salary.raise = { bear: 0, base: 0.03, bull: 1 };
+    o.salary.promotions = Array.from({ length: 120 }, () => ({ ...A.salary.promotions![0] }));
+    expect(validateOffer(o)).toEqual([]);
   });
   it("every problem at once", () => {
     const o = clone(C);
@@ -221,6 +257,10 @@ describe("validateOffer: the edges", () => {
       .toBe("The bear case can't be fewer hours than the base case: it's the case where you work the most.");
     expect(msg("hours.weekly.bull", "caseOrder", { scenario: "bull", side: "above" }))
       .toBe("The bull case can't be more hours than the base case: it's the case where you work the least.");
+    expect(msg("salary.annual", "tooLarge", { max: 100_000_000, unit: "dollars" })).toBe("Enter at most $100,000,000.");
+    expect(msg("salary.raise.bull", "tooLarge", { max: 1, unit: "percent" })).toBe("Enter at most 100%.");
+    expect(msg("bonus.amount.bull", "tooLarge", { max: 10, unit: "percent" })).toBe("Enter at most 1,000%.");
+    expect(msg("timeOff.gives", "tooLarge", { max: 260, unit: "days" })).toBe("Enter at most 260 days.");
   });
   it("Feb 29 is a real month and day (it falls on Feb 28 in other years)", () => {
     const o = clone(C);

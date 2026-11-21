@@ -39,8 +39,11 @@ export function nonHousingRpp(a: RppArea): number {
 
 /** The area for a BEA GeoFIPS code, e.g. "35620" (New York metro) or "37999" (NC nonmetro). */
 export function rppArea(code: string): RppArea & { code: string } {
-  const a = RPP.areas[code];
+  // Own keys only: "constructor" would find Object's (audit C25).
+  const a = Object.hasOwn(RPP.areas, code) ? RPP.areas[code] : undefined;
   if (!a) throw new Error(`Unknown BEA RPP area "${code}". Use findRppAreas() to look one up.`);
+  // Four of BEA's rows have no prices (all items and housing 0), which made the price factor Infinity.
+  if (!(a.allItems > 0 && a.housing > 0)) throw new Error(`BEA RPP area "${code}" (${a.name}) has no prices.`);
   return { code, ...a };
 }
 

@@ -779,6 +779,9 @@ describe("cost of living (BEA RPPs)", () => {
     expect(rppArea("35620").name).toMatch(/^New York-Newark-Jersey City/);
     expect(findRppAreas("charlotte-concord")).toEqual([expect.objectContaining({ code: "16740", kind: "msa" })]);
     expect(() => rppArea("99999")).toThrow(/Unknown BEA RPP area/);
+    // Own keys only, and an area with prices (audit C25): these gave NaN, not a throw.
+    expect(() => rppArea("constructor")).toThrow(/Unknown BEA RPP area/);
+    expect(() => rppArea("10999")).toThrow(/has no prices/);
   });
   it("city picker: every metro and each state's area outside metros, with the states each lies in", () => {
     expect(areaStates("35620")).toEqual(["NY", "NJ"]);

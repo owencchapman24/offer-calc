@@ -3,8 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import { compute } from "./compute";
-import { exportSession, readImport } from "./exchange";
-import { ASSUMPTIONS, blankOffer, shiftOffer, toHousehold, toOfferInput } from "./model";
+import { MAX_AMOUNT as ENGINE_MAX_AMOUNT } from "../../src/offer/validate";
+import { exportSession, readImport, TOO_BIG } from "./exchange";
+import { ASSUMPTIONS, blankOffer, MAX_AMOUNT, shiftOffer, toHousehold, toOfferInput } from "./model";
+import { readNumber } from "./ui";
 import { newEspp } from "./editors";
 import { Lead } from "./Lead";
 import { initialSession, migrateOffer, reducer, type Session, type V1Offer } from "./session";
@@ -117,7 +119,14 @@ describe("import", () => {
         "offers.0.draft.residence.philadelphia: should be true or false."],
       ["a local tax rate that isn't a number", bad((x) => { x.offers[1].draft.residence.locality = { rate: "2%", label: "Durham" }; }),
         "offers.1.draft.residence.locality.rate: should be a number."],
-      ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }), "household.spouseWages: should be an amount of $0 or more."],
+      ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }),
+        "household.spouseWages: should be an amount from $0 to $100,000,000."],
+      // Bounds (audit C25): wages of 1e308 imported and made NaN of every result; a file of any size was read.
+      ["a spouse's wages of 1e308", bad((x) => { x.household.spouseWages = 1e308; }),
+        "household.spouseWages: should be an amount from $0 to $100,000,000."],
+      ["other wages over $100 million", bad((x) => { x.household.otherWagesThisYear = 100_000_001; }),
+        "household.otherWagesThisYear: should be an amount from $0 to $100,000,000."],
+      ["a file over 1 MB", bad((x) => { x.offers[0].draft.label = "x".repeat(1_000_000); }), TOO_BIG],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],
       ["a benefit's tax, not yes or no", bad((x) => { x.offers[0].draft.otherBenefits = [{ label: "Gym", annual: 600, taxable: "maybe" }]; }),
         "offers.0.draft.otherBenefits.0.taxable: should be true or false."],
@@ -130,6 +139,17 @@ describe("import", () => {
       if (!r.ok) expect(r.problems, name).toContain(problem);
     }
     // Nothing is replaced unless the import is ok: the page dispatches "replace" only for an ok file.
+  });
+
+  it("About you's wages are bounded where they're typed, as where they're imported and as the engine checks (audit C25)", () => {
+    expect(MAX_AMOUNT).toBe(ENGINE_MAX_AMOUNT);
+    expect(readNumber("money", "100m", MAX_AMOUNT)).toBe(100_000_000);
+    expect(readNumber("money", "100,000,001", MAX_AMOUNT)).toBe("tooLarge");
+    expect(readNumber("money", "999999m", MAX_AMOUNT)).toBe("tooLarge");
+    expect(readNumber("money", "9".repeat(400), MAX_AMOUNT)).toBe("tooLarge");
+    expect(readNumber("money", "lots", MAX_AMOUNT)).toBe("unparsable");
+    expect(readNumber("money", "", MAX_AMOUNT)).toBe(null);
+    expect(readNumber("money", "9".repeat(400))).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("a schema 2 export (slices 3-5) migrates: prices in the U.S. average, everything else as it was", () => {

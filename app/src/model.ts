@@ -317,6 +317,11 @@ export interface AppHousehold {
 }
 
 export const DEFAULT_HOUSEHOLD: AppHousehold = { filingStatus: "single", stayYears: 4, otherWagesThisYear: 0, pricesIn: US_PRICES };
+/**
+ * The most About you's wages can be, where they're entered and imported (audit C25): the engine's MAX_AMOUNT
+ * (src/offer/validate.ts), which the main thread can't import. A test checks they agree.
+ */
+export const MAX_AMOUNT = 100_000_000;
 export const NYC_METRO = "35620";
 export const PHILADELPHIA_METRO = "37980";
 export const ASSUMPTIONS = { inflation: 0.025, discountRate: 0.05 } as const;

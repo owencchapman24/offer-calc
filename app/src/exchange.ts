@@ -1,5 +1,5 @@
 import { cityByCode } from "../../src/col/cities";
-import { type AppHousehold, type AppOffer, draftNow, type Letter, LETTERS, type OfferDraft } from "./model";
+import { type AppHousehold, type AppOffer, draftNow, type Letter, LETTERS, MAX_AMOUNT, type OfferDraft } from "./model";
 import { US_PRICES } from "./prices";
 import { migrateHousehold, migrateOffer, type Session, type UiState, type V1Offer, type V2Household } from "./session";
 
@@ -38,8 +38,16 @@ export type ImportResult =
   | { ok: true; household: AppHousehold; offers: AppOffer[]; ui?: Partial<UiState>; migratedFrom?: number; note?: string; exportedAt?: string }
   | { ok: false; problems: string[] };
 
+/**
+ * The largest file import reads (audit C25): an export of three detailed offers is about 20 kB, and nothing bounded a file
+ * before (a 1 MB offer name imported). The page checks the file's size before reading it; readImport checks the text's length.
+ */
+export const MAX_IMPORT_BYTES = 1_000_000;
+export const TOO_BIG = "This file is over 1 MB, so it isn't an Offer Calc export: one is a few kilobytes.";
+
 /** Reads an export: the format, the schema version (older ones migrate) and the shape of every field. Never throws. */
 export function readImport(text: string): ImportResult {
+  if (text.length > MAX_IMPORT_BYTES) return { ok: false, problems: [TOO_BIG] };
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -254,13 +262,17 @@ const DRAFT_FIELDS: Shape = obj({
   costOfLiving: obj({ area: nullable(str), monthlyRent: nullable(num), rentGrowth: nullable(num) }),
 });
 
+/** About you's wages: $0 to MAX_AMOUNT, as where they're entered (audit C25: 1e308 imported and made NaN of every result). */
+const wages: Shape = (v, p, ps) => {
+  if (!(typeof v === "number" && v >= 0 && v <= MAX_AMOUNT)) fail(ps, p, `an amount from $0 to $${MAX_AMOUNT.toLocaleString("en-US")}`);
+};
+
 const HOUSEHOLD: Shape = (v, p, ps) => {
-  obj({ filingStatus: oneOf("single", "joint", "headOfHousehold"), stayYears: num, otherWagesThisYear: num })(v, p, ps);
+  obj({ filingStatus: oneOf("single", "joint", "headOfHousehold"), stayYears: num, otherWagesThisYear: wages })(v, p, ps);
   const h = v as Partial<AppHousehold> | null;
   if (h && typeof h === "object" && h.healthUsage !== undefined) oneOf("low", "medium", "high")(h.healthUsage, `${p}.healthUsage`, ps);
   // Spouse's wages arrived on 2026-10-14: optional, so earlier exports still import.
-  if (h && typeof h === "object" && h.spouseWages !== undefined && !(typeof h.spouseWages === "number" && Number.isFinite(h.spouseWages)
-    && h.spouseWages >= 0)) fail(ps, `${p}.spouseWages`, "an amount of $0 or more");
+  if (h && typeof h === "object" && h.spouseWages !== undefined) wages(h.spouseWages, `${p}.spouseWages`, ps);
   if (h && typeof h.stayYears === "number" && !(Number.isInteger(h.stayYears) && h.stayYears >= 1 && h.stayYears <= 10)) {
     fail(ps, `${p}.stayYears`, "a whole number of years from 1 to 10");
   }

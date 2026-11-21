@@ -17,8 +17,10 @@ export type OfferIssue = { path: string } & (
   | { code: "required"; params: { kind: "amount" | "percent" | "date" | "number" | "choice" | "text" } }
   /** Text longer than `max` characters (a benefit's name). */
   | { code: "tooLong"; params: { max: number } }
-  /** A list longer than `max` (other benefits). */
+  /** A list longer than `max` (other benefits; any list, MAX_ROWS). */
   | { code: "tooMany"; params: { max: number } }
+  /** A number above the most it can be (audit C25): dollars, a percent (`max` a fraction) or days. */
+  | { code: "tooLarge"; params: { max: number; unit: "dollars" | "percent" | "days" } }
   /** Not a real "YYYY-MM-DD" date. */
   | { code: "date"; params: { value: string } }
   /** Not a real month and day (Feb 29 is allowed: it falls on Feb 28 in other years). */
@@ -92,6 +94,23 @@ const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
  * notes, src/tax/params/states2026.ts). So a typo such as 25 for 2.5% is caught.
  */
 export const MAX_LOCAL_RATE = 0.05;
+/**
+ * The most any dollar amount can be (audit C25): a year's salary, a bonus, a grant, a month's rent, a year's other wages. Far above
+ * any offer's pay, grant or cost, it keeps every figure finite and well inside exact cents: a salary of 1e308, or Infinity, made NaN
+ * of every result. The app's About you holds the same figure (app/src/model.ts), since the main thread can't import this file.
+ */
+export const MAX_AMOUNT = 100_000_000;
+/** The most a rate of change can be, a year (a raise, a promotion's step-up, share-price or rent growth): 100%. */
+export const MAX_RATE = 1;
+/** The most a bonus can be as a share of salary, and a 401(k) match as a rate on what you put in: 1,000%. */
+export const MAX_MULTIPLE = 10;
+/** The most vacation days an offer can give a year: a year's workdays (52 weeks of 5 days). */
+export const MAX_DAYS_GIVEN = 260;
+/**
+ * The most rows a list can have (audit C25): promotions, cash awards, grants, a schedule's tranches (monthly over 10 years is 120),
+ * vest months, match tiers, graded steps and amounts by employment year. Other benefits keep their own 8.
+ */
+export const MAX_ROWS = 120;
 
 /**
  * Every problem with an offer's inputs, each with the path of the field that caused it. Empty when
@@ -108,8 +127,23 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     if (!num(v)) { add(path, "required", { kind }); return false; }
     return true;
   };
-  const nonNegative = (path: string, v: unknown) => { if (amount(path, v) && !((v as number) >= 0)) add(path, "negative", {}); };
-  const rate = (path: string, v: unknown) => { if (amount(path, v, "percent") && !((v as number) > -1)) add(path, "rate", {}); };
+  /** An amount from 0 to `max`: dollars by default (MAX_AMOUNT), or a share of salary. Infinity is too large. */
+  const nonNegative = (path: string, v: unknown, max = MAX_AMOUNT, unit: "dollars" | "percent" = "dollars") => {
+    if (!amount(path, v)) return;
+    if (!((v as number) >= 0)) add(path, "negative", {});
+    else if (!((v as number) <= max)) add(path, "tooLarge", { max, unit });
+  };
+  const bonusShare = (path: string, v: unknown) => nonNegative(path, v, MAX_MULTIPLE, "percent");
+  /** A rate of change a year: above -100% and at most MAX_RATE. */
+  const rate = (path: string, v: unknown) => {
+    if (!amount(path, v, "percent")) return;
+    if (!((v as number) > -1)) add(path, "rate", {});
+    else if (!((v as number) <= MAX_RATE)) add(path, "tooLarge", { max: MAX_RATE, unit: "percent" });
+  };
+  /** A list of at most MAX_ROWS rows. */
+  const rows = (path: string, list: readonly unknown[] | undefined) => {
+    if (list && list.length > MAX_ROWS) add(path, "tooMany", { max: MAX_ROWS });
+  };
   const share = (path: string, v: unknown) => {
     if (amount(path, v, "percent") && !((v as number) >= 0 && (v as number) <= 1)) add(path, "share", {});
   };
@@ -156,17 +190,19 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   }
 
   // ---- where you'd live ------------------------------------------------------------------
-  if (!STATES_2026[offer.residence.state]) add("residence.state", "unknownState", { state: offer.residence.state });
+  // Own keys only (audit C25): "toString" or "constructor" would find an inherited property and pass.
+  if (!Object.hasOwn(STATES_2026, offer.residence.state)) add("residence.state", "unknownState", { state: offer.residence.state });
   const loc = offer.residence.locality;
   if (loc?.kind === "flat") {
     const r = "residence.locality.rate";
     if (amount(r, loc.rate, "percent") && !(loc.rate >= 0 && loc.rate <= MAX_LOCAL_RATE)) add(r, "localRate", { max: MAX_LOCAL_RATE });
     if (loc.label.length > 40) add("residence.locality.label", "tooLong", { max: 40 });
   }
-  if (!STATES_2026[offer.employerState]) add("employerState", "unknownState", { state: offer.employerState });
+  if (!Object.hasOwn(STATES_2026, offer.employerState)) add("employerState", "unknownState", { state: offer.employerState });
   const col = offer.costOfLiving;
   if (col) {
-    if (!RPP.areas[col.area]) add("costOfLiving.area", "unknownArea", { code: col.area });
+    // An area with prices (audit C25): four of BEA's rows have none, and their price factor was Infinity.
+    if (!hasPrices(col.area)) add("costOfLiving.area", "unknownArea", { code: col.area });
     if (col.monthlyRent !== undefined) nonNegative("costOfLiving.monthlyRent", col.monthlyRent);
     if (col.rentGrowth !== undefined) rate("costOfLiving.rentGrowth", col.rentGrowth);
   }
@@ -174,6 +210,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   // ---- pay -------------------------------------------------------------------------------
   nonNegative("salary.annual", offer.salary.annual);
   each("salary.raise", offer.salary.raise, rate);
+  rows("salary.promotions", offer.salary.promotions);
   (offer.salary.promotions ?? []).forEach((p, i) => {
     const on = date(`salary.promotions.${i}.on`, p.on);
     if (on !== null && start !== null && on <= start) add(`salary.promotions.${i}.on`, "notAfterStart", { start: offer.startDate });
@@ -185,9 +222,10 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   if (b) {
     if (b.basis === "byEmploymentYear") {
       if (b.amounts.length === 0) add("bonus.amounts", "noYears", {});
+      rows("bonus.amounts", b.amounts);
       b.amounts.forEach((a, i) => each(`bonus.amounts.${i}`, a, nonNegative));
     } else {
-      each("bonus.amount", b.amount, nonNegative);
+      each("bonus.amount", b.amount, b.basis === "percentOfSalary" ? bonusShare : nonNegative);
     }
     if (!b.payOn) add("bonus.payOn", "required", { kind: "date" });
     monthDay("bonus.payOn", b.payOn);
@@ -200,6 +238,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   if (cm) {
     if (cm.basis === "byEmploymentYear") {
       if (cm.amounts.length === 0) add("commission.amounts", "noYears", {});
+      rows("commission.amounts", cm.amounts);
       cm.amounts.forEach((a, i) => each(`commission.amounts.${i}`, a, nonNegative));
     } else {
       each("commission.amount", cm.amount, nonNegative);
@@ -218,6 +257,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   }
 
   // ---- cash awards -------------------------------------------------------------------------
+  rows("cashAwards", offer.cashAwards);
   (offer.cashAwards ?? []).forEach((a, i) => {
     const path = `cashAwards.${i}`;
     nonNegative(`${path}.amount`, a.amount);
@@ -234,6 +274,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   const eq = offer.equity;
   if (eq) {
     each("equity.priceGrowth", eq.priceGrowth, rate);
+    rows("equity.grants", eq.grants);
     eq.grants.forEach((g, i) => {
       const path = `equity.grants.${i}`;
       nonNegative(`${path}.value`, g.value);
@@ -259,6 +300,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   function schedule(path: string, s: VestingSchedule): boolean {
     let ok = true;
     if (!s.tranches.length) { add(path, "noTranches", {}); ok = false; }
+    if (s.tranches.length > MAX_ROWS) { add(`${path}.tranches`, "tooMany", { max: MAX_ROWS }); ok = false; }
     s.tranches.forEach((t, j) => {
       if (!whole(`${path}.tranches.${j}.month`, t.month, 0, "wholeMonths")) ok = false;
       if (!amount(`${path}.tranches.${j}.fraction`, t.fraction, "percent")) ok = false;
@@ -268,6 +310,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     if (s.tranches.length && Math.abs(sum - 1) > 1e-9) add(path, "trancheSum", { sum });
     if (s.vestDates) {
       if (!s.vestDates.months.length) add(`${path}.vestDates`, "noMonths", {});
+      if (s.vestDates.months.length > MAX_ROWS) add(`${path}.vestDates`, "tooMany", { max: MAX_ROWS });
       if (!num(s.vestDates.day)) { add(`${path}.vestDates`, "required", { kind: "date" }); return false; }
       const bad = s.vestDates.months.find((m) => !realMonthDay(m, s.vestDates!.day));
       if (bad !== undefined) { add(`${path}.vestDates`, "monthDay", { month: bad, day: s.vestDates.day }); ok = false; }
@@ -280,17 +323,19 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   if (ret) {
     share("retirement.contributionPct", ret.contributionPct);
     const tiers = ret.match ?? [];
+    rows("retirement.match", tiers);
     tiers.forEach((t, i) => {
       const path = `retirement.match.${i}`;
       if (!num(t.upToPct) || !num(t.rate)) { add(path, "required", { kind: "percent" }); return; }
-      if (!(t.upToPct > 0 && t.upToPct <= 1) || !(t.rate >= 0)) add(path, "tierRange", {});
+      if (!(t.upToPct > 0 && t.upToPct <= 1) || !(t.rate >= 0 && t.rate <= MAX_MULTIPLE)) add(path, "tierRange", {});
       else if (i > 0 && num(tiers[i - 1].upToPct) && t.upToPct <= tiers[i - 1].upToPct) add(path, "tierOrder", {});
     });
-    if (ret.nonElectivePct !== undefined) nonNegative("retirement.nonElectivePct", ret.nonElectivePct);
+    if (ret.nonElectivePct !== undefined) nonNegative("retirement.nonElectivePct", ret.nonElectivePct, 1, "percent");
     const v = ret.vesting;
     if (v?.kind === "cliff") whole("retirement.vesting.years", v.years, 1, "wholeYears");
     if (v?.kind === "graded") {
       const steps = v.steps;
+      rows("retirement.vesting.steps", steps);
       const rising = steps.length > 0 && steps.every((s, i) => Number.isInteger(s.years) && s.years >= 1 && s.pct > 0 && s.pct <= 1
         && (i === 0 || (s.years > steps[i - 1].years && s.pct > steps[i - 1].pct)));
       if (!rising || steps[steps.length - 1].pct !== 1) add("retirement.vesting.steps", "gradedSteps", {});
@@ -366,6 +411,8 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
       const v = t[k];
       if (v === undefined || !amount(`timeOff.${k}`, v, "number")) return false;
       if (!(v >= 0)) { add(`timeOff.${k}`, "negative", {}); return false; }
+      // Days given a year bound what banks (audit C25); a cap on banking needs none, since it caps what's given.
+      if (k === "gives" && !(v <= MAX_DAYS_GIVEN)) { add("timeOff.gives", "tooLarge", { max: MAX_DAYS_GIVEN, unit: "days" }); return false; }
       return true;
     };
     const ok = (["vacation", "holidays", "sick", "gives", "cap"] as const).filter(valid);
@@ -380,8 +427,25 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
   // ---- the household's part ------------------------------------------------------------------
   const savings = household?.costOfLiving?.savingsRate;
   if (savings !== undefined && !(savings >= 0 && savings < 1)) add("household.costOfLiving.savingsRate", "savingsRate", {});
+  // Other wages and a spouse's, each year's (audit C25). The app bounds them where they're entered and imported; this is the
+  // engine's own check.
+  for (const k of ["otherWages", "spouseWages"] as const) {
+    const bad = Object.values(household?.[k] ?? {}).find((w) => !(num(w) && w >= 0 && w <= MAX_AMOUNT));
+    if (bad === undefined) continue;
+    const path = `household.${k}`;
+    if (!num(bad)) add(path, "required", { kind: "amount" });
+    else if (bad < 0) add(path, "negative", {});
+    else add(path, "tooLarge", { max: MAX_AMOUNT, unit: "dollars" });
+  }
 
   return out;
+}
+
+/** A BEA area this data has, with prices: an own key (not "constructor"), and all items and housing above 0 (audit C25). */
+export function hasPrices(code: string): boolean {
+  if (!Object.hasOwn(RPP.areas, code)) return false;
+  const a = RPP.areas[code];
+  return a.allItems > 0 && a.housing > 0;
 }
 
 /** A month and day that exist (Feb 29 counts: it falls on Feb 28 in other years). */
