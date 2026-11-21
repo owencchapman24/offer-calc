@@ -114,7 +114,7 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
         <span className="updating" aria-hidden={!updating}>{updating ? "Updating…" : ""}</span>
       </header>
       {notes.map((n) => <p key={n} className="note">{n}</p>)}
-      {error && <p className="note error" role="alert">Couldn't compute: {error}</p>}
+      <ComputeError error={error} results={!!view} />
       <Problems issues={issues} results={!!view} onFix={onFix} />
       {/* With problems and no results, nothing is being worked out: the comparison waits for the fix. */}
       {view && m ? <m.Verdict view={view} letters={letters} stayYears={stayYears} dismissed={dismissed} dispatch={dispatch} cautions={cautions}
@@ -124,6 +124,19 @@ export function Lead({ view, letters, stayYears, updating, error, notes, sample,
       )}
       <TickLegend />
     </section>
+  );
+}
+
+/**
+ * The engine couldn't work out the latest inputs: what it said, and that the results shown are the last it did work out. The lead
+ * schedule shows it, and with one offer its breakdown's head (A-1), as a node from App.tsx, as Problems is.
+ */
+export function ComputeError({ error, results }: { error: string | null; /** Whether there are results from earlier inputs. */ results: boolean }) {
+  if (!error) return null;
+  return (
+    <p className="note error" role="alert">
+      Couldn't compute: {error}{results ? " The results shown are for your last inputs that could be worked out." : ""}
+    </p>
   );
 }
 

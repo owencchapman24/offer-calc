@@ -4,7 +4,7 @@ import { DATA_YEARS } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
-import { Lead, LiveVerdict, Problems, VerdictBar } from "./Lead";
+import { ComputeError, Lead, LiveVerdict, Problems, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
 import { BreakevenSlot, breakdownModule, ByYearSlot, LeavingSlot, loadLater, loadParts, RiskSlot, showBridge } from "./Later";
 import { useLazyModule, useLoadAfterPaint } from "./lazy";
@@ -246,8 +246,8 @@ export function App() {
   const leave = view && panels?.length === letters.length
     ? { leave: { basis: leaveBasis, stayEnd: dayBefore(view.row.window.end), panels } } : {};
   // The schedules after the lead show their figures from earlier inputs dimmed, and say why.
-  const stale: Stale = engine.updating ? "updating" : engine.invalid ? "invalid" : null;
-  const ready = !engine.updating && !engine.invalid && !!engine.sweep;
+  const stale = staleOf(engine);
+  const ready = stale === null && !!engine.sweep;
   // The close-call line (docs/ui-design.md §4.1): the runner-up's salary that ties, from the slow lane, ahead of L-3 and L-4.
   // Breakeven isn't defined per hour, so the line is for the dollar bases only.
   const lead = view?.lead;
@@ -278,12 +278,15 @@ export function App() {
   const ownTerms = byLetter(engine.terms.result);
   const ownPanels = byLetter(engine.cursor.result);
   // The breakdowns' slow jobs start once every complete offer's breakdown is current and valid (one offer is enough).
-  const ownReady = !engine.updating && !engine.invalid && complete.length > 0 && complete.every((x) => engine.breakdowns[x.o.id]);
+  const ownReady = stale === null && complete.length > 0 && complete.every((x) => engine.breakdowns[x.o.id]);
   // The breakdowns' parts, where the page places them (Breakdown.tsx): pinned with one offer, a section and the ledger's foot row
   // with two or more.
   const own = breakdown?.ownSlots({ offers: session.offers, breakdowns: engine.breakdowns, prices, tab: session.ui.offerTab, stayYears,
     updating: engine.updating, sample, notes, firstUse: !session.ui.dismissed?.afterRent, dispatch,
-    problems: <Problems issues={engine.invalid ? issues : {}} results={Object.keys(engine.breakdowns).length > 0} onFix={edit} />,
+    problems: <>
+      <ComputeError error={engine.error} results={Object.keys(engine.breakdowns).length > 0} />
+      <Problems issues={engine.invalid ? issues : {}} results={Object.keys(engine.breakdowns).length > 0} onFix={edit} />
+    </>,
     parts: {
       ui: session.ui, dispatch, request, ready: ownReady, requestSlow, slow: { work: engine.work, terms: engine.terms, cursor: engine.cursor },
       leave: { at: leaveAt, basis: leaveBasis, onAt: setLeaveAt }, status: stale,
@@ -483,6 +486,15 @@ export function copyBlock(s: { offers: number; view: boolean; own: boolean; inva
   if (comparing ? !s.view || !s.own : !s.own) return { why: comparing ? "Working out the comparison…" : "Working out the breakdown…", shown: false };
   return null;
 }
+
+/**
+ * Why the figures on the page aren't for the current inputs, if they aren't: being worked out; or kept from earlier inputs, because
+ * the inputs have a problem or the engine couldn't work them out (an error). Kept figures stay readable and say so ("⚠ Last valid
+ * results"); the slow jobs wait for figures that are current, so A-4, A-7, L-3 and L-4 never run on inputs the rest of the page
+ * doesn't show. (An error once left both unsaid: audit, 2026-11.)
+ */
+export const staleOf = (e: { updating: boolean; invalid: boolean; error: string | null }): Stale =>
+  e.updating ? "updating" : e.invalid || e.error ? "invalid" : null;
 
 type CopyState = "working" | "copied" | "again" | "failed" | null;
 const COPY_SAID: Record<Exclude<CopyState, null>, string> = {

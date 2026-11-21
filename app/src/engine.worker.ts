@@ -1,7 +1,7 @@
 import { needs, type OptionalModules, type OptionalName, provide } from "../../src/offer/optional";
 import { compute, type OwnCache } from "./compute";
 import { createRunner, inOrder, onFirstUse } from "./jobs";
-import type { EngineRequest, EngineResponse, SlowRequest, SlowResponse } from "./protocol";
+import { type EngineRequest, type EngineResponse, NOT_LOADED, type SlowRequest, type SlowResponse } from "./protocol";
 
 // The engine runs here, off the main thread, so typing stays smooth (docs/ui-design.md §3.4). Each complete offer gets its
 // breakdown, over its own stay, remembered by its inputs so an edit projects only the offer edited; two or more offers get the
@@ -50,16 +50,20 @@ function waitFor(m: EngineRequest | SlowRequest): Promise<unknown> | null {
   return loads.length ? Promise.all(loads) : null;
 }
 
+/** Edits that ran without a module they needed, which didn't load: their error says to reload (NOT_LOADED), not which module. */
+const unloaded = new WeakSet<EngineRequest>();
+
 /**
- * A request, on its lane. If a module it needed didn't load, an edit still runs (the engine says which module is missing) and a
- * slow job answers with the error, as a job that failed would.
+ * A request, on its lane. If a module it needed didn't load, an edit still runs (an offer without the module is worked out; one with
+ * it fails, saying to reload) and a slow job answers with the same error, as a job that failed would.
  */
 function dispatch(m: EngineRequest | SlowRequest, error?: Error) {
-  if (isEdit(m)) return runner.fast(m);
-  const s = slowJobs.value;
-  if (!s || error) {
-    return post({ lane: m.lane, gen: m.gen, ok: false, error: (error ?? new Error("The slow jobs didn't load.")).message, ms: 0 });
+  if (isEdit(m)) {
+    if (error) unloaded.add(m);
+    return runner.fast(m);
   }
+  const s = slowJobs.value;
+  if (!s || error) return post({ lane: m.lane, gen: m.gen, ok: false, error: NOT_LOADED, ms: 0 });
   if (m.lane === "leave") runner.slow("leave", s.leaveJob(m, post));
   else if (m.lane === "cursor") runner.slow("cursor", s.cursorJob(m, post));
   else if (m.lane === "work") runner.slow("work", s.paymentsJob(m, post));
@@ -79,6 +83,7 @@ function run(req: EngineRequest) {
   } catch (err) {
     // Rent estimates don't depend on the offers' results, so they still come back.
     const { rents } = compute({ ...req, offers: null, check: [] });
-    scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error: err instanceof Error ? err.message : String(err), issues: [], rents, ms: performance.now() - t });
+    const error = unloaded.has(req) ? NOT_LOADED : err instanceof Error ? err.message : String(err);
+    scope.postMessage({ lane: "compare", gen: req.gen, ok: false, error, issues: [], rents, ms: performance.now() - t });
   }
 }
