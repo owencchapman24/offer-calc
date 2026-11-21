@@ -104,6 +104,12 @@ const cases: Case[] = [
   ["rent growth of -100%", C, (o) => { o.costOfLiving!.rentGrowth = -1; }, "costOfLiving.rentGrowth", "rate", true],
   ["an unknown BEA area", C, (o) => { o.costOfLiving!.area = "99999"; }, "costOfLiving.area", "unknownArea", true],
   ["an unknown state", C, (o) => { o.residence = { state: "XX" }; }, "residence.state", "unknownState", true],
+  // A flat local income tax (2026-11-20): 0% to 5%, the highest anywhere being Philadelphia's 3.74%.
+  ["a local rate over 5%", C, (o) => { o.residence.locality = { kind: "flat", label: "Columbus", rate: 0.06, base: "wages" }; }, "residence.locality.rate", "localRate", false],
+  ["a negative local rate", C, (o) => { o.residence.locality = { kind: "flat", label: "Columbus", rate: -0.01, base: "wages" }; }, "residence.locality.rate", "localRate", false],
+  ["a blank local rate", C, (o) => { o.residence.locality = { kind: "flat", label: "Columbus", rate: Number.NaN, base: "wages" }; }, "residence.locality.rate", "required", false],
+  ["a local tax's name over 40 characters", C, (o) => { o.residence.locality = { kind: "flat", label: "x".repeat(41), rate: 0.02, base: "wages" }; },
+    "residence.locality.label", "tooLong", false],
   ["an unknown employer state", C, (o) => { o.employerState = "XX"; }, "employerState", "unknownState", false],
 ];
 

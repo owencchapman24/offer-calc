@@ -11,8 +11,8 @@ import {
 import {
   ChoiceField, DateField, EditButton, editorButtonName, EditorRow, MonthDayField, NumberField, PlanField, RangeField, shownValue, Warnings,
 } from "./controls";
-import { DefaultTick, FieldRow, fieldId, hintId, useLedger } from "./fields";
-import { type AppOffer, bonusBasis, hasCommission, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
+import { DefaultTick, FieldRow, fieldId, hintId, issuesAt, useLedger } from "./fields";
+import { type AppOffer, bonusBasis, CITY_TAX, cityTax, hasCommission, hasEspp, type HealthDraft, type RetirementDraft } from "./model";
 import { CityRow, RentRow, SalaryRow, StartRow } from "./rows";
 import type { LedgerSection } from "./session";
 import { bonusYearsText, cashAwardsText, commissionText, grantsText, matchText, otherBenefitsText, promotionsText, refreshersText } from "./summary";
@@ -38,6 +38,8 @@ export function DetailedSection({ id, rents }: { id: LedgerSection; rents: Recor
           <CityRow />
           <RentRow rents={rents} />
           <FieldRow k="employerState">{(o) => <><EmployerStateField o={o} /><Warnings o={o} path="employerState" /></>}</FieldRow>
+          <FieldRow k="residence.locality.rate">{(o) => <LocalRateField o={o} />}</FieldRow>
+          <FieldRow k="residence.locality.label">{(o) => <LocalNameField o={o} />}</FieldRow>
           <FieldRow k="costOfLiving.rentGrowth">{(o) => <NumberField o={o} path="costOfLiving.rentGrowth" kind="percent" label="rent growth a year" />}</FieldRow>
         </>
       );
@@ -481,6 +483,27 @@ function Perks() {
 
 /** Every state the tax engine knows (50 and DC), from the city list; a test checks it against the engine's. */
 export const US_STATES: string[] = [...new Set(CITIES.flatMap((c) => c.states))].sort();
+
+/** A local income tax at a flat rate, where the city's own tax isn't worked out (New York City's and Philadelphia's are). */
+function LocalRateField({ o }: { o: AppOffer }) {
+  const city = cityTax(o.draft);
+  if (city) return <span className="sub">{CITY_TAX[city].place}'s tax, worked out for you</span>;
+  return <NumberField o={o} path="residence.locality.rate" kind="percent" label="local income tax, a flat rate" blank="None" />;
+}
+
+/** The local tax's name, for its tax lines ("Columbus income tax"): blank, "Local". */
+function LocalNameField({ o }: { o: AppOffer }) {
+  const api = useLedger();
+  if (cityTax(o.draft)) return <span className="sub">{CITY_TAX[cityTax(o.draft)!].line}</span>;
+  const path = "residence.locality.label";
+  return (
+    <span className="field">
+      <input type="text" id={fieldId(o.letter, path)} aria-label={`Offer ${o.letter} local tax's name`} data-help={path}
+        aria-describedby={hintId(path)} aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} maxLength={40} placeholder="Local"
+        value={o.draft.residence.locality?.label ?? ""} onChange={(e) => api.set(o, { [path]: e.target.value || null })} />
+    </span>
+  );
+}
 
 function EmployerStateField({ o }: { o: AppOffer }) {
   const api = useLedger();

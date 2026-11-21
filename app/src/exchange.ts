@@ -201,6 +201,9 @@ const DRAFT_FIELDS: Shape = obj({
     // Inside Philadelphia arrived on 2026-10-14: optional, so earlier exports still import.
     const philly = (v as { philadelphia?: unknown } | null)?.philadelphia;
     if (v && typeof v === "object" && philly !== undefined) bool(philly, `${p}.philadelphia`, ps);
+    // A flat local income tax arrived on 2026-11-20: optional likewise.
+    const loc = (v as { locality?: unknown } | null)?.locality;
+    if (v && typeof v === "object" && loc !== undefined) nullable(obj({ rate: nullable(num), label: nullable(str) }))(loc, `${p}.locality`, ps);
   },
   employerState: nullable(str),
   startDate: nullable(date),

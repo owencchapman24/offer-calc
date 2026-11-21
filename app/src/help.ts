@@ -139,6 +139,8 @@ const META: Record<string, FieldMeta> = {
   "timeOff.payout": { label: "Unused vacation when you leave", section: "M-9", group: "hours" },
   // ---- where you'd live ----
   employerState: { label: "Employer state", section: "M-4", group: "where" },
+  "residence.locality.rate": { label: "Local income tax, a flat rate", section: "M-4", group: "where" },
+  "residence.locality.label": { label: "The local tax's name", section: "M-4", group: "where" },
   "costOfLiving.rentGrowth": { label: "Rent growth", section: "M-6.2", group: "where" },
   // ---- about you ----
   "about.filing": { label: "Filing status", section: "M-4", group: "about" },

@@ -6,7 +6,8 @@ import { HOUSING_WEIGHT, indexText, shownIndexes, type ShownYear, shownStay } fr
 export { indexText } from "./footing";
 import { HELP, helpKey } from "./help";
 import {
-  alsoCounted, type AppOffer, ASSUMPTIONS, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, CITY_TAX, cityTax, type Letter, type OfferDraft, type ScheduleDraft,
+  alsoCounted, type AppOffer, ASSUMPTIONS, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, CITY_TAX, cityTax, flatLocality, type Letter,
+  localTaxName, type OfferDraft, type ScheduleDraft,
   timeOffInput, toOfferInput,
 } from "./model";
 import { daysOff, weeksWorked } from "../../src/offer/timeOff";
@@ -1891,8 +1892,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
       const split = d.split.filter((s) => s.ey === n).sort((a, z) => a.year - z.year);
       const rates = d.taxYears.filter((t) => split.some((s) => s.year === t.year));
       const st = o?.draft.residence.state ?? "State";
-      const city = o ? cityTax(o.draft) : null;
-      const local = city ? CITY_TAX[city].line : "local";
+      const local = (o && localTaxName(o.draft)) ?? "local";
       return {
         title: title("tax"), scope,
         lines: [
@@ -2796,10 +2796,13 @@ function inputWork(ctx: WorkContext, letter: L, path: string): Work {
   switch (path) {
     case "costOfLiving.area": {
       const city = cityTax(d);
+      const flat = flatLocality(d);
       const state = d.residence.state;
       const where = `${cityName(d.costOfLiving.area)}${state ? ` · live in ${state}` : ""}${city ? `, inside ${CITY_TAX[city].place}` : ""}`;
+      const local = flat ? `, with ${flat.label === "Local" ? "a local" : `${flat.label}'s`} income tax at ${percent(flat.rate)} of `
+        + `${flat.base === "wages" ? "wages" : `${state} taxable income`}, as entered` : "";
       return { title: title("where you'd live"), lines: [{ label: "City", value: where, tick: "traced" }],
-        notes: [traced, `Taxed as a full-year resident of ${state ?? "that state"}${city ? ` and ${CITY_TAX[city].place}` : ""}; `
+        notes: [traced, `Taxed as a full-year resident of ${state ?? "that state"}${city ? ` and ${CITY_TAX[city].place}` : local}; `
           + "spending is priced with this metro's BEA price level."], ties: [], uses: [], edit };
     }
     case "costOfLiving.monthlyRent": {

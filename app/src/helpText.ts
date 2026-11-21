@@ -488,6 +488,17 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
     help: "We tax you where you'd live; the employer's state matters only for remote work. Some states, such as New York, can tax a "
       + "remote worker's pay too, and a warning says so. It defaults to the state you'd live in.",
   },
+  "residence.locality.rate": {
+    hint: "Your county's or city's income tax, if it has one.",
+    help: "Many places levy their own income tax: Maryland's counties, Ohio's and Michigan's cities, Pennsylvania's earned income tax, "
+      + "Kentucky's occupational taxes, Kansas City's and Saint Louis's earnings taxes. Enter its rate and it's counted as a resident's "
+      + "tax: on your wages, or in Maryland and Indiana on state taxable income. Anne Arundel and Frederick counties use brackets, so "
+      + "enter the rate for your income. New York City's and Philadelphia's taxes are worked out for you; blank means none.",
+  },
+  "residence.locality.label": {
+    hint: "What its tax lines call it.",
+    help: "The name its tax lines and work show, such as Baltimore County or Columbus. Blank, they say Local. It changes no figure.",
+  },
   "costOfLiving.rentGrowth": {
     hint: "How fast your rent rises each year.",
     help: "Your rent rises by this much at each anniversary of your start date. It defaults to inflation, 2.5% a year; rents in "

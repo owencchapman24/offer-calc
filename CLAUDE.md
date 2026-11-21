@@ -25,8 +25,9 @@ behind every figure.
   vacation, holidays and sick days set the weeks worked; unused vacation paid on leaving where the employer's state requires it,
   2026-10-19); v2's 4i (an employee stock purchase plan, each lot sold the day it's bought, 2026-10-22); v2's 4j (other benefits,
   taxable or tax-free, and tax-free benefits, the perks among them, on a line of their own, 2026-10-23); v2's 4h (commission, paid
-  monthly or quarterly after a lag, with a range, a draw against it and what's paid when you leave, 2026-11-05, for review). How each
-  differs from the design: `docs/ui-design.md` §12.
+  monthly or quarterly after a lag, with a range, a draw against it and what's paid when you leave, 2026-11-05, for review); and a
+  flat local income tax, entered under Where you'd live (2026-11-20, from the November audit). How each differs from the design:
+  `docs/ui-design.md` §12.
 - **The October 2026 audit** (`docs/audit-2026-10.md`): its fixes are merged for spouse wages (C1), Philadelphia's resident tax
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the tax baselines committed and the grid's checked in CI (T1), the e2e
@@ -492,7 +493,9 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 - Low-income credits and tables: CT's personal credit and AR's tables reach ~$100k (AR single +$112 at $80k, joint +$270 at $100k; CT
   single +$257 at $60k, joint +$310 at $80k). HI and MN refundable credits and ME and NM joint credits matter only below ~$60k.
 - CO's TABOR refund (+$19 to +$118) and AK's Permanent Fund Dividend (our federal $120-$480 lower) aren't modeled.
-- MD county, OH city and PA EIT taxes aren't defaulted (a flat local rate can be entered). PolicyEngine's SALT includes MD county
+- MD county, OH city and PA EIT taxes aren't defaulted: a flat local rate can be entered (detailed mode, Where you'd live; on FICA
+  wages, or in MD and IN on state taxable income, `LOCAL_ON_STATE_INCOME` in `app/src/model.ts`), so Anne Arundel's and Frederick's
+  brackets are approximated by the rate entered. PolicyEngine's SALT includes MD county
   tax, so our federal is up to $3,374 higher (single, $320k), the oracle's largest federal gap.
 - Unverified: AL's federal-tax deduction (PolicyEngine includes Additional Medicare Tax: +$9 to +$54 above $200k); MN joint at high
   incomes (−$186 at $300k, −$594 at $320k; single within $6); RI's spike at $280k; AZ's standard deduction ($15,750, copied from

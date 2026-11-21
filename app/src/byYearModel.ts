@@ -3,7 +3,7 @@ import { type ShownYear, shownStay, shownYears } from "./footing";
 import {
   type BridgeLine, detailOf, join, type MetricId, offerByLetter, ownOf, ownYearOf, pricesOf, res, shortCity, type WorkContext, yearOf,
 } from "./metrics";
-import { type AppOffer, CITY_TAX, cityTax, type Letter } from "./model";
+import { type AppOffer, type Letter, localTaxName } from "./model";
 import type { OfferDetail } from "./protocol";
 import { dayBefore, dollars, longDate, monthName, percent, shortDate } from "./text";
 
@@ -238,8 +238,7 @@ export function bridge(ctx: WorkContext, letter: L, n: number, of: "own" | "comp
 
   const taxYears = d.split.filter((s) => s.ey === n).map((s) => s.year);
   const kinds = d.taxYears.filter((t) => taxYears.includes(t.year));
-  const city = o ? cityTax(o.draft) : null;
-  const locality = city ? CITY_TAX[city].line : "local";
+  const locality = (o && localTaxName(o.draft)) ?? "local";
   const who = [
     kinds.some((t) => t.parts.federal) && "federal", kinds.some((t) => t.parts.fica) && "FICA",
     kinds.some((t) => t.parts.state) && (o?.draft.residence.state ?? "state"), kinds.some((t) => t.parts.local) && locality,

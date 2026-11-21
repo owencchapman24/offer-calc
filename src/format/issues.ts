@@ -42,6 +42,7 @@ export function formatIssue(i: OfferIssue): string {
     case "wholeYears": return `Enter a whole number of years, ${i.params.min} or more.`;
     case "wholeDays": return `Enter a whole number of days, ${i.params.min} or more.`;
     case "dayRange": return `Enter a whole number of days, ${i.params.min} to ${i.params.max}.`;
+    case "localRate": return `Enter a rate from 0% to ${+(i.params.max * 100).toFixed(2)}%: no U.S. city's or county's is higher.`;
     case "positive": return "Each tranche must vest more than 0%.";
     case "trancheSum": {
       const { sum } = i.params;

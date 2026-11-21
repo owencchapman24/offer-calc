@@ -53,6 +53,8 @@ describe("import", () => {
     s = reducer(s, { type: "edit", id: s.offers[1].id, set: { espp: { ...newEspp(), contributionPct: 0.08, lookback: false, offeringsStart: { month: 5, day: 1 } } } });
     s = reducer(s, { type: "edit", id: s.offers[0].id, set: { espp: "none", otherBenefits: [{ label: "Gym", annual: 600, taxable: false }] } });
     s = reducer(s, { type: "edit", id: s.offers[2].id, set: { otherBenefits: [] } });
+    // A flat local income tax (2026-11-20); the samples' exports have none, as earlier exports don't.
+    s = reducer(s, { type: "edit", id: s.offers[1].id, set: { "residence.locality.rate": 0.01, "residence.locality.label": "Durham" } });
     s = reducer(s, { type: "household", patch: { stayYears: 3, healthUsage: "high", pricesIn: "16740" } });
     expect(JSON.parse(exportSession(s, TODAY, NOW).text).household.pricesIn).toBe("16740");
     // A spouse's wages (2026-10-14) round-trip; exports from before them import as none.
@@ -113,6 +115,8 @@ describe("import", () => {
       ["a bad stay", bad((x) => { x.household.stayYears = 0; }), "household.stayYears: should be a whole number of years from 1 to 10."],
       ["inside Philadelphia, not yes or no", bad((x) => { x.offers[0].draft.residence.philadelphia = "maybe"; }),
         "offers.0.draft.residence.philadelphia: should be true or false."],
+      ["a local tax rate that isn't a number", bad((x) => { x.offers[1].draft.residence.locality = { rate: "2%", label: "Durham" }; }),
+        "offers.1.draft.residence.locality.rate: should be a number."],
       ["a spouse's wages below $0", bad((x) => { x.household.spouseWages = -1; }), "household.spouseWages: should be an amount of $0 or more."],
       ["a 401(k) that's neither", bad((x) => { x.offers[0].draft.retirement = "maybe"; }), "offers.0.draft.retirement: should be \"none\" or a 401(k) plan."],
       ["a benefit's tax, not yes or no", bad((x) => { x.offers[0].draft.otherBenefits = [{ label: "Gym", annual: 600, taxable: "maybe" }]; }),

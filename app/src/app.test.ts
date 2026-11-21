@@ -4,9 +4,10 @@ import type { OfferInput } from "../../src/offer/types";
 import { VESTING_PRESETS } from "../../src/offer/vesting";
 import { SAMPLE_OFFERS } from "../../src/samples";
 import {
-  type AppOffer, blankCommission, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, getPath, sampleOffers, sampleShift, setPath, shiftOffer, shiftYears, toHousehold,
-  toOfferInput, withBase,
+  type AppOffer, blankCommission, blankOffer, blankTimeOff, DEFAULT_HOUSEHOLD, dropTrailing, firstYear, fromOfferInput, getPath, sampleOffers, sampleShift, setPath,
+  shiftOffer, shiftYears, toHousehold, toOfferInput, withBase,
 } from "./model";
+import { computeTaxes, paramsForYear } from "../../src/tax/index";
 import { newEspp } from "./editors";
 import { validateOffer } from "../../src/offer/validate";
 import { copyBlock, staleOf } from "./App";
@@ -127,6 +128,34 @@ describe("drafts to the engine's input", () => {
     const y2026 = projectOffer(offer, toHousehold(DEFAULT_HOUSEHOLD, 2026), { valuationDate: "2026-07-13" }).scenarios.base.calendarYears[0];
     expect(y2026.withOffer.result.localIncomeTax).toBeCloseTo(1_748.19, 2);
     expect(y2026.withoutOffer.result.localIncomeTax).toBe(0);
+  });
+  it("a flat local income tax (2026-11-20): on wages, or in Maryland and Indiana on state taxable income; never beside a city's own", () => {
+    const b = blankOffer("A");
+    const at = (state: string, area: string, locality: AppOffer["draft"]["residence"]["locality"], nyc = false): AppOffer => ({ ...b, draft: { ...b.draft,
+      salary: { ...b.draft.salary, annual: 100_000 }, startDate: "2026-07-13", residence: { state, nyc, locality },
+      costOfLiving: { ...b.draft.costOfLiving, area } } });
+    const input = (o: AppOffer) => (toOfferInput(o) as { offer: OfferInput }).offer;
+    const columbus = input(at("OH", "18140", { rate: 0.025, label: "Columbus" }));
+    expect(columbus.residence.locality).toEqual({ kind: "flat", label: "Columbus", rate: 0.025, base: "wages" });
+    // Named with "income tax" on the end, it isn't said twice on its tax line; blank, it's "Local".
+    const md = input(at("MD", "12580", { rate: 0.032, label: "Baltimore County income tax" }));
+    expect(md.residence.locality).toEqual({ kind: "flat", label: "Baltimore County", rate: 0.032, base: "stateTaxableIncome" });
+    expect(input(at("OH", "18140", { rate: 0.025, label: null })).residence.locality).toMatchObject({ label: "Local" });
+    // A blank rate, or nothing entered: none. In New York City, the city's own tax, not this.
+    expect(input(at("OH", "18140", { rate: null, label: "Columbus" })).residence.locality).toBeUndefined();
+    expect(input(at("OH", "18140", null)).residence.locality).toBeUndefined();
+    expect(input(at("NY", "35620", { rate: 0.02, label: "X" }, true)).residence.locality).toEqual({ kind: "nyc" });
+    // A draft made from the engine's input keeps it.
+    expect(fromOfferInput(md).residence.locality).toEqual({ rate: 0.032, label: "Baltimore County" });
+    // Hand-checked: 2026 pay from Jul 13 is 46,774.19 (as above); Columbus's 2.5% of it is 1,169.35, on pay before any 401(k).
+    const year = (o: OfferInput) => projectOffer(o, toHousehold(DEFAULT_HOUSEHOLD, 2026), { valuationDate: "2026-07-13" }).scenarios.base.calendarYears[0];
+    expect(year(columbus).withOffer.result.localIncomeTax).toBeCloseTo(1_169.35, 2);
+    // Maryland's is 3.2% of Maryland taxable income: the same year's tax input at a 100% rate on that base gives the base itself.
+    const y = year(md).withOffer;
+    const base = computeTaxes({ ...y.input, locality: { kind: "flat", label: "x", rate: 1, base: "stateTaxableIncome" } }, paramsForYear(2026)).localIncomeTax;
+    expect(base).toBeGreaterThan(0);
+    expect(base).toBeLessThan(46_774.19); // after Maryland's deduction and exemption
+    expect(y.result.localIncomeTax).toBeCloseTo(0.032 * base, 2); // the tax engine's results are to the cent
   });
   it("other wages go to the earliest start date's calendar year, or this year before any start date", () => {
     expect(toHousehold({ ...DEFAULT_HOUSEHOLD, otherWagesThisYear: 12_000 }, 2027).otherWages).toEqual({ 2027: 12_000 });

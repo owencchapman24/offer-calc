@@ -49,6 +49,8 @@ export type OfferIssue = { path: string } & (
   | { code: "wholeDays"; params: { min: number } }
   /** A whole number of days outside min-max (commission's payout lag, 0 to 366). */
   | { code: "dayRange"; params: { min: number; max: number } }
+  /** A flat local income tax rate outside 0 to `max` (a fraction): no U.S. city's or county's is higher. */
+  | { code: "localRate"; params: { max: number } }
   /** A vesting tranche of 0% or less. */
   | { code: "positive"; params: NoParams }
   /** Vesting tranches that don't add up to 100%. `sum` is a fraction (0.95). */
@@ -79,6 +81,12 @@ const SCENARIOS = ["bear", "base", "bull"] as const;
 const FIRST_DAY = toDays("2026-01-01");
 /** Days in each month, with February's leap day allowed (a Feb 29 date falls on Feb 28 in other years). */
 const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+/**
+ * The most a flat local income tax can be: above every U.S. city's and county's, the highest being Philadelphia's resident wage
+ * tax, 3.74% in 2026 (src/tax/params/local2026.ts); Maryland's counties reach about 3.3% and Ohio's cities 2.5% or so (the states'
+ * notes, src/tax/params/states2026.ts). So a typo such as 25 for 2.5% is caught.
+ */
+export const MAX_LOCAL_RATE = 0.05;
 
 /**
  * Every problem with an offer's inputs, each with the path of the field that caused it. Empty when
@@ -133,6 +141,12 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
 
   // ---- where you'd live ------------------------------------------------------------------
   if (!STATES_2026[offer.residence.state]) add("residence.state", "unknownState", { state: offer.residence.state });
+  const loc = offer.residence.locality;
+  if (loc?.kind === "flat") {
+    const r = "residence.locality.rate";
+    if (amount(r, loc.rate, "percent") && !(loc.rate >= 0 && loc.rate <= MAX_LOCAL_RATE)) add(r, "localRate", { max: MAX_LOCAL_RATE });
+    if (loc.label.length > 40) add("residence.locality.label", "tooLong", { max: 40 });
+  }
   if (!STATES_2026[offer.employerState]) add("employerState", "unknownState", { state: offer.employerState });
   const col = offer.costOfLiving;
   if (col) {
