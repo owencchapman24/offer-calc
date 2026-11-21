@@ -1439,6 +1439,28 @@ describe("an employee stock purchase plan, each lot sold at purchase (v2 4i)", (
     expect(cliffs(tx(), single, { years: 1 }).filter((c) => c.kind === "esppPurchase").map((c) => [c.date, c.amount]))
       .toEqual([["2026-06-30", 1_058.82], ["2026-12-31", 1_058.82]]);
   });
+  it("pay after your last day puts nothing in the plan: commission paid after you leave and a prorated bonus", () => {
+    // "Salary and bonus" (which counts commission), $12,000 a year of commission paid 15 days after each month, and a $12,000 bonus
+    // for 2026 paid Mar 15, 2027, prorated if you've left. Last day Jun 29, 2026, the day before the first purchase:
+    // - in by the last day: salary $5,966.67 (as above), and January's to May's commission, paid Feb 15 to Jun 15, 5 x $1,000 x 10%
+    //   = $500, all refunded on Jun 29: $6,466.67;
+    // - paid after it, putting nothing in: June's commission, $1,000 x 29/30 = $966.67 on Jul 15, and the bonus, $12,000 x 180/365 =
+    //   $5,917.81 on Mar 15, 2027 (Jan 1 - Jun 29 is 180 days). Before the fix, 10% of each went in and was "refunded" on Jun 29,
+    //   before it was paid: $7,155.11.
+    const o = tx({ espp: { ...plan, eligiblePay: "salaryAndBonus" },
+      commission: { basis: "fixed", amount: all(12_000), period: "month", payAfterDays: 15 },
+      bonus: { basis: "fixed", amount: all(12_000), payOn: { month: 3, day: 15 }, mustBeEmployedOnPayDate: false } });
+    const r = keptIfLeaving(o, single, toDays("2026-06-29")).result;
+    expect(r.leave!.esppRefund).toBe(6_466.67);
+    const late = r.events.filter((e) => e.date > "2026-06-29").map((e) => [e.date, e.component, e.gross]);
+    expect(late).toEqual([["2026-07-15", "commission", 966.67], ["2027-03-15", "bonus", 5_917.81]]);
+    const putIn = r.benefitEvents.filter((b) => b.detail.kind === "esppContribution");
+    expect(putIn.every((b) => b.date <= "2026-06-29")).toBe(true);
+    expect(putIn.reduce((s, b) => s + b.amount, 0)).toBeCloseTo(6_466.67, 2);
+    // Leaving after the purchase it's paid toward, the same pay still buys: May's commission, paid Jun 15, is in June 30's purchase.
+    const stayed = keptIfLeaving(o, single, toDays("2026-06-30")).result;
+    expect(stayed.events.find((e) => e.component === "espp")!.detail).toMatchObject({ contributed: expect.closeTo(6_500, 6) });
+  });
   it("money in the plan at a year's end is out of take-home and saved: offerings from Feb 1 hold Aug-Dec's $5,000 at year 1's end", () => {
     // Feb 1 - Jul 31 buys Jul 31 with Feb-Jul's $6,000; Aug 1 - Jan 31 buys Jan 31, 2027. January 2026's pay is before the first offering.
     const y1 = projectScenario(tx({ espp: { ...plan, offeringsStart: { month: 2, day: 1 } } }), single, { years: 2 }).employmentYears[0];

@@ -63,6 +63,8 @@ export function esppFlows(
     || (p.eligiblePay === "salaryAndBonus" && (e.component === "bonus" || e.component === "commission")))
     .sort((a, b) => a.day - b.day);
   for (const e of eligible) {
+    // Pay after your last day (commission paid after you leave, a prorated bonus) puts nothing in: you're no longer a participant.
+    if (leave !== undefined && e.day > leave) continue;
     const period = periods.find((x) => x.from <= e.day && e.day <= x.to);
     if (!period || !(e.gross > 0)) continue;
     const amount = p.contributionPct * e.gross;
