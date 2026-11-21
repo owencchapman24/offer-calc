@@ -66,7 +66,12 @@ export function projectScenario(offer: OfferInput, household: Household, options
   // after the 1st of a month had its last month in the window dated at the month's end, outside it (audit C3).
   const cuts = [...new Set([...anniversaries, windowStart, windowEnd])].sort((a, b) => a - b);
   // Simulate to the end of the calendar year holding the last reported day, so it's taxed in full.
-  const until = jan1(yearOfDay(Math.max(anniversaries[years], windowEnd) - 1) + 1);
+  const reported = jan1(yearOfDay(Math.max(anniversaries[years], windowEnd) - 1) + 1);
+  // With a leave date inside it, follow pay still due for work up to the last day to the year it's paid (audit C6): a bonus for the
+  // period you leave in pays on the first pay date after that period ends, under 732 days on; commission for a period of at most 3
+  // months, within 366 days of its end. Nothing is earned after the last day, so the years added hold only those payouts.
+  const dueAfter = leave === undefined || leave >= reported ? 0 : Math.max(offer.bonus ? 732 : 0, offer.commission ? 92 + 366 : 0);
+  const until = dueAfter ? Math.max(reported, jan1(yearOfDay(leave! + dueAfter) + 1)) : reported;
   // Employment ends after the leave date (inclusive); nothing is earned, vested or granted after it.
   const workEnd = leave !== undefined ? Math.min(until, leave + 1) : until;
 

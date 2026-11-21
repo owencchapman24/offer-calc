@@ -75,8 +75,9 @@ section 2's and the plan's in step):
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
-4. **The audit's "fix before going public" items** (its table): C6, C7, C16-C19, C24, C25, C27, C28, T6, T7, T9, S1, S2's
-   `npm audit` step, D9, D11, P5-P7. (D10, the README's drift, was fixed 2026-10-17 with the README's refresh.)
+4. **The audit's "fix before going public" items** (its table): C7, C17-C19, C24, C25, C27, C28, T6, T7, T9, S1, S2's
+   `npm audit` step, D9, D11, P5-P7. (D10, the README's drift, was fixed 2026-10-17 with the README's refresh; C16, the minus
+   zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like case.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
    `.claude/review/readme/shots.e2e.ts`), and check the README and M-4 against the oracle report, and the docs against the code.
 
