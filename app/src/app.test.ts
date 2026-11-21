@@ -9,7 +9,8 @@ import {
 } from "./model";
 import { newEspp } from "./editors";
 import { validateOffer } from "../../src/offer/validate";
-import { copyBlock } from "./App";
+import { copyBlock, staleOf } from "./App";
+import { NOT_LOADED } from "./protocol";
 import { readImport } from "./exchange";
 import { PRESETS, presetOf } from "./presets";
 import { priceWords, US_PRICES } from "./prices";
@@ -456,6 +457,16 @@ describe("text", () => {
     // L-2's drop: an offer without ranges loses nothing in its bear case, "0%".
     const drop = (share: number) => dropText({ share } as RiskRow);
     expect([0, -0, 0.004, -0.004, 0.17, -0.05].map(drop)).toEqual(["0%", "0%", "0%", "0%", "−17%", "+5%"]);
+  });
+});
+
+describe("whether the figures are for the current inputs (staleOf)", () => {
+  // Audit, 2026-11: an error from the engine kept the old figures, unmarked, and let the slow jobs run on the new inputs.
+  const at = (s: Partial<{ updating: boolean; invalid: boolean; error: string | null }>) => staleOf({ updating: false, invalid: false, error: null, ...s });
+  it("current; being worked out; kept from earlier inputs, for a problem with them or an error", () => {
+    expect([at({}), at({ updating: true }), at({ invalid: true }), at({ error: NOT_LOADED })]).toEqual([null, "updating", "invalid", "invalid"]);
+    // A newer edit being worked out says so, whatever came before.
+    expect(at({ updating: true, error: "x" })).toBe("updating");
   });
 });
 

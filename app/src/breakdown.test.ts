@@ -9,7 +9,8 @@ import Methodology from "./Methodology";
 import { type MetricId, metricKind, type WorkContext } from "./metrics";
 import { ASSUMPTIONS, blankOffer, DEFAULT_HOUSEHOLD, sampleOffers, toHousehold, toOfferInput } from "./model";
 import { priceWords } from "./prices";
-import type { CompareRequest } from "./protocol";
+import { type CompareRequest, NOT_LOADED } from "./protocol";
+import { ComputeError } from "./Lead";
 import { SECTIONS } from "./sections";
 import { initialSession, reducer } from "./session";
 import { alone, context, footsAsDisplayed, ownOffers, renderAlone, renderBreakdowns, VALUATION, withParts } from "./testing";
@@ -210,6 +211,18 @@ describe("one offer is enough (v2-plan.md, item 5, \"Quick mode from one offer\"
       withRef: false, updating: false, problems: null, notes: [], firstUse: true, dispatch: () => {} })] }));
     expect(words(html)).toContain("Add a salary, a city and a start date to see A on its own.");
     expect(html).toContain('id="own-title"');
+  });
+
+  it("when the engine couldn't work out the latest inputs, A-1 says so, and that its figures are the last that could be (audit, 2026-11)", () => {
+    // App.tsx hands it the error as it hands it the problems, a node (Breakdown.tsx mustn't import Lead.tsx).
+    const ctx = alone("A");
+    const x = ownOffers(ctx)[0];
+    const pinned = (error: string | null) => words(renderToStaticMarkup(createElement(WorkProvider, { ctx, children: [createElement(OwnPinned, {
+      key: "o", x, prices: priceWords(undefined), withRef: false, updating: false, notes: [], firstUse: false, dispatch: () => {},
+      problems: createElement(ComputeError, { error, results: true }) })] })));
+    expect(pinned(NOT_LOADED)).toContain("Couldn't compute: Part of the calculator didn't load. If the site was updated since this page opened, reload "
+      + "the page to get the latest version. The results shown are for your last inputs that could be worked out.");
+    expect(pinned(null)).not.toContain("Couldn't compute");
   });
 
   it("the page's slots: with one offer A-1 pinned, its bar and sentence; with two or more, the section and the ledger's row instead", () => {

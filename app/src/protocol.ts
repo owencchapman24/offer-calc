@@ -139,6 +139,12 @@ export type EngineResponse = {
 
 export const rentKey = (area: string, state: string) => `${area}|${state}`;
 
+/**
+ * The worker's error when code it loads on first use didn't load (an optional module, the slow jobs): most likely the site was
+ * updated since the page opened, and the old files are gone. A later edit tries again, so a dropped connection mends itself.
+ */
+export const NOT_LOADED = "Part of the calculator didn't load. If the site was updated since this page opened, reload the page to get the latest version.";
+
 // ---- the slow lane (jobs.ts): L-4's leave sweep and its panel at the cursor, breakeven (L-3 and the
 // close-call line), and L-6's payments and tax years ----------------------------------------------------
 
