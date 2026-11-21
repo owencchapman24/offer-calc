@@ -329,8 +329,9 @@ section 2's and the plan's in step):
   calendar year at first-day value (an offering accrues each year it's outstanding, used earliest first); what's over comes back at
   the purchase. The gain is pay that day: wages for income tax, not FICA (`statutoryOptionIncome`), nothing withheld. Money in the
   plan is out of take-home, at face value in the after-rent total; A-2 shows it as its own share ("in the ESPP"), not in "saved", and
-  A-1's saved leaves it out (over the stay it's in "to spend": it comes back). Leaving before a purchase gives it back that day; each
-  purchase date is a cliff. The share price follows the equity's growth.
+  A-1's saved leaves it out (over the stay it's in "to spend": it comes back). Leaving before a purchase gives it back that day, and
+  pay after the last day (commission paid later, a prorated bonus) puts nothing in; each purchase date is a cliff. The share price
+  follows the equity's growth.
 - **Commission** (v2's 4h, D24-D28): an amount a year (a range sets bear and bull) or by employment year, earned a twelfth each calendar
   month while employed, a part month by its days; each calendar month or quarter is paid the days after it ends that you enter (both
   required, no default), as one payment: what it earned less the draws paid for it, never below zero (`commission.ts`). A draw is paid

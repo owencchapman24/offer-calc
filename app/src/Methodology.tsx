@@ -184,7 +184,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             payroll taxes that follow them (IRC 3121(a)(22)), and nothing is withheld on it (IRC 421(b)). The share price moves
             at the growth you enter for RSUs. Money in the plan is yours: it's out of take-home pay and counts at face value until it
             buys shares, a share of each $100 of its own ("in the ESPP"), not saved; if you leave before a purchase, it comes back that
-            day, without a gain.
+            day, without a gain, and pay you get after your last day (commission paid later, a prorated bonus) puts nothing in.
           </p>
           <p>
             Options and private-company equity (including double-trigger RSUs) aren't modeled yet and count as $0.
