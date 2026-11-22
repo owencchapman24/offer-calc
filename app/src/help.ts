@@ -41,10 +41,12 @@ export const helpKey = (path: string) => path.split(".").filter((k) => !/^\d+$/.
 export function fieldName(path: string): string {
   const scenario = /\.(bear|base|bull)$/.exec(path)?.[1];
   const key = helpKey(scenario ? path.slice(0, -scenario.length - 1) : path);
-  // A field whose name loads with detailed mode is named by its part (an ESPP's terms) until then.
-  const h = HELP[key] ?? HELP[key.split(".")[0]];
-  if (!h) return "Input";
-  const name = h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
+  // A field whose name loads with detailed mode is named by its part (an ESPP's terms) until then, or by its detailed-mode section
+  // where the part has no field of its own (commission's terms: audit N18, which said "Input").
+  const head = key.split(".")[0];
+  const h = HELP[key] ?? HELP[head];
+  const name = !h ? LEDGER_SECTIONS.find((s) => s.id === head)?.title ?? "Input"
+    : h.editor && h.editor !== key && HELP[h.editor] ? `${HELP[h.editor].label}, ${h.label.toLowerCase()}` : h.label;
   return scenario && scenario !== "base" ? `${name}, ${scenario} case` : name;
 }
 
