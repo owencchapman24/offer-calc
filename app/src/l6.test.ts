@@ -204,3 +204,20 @@ describe("A-7 opens only when asked", () => {
     expect(html).not.toContain('data-metric="l6p.');
   });
 });
+
+describe("a stay over 5 years: every year of it, by year (found with audit N16)", () => {
+  it("L-1 and each breakdown show all 7 years of a 7-year stay, and years 1-7 add up to the stay with nothing past it", () => {
+    // The engine reported 5 employment years by default though it projected the whole window: years 6 and 7 were missing, and
+    // "what runs past your stay" was minus two years (A: -$357,694 after tax) so the stay still footed.
+    const ctx = context("colAdjustedTotal", undefined, 7);
+    for (const letter of ["A", "B", "C"] as const) {
+      const d = ctx.results!.detail!.offers[ctx.results!.letters.indexOf(letter)];
+      expect(byYear(ctx, letter).years.map((y) => y.n)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(ctx.own!.breakdowns[letter]!.detail.employmentYears).toHaveLength(7);
+      const s = shownStay(d, 7);
+      // The samples all start on the window's first day, so no year runs past it.
+      expect(s.after).toEqual({ gross: 0, tax: 0, premiums: 0, cash: 0, totalRewards: 0, colAdjustedTotal: 0 });
+      expect(s.years.cash).toBe(s.stay.cash);
+    }
+  });
+});

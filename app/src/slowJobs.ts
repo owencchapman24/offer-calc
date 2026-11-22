@@ -96,6 +96,18 @@ export function* cursorJob(req: CursorRequest, post: (r: SlowResponse) => void, 
   }
 }
 
+/**
+ * The employment years of cliffs the panel looks through for the next one: to the end of the year after the one the last day is in,
+ * and at least cliffs()' 5, as before for a last day in years 1-4. On that default alone, a last day past year 5 of a longer stay
+ * found no next cliff (audit N16).
+ */
+export function cliffYears(startDate: ISODate, day: number): number {
+  const start = toDays(startDate);
+  let n = 1;
+  while (addMonths(start, 12 * n) <= day) n++;
+  return Math.max(5, n + 1);
+}
+
 function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: number, options: { inflation: number }): LeavePanel {
   const k = keptIfLeaving(o, req.household, day, options);
   const r = k.result;
@@ -121,7 +133,7 @@ function panelFor(req: CursorRequest, o: CursorRequest["offers"][number], day: n
     retirementVested: k.retirementVested,
     retirementForfeited: r.leave!.retirementForfeited,
     unvestedRsuForfeited: r.leave!.unvestedRsuForfeited,
-    next: nextCliff(o, req.household, req.leaveDate, options, { skip: proratedStep }).next,
+    next: nextCliff(o, req.household, req.leaveDate, { ...options, years: cliffYears(o.startDate, day) }, { skip: proratedStep }).next,
     warnings: r.warnings.filter((w) => w.code === "bonusForfeited" || w.code === "clawbackFica" || w.code === "commissionForfeited"),
     vacation: { ...r.leave!.vacation, annual: payout?.detail.kind === "vacationPayout" ? payout.detail.annual : null },
     esppRefund: r.leave!.esppRefund,
