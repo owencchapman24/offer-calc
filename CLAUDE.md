@@ -75,8 +75,8 @@ checklist (item 4); the should-fix ones (the engine, tax data, commission's UI, 
 to pick.
 
 **The next data checks** (`docs/data-refresh.md` has the calendar):
-- Now: Massachusetts' 2026 surtax threshold, published at $1,107,750 (the November audit's N26). December: FTB's 2026 amounts for
-  California (N27).
+- December: FTB's 2026 amounts for California (the November audit's N27). (Massachusetts' 2026 surtax threshold, $1,107,750, is
+  in since 2026-11-22: N26.)
 - December to February: BEA's 2025 RPPs, Pub. 15-T, the states' payroll caps, then the base-year move to 2027. Every federal
   amount for 2027 is in `FEDERAL_2027` (Rev. Proc. 2026-35, Notice 2026-66, Rev. Proc. 2026-24 and SSA's wage base), each pinned in
   `test/law.test.ts`.
