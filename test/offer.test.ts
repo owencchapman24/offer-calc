@@ -618,6 +618,31 @@ describe("present value and comparisons", () => {
     expect(s.increase).toBeCloseTo(-15_000, 1);
     expect(s.aheadBy).toBeCloseTo(10_552.5, 2);
   });
+  it("no change ties when the lever pays nothing inside the window: an outcome, not an error (audit N15)", () => {
+    // The window is A's start + 1 year: Jan 1, 2026 to Jan 1, 2027.
+    const jan = (o: Partial<OfferInput>) => tx({ startDate: "2026-01-01", ...o });
+    const opts = { valuationDate: "2026-01-01", discountRate: 0, horizonYears: 1, years: 1 };
+    // B starts Mar 1, 2027, after the window ends: no salary and no sign-on 30 days in is paid inside it.
+    const late = jan({ startDate: "2027-03-01" });
+    for (const field of ["salary", "signOn"] as const) {
+      expect(breakeven(jan({}), late, field, single, opts)).toMatchObject({ outcome: "notInWindow", increase: null, to: null });
+    }
+    // B starts with A, $10,000 lower, and its one cash award is paid after the window: that lever can't tie, salary still can.
+    const B = jan({ salary: { annual: 90_000 }, cashAwards: [{ label: "Retention", amount: 5_000, paidOn: "2027-06-01" }] });
+    expect(breakeven(jan({}), B, "signOn", single, opts)).toMatchObject({ outcome: "notInWindow", from: 5_000 });
+    const s = breakeven(jan({}), B, "salary", single, opts);
+    expect(s.outcome).toBe("tie");
+    expect(s.increase).toBeCloseTo(10_000, 1);
+  });
+  it("no tie within $100M more (the most an amount can be): out of reach, not an error (audit N15)", () => {
+    // A: $100M of salary and a $100M award paid on its first day; B: $100,000. B needs about $200M more.
+    const jan = (o: Partial<OfferInput>) => tx({ startDate: "2026-01-01", ...o });
+    const opts = { valuationDate: "2026-01-01", discountRate: 0, horizonYears: 1, years: 1 };
+    const A = jan({ salary: { annual: 100_000_000 }, cashAwards: [{ label: "Sign-on", amount: 100_000_000, paidOn: "2026-01-01" }] });
+    for (const field of ["salary", "signOn"] as const) {
+      expect(breakeven(A, jan({}), field, single, opts)).toMatchObject({ outcome: "outOfReach", increase: null, to: null });
+    }
+  });
 });
 
 describe("401(k), health, perks and hours", () => {

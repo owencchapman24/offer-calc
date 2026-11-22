@@ -1,6 +1,7 @@
 import { rentFlipFrom, sharedWindow, windowEnd } from "./compare";
 import { projectScenario } from "./project";
 import type { BreakevenResult, Household, ISODate, OfferInput, RentFlipResult, ValuedOptions, ValueBasis } from "./types";
+import { MAX_AMOUNT } from "./validate";
 
 // What it would take (L-3, and the close-call line): the salary, cash or rent at which one offer ties another. Apart from
 // compare.ts so the worker loads it with its slow jobs, after the first answer (CLAUDE.md, Bundles).
@@ -27,9 +28,10 @@ function needsCostOfLiving(offers: OfferInput[], basis: ValueBasis) {
  * present value, on after-tax comp (default), total rewards or the COL-adjusted total. Found by
  * bisection to the cent; PV rises with pay, since tax takes less than all of each extra dollar.
  * Raises, percent-of-salary bonuses and 401(k) amounts scale with the new salary. With no cash award,
- * the lever is a sign-on paid 30 days after the start, with no clawback. If B leads even at a $0 salary
- * (or award), the outcome is "alreadyAhead" rather than an error; `aheadBy` always gives B's lead as
- * entered.
+ * the lever is a sign-on paid 30 days after the start, with no clawback. No change ties in three cases,
+ * each an outcome rather than an error: B leads even at a $0 salary (or award), "alreadyAhead"; the
+ * lever pays nothing inside the window, "notInWindow"; B still trails after $100M more (validate.ts'
+ * MAX_AMOUNT), "outOfReach". `aheadBy` always gives B's lead as entered.
  *
  * The window: pass `window`, the comparison window of every offer compared (comparisonWindow), so the
  * target is the rank list's figure. Without it, it's the two offers' own [earlier start, +
@@ -70,7 +72,7 @@ export function* breakevenSteps(
   yield;
   const common = { field, basis, from, aheadBy, targetPV: target, window: { start: window.start, end: windowEnd(window) } };
 
-  // Bracket the root, then bisect. B can't go below a $0 salary or sign-on.
+  // Bracket the root, then bisect. B can't go below a $0 salary or sign-on, nor rise more than MAX_AMOUNT.
   let lo = 0;
   let hi = 0;
   if (aheadBy < 0) {
@@ -79,9 +81,11 @@ export function* breakevenSteps(
       const g = gap(hi);
       yield;
       if (g >= 0) break;
+      // Nothing the lever pays falls inside the window: B starts after it ends, or the cash award is paid after it.
+      if (g === aheadBy) return { ...common, outcome: "notInWindow", increase: null, to: null };
+      if (hi === MAX_AMOUNT) return { ...common, outcome: "outOfReach", increase: null, to: null };
       lo = hi;
-      hi *= 2;
-      if (hi > 1e8) throw new Error("No breakeven below a $100M increase.");
+      hi = Math.min(hi * 2, MAX_AMOUNT);
     }
   } else {
     lo = -Math.min(from, 10_000);

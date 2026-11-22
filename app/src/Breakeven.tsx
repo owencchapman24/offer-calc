@@ -173,7 +173,8 @@ function Cushion({ x, v, ctx }: { x: TieLine & { letter: Letter }; v: TieView; c
       </p>
       {cash && (
         <p className="tie-line tie-or">
-          {cash.outcome === "alreadyAhead" ? (
+          {/* The winner leads on this basis, so it's a tie or already ahead: never short of the window or out of reach. */}
+          {cash.outcome !== "tie" ? (
             !x.cash.added ? (
               <><Who l={W} /> still leads <Who l={R} /> with no {inSentence(x.cash.label)} (now{" "}
                 <Fig id={`in.${W}.cashAwards.0.amount`} label={`${dollars(cash.from)}, ${W}'s cash award as entered`}>{dollars(cash.from)}</Fig>,

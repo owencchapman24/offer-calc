@@ -479,6 +479,10 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             dollar for dollar less that tax, discounted to its date.
           </p>
           <p>
+            Sometimes no change ties, and L-3 says so: an offer that starts after your stay ends is paid no salary inside it, a cash award
+            paid after it ends doesn't count, and the search stops at $100,000,000 more, the most an amount can be.
+          </p>
+          <p>
             Rent is worked out directly, since the after-rent total is linear in rent (<Ref id="M-6.3" />): each $1 of rent is $1 less to
             spend there, worth that city's price factor at {p.place} prices. Rent's present-value factor is what $1 a month of first-year
             rent is worth over the months you'd work there in your stay, rising at each lease anniversary.

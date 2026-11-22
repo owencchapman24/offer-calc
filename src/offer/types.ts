@@ -968,12 +968,14 @@ export interface HorizonSweep {
 
 /**
  * "tie": `increase` is the change to B's starting salary (or first sign-on) that ties A. It's
- * negative when B is already ahead and could give some up. "alreadyAhead": B leads even at a $0
- * salary (or sign-on), so no change ties; `increase` and `to` are null.
+ * negative when B is already ahead and could give some up. No change ties otherwise, and `increase`
+ * and `to` are null: "alreadyAhead", B leads even at a $0 salary (or sign-on); "notInWindow", the
+ * lever pays nothing inside the window (B starts after it ends, or the cash award is paid after it);
+ * "outOfReach", B still trails with $100M more.
  */
 export type BreakevenResult = BreakevenCommon & (
   | { outcome: "tie"; increase: number; to: number }
-  | { outcome: "alreadyAhead"; increase: null; to: null }
+  | { outcome: "alreadyAhead" | "notInWindow" | "outOfReach"; increase: null; to: null }
 );
 
 interface BreakevenCommon {
