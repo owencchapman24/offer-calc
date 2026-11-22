@@ -120,35 +120,47 @@ const INVALID: Record<NumberKind, string> = {
 };
 
 /**
+ * What a number field's text gives: its value (null when blank), "unparsable", or "tooLarge" when it's above `max` (audit C25:
+ * About you's wages have no validator behind them, and "999999m" typed there made NaN of every result).
+ */
+export function readNumber(kind: NumberKind, text: string, max?: number): number | null | "unparsable" | "tooLarge" {
+  const v = PARSE[kind](text);
+  if (v === null) return null;
+  if (Number.isNaN(v)) return "unparsable";
+  return max !== undefined && !(v <= max) ? "tooLarge" : v;
+}
+
+/**
  * A number field: accepts what people type ("110k", "$110,000", "12.5%") while typing, and shows the
  * value formatted otherwise. Blank is null. `help` names its help entry (help.ts); `describedBy` ties
- * the hint to it; `invalid` marks a problem the validator found.
+ * the hint to it; `invalid` marks a problem the validator found. A value above `max` is said at the field and not used.
  */
-export function NumberInput({ id, kind, value, onChange, label, placeholder, unit, describedBy, help, invalid, invalidNote }: {
+export function NumberInput({ id, kind, value, onChange, label, placeholder, unit, describedBy, help, invalid, invalidNote, max }: {
   id?: string; kind: NumberKind; value: number | null; onChange: (v: number | null) => void; label: string; placeholder?: string;
   /** Shown after the field ("%", "hrs"); money shows "$" before it. */ unit?: string; describedBy?: string; help?: string;
-  invalid?: boolean; invalidNote?: string;
+  invalid?: boolean; invalidNote?: string; max?: number;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const format = (v: number) => (kind === "money" ? figure(v) : String(v));
   const shown = draft ?? (value === null ? "" : format(value));
-  const parsed = draft === null ? value : PARSE[kind](draft);
-  const unparsable = parsed !== null && Number.isNaN(parsed);
+  const read = draft === null ? value : readNumber(kind, draft, max);
+  const problem = read === "unparsable" || (typeof read === "number" && Number.isNaN(read)) ? invalidNote ?? INVALID[kind]
+    : read === "tooLarge" ? `Enter at most ${kind === "money" ? "$" : ""}${format(max!)}.` : null;
   const after = kind === "percent" ? unit ?? "%" : unit;
   return (
     <span className={`money num-${kind}`}>
       {kind === "money" && <span className="unit" aria-hidden="true">$</span>}
       <input id={id} aria-label={label} inputMode="decimal" value={shown} placeholder={placeholder} data-help={help}
-        aria-invalid={unparsable || invalid || undefined} aria-describedby={describedBy}
+        aria-invalid={problem !== null || invalid || undefined} aria-describedby={describedBy}
         onFocus={() => setDraft(shown)} /* keep the text as shown, so a select-all-and-type replaces it cleanly */
         onChange={(e) => {
           setDraft(e.target.value);
-          const v = PARSE[kind](e.target.value);
-          if (v === null || !Number.isNaN(v)) onChange(v);
+          const v = readNumber(kind, e.target.value, max);
+          if (v !== "unparsable" && v !== "tooLarge") onChange(v);
         }}
         onBlur={() => setDraft(null)} />
       {after && <span className="unit" aria-hidden="true">{after}</span>}
-      {unparsable && <span className="field-error" role="alert">{invalidNote ?? INVALID[kind]}</span>}
+      {problem !== null && <span className="field-error" role="alert">{problem}</span>}
     </span>
   );
 }

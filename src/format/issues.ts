@@ -16,6 +16,11 @@ export function formatIssue(i: OfferIssue): string {
         choice: "Pick one.", text: "Enter a name." }[i.params.kind];
     case "tooLong": return `At most ${i.params.max} characters.`;
     case "tooMany": return `At most ${i.params.max}.`;
+    case "tooLarge": {
+      const { max, unit } = i.params;
+      return unit === "dollars" ? `Enter at most $${max.toLocaleString("en-US")}.`
+        : unit === "percent" ? `Enter at most ${(max * 100).toLocaleString("en-US")}%.` : `Enter at most ${max} days.`;
+    }
     case "date": return `"${i.params.value}" isn't a date: use a date like 2027-07-12.`;
     case "monthDay": {
       const { month, day } = i.params;
@@ -51,7 +56,7 @@ export function formatIssue(i: OfferIssue): string {
     }
     case "noTranches": return "Add at least one tranche.";
     case "noMonths": return "Pick at least one vest month.";
-    case "tierRange": return "A match tier goes up to more than 0% and at most 100% of pay, at a rate of 0% or more.";
+    case "tierRange": return "A match tier goes up to more than 0% and at most 100% of pay, at a rate from 0% to 1,000%.";
     case "tierOrder": return "Each match tier must go higher than the one before it.";
     case "noYears": return /commission/.test(i.path) ? "Enter at least one year's commission." : "Enter at least one year's bonus.";
     case "needsHours": return "Counting service by plan-year hours needs weekly hours for this offer.";

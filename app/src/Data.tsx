@@ -1,7 +1,7 @@
 import { type ChangeEvent, type Dispatch, type RefObject, useEffect, useRef, useState } from "react";
 import { formatIssue } from "../../src/format/issues";
 import type { OfferIssue } from "../../src/offer/validate";
-import { exportSession, type ImportResult, readImport } from "./exchange";
+import { exportSession, type ImportResult, MAX_IMPORT_BYTES, readImport, TOO_BIG } from "./exchange";
 import { fieldName } from "./help";
 import { type AppOffer, type Missing, toOfferInput } from "./model";
 import { priceWords } from "./prices";
@@ -90,6 +90,8 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
     e.target.value = "";
     if (!f) return;
     setDone(null);
+    // A file too large to be an export isn't read at all (audit C25).
+    if (f.size > MAX_IMPORT_BYTES) return void setFile({ name: f.name, result: { ok: false, problems: [TOO_BIG] } });
     const result = readImport(await f.text());
     setFile({ name: f.name, result });
     if (!result.ok) return;

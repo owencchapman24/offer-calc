@@ -1,7 +1,7 @@
 import { type Dispatch, useEffect, useRef, useState } from "react";
 import { CITIES } from "../../src/col/cities";
 import type { FilingStatus } from "../../src/tax/types";
-import { ASSUMPTIONS } from "./model";
+import { ASSUMPTIONS, MAX_AMOUNT } from "./model";
 import { priceWords, US_PRICES } from "./prices";
 import type { Action, Session } from "./session";
 import { dollars, longDate } from "./text";
@@ -52,7 +52,7 @@ export function About({ session, dispatch, today, wagesYear }: {
             {h.otherWagesThisYear === 0 && <TickButton id="about.wages" label={`other wages of ${dollars(0)}`} />}
           </span>
           <MoneyInput id="about-wages" label={`Your wages from another job in ${wagesYear}`} value={h.otherWagesThisYear} help="about.wages"
-            describedBy="hint-about-wages" onChange={(v) => dispatch({ type: "household", patch: { otherWagesThisYear: v ?? 0 } })} />
+            describedBy="hint-about-wages" max={MAX_AMOUNT} onChange={(v) => dispatch({ type: "household", patch: { otherWagesThisYear: v ?? 0 } })} />
           <AboutHelp k="about.wages" />
         </Trace>
         {h.filingStatus === "joint" && (
@@ -62,7 +62,7 @@ export function About({ session, dispatch, today, wagesYear }: {
               {!h.spouseWages && <TickButton id="about.spouse" label={`spouse's wages of ${dollars(0)}`} />}
             </span>
             <MoneyInput id="about-spouse" label={`Your spouse's wages in ${wagesYear}`} value={h.spouseWages ?? 0} help="about.spouse"
-              describedBy="hint-about-spouse" onChange={(v) => dispatch({ type: "household", patch: { spouseWages: v ?? 0 } })} />
+              describedBy="hint-about-spouse" max={MAX_AMOUNT} onChange={(v) => dispatch({ type: "household", patch: { spouseWages: v ?? 0 } })} />
             <AboutHelp k="about.spouse" />
           </Trace>
         )}
