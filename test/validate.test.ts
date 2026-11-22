@@ -133,6 +133,15 @@ const cases: Case[] = [
   // Bounds (audit C25): every amount at most $100 million, a rate 100% a year, a list 120 rows; an area with prices, a state by
   // its own key. Each of these made NaN of the results, or a throw, with no problem at the field.
   ["a salary of 1e308", C, (o) => { o.salary.annual = 1e308; }, "salary.annual", "tooLarge", false],
+  // Whole numbers (audit N17): at most 10 years' worth, the longest stay. A clawback of 10,000 months stalled the worker for 68 s.
+  ["a clawback window of 10,000 months", C, (o) => { o.cashAwards![0].clawback!.months = 10_000; }, "cashAwards.0.clawback.months", "wholeMonths", false],
+  ["a clawback window of 121 months", C, (o) => { o.cashAwards![0].clawback!.months = 121; }, "cashAwards.0.clawback.months", "wholeMonths", false],
+  ["a tranche at month 121", C, (o) => { o.equity!.grants[0].schedule.tranches[0].month = 121; }, "equity.grants.0.schedule.tranches.0.month", "wholeMonths", false],
+  ["a first refresher after 1e308 months", C, (o) => { o.equity!.refreshers!.firstAfterMonths = 1e308; }, "equity.refreshers.firstAfterMonths", "wholeMonths", true],
+  ["a refresher every 121 months", C, (o) => { o.equity!.refreshers!.everyMonths = 121; }, "equity.refreshers.everyMonths", "wholeMonths", false],
+  ["a draw for 121 months", C, (o) => { o.commission = { ...COMMISSION, draw: { monthly: 1_000, recoverable: true, months: 121 } }; }, "commission.draw.months", "wholeMonths", false],
+  ["an 11-year cliff", C, (o) => { o.retirement!.vesting = { kind: "cliff", years: 11 }; }, "retirement.vesting.years", "wholeYears", false],
+  ["a sign-on paid 3,654 days after the start", C, (o) => { o.cashAwards![0].paidOn = { daysAfterStart: 3_654 }; }, "cashAwards.0.paidOn", "wholeDays", false],
   ["an infinite salary", C, (o) => { o.salary.annual = Number.POSITIVE_INFINITY; }, "salary.annual", "tooLarge", false],
   ["a salary of $100,000,000.01", C, (o) => { o.salary.annual = 100_000_000.01; }, "salary.annual", "tooLarge", false],
   ["a rent of 1e308 a month", C, (o) => { o.costOfLiving!.monthlyRent = 1e308; }, "costOfLiving.monthlyRent", "tooLarge", false],
@@ -146,7 +155,7 @@ const cases: Case[] = [
   ["261 vacation days given a year", C, (o) => { o.timeOff = { gives: 261 }; }, "timeOff.gives", "tooLarge", false],
   ["121 promotions", A, (o) => { o.salary.promotions = Array.from({ length: 121 }, () => ({ ...o.salary.promotions![0] })); }, "salary.promotions", "tooMany", false],
   ["121 tranches", C, (o) => {
-    o.equity!.grants[0].schedule = { tranches: Array.from({ length: 121 }, (_, i) => ({ month: i + 1, fraction: i ? 0.5 / 120 : 0.5 })) };
+    o.equity!.grants[0].schedule = { tranches: Array.from({ length: 121 }, (_, i) => ({ month: i, fraction: i ? 0.5 / 120 : 0.5 })) };
   }, "equity.grants.0.schedule.tranches", "tooMany", false],
   ["a BEA area with no prices", C, (o) => { o.costOfLiving!.area = "10999"; }, "costOfLiving.area", "unknownArea", true],
   ["an area named constructor", C, (o) => { o.costOfLiving!.area = "constructor"; }, "costOfLiving.area", "unknownArea", true],
@@ -247,7 +256,10 @@ describe("validateOffer: the edges", () => {
     expect(msg("salary.promotions.0.on", "notAfterStart", { start: "2026-07-13" })).toBe("The promotion date must be after your start date.");
     expect(msg("hours.weekly.base", "hours", { min: 1, max: 168 })).toBe("Weekly hours must be between 1 and 168.");
     expect(msg("hours.weeksPerYear", "weeks", { min: 1, max: 52 })).toBe("Weeks a year must be between 1 and 52.");
-    expect(msg("cashAwards.0.clawback.months", "wholeMonths", { min: 1 })).toBe("A clawback window is a whole number of months, at least 1.");
+    expect(msg("cashAwards.0.clawback.months", "wholeMonths", { min: 1, max: 120 })).toBe("A clawback window is a whole number of months, 1 to 120.");
+    expect(msg("equity.refreshers.everyMonths", "wholeMonths", { min: 1, max: 120 })).toBe("Enter a whole number of months, 1 to 120.");
+    expect(msg("retirement.vesting.years", "wholeYears", { min: 1, max: 10 })).toBe("Enter a whole number of years, 1 to 10.");
+    expect(msg("cashAwards.0.paidOn", "wholeDays", { min: 0, max: 3_653 })).toBe("Enter a whole number of days, 0 to 3,653.");
     expect(msg("cashAwards.0.paidOn", "before2026", { what: "payment" })).toBe("Payments before 2026 aren't supported: tax data starts in 2026.");
     expect(msg("bonus.payOn", "monthDay", { month: 2, day: 30 })).toBe("February has no 30th.");
     expect(msg("bonus.cutoff", "monthDay", { month: 4, day: 31 })).toBe("April has no 31st.");

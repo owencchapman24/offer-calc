@@ -231,7 +231,8 @@ to pick.
   engine); its problems at the field (`validateOffer`, in the worker). While any input has a problem, the results are the last valid
   ones, said so in the lead with "Fix it". Ranges are opt-in ("+ range") and run one way: bear <= base <= bull, weekly hours
   bear >= base >= bull (the bear case works the most; `caseOrder`, the user's word, 2026-11-21). Every amount is at most $100
-  million, a rate of change 100% a year, a list 120 rows, and an import 1 MB (`MAX_AMOUNT` and the rest in `validate.ts` and
+  million, a rate of change 100% a year, a list 120 rows, a number of months, years or days after the start 10 years' worth (the
+  longest stay), and an import 1 MB (`MAX_AMOUNT` and the rest in `validate.ts` and
   `exchange.ts`; About you's wages, which no validator sees, through `NumberInput`'s `max`). A 401(k) or health plan is not
   entered (not counted), entered, or none; a cost or benefit counted for some offers but not others is named under the verdict. Per
   hour shows only when every offer has hours.
