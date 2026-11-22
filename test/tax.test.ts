@@ -39,6 +39,16 @@ describe("state", () => {
   it("no-income-tax states owe zero state income tax", () => {
     for (const st of ["TX", "FL", "TN", "WA", "NV"]) expect(single(150_000, st).stateIncomeTax).toBe(0);
   });
+  it("MA's 4% surtax starts above 2026's $1,107,750 of taxable income, single or joint", () => {
+    // Taxable income = wages - the exemption - FICA's deduction (capped at $2,000 a person, reached at these wages):
+    // single 1,124,150 - 4,400 - 2,000 = 1,117,750; joint 1,128,550 - 8,800 - 2,000 = 1,117,750 (only one earner).
+    // 5% x 1,117,750 = 55,887.50, plus 4% x (1,117,750 - 1,107,750 = 10,000) = 400: 56,287.50. 2025's threshold ($1,083,150)
+    // would add 4% x 24,600 = 984 more.
+    expect(single(1_124_150, "MA").stateIncomeTax).toBe(56_287.5);
+    expect(computeTaxes({ year: 2026, filingStatus: "joint", wages: 1_128_550, state: "MA" }).stateIncomeTax).toBe(56_287.5);
+    // At the threshold exactly, no surtax: 5% x 1,107,750 = 55,387.50.
+    expect(single(1_114_150, "MA").stateIncomeTax).toBe(55_387.5);
+  });
   it("WA payroll: WA Cares 0.58% + PFML on wages", () => {
     expect(single(100_000, "WA").statePayrollTax).toBeCloseTo(580 + 807.16, 1);
   });

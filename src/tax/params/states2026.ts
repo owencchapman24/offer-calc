@@ -221,7 +221,9 @@ export const STATES_2026: Record<string, StateSpec> = {
   },
   MA: {
     name: "Massachusetts", kind: "income",
-    single: [[0, 0.05], [1_083_150, 0.09]], joint: [[0, 0.05], [1_083_150, 0.09]],
+    // OVERRIDE: the 4% surtax's 2026 threshold, $1,107,750, certified by the Department of Revenue on 2025-11-20 (M.G.L. c. 62,
+    // s. 4(d); mass.gov, "4% Surtax on Taxable Income"). The Tax Foundation's table has 2025's, $1,083,150. Not doubled for joint.
+    single: [[0, 0.05], [1_107_750, 0.09]], joint: [[0, 0.05], [1_107_750, 0.09]],
     exemption: [4_400, 8_800],
     payroll: [{ label: "MA Paid Family & Medical Leave", rate: 0.0046, wageCap: "ssWageBase" }], // TF fn (rr)
     special: "MA", // deduction for Social Security/Medicare contributions, up to $2,000 per person
