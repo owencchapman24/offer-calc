@@ -1,4 +1,5 @@
 import { STATES_2026 } from "../tax/index";
+import { BASE_YEAR } from "../tax/params/index";
 import { RPP } from "../col/index";
 import { addMonths, toDays } from "./dates";
 import { daysOff } from "./timeOff";
@@ -25,8 +26,8 @@ export type OfferIssue = { path: string } & (
   | { code: "date"; params: { value: string } }
   /** Not a real month and day (Feb 29 is allowed: it falls on Feb 28 in other years). */
   | { code: "monthDay"; params: { month: number; day: number } }
-  /** A date or payment before 2026: tax data starts in 2026. */
-  | { code: "before2026"; params: { what: "start" | "payment" | "vest" } }
+  /** A date or payment before the tax base year (BASE_YEAR, 2026): tax data starts then. */
+  | { code: "beforeBaseYear"; params: { what: "start" | "payment" | "vest"; year: number } }
   | { code: "leaveBeforeStart"; params: NoParams }
   /** A promotion on or before the start date. */
   | { code: "notAfterStart"; params: { start: ISODate } }
@@ -86,7 +87,8 @@ export type OfferIssue = { path: string } & (
 export type IssueCode = OfferIssue["code"];
 
 const SCENARIOS = ["bear", "base", "bull"] as const;
-const FIRST_DAY = toDays("2026-01-01");
+/** Jan 1 of the tax base year: the first day the tax data covers (audit C28: it was a literal). */
+const FIRST_DAY = toDays(`${BASE_YEAR}-01-01`);
 /** Days in each month, with February's leap day allowed (a Feb 29 date falls on Feb 28 in other years). */
 const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 /**
@@ -196,7 +198,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
 
   // ---- dates ---------------------------------------------------------------------------
   const start = date("startDate", offer.startDate);
-  if (start !== null && start < FIRST_DAY) add("startDate", "before2026", { what: "start" });
+  if (start !== null && start < FIRST_DAY) add("startDate", "beforeBaseYear", { what: "start", year: BASE_YEAR });
   if (offer.leaveDate !== undefined) {
     const leave = date("leaveDate", offer.leaveDate);
     if (leave !== null && start !== null && leave < start) add("leaveDate", "leaveBeforeStart", {});
@@ -276,7 +278,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     nonNegative(`${path}.amount`, a.amount);
     if (typeof a.paidOn === "string") {
       const paid = date(`${path}.paidOn`, a.paidOn);
-      if (paid !== null && paid < FIRST_DAY) add(`${path}.paidOn`, "before2026", { what: "payment" });
+      if (paid !== null && paid < FIRST_DAY) add(`${path}.paidOn`, "beforeBaseYear", { what: "payment", year: BASE_YEAR });
     } else {
       whole(`${path}.paidOn`, a.paidOn?.daysAfterStart, 0, "wholeDays");
     }
@@ -297,7 +299,7 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
         // A tranche can't vest before 2026: tax data starts in 2026.
         const days = g.schedule.tranches.map((t) => addMonths(vestStart, t.month));
         const vests = g.schedule.vestDates ? days.map((d) => snapToVestDate(d, g.schedule.vestDates!)) : days;
-        if (vests.some((d) => d < FIRST_DAY)) add(g.vestStart !== undefined ? `${path}.vestStart` : "startDate", "before2026", { what: "vest" });
+        if (vests.some((d) => d < FIRST_DAY)) add(g.vestStart !== undefined ? `${path}.vestStart` : "startDate", "beforeBaseYear", { what: "vest", year: BASE_YEAR });
       }
     });
     const r = eq.refreshers;

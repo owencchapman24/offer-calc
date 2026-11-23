@@ -749,7 +749,7 @@ function assumptions(ctx: WorkContext, sc: Scope, add: Add, heading: string) {
     `Base case: every input ${sc.anyRange ? "at its middle value" : "as entered"}. Your stay: ${years(n)}${def("stay")}; pay after it isn't counted.`,
     `Today's dollars: each payment discounted at ${percent(sc.discountRate)} a year to ${longDate(ctx.today)}. Inflation, ${percent(ASSUMPTIONS.inflation)} a `
       + "year, moves tax brackets and rent, never pay.",
-    `Tax: 2026 law, later years projected; filing ${FILING[h.filingStatus]}${def("filing")}; ${h.otherWagesThisYear
+    `Tax: ${DATA_YEARS.tax} law, later years projected; filing ${FILING[h.filingStatus]}${def("filing")}; ${h.otherWagesThisYear
       ? `${dollars(h.otherWagesThisYear)} of other wages in ${ctx.wagesYear}` : "no other wages"}${def("wages")}${h.filingStatus === "joint"
       ? `; ${h.spouseWages ? `your spouse's wages of ${dollars(h.spouseWages)} in ${ctx.wagesYear}, growing with inflation` : "no spouse's wages"}${def("spouse")}`
       : ""}; ${letters.length === 1 ? "the offer" : "each offer"} taxed where you'd live, for the whole year.`,
@@ -1175,7 +1175,7 @@ function taxSection(x: Own, add: Add, worked: Worked[]) {
       return { label: `${r.year}${r.projectedLaw ? "*" : ""}`, cells: [figure(r.values.gross), ...parts, figure(r.values.tax), rateText(r.rate)] };
     }),
   } });
-  if (rows.some((r) => r.projectedLaw)) add({ kind: "note", runs: ["* Tax law projected from 2026's."] });
+  if (rows.some((r) => r.projectedLaw)) add({ kind: "note", runs: [`* Tax law projected from ${DATA_YEARS.tax}'s.`] });
   const lastYear = Number(dayBefore(b.window.end).slice(0, 4));
   const groups = stayWarnings([...d.warnings, ...d.withholding.warnings], lastYear);
   if (!groups.length) {

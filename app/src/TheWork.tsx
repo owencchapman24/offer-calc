@@ -1,4 +1,5 @@
 import { memo, type ReactNode, useMemo } from "react";
+import { DATA_YEARS } from "../../src/col/cities";
 import type { L6Part } from "./csv";
 import { CsvButton, Fig } from "./figures";
 import { type MetricId, type WorkContext } from "./metrics";
@@ -255,7 +256,7 @@ function TaxYears({ letter, tables }: { letter: Letter; tables: TaxTable[] }) {
       {tables.map((t) => (
         <tbody key={t.year}>
           <tr className="l6-section">
-            <th scope="rowgroup" colSpan={4}>{t.year} · {t.projectedLaw ? "tax law projected from 2026" : "2026 tax law"}</th>
+            <th scope="rowgroup" colSpan={4}>{t.year} · {t.projectedLaw ? `tax law projected from ${DATA_YEARS.tax}` : `${DATA_YEARS.tax} tax law`}</th>
           </tr>
           {t.rows.map((row) => (
             <tr key={row.line} className={`l6-${row.kind}${row.kind === "total" ? " rule-double" : row.line === "federal" ? " l6-gap" : ""}`}>

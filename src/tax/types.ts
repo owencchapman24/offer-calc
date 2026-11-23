@@ -73,7 +73,7 @@ export type TaxWarning =
   | { code: "k401OverLimit"; params: { year: number; limit: number } }
   | { code: "amtNotModeled"; params: Record<string, never> }
   /** Tax law for `year` is projected from 2026. */
-  | { code: "projectedLaw"; params: { year: number } }
+  | { code: "projectedLaw"; params: { year: number; base: number } }
   | { code: "nycNonresident"; params: Record<string, never> }
   | { code: "phillyNonresident"; params: Record<string, never> }
   | { code: "flatLocalRate"; params: { label: string; rate: number } }

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { formatWarning } from "../../src/format/warnings";
 import { WARNING_AT } from "./warningAt";
 import type { ByScenario, MonthDay } from "../../src/offer/types";
+import { DATA_YEARS } from "../../src/col/cities";
 import { defaultFor, isDefault } from "./defaults";
 import { DefaultTick, fieldId, hintId, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
@@ -188,7 +189,7 @@ export function DateField({ o, path, label, fallback }: { o: AppOffer; path: str
   return (
     <span className="field">
       <input id={fieldId(o.letter, path)} type="date" aria-label={`Offer ${o.letter} ${label}`} data-help={k} aria-describedby={hintId(k)}
-        aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} value={v ?? ""} min="2026-01-01"
+        aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} value={v ?? ""} min={`${DATA_YEARS.tax}-01-01`}
         onChange={(e) => api.set(o, { [path]: e.target.value || null })} />
       <DefaultTick o={o} path={path} label={`the ${label}`} />
     </span>

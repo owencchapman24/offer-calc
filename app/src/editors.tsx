@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { describeSchedule } from "../../src/format/schedule";
 import type { Scenario } from "../../src/offer/types";
+import { DATA_YEARS } from "../../src/col/cities";
 import { ChoiceField, DateField, EditorHead, NumberField, RangeField, ResetFields } from "./controls";
 import { DefaultTick, fieldId, hintId, inputMetric, Issues, issuesAt, useLedger } from "./fields";
 import { HELP, helpKey } from "./help";
@@ -552,7 +553,7 @@ function PaidOnField({ o, path, what }: { o: AppOffer; path: string; what: strin
         <option value="date">On a date</option>
       </select>
       {onDate
-        ? <input id={fieldId(o.letter, path)} type="date" min="2026-01-01" aria-label={`Offer ${o.letter} ${what}, paid on`} {...common} value={v}
+        ? <input id={fieldId(o.letter, path)} type="date" min={`${DATA_YEARS.tax}-01-01`} aria-label={`Offer ${o.letter} ${what}, paid on`} {...common} value={v}
             aria-invalid={issuesAt(api, o.letter, path).length > 0 || undefined} onChange={(e) => api.set(o, { [path]: e.target.value || null })} />
         : <NumberInput id={fieldId(o.letter, path)} kind="number" unit="days" label={`Offer ${o.letter} ${what}, days after you start`}
             value={days} help="cashAwards.paidOn" describedBy={hintId("cashAwards.paidOn")} invalid={issuesAt(api, o.letter, path).length > 0}

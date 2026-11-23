@@ -30,7 +30,7 @@ type Case = [name: string, base: OfferInput, edit: (o: OfferInput) => void, path
 const cases: Case[] = [
   ["a blank salary", C, (o) => { o.salary.annual = Number.NaN; }, "salary.annual", "required", true],
   ["a negative salary", C, (o) => { o.salary.annual = -1; }, "salary.annual", "negative", true],
-  ["a start before 2026", C, (o) => { o.startDate = "2025-12-01"; }, "startDate", "before2026", true],
+  ["a start before 2026", C, (o) => { o.startDate = "2025-12-01"; }, "startDate", "beforeBaseYear", true],
   ["no such day", C, (o) => { o.startDate = "2026-02-30"; }, "startDate", "date", true],
   ["a leave date before the start", C, (o) => { o.leaveDate = "2026-07-12"; }, "leaveDate", "leaveBeforeStart", true],
   ["a bear raise of -100%", C, (o) => { o.salary.raise = { bear: -1, base: 0.03, bull: 0.03 }; }, "salary.raise.bear", "rate", true],
@@ -42,7 +42,7 @@ const cases: Case[] = [
   ["a pay month of 13", C, (o) => { o.bonus!.payOn = { month: 13, day: 1 }; }, "bonus.payOn", "monthDay", true],
   ["a cutoff of Apr 31", C, (o) => { o.bonus!.cutoff = { month: 4, day: 31 }; }, "bonus.cutoff", "monthDay", false],
   ["a negative sign-on", C, (o) => { o.cashAwards![0].amount = -5; }, "cashAwards.0.amount", "negative", false],
-  ["a sign-on paid in 2025", C, (o) => { o.cashAwards![0].paidOn = "2025-12-31"; }, "cashAwards.0.paidOn", "before2026", true],
+  ["a sign-on paid in 2025", C, (o) => { o.cashAwards![0].paidOn = "2025-12-31"; }, "cashAwards.0.paidOn", "beforeBaseYear", true],
   ["a sign-on paid half a day after the start", C, (o) => { o.cashAwards![0].paidOn = { daysAfterStart: 0.5 }; }, "cashAwards.0.paidOn", "wholeDays", false],
   ["a clawback window of 0 months", C, (o) => { o.cashAwards![0].clawback!.months = 0; }, "cashAwards.0.clawback.months", "wholeMonths", false],
   ["share-price growth of -100%", C, (o) => { o.equity!.priceGrowth = { bear: -1, base: 0, bull: 0 }; }, "equity.priceGrowth.bear", "rate", true],
@@ -57,7 +57,7 @@ const cases: Case[] = [
   ["company vest dates with no day", C, (o) => { o.equity!.grants[0].schedule.vestDates = { months: [2, 8], day: Number.NaN }; },
     "equity.grants.0.schedule.vestDates", "required", true],
   ["company vest dates on Feb 31", C, (o) => { o.equity!.grants[0].schedule.vestDates = { months: [2, 5, 8, 11], day: 31 }; }, "equity.grants.0.schedule.vestDates", "monthDay", false],
-  ["a vesting start that vests before 2026", C, (o) => { o.equity!.grants[0].vestStart = "2024-01-01"; }, "equity.grants.0.vestStart", "before2026", true],
+  ["a vesting start that vests before 2026", C, (o) => { o.equity!.grants[0].vestStart = "2024-01-01"; }, "equity.grants.0.vestStart", "beforeBaseYear", true],
   ["a refresher every 0 months", C, (o) => { o.equity!.refreshers!.everyMonths = 0; }, "equity.refreshers.everyMonths", "wholeMonths", true],
   ["a first refresher at -1 months", C, (o) => { o.equity!.refreshers!.firstAfterMonths = -1; }, "equity.refreshers.firstAfterMonths", "wholeMonths", true],
   ["a negative bear refresher", C, (o) => { o.equity!.refreshers!.value.bear = -1; }, "equity.refreshers.value.bear", "negative", false],
@@ -260,7 +260,7 @@ describe("validateOffer: the edges", () => {
     expect(msg("equity.refreshers.everyMonths", "wholeMonths", { min: 1, max: 120 })).toBe("Enter a whole number of months, 1 to 120.");
     expect(msg("retirement.vesting.years", "wholeYears", { min: 1, max: 10 })).toBe("Enter a whole number of years, 1 to 10.");
     expect(msg("cashAwards.0.paidOn", "wholeDays", { min: 0, max: 3_653 })).toBe("Enter a whole number of days, 0 to 3,653.");
-    expect(msg("cashAwards.0.paidOn", "before2026", { what: "payment" })).toBe("Payments before 2026 aren't supported: tax data starts in 2026.");
+    expect(msg("cashAwards.0.paidOn", "beforeBaseYear", { what: "payment", year: 2026 })).toBe("Payments before 2026 aren't supported: tax data starts in 2026.");
     expect(msg("bonus.payOn", "monthDay", { month: 2, day: 30 })).toBe("February has no 30th.");
     expect(msg("bonus.cutoff", "monthDay", { month: 4, day: 31 })).toBe("April has no 31st.");
     expect(msg("salary.raise.bear", "caseOrder", { scenario: "bear", side: "above" })).toBe("The bear case can't be above the base case.");

@@ -1,4 +1,5 @@
 import type { Basis } from "../../src/offer/types";
+import { DATA_YEARS } from "../../src/col/cities";
 import { CASES, dropText, riskView } from "./cases";
 import { basisPhrase, type MetricId, metricKind, ownOf, pricesOf, res, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
@@ -250,7 +251,7 @@ const L6: Record<L6Part, (ctx: WorkContext, letter: Letter) => Built> = {
     const rows: Cell[][] = [];
     for (const t of taxTables(ctx, letter)) {
       for (const row of t.rows) {
-        const head: Cell[] = [num(t.year), t.projectedLaw ? "projected from 2026" : "2026 tax law", row.kind === "rate" ? `${row.label} (%)` : row.label, row.gloss ?? ""];
+        const head: Cell[] = [num(t.year), t.projectedLaw ? `projected from ${DATA_YEARS.tax}` : `${DATA_YEARS.tax} tax law`, row.kind === "rate" ? `${row.label} (%)` : row.label, row.gloss ?? ""];
         rows.push(row.kind === "rate"
           ? [...head, null, null, null, null, ...fig(ctx, `l6t.${letter}.${t.year}.rate.offer`, rateText(t.rate, t.digits))]
           : [...head, ...cols.flatMap((c) => fig(ctx, `l6t.${letter}.${t.year}.${row.line}.${c}`, moneyText(row[c]!)))]);
@@ -349,7 +350,7 @@ const PARTS: Record<PartTable, (ctx: WorkContext, letter: Letter, n: number) => 
       title: partRef(ctx, letter, 6, "Tax by calendar year: each year's pay, its tax by kind, and its rate"),
       header: ["Calendar year", "Tax law", ...kinds.flatMap(([, name]) => [`${name} ($)`, `${name} tickmark`]), "Rate, of that calendar year's pay (%)", "Rate tickmark"],
       rows: taxYearsOf(b.detail, b.window).map((r): Cell[] => [
-        num(r.year), r.projectedLaw ? "projected from 2026" : "2026 tax law",
+        num(r.year), r.projectedLaw ? `projected from ${DATA_YEARS.tax}` : `${DATA_YEARS.tax} tax law`,
         ...kinds.flatMap(([k]) => fig(ctx, `a6.${letter}.${r.year}.${k}`, figure(r.values[k]))),
         ...fig(ctx, `a6.${letter}.${r.year}.rate`, shareText(r.rate)),
       ]),

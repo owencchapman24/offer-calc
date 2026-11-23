@@ -26,10 +26,12 @@ export function formatIssue(i: OfferIssue): string {
       const { month, day } = i.params;
       return month >= 1 && month <= 12 ? `${MONTH_NAMES[month - 1]} has no ${day}${ordinal(day)}.` : "Pick a month from January to December.";
     }
-    case "before2026":
-      return i.params.what === "start" ? "Start dates before 2026 aren't supported: tax data starts in 2026."
-        : i.params.what === "vest" ? "A tranche would vest before 2026, and tax data starts in 2026: move the vesting start later."
-        : "Payments before 2026 aren't supported: tax data starts in 2026.";
+    case "beforeBaseYear": {
+      const y = i.params.year;
+      return i.params.what === "start" ? `Start dates before ${y} aren't supported: tax data starts in ${y}.`
+        : i.params.what === "vest" ? `A tranche would vest before ${y}, and tax data starts in ${y}: move the vesting start later.`
+        : `Payments before ${y} aren't supported: tax data starts in ${y}.`;
+    }
     case "leaveBeforeStart": return "The leave date can't be before the start date.";
     case "notAfterStart": return "The promotion date must be after your start date.";
     case "negative": return "Enter 0 or more.";

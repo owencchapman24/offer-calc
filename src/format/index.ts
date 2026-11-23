@@ -136,9 +136,9 @@ export function formatAssumption(a: Assumption): string {
       return `Taxed as a full-year resident of ${a.params.state}${l === "flat" ? ", with a local income tax at the flat rate entered" : l ? ` and ${LOCALITY[l]}` : ""}.`;
     }
     case "projectedLaw":
-      return `Tax years after 2026 are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed from the latest `
-        + "published (2026's, or a later year's where the IRS has published it), state law held at 2026 except statutory indexing (CA) "
-        + "and federal links.";
+      return `Tax years after ${a.params.base} are projected at ${pct(a.params.inflation, 2)} inflation: federal amounts indexed from the `
+        + `latest published (${a.params.base}'s, or a later year's where the IRS has published it), state law held at ${a.params.base} except `
+        + "statutory indexing (CA) and federal links.";
     case "salaryChanges":
       return `Salary changes (${a.params.scenario} scenario): ${a.params.changes
         .map((c) => `${c.date} ${c.reasons.map(reason).join(" + ")} to ${usd(round2(c.annual))}`).join("; ")}.`;

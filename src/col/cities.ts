@@ -6,8 +6,11 @@ import data from "./cities.json";
 export interface City { code: string; name: string; states: string[] }
 
 export const CITIES: City[] = data.cities;
-/** BEA RPP data year and HUD FMR fiscal year, for the sources line. */
-export const DATA_YEARS = { rpp: data.rppDataYear, fmr: data.fmrFiscalYear };
+/**
+ * BEA RPP data year and HUD FMR fiscal year, for the sources line; and the tax base year (the engine's BASE_YEAR), for every
+ * "2026 tax law", "projected from 2026" and first date the app shows (audit C28).
+ */
+export const DATA_YEARS = { rpp: data.rppDataYear, fmr: data.fmrFiscalYear, tax: data.taxBaseYear };
 
 const byCode = new Map(CITIES.map((c) => [c.code, c]));
 
