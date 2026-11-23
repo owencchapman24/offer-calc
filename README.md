@@ -85,7 +85,8 @@ The code: `src/tax` (the tax engine), `src/offer` (offers to dated, taxed paymen
   as many on a new random seed, and shrinks any failure it finds to its smallest case, which its seed replays.
 - **The tax engine is checked against [PolicyEngine-US](https://github.com/PolicyEngine/policyengine-us)**
   (version 2.30.3) for 2026 law, on wages from $40,000 to $320,000 for every state and DC, single and
-  married filing jointly. Social Security, Medicare and state payroll taxes match exactly; New York
+  married filing jointly. Social Security, Medicare and state payroll taxes match exactly (the state
+  payroll taxes' parameters were copied from PolicyEngine-US, so that match is circular); New York
   City within $0.48. For single filers from $60,000 to $200,000, federal income tax is within $5 in 50
   of 51 places and state income tax in 42 of 51 (44 within $6). The differences that remain, and the
   ones that are intentional, are listed in the methodology (M-4, M-10). The comparison's report is
@@ -134,7 +135,10 @@ npm run oracle
   wage base).
 - **Tax Foundation**, "State Individual Income Tax Rates and Brackets, 2026", and each state law enacted
   after it, listed in the methodology (M-11).
-- **PolicyEngine-US**, used only to validate the tax engine; it isn't part of the app.
+- **PolicyEngine-US** (version 2.30.3): it validates the tax engine (M-4), and some of the engine's values were copied from it:
+  the state payroll taxes' parameters, Arizona's standard deduction, and nine of the eleven state laws enacted after the Tax
+  Foundation's table (each marked "via PolicyEngine-US" or "as modeled by PolicyEngine-US" in `src/tax/params/states2026.ts`).
+  Where a value came from it, agreeing with it is circular. It isn't part of the app.
 - **Atkinson Hyperlegible Next and Mono** (Braille Institute, SIL Open Font License 1.1) and **React**
   (MIT License), installed from npm.
 
