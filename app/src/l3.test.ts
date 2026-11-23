@@ -249,3 +249,20 @@ describe("the slow job", () => {
     expect(page).toMatch(/or Sign-on, paid Oct 1, 2027: \$5,000 → no amount ties/);
   });
 });
+
+describe("L-3 names cities as the rest of the app does (audit C19)", () => {
+  // B in Winston-Salem, NC (BEA area 49180), C in Louisville, KY (31140): L-3 split at the first "-" or ",", so it said
+  // "Winston" and "Louisville/Jefferson County", where the rest of the app says "Winston-Salem" and "Louisville" (shortCity).
+  const ctx = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B"
+    ? { ...o, draft: { ...o.draft, costOfLiving: { ...o.draft.costOfLiving, area: "49180", monthlyRent: 1_200 } } }
+    : o.letter === "C" ? { ...o, draft: { ...o.draft, residence: { ...o.draft.residence, state: "KY" }, costOfLiving: { ...o.draft.costOfLiving, area: "31140", monthlyRent: 1_400 } } }
+    : o)));
+  const page = l3Text(ctx);
+
+  it("says Winston-Salem and Louisville, as the breakdowns and the verdict do", () => {
+    expect(page).toContain("Winston-Salem");
+    expect(page).toContain("Louisville");
+    expect(page).not.toMatch(/Winston(?!-Salem)/);
+    expect(page).not.toContain("Jefferson County");
+  });
+});

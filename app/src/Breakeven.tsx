@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { RentFlipResult } from "../../src/offer/types";
-import { changeText, inSentence, rentCity, rentTie, rentTies, type TieLine, type TieView, tieView } from "./breakevenModel";
+import { changeText, inSentence, rentTie, rentTies, type TieLine, type TieView, tieView } from "./breakevenModel";
 import { shownIndexes } from "./footing";
 import { Fig, useRovingTicks } from "./figures";
 import { useOnScreen } from "./lazy";
-import { basisPhrase, detailOf, pricesOf, type WorkContext } from "./metrics";
+import { basisPhrase, detailOf, pricesOf, shortCity, type WorkContext } from "./metrics";
 import type { Letter } from "./model";
 import { type CompareRequest, tieJob, type Ties } from "./protocol";
 import { dayBefore, dollars, figure, longDate } from "./text";
@@ -97,11 +97,11 @@ export function Breakeven(p: BreakevenProps) {
   );
 }
 
-/** The city of an offer's rent, from your stay's projection. */
+/** The city of an offer's rent, from your stay's projection, named as everywhere else: "Winston-Salem", "Louisville" (audit C19). */
 function cityOf(ctx: WorkContext, letter: Letter): string {
   const r = ctx.results!;
   const name = r.detail?.offers[r.letters.indexOf(letter)]?.costOfLiving?.area.name;
-  return name ? rentCity(name) : "local";
+  return name ? shortCity(name) : "local";
 }
 
 /** An offer behind the winner: what would tie it. */
