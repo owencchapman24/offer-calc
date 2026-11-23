@@ -100,9 +100,6 @@ export function changeText(r: BreakevenResult): string {
   return `${sign}${dollars(change)}${r.from > 0 ? `, ${sign}${(Math.abs(r.increase / r.from) * 100).toFixed(1)}%` : ""}`;
 }
 
-/** The city a rent lever names: "New York" (the metro's first city). */
-export const rentCity = (areaName: string) => areaName.split(/[-,]/)[0].trim();
-
 /**
  * A rent lever as shown (L-3, its work, the rent note's work, the copied document): the gap between the two totals as shown,
  * restated in the offer's city's dollars with its two BEA indexes as shown, ÷ rent's present-value factor as shown (4 decimals),
