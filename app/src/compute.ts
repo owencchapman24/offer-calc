@@ -92,7 +92,9 @@ function ownStay(o: OfferInput, c: CompareRequest, key: string): Own {
  */
 function offerDetail(o: OfferInput, household: Household, options: ValuedOptions, window: { start: ISODate; years: number }):
   { detail: OfferDetail; base: ScenarioResult } {
-  const r = projectScenario(o, household, { ...options, scenario: "base", window });
+  // Every employment year the window touches: the engine reports `years` of them (5 by default), though it projects the whole
+  // window, so a stay over 5 years showed only years 1-5 in L-1 and A-3, and its reconciliation lost the rest. At least 5, as before.
+  const r = projectScenario(o, household, { ...options, scenario: "base", window, years: Math.max(5, window.years) });
   const cases = {
     bear: projectScenario(o, household, { ...options, scenario: "bear", window }).window,
     bull: projectScenario(o, household, { ...options, scenario: "bull", window }).window,

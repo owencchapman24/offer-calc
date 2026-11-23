@@ -10,7 +10,7 @@ import { addMonthsIso, leaveAxis, leaveLines, reconcile, valueAt, worked } from 
 import { shownStay } from "./footing";
 import type { WorkContext } from "./metrics";
 import type { LeaveCurve, LeavePanel } from "./protocol";
-import { cursorJob, leaveJob, sweepDays } from "./slowJobs";
+import { cliffYears, cursorJob, leaveJob, sweepDays } from "./slowJobs";
 import { BENEFITS, compareOf, context, footsAsDisplayed, runJob, VALUATION, withLeave } from "./testing";
 import { dayBefore } from "./text";
 import { WorkProvider } from "./Tickmarks";
@@ -199,4 +199,25 @@ describe("schedules whose figures are from earlier inputs say so", () => {
     expect(invalid).toMatch(/class="schedule risk is-invalid"/);
     expect(html(createElement(Risk, { ctx, sample: true }))).not.toMatch(/is-updating/);
   });
+});
+
+describe("L-4's panel past year 5 of a longer stay (audit N16)", () => {
+  const ctx = context("colAdjustedTotal", undefined, 7);
+
+  it("looks for the next cliff through the year after the last day's, and at least 5 years, as before", () => {
+    // Year n runs [Jul 13, 2025 + n, Jul 13, 2026 + n): Jul 12, 2031 is year 5's last day, Jul 13, 2031 year 6's first.
+    expect(cliffYears(VALUATION, toDays("2026-07-13"))).toBe(5);
+    expect(cliffYears(VALUATION, toDays("2030-07-12"))).toBe(5); // year 4: 4 + 1 = 5
+    expect(cliffYears(VALUATION, toDays("2030-07-13"))).toBe(6); // year 5: 5 + 1
+    expect(cliffYears(VALUATION, toDays("2031-07-12"))).toBe(6);
+    expect(cliffYears(VALUATION, toDays("2031-07-13"))).toBe(7); // year 6
+  });
+  it("finds each offer's next cliff in years 6 and 7, as it does before year 5", () => {
+    // Each sample's bonus is paid every year: A's on Jan 31, B's and C's on Mar 15; C's RSUs vest quarterly. Before the fix, every
+    // offer but C found none after Jul 13, 2031, and none at all in year 7.
+    const next = (leaveDate: string) => panels(ctx, leaveDate).map((p) => p!.next?.date ?? null);
+    expect(next("2031-01-12")).toEqual(["2031-01-31", "2031-03-15", "2031-02-15"]);
+    expect(next("2032-01-12")).toEqual(["2032-01-31", "2032-03-15", "2032-02-15"]);
+    expect(next("2033-01-12")).toEqual(["2033-01-31", "2033-03-15", "2033-02-15"]);
+  }, 30_000);
 });
