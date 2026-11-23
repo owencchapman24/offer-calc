@@ -319,7 +319,8 @@ to pick.
 - **Per hour:** the after-rent total, nominal, ÷ hours worked in the window, when every offer has a city (always, in the app); total
   rewards otherwise (`perHourOf`, `compare.ts`).
 - **Breakeven:** bisection to the cent on base-scenario present value, on after-tax comp, total rewards or the after-rent total.
-  "alreadyAhead" (B leads even at $0) is an outcome, not an error; `aheadBy` is always given.
+  "alreadyAhead" (B leads even at $0), "notInWindow" (the lever pays nothing inside the window) and "outOfReach" (B trails with
+  $100M more, `MAX_AMOUNT`) are outcomes, not errors; `aheadBy` is always given.
 - **Cliffs:** dated by the first last day that keeps them, by the leave-date rules. `cliffValue` taxes payments at that year's
   average offer rate in the stay-until-the-cliff projection.
 - **Quoted total compensation:** the offer-letter view; it excludes refreshers, proration, payout lag and vest snapping.

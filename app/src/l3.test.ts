@@ -234,4 +234,18 @@ describe("the slow job", () => {
     const again = runJob((post) => breakevenJob({ ...tieJob("breakeven", c, "colAdjustedTotal", lead), gen: 2 }, post));
     expect(again.ok).toBe(true);
   });
+  it("an offer whose levers pay nothing inside your stay gets its row and its reason, not an error for all of L-3 (audit N15)", () => {
+    // A one-year stay from Jul 13, 2026, and B starting Sep 1, 2027, after it ends: neither its salary nor its sign-on is paid inside it.
+    const ctx = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B" ? { ...o, draft: { ...o.draft, startDate: "2027-09-01" } } : o)), 1);
+    const t = withTies(ctx); // L-3's job threw here: "No breakeven below a $100M increase."
+    const b = t.ctx.results!.ties!.l3!.rows.find((x) => x.offer === 1)!;
+    expect([b.salary.outcome, b.cash!.outcome, b.rent!.outcome]).toEqual(["notInWindow", "notInWindow", "noRent"]);
+    expect(derive("tie.B.salary", t.ctx).notes[0])
+      .toBe("B starts after your stay ends, so none of its salary is paid inside it: no starting salary changes its total, and none ties.");
+    expect(derive("tie.B.cash", t.ctx).notes[0])
+      .toBe("B's sign-on would be paid Oct 1, 2027, after your stay ends, so no amount changes its total over your stay, and none ties.");
+    const page = l3Text(ctx);
+    expect(page).toMatch(/B Starting salary \$80,000 → no salary ties/);
+    expect(page).toMatch(/or Sign-on, paid Oct 1, 2027: \$5,000 → no amount ties/);
+  });
 });

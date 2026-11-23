@@ -7,7 +7,7 @@ export { indexText } from "./footing";
 import { HELP, helpKey } from "./help";
 import {
   alsoCounted, type AppOffer, ASSUMPTIONS, bonusBasis, type CashAwardDraft, type ClawbackDraft, getPath, hasRange, CITY_TAX, cityTax, flatLocality, type Letter,
-  localTaxName, type OfferDraft, type ScheduleDraft,
+  localTaxName, MAX_AMOUNT, type OfferDraft, type ScheduleDraft,
   timeOffInput, toOfferInput,
 } from "./model";
 import { daysOff, weeksWorked } from "../../src/offer/timeOff";
@@ -828,10 +828,14 @@ function salaryWork(ctx: WorkContext, t: Ties, row: TieRow, extra: string[] = []
   const lines = gapLines(x, t.basis, r);
   const inputs = fromInputs(ctx, x.me, ["salary.annual"]);
   if (r.outcome !== "tie") {
+    const why = r.outcome === "alreadyAhead"
+      ? `Even at a $0 starting salary, ${x.me}'s total stays above ${x.other}'s, so no salary ties: what keeps ${x.me} ahead is paid apart `
+        + "from salary."
+      : r.outcome === "notInWindow"
+        ? `${x.me} starts after your stay ends, so none of its salary is paid inside it: no starting salary changes its total, and none ties.`
+        : `Even ${dollars(MAX_AMOUNT)} more starting salary leaves ${x.me}'s total below ${x.other}'s, so no salary up to that ties.`;
     return {
-      title: x.title, scope: x.scope, lines,
-      notes: [`Even at a $0 starting salary, ${x.me}'s total stays above ${x.other}'s, so no salary ties: what keeps ${x.me} ahead is paid apart `
-        + "from salary.", sameWindow(x)],
+      title: x.title, scope: x.scope, lines, notes: [why, sameWindow(x)],
       ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
     };
   }
@@ -903,10 +907,14 @@ function cashWork(ctx: WorkContext, t: Ties, row: TieRow): Work {
   const lines = gapLines(x, t.basis, r);
   const inputs = lever.added ? { inputs: [], uses: [] } : fromInputs(ctx, x.me, ["cashAwards.0.amount"]);
   if (r.outcome !== "tie") {
+    const why = r.outcome === "alreadyAhead"
+      ? `With no ${inSentence(lever.label)} at all, ${x.me}'s total stays above ${x.other}'s, so no amount ties: ${x.me} doesn't need it to lead.`
+      : r.outcome === "notInWindow"
+        ? `${lever.added ? "A sign-on 30 days in" : `${x.me}'s ${inSentence(lever.label)}`} would be paid ${lever.paid}, after your stay ends, so no `
+          + "amount changes its total over your stay, and none ties."
+        : `Even ${dollars(MAX_AMOUNT)} more leaves ${x.me}'s total below ${x.other}'s, so no ${inSentence(lever.label)} up to that ties.`;
     return {
-      title: x.title, scope: x.scope, lines,
-      notes: [`With no ${inSentence(lever.label)} at all, ${x.me}'s total stays above ${x.other}'s, so no amount ties: ${x.me} doesn't need it to lead.`,
-        sameWindow(x)],
+      title: x.title, scope: x.scope, lines, notes: [why, sameWindow(x)],
       ties: [], ...inputs, uses: [...x.uses, ...inputs.uses],
     };
   }

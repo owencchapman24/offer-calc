@@ -222,8 +222,9 @@ const sign = (x: number) => (x < 0 ? "-" : "+");
 for (const other of [offers[1], offers[2]]) {
   for (const basis of ["cash", "totalRewards", "colAdjustedTotal"] as const) {
     const r = breakeven(offers[0], other, "salary", household, { inflation, valuationDate, horizonYears: 5, basis });
-    out.push(r.outcome === "alreadyAhead"
-      ? `   ${short(other)}, ${basisLabel[basis]}: already ahead by $${$(r.aheadBy)} in PV, even at a $0 salary`
+    out.push(r.outcome !== "tie"
+      ? `   ${short(other)}, ${basisLabel[basis]}: ` + (r.outcome === "alreadyAhead" ? `already ahead by $${$(r.aheadBy)} in PV, even at a $0 salary`
+        : r.outcome === "notInWindow" ? "no salary is paid inside the window" : "no tie within $100M more")
       : `   ${short(other)}, ${basisLabel[basis]}: $${$(r.from)} -> $${$(r.to)} `
         + `(${sign(r.increase)}$${$(Math.abs(r.increase))}, ${sign(r.increase)}${pct(Math.abs(r.increase) / r.from)}); `
         + `target PV $${$(r.targetPV)}`);
