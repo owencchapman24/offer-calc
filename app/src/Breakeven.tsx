@@ -66,7 +66,9 @@ export function Breakeven(p: BreakevenProps) {
         {p.sample && <Stamp>Illustrative samples</Stamp>}
         <StaleNote status={status} />
       </header>
-      {!v ? <p className="note">{p.ties.error ?? "Working out what would tie…"}</p> : (
+      {/* Until its ties are in, their room is held (the scope line, and about 6.5em an offer), so L-4 below doesn't jump down as
+          they fill in on screen (audit T6). */}
+      {!v ? <p className="note ties-wait" style={{ minHeight: `${2.5 + r.letters.length * 6.5}em` }}>{p.ties.error ?? "Working out what would tie…"}</p> : (
         <>
           <p className="tie-scope">
             {/* After rent, its dollars are said once, in words, after the figure. */}
