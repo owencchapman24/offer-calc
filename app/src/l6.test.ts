@@ -1,12 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
+import { niceTicks, valueTicks } from "./axes";
+import { ByYear } from "./ByYear";
 import { derive } from "./derive";
 import { shownStay } from "./footing";
 import { type MetricId, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
 import { type AppOffer, blankDraft, type Letter } from "./model";
-import { context, footsAsDisplayed, renderPage, renderWork, withWork } from "./testing";
+import { initialSession } from "./session";
+import { context, footsAsDisplayed, renderPage, renderWork, VALUATION, withWork } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
 import { addCents, exactPay, FOOTS, paymentYears, stayRows, taxTables, yearCell, yearTable } from "./workpaper";
@@ -219,5 +222,46 @@ describe("a stay over 5 years: every year of it, by year (found with audit N16)"
       expect(s.after).toEqual({ gross: 0, tax: 0, premiums: 0, cash: 0, totalRewards: 0, colAdjustedTotal: 0 });
       expect(s.years.cash).toBe(s.stay.cash);
     }
+  });
+});
+
+describe("a value axis below zero (audit C17)", () => {
+  it("starts at 0 when nothing is below it; otherwise spans the values, with 0 among its ticks", () => {
+    expect(valueTicks([12_000, 48_000])).toEqual(niceTicks(48_000));
+    expect(valueTicks([])).toEqual(niceTicks(0));
+    const t = valueTicks([-57_000, -64_000, 125_000]);
+    expect(t).toContain(0);
+    expect(t[0]).toBeLessThanOrEqual(-64_000);
+    expect(t[t.length - 1]).toBeGreaterThanOrEqual(125_000);
+    // All below zero: the top tick is 0. Steps under 1 still put exactly 0 among the ticks, not 1e-17.
+    expect(valueTicks([-5, -1]).at(-1)).toBe(0);
+    expect(valueTicks([-0.3, 0.2])).toContain(0);
+  });
+
+  /** L-1's chart, each year (H 240 below a top margin of 14, as ByYear.tsx draws it). */
+  const chart = (ctx: WorkContext) => renderToStaticMarkup(createElement(WorkProvider, { ctx,
+    children: createElement(ByYear, { ctx, ui: initialSession(VALUATION).ui, sample: true, dispatch: () => {} }) }));
+  const dots = (html: string) => [...html.matchAll(/class="series-dot" cx="[^"]+" cy="([^"]+)"/g)].map((m) => Number(m[1]));
+
+  it("L-1 draws a year after rent below zero inside the plot, under a zero line, its tick and its figure with a true minus", () => {
+    // B's rent at $20,000 a month is more than its take-home: every year after rent is below zero.
+    const ctx = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B"
+      ? { ...o, draft: { ...o.draft, costOfLiving: { ...o.draft.costOfLiving, monthlyRent: 20_000 } } } : o)));
+    expect(byYear(ctx, "B").years.every((y) => y.value < 0)).toBe(true);
+    const html = chart(ctx);
+    const ys = dots(html);
+    expect(ys.length).toBe(12);
+    for (const y of ys) expect(y >= 14 && y <= 14 + 240, `a dot at y ${y}`).toBe(true);
+    expect(html).toContain('class="grid zero"');
+    expect(html).toMatch(/>−\d+k<\/text>/);
+    // B's last year at its line's end: "−186,581", not "-186,581".
+    expect(html).toMatch(/class="fig-value">−\d{1,3},\d{3}</);
+    expect(html).not.toMatch(/class="fig-value">-\d/);
+  });
+
+  it("the samples, all above zero, still start at 0 with no zero line", () => {
+    const html = chart(context());
+    expect(html).not.toContain("grid zero");
+    expect(html).toMatch(/textAnchor="end"[^>]*>0<\/text>|text-anchor="end"[^>]*>0<\/text>/);
   });
 });

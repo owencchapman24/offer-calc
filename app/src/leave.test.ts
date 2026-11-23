@@ -221,3 +221,22 @@ describe("L-4's panel past year 5 of a longer stay (audit N16)", () => {
     expect(next("2033-01-12")).toEqual(["2033-01-31", "2033-03-15", "2033-02-15"]);
   }, 30_000);
 });
+
+describe("L-4's chart below zero (audit C17)", () => {
+  it("a day whose clawback outweighs the pay is drawn under a zero line, not pinned to the axis", () => {
+    // A, in New York City, with a $1,000,000 sign-on, all of it repaid on leaving within a year. Repaid in a later calendar year
+    // than it was paid, its New York State and City tax and its Medicare tax aren't refunded (IRC 1341 gives back federal tax
+    // only): leaving early in 2027 keeps less than nothing.
+    const ctx = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "A" ? { ...o, draft: { ...o.draft,
+      cashAwards: [{ ...o.draft.cashAwards[0], amount: 1_000_000, clawback: { months: 12, kind: "full", per: null, from: null, repay: null } }] } } : o)));
+    const L = withLeave(ctx);
+    const html = renderToStaticMarkup(createElement(WorkProvider, { ctx: L.ctx, children: createElement(Leaving, L.props) }));
+    // The zero line is drawn only when a value is below zero.
+    expect(html).toContain('class="grid zero"');
+    expect(html).toMatch(/>−\d+k<\/text>/);
+    // Every point of every line inside the plot (H 240 below a top margin of 24, as Leaving.tsx draws it).
+    const ys = [...html.matchAll(/class="series-line" points="([^"]+)"/g)].flatMap((m) => m[1].split(" ").map((p) => Number(p.split(",")[1])));
+    expect(ys.length).toBeGreaterThan(0);
+    for (const y of ys) expect(y >= 24 - 0.001 && y <= 24 + 240 + 0.001, `a point at y ${y}`).toBe(true);
+  });
+});

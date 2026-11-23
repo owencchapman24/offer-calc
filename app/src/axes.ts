@@ -34,6 +34,19 @@ export function niceTicks(max: number): number[] {
   return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
 }
 
+/**
+ * A value axis's ticks for what a chart draws: from 0 when nothing is below it (niceTicks); otherwise over the whole range, 0
+ * among the ticks, so a year after rent below zero, or a day whose clawback outweighs the pay, is drawn under a zero line, not
+ * clipped or pinned to the axis (audit C17).
+ */
+export function valueTicks(values: readonly number[]): number[] {
+  const lo = Math.min(0, ...values);
+  const hi = Math.max(0, ...values);
+  if (!(lo < 0)) return niceTicks(hi);
+  // Steps of 0.25 or less aren't exact in binary: the tick at 0 is 0, not 1e-17.
+  return rangeTicks(lo, hi).map((t) => (Math.abs(t) < 1e-9 ? 0 : t));
+}
+
 /** Axis ticks over a range that needn't start at 0: 1, 2, 2.5 or 5 times a power of ten, about five of them. */
 export function rangeTicks(lo: number, hi: number): number[] {
   if (!(hi > lo)) {
