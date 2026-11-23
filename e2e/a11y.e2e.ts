@@ -126,6 +126,25 @@ test.describe("compare", () => {
     await scan(page, "every schedule updating (held)", { held: true });
   });
 
+  // Audit T7: an input's help, open (quick mode's help is a chunk of its own); and the schedules while an input has a problem.
+  test("an input's help, open", async ({ page }) => {
+    await openCompare(page);
+    await page.getByRole("button", { name: "More help" }).first().click();
+    await expect(page.locator(".help-body").first()).not.toContainText("Getting the help…", { timeout: 10_000 });
+    await scan(page, "an input's help, open");
+  });
+
+  test("L-1 to L-4 while an input has a problem: the last valid results", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openCompare(page);
+    await loadSchedules(page);
+    // On a phone the ledger shows one offer at a time: B's tab first.
+    await selectOffer(page, "B");
+    await page.locator("#in-B-salary-annual").fill("200000000");
+    await expect(page.getByRole("button", { name: "Fix it" }).first()).toBeVisible({ timeout: 15_000 });
+    await scan(page, "L-1 to L-4, an input with a problem");
+  });
+
   test("tickmarks hidden", async ({ page }) => {
     await openCompare(page);
     // The setting is at the foot of the page: going there brings L-2 to L-4 on screen. Load and work them out first, so the scan
