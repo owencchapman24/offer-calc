@@ -383,3 +383,30 @@ test.describe("recovery", () => {
     expect(await savedNow(page)).toBe(SAVED.newer);
   });
 });
+
+test("a chunk that won't load reloads the page once, keeping what was just typed (audit C24)", async ({ page }) => {
+  await openCompare(page);
+  // Detailed mode's chunk is gone, as for a tab left open across a deploy.
+  let aborted = 0;
+  await page.route(/\/assets\/Detailed-[^/]+\.js$/, (route) => {
+    aborted++;
+    return route.abort();
+  });
+  let loads = 0;
+  page.on("load", () => { loads++; });
+  // Typed and straight away asks for the chunk, before the session's usual save (500 ms after an edit).
+  await page.locator("#in-B-salary-annual").fill("123456");
+  await page.getByRole("button", { name: "Detailed", exact: true }).click();
+  await expect.poll(() => loads, { timeout: 15_000 }).toBe(1);
+  // What was typed was saved before the reload: the session in this browser has it.
+  const salaryB = () => page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("offer-calc:v1") ?? "{}") as { offers?: Array<{ letter: string; draft: { salary: { annual: number } } }> };
+    return s.offers?.find((o) => o.letter === "B")?.draft.salary.annual;
+  });
+  expect(await salaryB()).toBe(123_456);
+  // It doesn't reload again: the chunk still fails, within the minute.
+  await page.getByRole("button", { name: "Detailed", exact: true }).click().catch(() => {});
+  await page.waitForTimeout(2_000);
+  expect(loads).toBe(1);
+  expect(aborted).toBeGreaterThanOrEqual(1);
+});

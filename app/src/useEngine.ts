@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RentEstimate } from "../../src/col/rent";
 import type { HorizonSweep } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
-import type {
-  Breakdown, EngineRequest, EngineResponse, LeaveCurve, LeavePanel, OfferTerms, SlowLane, SlowRequest, SlowResponse, StayDetail, Ties,
-  WorkOffer,
+import {
+  type Breakdown, type EngineRequest, type EngineResponse, type LeaveCurve, type LeavePanel, NOT_LOADED, type OfferTerms, type SlowLane,
+  type SlowRequest, type SlowResponse, type StayDetail, type Ties, type WorkOffer,
 } from "./protocol";
 
 /** A slow-lane result (L-3, L-4, L-6, the close-call line): the latest one back, the request it answers, and whether a newer one is on its way. */
@@ -110,6 +110,17 @@ export function useEngine(request: Omit<EngineRequest, "gen">, /** Changes when 
           invalid: false, ms: Object.keys(r.breakdowns).length ? r.ms : s.ms }
         : { ...s, rents: r.rents, updating: false, error: r.error, issues: r.issues, invalid: r.error === null });
     };
+    // The worker's script didn't load, or threw outside a request (audit C24): no answer is coming, so the lead and every waiting
+    // schedule say so instead of "Updating…" forever. A script that didn't load gives a bare event: most likely the site was updated
+    // since the page opened (NOT_LOADED says to reload).
+    const failed = (e: Event) => {
+      e.preventDefault();
+      const error = e instanceof ErrorEvent && e.message ? e.message : NOT_LOADED;
+      setState((s) => ({ ...s, updating: false, error,
+        ...Object.fromEntries(LANES.map((l) => [l, s[l].updating ? { ...s[l], updating: false, error } : s[l]])) }));
+    };
+    w.onerror = failed;
+    w.onmessageerror = failed;
     worker.current = w;
     for (const m of queued.current.splice(0)) w.postMessage(m);
     return () => w.terminate();

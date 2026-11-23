@@ -7,7 +7,7 @@ import { asymmetries, asymmetryText } from "./comparability";
 import { ComputeError, Lead, LiveVerdict, Problems, VerdictBar } from "./Lead";
 import { PHONE, TABLET, useFocusClearOfBars, useKeyboardUp, useMedia } from "./media";
 import { BreakevenSlot, breakdownModule, ByYearSlot, LeavingSlot, loadLater, loadParts, RiskSlot, showBridge } from "./Later";
-import { useLazyModule, useLoadAfterPaint } from "./lazy";
+import { reloadForChunk, useLazyModule, useLoadAfterPaint } from "./lazy";
 import type { LeaveBasis } from "./leaveModel";
 import type { OfferWarning } from "../../src/offer/types";
 import type { OfferIssue } from "../../src/offer/validate";
@@ -92,6 +92,28 @@ export function App() {
     return () => clearTimeout(t);
   }, [session]);
 
+  // A chunk that won't load (Vite's vite:preloadError; audit C24): a tab left open across a deploy asks for files that are gone.
+  // Save the session now, not in 500 ms, so nothing typed is lost, and reload once to get the current version (reloadForChunk: not
+  // again within a minute). Otherwise the failure shows where it happened.
+  const sessionNow = useRef(session);
+  sessionNow.current = session;
+  useEffect(() => {
+    const onFail = (e: Event) => {
+      let tab: Storage | undefined;
+      try {
+        tab = window.sessionStorage;
+      } catch {
+        tab = undefined;
+      }
+      if (!reloadForChunk(tab, Date.now())) return;
+      e.preventDefault();
+      saveSession(storage(), sessionNow.current);
+      window.location.reload();
+    };
+    window.addEventListener("vite:preloadError", onFail);
+    return () => window.removeEventListener("vite:preloadError", onFail);
+  }, []);
+
   const theme = themeOverride() ?? session.ui.theme;
   useEffect(() => {
     if (theme === "system") delete document.documentElement.dataset.theme;
@@ -138,17 +160,25 @@ export function App() {
       window.removeEventListener("afterprint", after);
     };
   }, []);
+  // Whether the last Print… failed partway: a schedule's code didn't load (audit C24).
+  const [printFailed, setPrintFailed] = useState(false);
   const print = async () => {
     if (preparing) return;
     setChoosing(false);
     printToggle.current?.focus();
     setPreparing(true);
+    setPrintFailed(false);
     try {
       const m = await import("./print");
       await m.printPage(() => {
         document.documentElement.classList.add("printing");
         setPrinting(scope);
       }, loadLater);
+    } catch {
+      // The page goes back to its screen layout, with its controls, and says why nothing printed.
+      document.documentElement.classList.remove("printing");
+      setPrinting(null);
+      setPrintFailed(true);
     } finally {
       setPreparing(false);
     }
@@ -333,7 +363,8 @@ export function App() {
                 them out first. */}
             <button ref={printToggle} type="button" className="link" aria-expanded={choosing} aria-controls="print-choice"
               onClick={() => { setChoosing(!choosing); setCopyChoosing(false); }}>Print…</button>
-            <span className="print-status" role="status">{preparing ? "Getting every schedule ready…" : ""}</span>
+            <span className="print-status" role="status">{preparing ? "Getting every schedule ready…"
+              : printFailed ? "Part of the page didn't load, so nothing was printed. Reload the page, then print." : ""}</span>
             <button ref={copyToggle} type="button" className="link" aria-disabled={copyBlocked ? true : undefined}
               aria-describedby={copyBlocked ? "copy-why" : undefined} aria-expanded={copyChoosing} aria-controls="copy-choice" onClick={() => {
                 if (copyBlocked) return;
