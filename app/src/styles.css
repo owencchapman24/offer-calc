@@ -400,6 +400,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .chart-plot { position: relative; }
 .chart-plot svg { display: block; overflow: visible; }
 .chart .grid { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+/* Where values go below zero, its gridline is drawn as the zero line (audit C17). */
+.chart .grid.zero { stroke: var(--graphite); }
 .chart .axis { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart .crosshair { stroke: var(--graphite); stroke-width: 1; shape-rendering: crispEdges; }
 .chart .leader { stroke: var(--muted); stroke-width: 1; }

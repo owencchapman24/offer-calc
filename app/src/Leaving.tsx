@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import type { ISODate } from "../../src/offer/types";
-import { niceTicks, useChartWidth } from "./axes";
+import { useChartWidth, valueTicks } from "./axes";
 import { Fig, useRovingTicks } from "./figures";
 import {
   addDays, addMonthsIso, cliffsText, daysBetween, firstLastDay, type LeaveAxis, leaveAxis, type LeaveBasis, type LeaveLine, leaveLines,
@@ -144,7 +144,12 @@ const H = 240;
 const M = { top: 24, right: 24, bottom: 28, left: 56 };
 const BAND = 18;
 
-const short = (x: number) => (x >= 1_000_000 ? `${+(x / 1e6).toFixed(1)}M` : x >= 1000 ? `${Math.round(x / 1000)}k` : `${Math.round(x)}`);
+/** An axis label: "120k"; a negative one with a true minus, "−20k", never "-20000" (audit C16, C17). */
+const short = (x: number) => {
+  const a = Math.abs(x);
+  const text = a >= 1_000_000 ? `${+(a / 1e6).toFixed(1)}M` : a >= 1000 ? `${Math.round(a / 1000)}k` : `${Math.round(a)}`;
+  return `${x < 0 && /[1-9]/.test(text) ? "−" : ""}${text}`;
+};
 
 function LeaveChart({ lines, axis, at, onAt, said }: {
   lines: LeaveLine[]; axis: LeaveAxis; at: ISODate; onAt(date: ISODate): void;
@@ -167,9 +172,12 @@ function LeaveChart({ lines, axis, at, onAt, said }: {
   const span = daysBetween(axis.start, axis.end);
   const plotW = width - M.left - M.right;
   const x = (date: ISODate) => M.left + (daysBetween(axis.start, date) / span) * plotW;
-  const ticks = niceTicks(Math.max(0, ...lines.flatMap((l) => l.points.map((pt) => pt.value))));
+  // A day whose clawback outweighs what was paid keeps less than nothing: it's drawn under the zero line, not pinned to it
+  // (audit C17, as L-1).
+  const ticks = valueTicks(lines.flatMap((l) => l.points.map((pt) => pt.value)));
+  const bottom = ticks[0];
   const top = ticks[ticks.length - 1];
-  const y = (v: number) => M.top + H - (Math.max(0, v) / top) * H;
+  const y = (v: number) => M.top + H - ((v - bottom) / (top - bottom)) * H;
   const years = Array.from({ length: 12 }, (_, i) => `${Number(axis.start.slice(0, 4)) + i + 1}-01-01`).filter((d) => d < axis.end);
   const bands = lines.flatMap((l) => l.segments.map((s) => ({ letter: l.letter, s })));
   // On a narrow screen a segment's label won't fit beside it: the labels go in a list under the chart.
@@ -205,7 +213,7 @@ function LeaveChart({ lines, axis, at, onAt, said }: {
         <svg width={width} height={height} aria-hidden="true">
           {ticks.map((t) => (
             <g key={t}>
-              <line className="grid" x1={M.left} x2={M.left + plotW} y1={y(t)} y2={y(t)} />
+              <line className={t === 0 && bottom < 0 ? "grid zero" : "grid"} x1={M.left} x2={M.left + plotW} y1={y(t)} y2={y(t)} />
               <text className="axis" x={M.left - 8} y={y(t)} dy="0.32em" textAnchor="end">{short(t)}</text>
             </g>
           ))}

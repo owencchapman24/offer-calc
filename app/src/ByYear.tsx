@@ -4,8 +4,8 @@ import type { Letter } from "./model";
 import { basisPhrase, type MetricId, pricesOf, type WorkContext } from "./metrics";
 import { byYear, type ByYear as ByYearData, yearNotes } from "./byYearModel";
 import type { Action, UiState } from "./session";
-import { niceTicks, useChartWidth } from "./axes";
-import { cents, dollars, figure } from "./text";
+import { useChartWidth, valueTicks } from "./axes";
+import { cents, dollars, signed } from "./text";
 import { placeOf } from "./verdict";
 import { CsvButton, Fig, useRovingTicks } from "./figures";
 import { type Stale, staleClass, StaleNote, Stamp, TickLegend, usePrinting } from "./ui";
@@ -109,12 +109,14 @@ function Chart({ offers, basis, units, running, title, say }: {
     return { letter: o.letter, points: o.years.map((y) => ({ n: y.n, value: running ? (acc += y.value) : y.value })) };
   });
   const n = Math.max(1, ...series.map((s) => s.points.length));
-  const max = Math.max(0, ...series.flatMap((s) => s.points.map((p) => p.value)));
-  const ticks = niceTicks(max);
+  // From the lowest value to the highest, 0 always among them: a year after rent below zero (rent above take-home) shows under
+  // the zero line, the offer most worth a warning (audit C17).
+  const ticks = valueTicks(series.flatMap((s) => s.points.map((p) => p.value)));
+  const bottom = ticks[0];
   const top = ticks[ticks.length - 1];
   const plotW = width - M.left - M.right;
   const x = (year: number) => M.left + (n === 1 ? plotW / 2 : ((year - 1) / (n - 1)) * plotW);
-  const y = (v: number) => M.top + H - (v / top) * H;
+  const y = (v: number) => M.top + H - ((v - bottom) / (top - bottom)) * H;
 
   // End labels at each line's last point; where two would overlap they're pushed apart, with a leader.
   const ends = series.filter((s) => s.points.length).map((s) => {
@@ -141,7 +143,8 @@ function Chart({ offers, basis, units, running, title, say }: {
       setHover(e.key === "Home" ? 1 : n);
     } else if (e.key === "Escape") setHover(null);
   };
-  const fmt = (v: number) => (perHour ? cents(v) : figure(v));
+  // A year below zero reads "−186,581", a true minus, as the axis does (audit C16, C17).
+  const fmt = (v: number) => (perHour ? cents(v) : signed(v));
   // What a screen reader says as the year moves: the slider's value, so it speaks only when you move it.
   const year = hover ?? 1;
   const readout = `Year ${year}${running ? ", running total" : ""}: ${series.flatMap((s) => {
@@ -160,7 +163,7 @@ function Chart({ offers, basis, units, running, title, say }: {
         <svg width={width} height={M.top + H + M.bottom} aria-hidden="true">
           {ticks.map((t) => (
             <g key={t}>
-              <line className="grid" x1={M.left} x2={M.left + plotW} y1={y(t)} y2={y(t)} />
+              <line className={t === 0 && bottom < 0 ? "grid zero" : "grid"} x1={M.left} x2={M.left + plotW} y1={y(t)} y2={y(t)} />
               <text className="axis" x={M.left - 8} y={y(t)} dy="0.32em" textAnchor="end">{short(t, perHour)}</text>
             </g>
           ))}
@@ -224,7 +227,8 @@ function YearTable({ offers, basis, units, running, years, say, perHour: rate }:
   /** A figure as its label says it (`said`); each offer's per hour over your stay. */ say: (v: number, n?: number) => string; perHour: (l: Letter) => number;
 }) {
   const perHour = basis === "perHour";
-  const fmt = (v: number) => (perHour ? cents(v) : figure(v));
+  // A year below zero reads "−186,581", a true minus, as the axis does (audit C16, C17).
+  const fmt = (v: number) => (perHour ? cents(v) : signed(v));
   return (
     <table className="year-table" id="l1-table">
       <caption className="sr-only">Each offer by employment year, {units}</caption>
@@ -253,7 +257,7 @@ function YearTable({ offers, basis, units, running, years, say, perHour: rate }:
         ) : (
           <tr className="rule-double">
             <th scope="row">Your stay, as paid</th>
-            {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${say(o.window ?? 0)}`}>{figure(o.window ?? 0)}</Fig></td>)}
+            {offers.map((o) => <td key={o.letter}><Fig id={`eysum.${o.letter}`} label={`${o.letter}'s stay as paid, ${say(o.window ?? 0)}`}>{signed(o.window ?? 0)}</Fig></td>)}
           </tr>
         )}
       </tfoot>
