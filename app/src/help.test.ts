@@ -6,6 +6,7 @@ import { LedgerProvider } from "./fields";
 import { type AppOffer, blankCommission, type RetirementDraft } from "./model";
 import { DEFAULTS } from "./defaults";
 import { fieldName, HELP, helpKey } from "./help";
+import { sectionOfPath } from "./Ledger";
 import { SECTIONS } from "./sections";
 import { context, renderAllInputs, withEspp } from "./testing";
 
@@ -43,6 +44,22 @@ describe("help on every input", () => {
     expect(fieldName("equity.refreshers.value.bear")).toBe(`${fieldName("equity.refreshers.value")}, bear case`);
     expect(fieldName("hours.weekly.base")).toBe(HELP["hours.weekly"].label);
     expect(fieldName("salary.raise.bear")).toBe("Merit raise, bear case");
+  });
+
+  it("a commission problem before detailed mode registers its names: named Commission, and Fix it opens its section (audit N18)", () => {
+    // Commission's terms register their names with detailed mode (detailedDefaults.ts). Until then, on the main thread, a problem
+    // with one (an imported file's, say) said "Input", and Fix it opened no section.
+    const saved = Object.fromEntries(Object.entries(HELP).filter(([k]) => k.startsWith("commission")));
+    try {
+      for (const k of Object.keys(saved)) delete HELP[k];
+      expect(fieldName("commission.amount")).toBe("Commission");
+      expect(fieldName("commission.amount.bull")).toBe("Commission, bull case");
+      expect(sectionOfPath("commission.draw.months")).toBe("commission");
+    } finally {
+      Object.assign(HELP, saved);
+    }
+    expect(fieldName("commission.amount")).toBe("Expected a year");
+    expect(sectionOfPath("commission.draw.months")).toBe("commission");
   });
 
   it("every rendered input names its help, and the help is there", () => {
