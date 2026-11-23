@@ -108,6 +108,24 @@ test.describe("compare", () => {
     await scan(page, "Copy as document: waiting on a problem");
   });
 
+  // Audit P5: while a schedule is worked out its text turns graphite (styles.css), not 60% opacity (2.99:1). The scan otherwise waits
+  // that moment out, so here every schedule is held in it: each gets the class it has while updating, and axe checks the contrast.
+  test("every schedule as it looks while it's being worked out", async ({ page }) => {
+    test.setTimeout(180_000);
+    await openCompare(page);
+    await loadSchedules(page);
+    await quiet(page);
+    const held = await page.evaluate(() => {
+      const els = document.querySelectorAll(".lead, .close, .own, .own-parts, .ties, .by-year, .risk, .leaving, .warnings, .verdict-bar, .the-work");
+      for (const el of els) el.classList.add("is-updating");
+      return els.length;
+    });
+    expect(held).toBeGreaterThan(5);
+    // Past the 120 ms colour transition.
+    await page.waitForTimeout(400);
+    await scan(page, "every schedule updating (held)", { held: true });
+  });
+
   test("tickmarks hidden", async ({ page }) => {
     await openCompare(page);
     // The setting is at the foot of the page: going there brings L-2 to L-4 on screen. Load and work them out first, so the scan
