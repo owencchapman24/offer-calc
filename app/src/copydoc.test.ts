@@ -362,7 +362,7 @@ describe("Copy as document, for one offer: its breakdown, for someone who's neve
   });
 });
 
-// Audit C16 and the owner's own use (docs/user-testing.md, finding 3): living at home, rent $0. A unary minus on a zero rent printed
+// Audit C16, seen in the owner's own use (docs/user-testing.md, finding 3): a rent of $0. A unary minus on a zero rent printed
 // "-0" in A-7's rent row, the bridge and the document ("less rent ... -0").
 describe("a rent of $0: no minus zero on the page or in the document", () => {
   const zeroRent = () => alone("A", (o) => ({ ...o, draft: { ...o.draft, costOfLiving: { ...o.draft.costOfLiving, monthlyRent: 0 } } }));
