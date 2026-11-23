@@ -46,9 +46,10 @@ export type OfferIssue = { path: string } & (
   | { code: "esppPurchases"; params: NoParams }
   /** Vacation, holidays and sick days that come to a whole year of workdays or more (260). */
   | { code: "daysOff"; params: { max: number } }
-  | { code: "wholeMonths"; params: { min: number } }
-  | { code: "wholeYears"; params: { min: number } }
-  | { code: "wholeDays"; params: { min: number } }
+  /** A whole number of months, years or days (after the start) from `min` to `max` (MAX_MONTHS, MAX_YEARS, MAX_DAYS_AFTER_START). */
+  | { code: "wholeMonths"; params: { min: number; max: number } }
+  | { code: "wholeYears"; params: { min: number; max: number } }
+  | { code: "wholeDays"; params: { min: number; max: number } }
   /** A whole number of days outside min-max (commission's payout lag, 0 to 366). */
   | { code: "dayRange"; params: { min: number; max: number } }
   /** A flat local income tax rate outside 0 to `max` (a fraction): no U.S. city's or county's is higher. */
@@ -111,6 +112,16 @@ export const MAX_DAYS_GIVEN = 260;
  * vest months, match tiers, graded steps and amounts by employment year. Other benefits keep their own 8.
  */
 export const MAX_ROWS = 120;
+/**
+ * The most months (a clawback window, a vesting tranche, a refresher's timing, a draw), years (a 401(k) cliff) and days after the
+ * start (a cash award's payment) an input can be: the longest stay, 10 years, since nothing timed later can pay inside one.
+ * Unbounded, a clawback of 10,000 months took cliffs() 68 s, which grows with its months squared, and stalled the worker (audit N17).
+ */
+export const MAX_MONTHS = 120;
+export const MAX_YEARS = 10;
+/** 10 years of days, with the most leap days 10 years can hold (3). */
+export const MAX_DAYS_AFTER_START = 3_653;
+const MAX_WHOLE = { wholeMonths: MAX_MONTHS, wholeYears: MAX_YEARS, wholeDays: MAX_DAYS_AFTER_START } as const;
 
 /**
  * Every problem with an offer's inputs, each with the path of the field that caused it. Empty when
@@ -161,9 +172,11 @@ export function validateOffer(offer: OfferInput, household?: Household): OfferIs
     if (s[low] > s.base) add(`${path}.${low}`, "caseOrder", { scenario: low, side: "above" });
     if (s[high] < s.base) add(`${path}.${high}`, "caseOrder", { scenario: high, side: "below" });
   };
-  const whole = (path: string, v: unknown, min: number, code: "wholeMonths" | "wholeYears" | "wholeDays") => {
+  /** A whole number from `min` to its unit's most (MAX_MONTHS, MAX_YEARS or MAX_DAYS_AFTER_START). */
+  const whole = (path: string, v: unknown, min: number, code: keyof typeof MAX_WHOLE) => {
     if (!amount(path, v, "number")) return false;
-    if (!Number.isInteger(v) || (v as number) < min) { add(path, code, { min }); return false; }
+    const max = MAX_WHOLE[code];
+    if (!Number.isInteger(v) || (v as number) < min || (v as number) > max) { add(path, code, { min, max }); return false; }
     return true;
   };
   /** A real date's day number, or null (with an issue). */

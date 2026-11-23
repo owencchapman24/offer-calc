@@ -42,10 +42,10 @@ export function formatIssue(i: OfferIssue): string {
     case "esppPurchases": return "A whole number that divides the offering's months.";
     case "daysOff": return `Vacation, holidays and sick days together must be under ${i.params.max}, a year's workdays.`;
     case "wholeMonths":
-      return /clawback/.test(i.path) ? `A clawback window is a whole number of months, at least ${i.params.min}.`
-        : `Enter a whole number of months, ${i.params.min} or more.`;
-    case "wholeYears": return `Enter a whole number of years, ${i.params.min} or more.`;
-    case "wholeDays": return `Enter a whole number of days, ${i.params.min} or more.`;
+      return /clawback/.test(i.path) ? `A clawback window is a whole number of months, ${i.params.min} to ${i.params.max}.`
+        : `Enter a whole number of months, ${i.params.min} to ${i.params.max}.`;
+    case "wholeYears": return `Enter a whole number of years, ${i.params.min} to ${i.params.max}.`;
+    case "wholeDays": return `Enter a whole number of days, ${i.params.min} to ${i.params.max.toLocaleString("en-US")}.`;
     case "dayRange": return `Enter a whole number of days, ${i.params.min} to ${i.params.max}.`;
     case "localRate": return `Enter a rate from 0% to ${+(i.params.max * 100).toFixed(2)}%: no U.S. city's or county's is higher.`;
     case "positive": return "Each tranche must vest more than 0%.";
