@@ -1,4 +1,5 @@
 import type { Component, ValueBasis } from "../../src/offer/types";
+import type { FilingStatus } from "../../src/tax/types";
 import { addCents, shownIndexes, type ShownYear, shownStay, shownYears } from "./footing";
 import { type L6Line, offerByLetter, ownOf, pricesOf, shortCity, type TaxLine, type WorkContext } from "./metrics";
 import { cashName, taxFreeNames } from "./byYearModel";
@@ -480,6 +481,13 @@ const TAX_LINES: Array<{ line: TaxLine; key: keyof TaxRun }> = [
  * federal income tax (the largest line) takes the rounding: the total less the other lines as rounded. The offer's column is
  * with less without, line by line.
  */
+/**
+ * Where the additional 0.9% Medicare tax starts, by filing status (IRC 3101(b)(2)): set by statute and not indexed, so the same in
+ * every year. A copy of the engine's `additionalMedicareThreshold` (src/tax/params/federal2026.ts), which the main thread can't import;
+ * l6.test.ts ties the two (audit C18: the note said $200,000 for a joint return too).
+ */
+export const ADDITIONAL_MEDICARE_OVER: Record<FilingStatus, number> = { single: 200_000, joint: 250_000, headOfHousehold: 200_000 };
+
 export function taxTables(ctx: WorkContext, letter: L): TaxTable[] {
   const w = workOf(ctx, letter);
   const o = offerByLetter(ctx, letter);
@@ -537,7 +545,7 @@ function taxTablesOf(w: WorkOffer, st: string, local: string, joint: boolean, n:
     rows.push({ line: "federal", label: "Federal income tax", kind: "tax", with: withFed, without: withoutFed, offer: withFed - withoutFed });
     for (const x of lines) {
       rows.push({ line: x.line, label: label(x.line), kind: "tax", with: R(t.with[x.key]), without: R(t.without[x.key]), offer: R(t.with[x.key]) - R(t.without[x.key]),
-        ...(x.line === "medicare" ? { gloss: "the additional 0.9% over $200,000 included" } : x.line === "statePayroll" ? { gloss: "disability, paid leave or long-term care" } : {}) });
+        ...(x.line === "medicare" ? { gloss: `the additional 0.9% over ${dollars(ADDITIONAL_MEDICARE_OVER[joint ? "joint" : "single"])} included` } : x.line === "statePayroll" ? { gloss: "disability, paid leave or long-term care" } : {}) });
     }
     rows.push({ line: "total", label: "Total tax", kind: "total", with: withTotal, without: withoutTotal, offer: offerTax });
     const rate = t.offerTaxRate;

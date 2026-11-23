@@ -202,9 +202,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             <strong>What's included:</strong> federal income tax (2026 brackets and standard deduction, or itemizing when that's
             lower, with state and local tax capped at the 2026 SALT limit); Social Security (6.2% up to the wage base) and Medicare
-            (1.45%, plus 0.9% above $200,000 single); state income tax for all 50 states and DC, and state payroll taxes such as
-            California's SDI; New York City's income tax and Philadelphia's wage tax, for residents (you say whether you'd live inside
-            the city); and any other local income tax you enter, at its flat rate. Your 401(k) deferrals and health premiums come out
+            (1.45%, plus 0.9% above $200,000, or $250,000 on a joint return); state income tax for all 50 states and DC, and state
+            payroll taxes such as California's SDI; New York City's income tax and Philadelphia's wage tax, for residents (you say
+            whether you'd live inside the city); and any other local income tax you enter, at its flat rate. Your 401(k) deferrals and health premiums come out
             before income tax; Philadelphia's wage tax, and a local tax you enter, are on pay before your 401(k), except in Maryland and
             Indiana, whose county taxes are on state taxable income.
           </p>

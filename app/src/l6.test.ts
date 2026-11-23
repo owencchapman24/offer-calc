@@ -12,7 +12,8 @@ import { initialSession } from "./session";
 import { context, footsAsDisplayed, renderPage, renderWork, VALUATION, withWork } from "./testing";
 import { TheWork } from "./TheWork";
 import { WorkProvider } from "./Tickmarks";
-import { addCents, exactPay, FOOTS, paymentYears, stayRows, taxTables, yearCell, yearTable } from "./workpaper";
+import { PAYROLL_2026 } from "../../src/tax/params/federal2026";
+import { ADDITIONAL_MEDICARE_OVER, addCents, exactPay, FOOTS, paymentYears, stayRows, taxTables, yearCell, yearTable } from "./workpaper";
 
 // A-7 · The work (docs/ui-design.md §4.8; L-6 from slice 6 until stop 5B): every column adds up as displayed, the tables tie to L-1,
 // the bridge and the lead schedule, the payments tie to the years, and each calendar year's tax foots with and without the offer. Each
@@ -263,5 +264,18 @@ describe("a value axis below zero (audit C17)", () => {
     const html = chart(context());
     expect(html).not.toContain("grid zero");
     expect(html).toMatch(/textAnchor="end"[^>]*>0<\/text>|text-anchor="end"[^>]*>0<\/text>/);
+  });
+});
+
+describe("A-7's Medicare note names the threshold for the filing status (audit C18)", () => {
+  const gloss = (ctx: WorkContext) => taxTables(ctx, "A")[0].rows.find((r) => r.line === "medicare")!.gloss;
+
+  it("the app's copy is the engine's: $200,000 single and head of household, $250,000 joint", () => {
+    expect(ADDITIONAL_MEDICARE_OVER).toEqual(PAYROLL_2026.additionalMedicareThreshold);
+  });
+
+  it("says $200,000 for a single filer and $250,000 for a joint return", () => {
+    expect(gloss(context())).toBe("the additional 0.9% over $200,000 included");
+    expect(gloss(context("colAdjustedTotal", undefined, 4, { filingStatus: "joint" }))).toBe("the additional 0.9% over $250,000 included");
   });
 });
