@@ -14,7 +14,7 @@ behind every figure.
   A-1 (its bottom line) to A-7 (the work), and Copy as document copies one offer's breakdown, the comparison or both.
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
-## 2. Current state (2026-11-21)
+## 2. Current state (2026-11-22)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (every federal amount for 2027: the brackets, standard
   deduction, 127, 132(f), 401(k) and HSA limits, and the Social Security wage base).
@@ -41,8 +41,10 @@ behind every figure.
   pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
   with one offer (N6, part of October's C24), the minus zero (N7, October's C16), the flat local tax (N10) and the ESPP after the
   last day (N14); the ranges' order (N8, October's C7) in #97; and the bounds on every amount, rate, list and import, and areas and
-  states by own key (N9, the rest of October's C25) in #98. What's left: its table; the fix-before-launch items are in section 3's
-  checklist.
+  states by own key (N9, the rest of October's C25) in #98. Of its should-fix items, fixed on 2026-11-22: Massachusetts' surtax
+  (N26) in #99, breakeven with no tie (N15) in #100, L-4, L-1 and A-3 past year 5 (N16) in #101, whole months, years and days
+  (N17) in #102 and commission's problems' names (N18) in #103. What's left: its table; the fix-before-launch items are in
+  section 3's checklist.
 - **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
   decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
   pre-launch checklist is done, is the user's call (section 3).
