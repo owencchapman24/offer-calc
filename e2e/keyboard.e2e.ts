@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./lib/fixtures";
 import { addOffer, fillOffer, loadSchedules, openCompare, openSection, ownSettled, settled, showByYear } from "./lib/app";
 
 // What the scan can't see (docs/ui-slices-4-8-plan.md, slice 7, "known before the scan"): what a screen reader hears, and

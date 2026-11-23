@@ -1,3 +1,4 @@
+import { PINNED_DATE } from "./fixtures";
 import { expect, type Page } from "@playwright/test";
 
 // Driving the app in the tests: the states the scan visits, and when the page has settled into one. Every test starts
@@ -143,7 +144,7 @@ export async function fillOffer(page: Page, letter: string, salary: string, city
   await selectOffer(page, letter);
   await page.locator(`#in-${letter}-salary-annual`).fill(salary);
   await page.getByRole("combobox", { name: `Offer ${letter} city` }).fill(city);
-  const next = new Date().getFullYear() + 1;
+  const next = PINNED_DATE.getFullYear() + 1;
   await page.locator(`#in-${letter}-startDate`).fill(`${next}-07-01`);
 }
 

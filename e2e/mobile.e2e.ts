@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./lib/fixtures";
 import { focusCovered, openAlone, openCompare, settled, twoFrames } from "./lib/app";
 
 // Phones and tablets (docs/ui-design.md §3.2, slice 7 stop B): the phone's offer tabs, and the sticky verdict bar, at the
