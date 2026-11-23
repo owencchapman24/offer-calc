@@ -32,10 +32,12 @@ behind every figure.
   (C2), a later start's days, money before day one and guaranteed bonuses (C3-C5), every derivation footing as displayed (C12-C15),
   recovery from a bad or newer saved session (C22, C23), the tax baselines committed and the grid's checked in CI (T1), the e2e
   shards (T3), the property tests (T4), frozen law for the tests
-  (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
-  part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8), per hour documented
-  as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and S1: the `main` ruleset, and Vercel
-  waiting for the CI checks (2026-11-22). What's left: section 3.
+  (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene and
+  `npm audit` in CI (S2; #110), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8),
+  per hour documented as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); S1: the `main`
+  ruleset, and Vercel waiting for the CI checks (2026-11-22); and, on 2026-11-22, L-1's and L-4's values below zero (C17, #107),
+  the joint Medicare threshold in A-7 (C18, #108), L-3's city names (C19, #109) and recovery when a chunk or the worker won't load
+  (C24, #91 and #111). What's left: section 3.
 - **The November 2026 audit** (`docs/audit-2026-11.md`, of `main` at `09c2ea6`, 2026-11-10; its table keeps each finding's
   status): fixed in #83-#95, all merged by 2026-11-21, are the IRS's 2027 amounts (N1), tax-free benefits when leaving early (N2),
   pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
@@ -87,14 +89,18 @@ to pick.
 1. **Visibility and settings:** public (section 2). `docs/slice-3-plan.md`, "Public-repo prep",
    item 7, has each setting; the ruleset it plans is in place, and Vercel waits for the CI checks before promoting (section 4;
    audit S1 and N12, done 2026-11-22).
-2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files).
+2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files). Last run 2026-11-22, of 412 commits on
+   every ref: GitHub noreply addresses only (the owner's, Dependabot's, GitHub's for web merges); no secret-shaped strings, local
+   paths or personal email in any patch or message; no blob over 500 KB; two files ever deleted, both harmless
+   (`.claude/launch.json`, `app/src/Warnings.tsx`). The owner's offer's details stay in the history before #105 (N11). Re-run it
+   just before launch.
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
-4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C17-C19, C24 (in part: #91
-   did the engine's error and a missing chunk), C27, C28, T6, T7, T9, S2's `npm audit` step, D9, D11, P5-P7; none of November's.
-   (S1 and N12, Vercel waiting for CI, were done 2026-11-22 in its settings; N11, the owner's offer, was fixed 2026-11-22 in #105;
-   D10, the README's drift, 2026-10-17 with the
+4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C27, C28, T6, T7, T9, D9,
+   D11, P5-P7; none of November's. (C17-C19 were fixed 2026-11-22 in #107-#109, C24 in #91 and #111, and S2's `npm audit` step in
+   #110; S1 and N12, Vercel waiting for CI, were done 2026-11-22 in its settings; N11, the owner's offer, was fixed 2026-11-22 in
+   #105; D10, the README's drift, 2026-10-17 with the
    README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like
    case; C7 and N8, the ranges' order, 2026-11-21 in #97; C25 and N9, the bounds on inputs and imports, 2026-11-21 in #98.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
@@ -289,7 +295,9 @@ to pick.
     comparison (their default) or both too. Copy writes a `ClipboardItem` of promises at once, for Safari.
 - **Saved state:** this browser's localStorage only. A session the page can't show gets the error boundary's way out (`Recovery.tsx`:
   download what's saved, start again, reload); a session from a newer schema is never saved over; an unreadable one is set aside
-  under `offer-calc:backup`.
+  under `offer-calc:backup`. A chunk that won't load (`vite:preloadError`: a tab left open across a deploy) saves the session at
+  once and reloads the page, not again within a minute (`reloadForChunk`, `lazy.ts`); a lazy module that failed loads again on
+  the next try; a worker that won't load ends "Updating…" with `NOT_LOADED` (audit C24).
 - **Files:** on Windows, names that differ only in case collide (`work.ts` and `Work.tsx`): `cases.ts` and `Risk.tsx`, `metrics.ts`
   and `Tickmarks.tsx` are named apart on purpose.
 
