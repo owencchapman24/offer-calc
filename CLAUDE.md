@@ -45,9 +45,9 @@ behind every figure.
   (N26) in #99, breakeven with no tie (N15) in #100, L-4, L-1 and A-3 past year 5 (N16) in #101, whole months, years and days
   (N17) in #102 and commission's problems' names (N18) in #103. What's left: its table; the fix-before-launch items are in
   section 3's checklist.
-- **The repository is public on GitHub** (its one visibility event in GitHub's record is at its creation, 2026-10-07), though the
-  decision recorded on 2026-10-08 was to keep it private until launch. Whether to keep it public, or make it private until the
-  pre-launch checklist is done, is the user's call (section 3).
+- **The repository is public on GitHub** (since its creation, 2026-10-07), and stays public: decided 2026-11-22, the user leaving
+  it to Claude's judgment, over the 2026-10-08 record of "private until launch" (section 7). The owner's offer's details are out
+  of `docs/user-testing.md` since #105 (the November audit's N11).
 - **The numbers come from commands, not from this file:** `npm test` (unit tests), `npm run e2e` (Playwright and the scan),
   `npm run check-bundle` (sizes), `npm run lighthouse` (load time), `npm run bench` (engine timings). What they were at each
   milestone is in `docs/history.md`.
@@ -84,7 +84,7 @@ to pick.
   `test/law.test.ts`.
 
 **Pre-launch checklist** (before the public launch):
-1. **Visibility and settings:** decide public or private now (section 2). For public: `docs/slice-3-plan.md`, "Public-repo prep",
+1. **Visibility and settings:** public (section 2). `docs/slice-3-plan.md`, "Public-repo prep",
    item 7, has each setting; the ruleset it plans is in place (section 4). What's left of audit S1: Vercel still deploys every push
    to `main` without waiting for CI; have it wait for the checks before promoting.
 2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files).
@@ -92,8 +92,8 @@ to pick.
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
 4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C17-C19, C24 (in part: #91
-   did the engine's error and a missing chunk), C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7; November's N11
-   (the owner's offer in `docs/user-testing.md`, with item 1) and N12 (S1). (D10, the README's drift, was fixed 2026-10-17 with the
+   did the engine's error and a missing chunk), C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7; November's N12
+   (S1). (N11, the owner's offer, was fixed 2026-11-22 in #105; D10, the README's drift, 2026-10-17 with the
    README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like
    case; C7 and N8, the ranges' order, 2026-11-21 in #97; C25 and N9, the bounds on inputs and imports, 2026-11-21 in #98.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
@@ -384,7 +384,9 @@ to pick.
   out-of-pocket).
 
 **Product and project**
-- **Repo visibility:** recorded 2026-10-08 as "private until launch"; it's public (section 2). The user decides.
+- **Repo visibility:** public, decided 2026-11-22 (the user left it to Claude's judgment), over the 2026-10-08 record of "private
+  until launch": no stars, forks or watchers yet; a private repository's ruleset needs a paid GitHub plan; the README shows the
+  source for review. The owner's own details stay out of the docs (the November audit's N11).
 - **No LICENSE:** "© 2026 Owen Chapman. All rights reserved. Source shown for review only." (README; the footer has the first
   sentence.)
 - **Budgets:** the main thread 120 kB gzip, with Lighthouse holding LCP at 2.5 s (kilobytes are the proxy, LCP the outcome);
