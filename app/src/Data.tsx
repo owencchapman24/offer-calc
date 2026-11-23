@@ -5,7 +5,7 @@ import { exportSession, type ImportResult, MAX_IMPORT_BYTES, readImport, TOO_BIG
 import { fieldName } from "./help";
 import { type AppOffer, type Missing, toOfferInput } from "./model";
 import { priceWords } from "./prices";
-import type { EngineResponse } from "./protocol";
+import { type EngineResponse, NOT_LOADED } from "./protocol";
 import { downloadSaved } from "./Recovery";
 import { type Action, BACKUP_KEY, type KeyValueStore, readBackup, type SaveStatus, type Session, STORAGE_KEY } from "./session";
 import { dollars, localToday, longDate } from "./text";
@@ -25,16 +25,26 @@ function storage(): KeyValueStore | undefined {
   }
 }
 
-/** Checks imported offers' values with the engine, in a worker (the main thread never loads the engine). */
+/**
+ * Checks imported offers' values with the engine, in a worker (the main thread never loads the engine). It rejects when the check
+ * couldn't run: the worker didn't load, or the engine threw (audit C24: that read as "Its inputs check out").
+ */
 function checkOffers(offers: AppOffer[]): Promise<Checked["issues"] & {}> {
   const built = offers.map((o) => ({ o, r: toOfferInput(o) }));
   const complete = built.flatMap((x) => ("offer" in x.r ? [{ letter: x.o.letter, offer: x.r.offer }] : []));
   if (!complete.length) return Promise.resolve([]);
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const w = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });
     w.onmessage = (e: MessageEvent<EngineResponse>) => {
       w.terminate();
-      resolve(e.data.issues.flatMap((list, i) => list.map((issue) => ({ letter: complete[i].letter, issue }))));
+      const r = e.data;
+      if (!r.ok && r.error) return reject(new Error(r.error));
+      resolve(r.issues.flatMap((list, i) => list.map((issue) => ({ letter: complete[i].letter, issue }))));
+    };
+    w.onerror = (e) => {
+      e.preventDefault();
+      w.terminate();
+      reject(new Error(e.message || NOT_LOADED));
     };
     w.postMessage({ gen: 1, offers: null, check: complete.map((x) => x.offer), rents: [] });
   });
@@ -95,7 +105,13 @@ export default function DataPage({ session, dispatch, today, saved, clear }: {
     const result = readImport(await f.text());
     setFile({ name: f.name, result });
     if (!result.ok) return;
-    const issues = await checkOffers(result.offers);
+    let issues: Checked["issues"];
+    try {
+      issues = await checkOffers(result.offers);
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      return void setFile({ name: f.name, result: { ok: false, problems: [`Its inputs couldn't be checked, so it isn't imported. ${why}`] } });
+    }
     const missing = result.offers.flatMap((o) => { const r = toOfferInput(o); return "missing" in r ? [{ letter: o.letter, missing: r.missing }] : []; });
     setFile({ name: f.name, result, checked: { ...result, issues, missing } });
     then("review");

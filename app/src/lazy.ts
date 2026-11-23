@@ -24,13 +24,39 @@ export function lazyModule<T>(loader: () => Promise<T>): LazyModule<T> {
   };
   return {
     get: () => value,
-    load: () => (value ? Promise.resolve(value) : (pending ??= loader().then(set))),
+    // A load that fails is forgotten, so the next call tries again (audit C24): a dropped connection mends itself.
+    load: () => (value ? Promise.resolve(value) : (pending ??= loader().then(set, (err: unknown) => {
+      pending = null;
+      throw err;
+    }))),
     provide: (v) => { set(v); },
     subscribe: (f) => {
       listeners.add(f);
       return () => { listeners.delete(f); };
     },
   };
+}
+
+/** sessionStorage's key for when the page last reloaded because a chunk wouldn't load. */
+export const CHUNK_RELOAD_KEY = "offer-calc:chunk-reload";
+/** How soon after one such reload another may follow: a site that's down shouldn't reload the page forever. */
+const RELOAD_GAP_MS = 60_000;
+
+/**
+ * Whether a chunk that wouldn't load should reload the page (audit C24): most likely the site was updated since the page opened,
+ * and the old files are gone, so a reload gets the current version. Not within a minute of the last such reload, and never where
+ * this tab's storage can't be read (it couldn't tell). Records the reload when it says yes.
+ */
+export function reloadForChunk(store: Pick<Storage, "getItem" | "setItem"> | undefined, now: number): boolean {
+  if (!store) return false;
+  try {
+    const last = Number(store.getItem(CHUNK_RELOAD_KEY) ?? 0);
+    if (now - last < RELOAD_GAP_MS) return false;
+    store.setItem(CHUNK_RELOAD_KEY, String(now));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The module if it's loaded, re-rendering when it arrives; null until then (call load() to start it). */

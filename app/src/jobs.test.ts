@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRunner, inOrder, onFirstUse } from "./jobs";
+import { CHUNK_RELOAD_KEY, lazyModule, reloadForChunk } from "./lazy";
 
 // The worker's two lanes (docs/ui-design.md §3.4), stepped by hand: `tick` runs one scheduled step,
 // as the worker's event loop would between messages.
@@ -130,5 +131,32 @@ describe("loading on first use", () => {
     load.reject(new Error("offline"));
     await settle();
     expect(log).toEqual(["1: offline", "2"]);
+  });
+});
+
+describe("a chunk that won't load (audit C24)", () => {
+  it("a lazy module whose load fails is tried again on the next load, and arrives", async () => {
+    let calls = 0;
+    const m = lazyModule(() => (++calls === 1 ? Promise.reject(new Error("chunk gone")) : Promise.resolve({ v: 42 })));
+    await expect(m.load()).rejects.toThrow("chunk gone");
+    expect(m.get()).toBeNull();
+    await expect(m.load()).resolves.toEqual({ v: 42 });
+    expect(m.get()).toEqual({ v: 42 });
+    expect(calls).toBe(2);
+  });
+
+  it("reloads the page once, not again within a minute, and never where it can't record it", () => {
+    const mem = new Map<string, string>();
+    const tab = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
+    const t = 1_800_000_000_000;
+    expect(reloadForChunk(tab, t)).toBe(true);
+    expect(mem.get(CHUNK_RELOAD_KEY)).toBe(String(t));
+    // The reloaded page fails too, within the minute: no second reload, so a site that's down doesn't loop.
+    expect(reloadForChunk(tab, t + 59_999)).toBe(false);
+    // A later deploy, the same tab: it may reload again.
+    expect(reloadForChunk(tab, t + 60_000)).toBe(true);
+    expect(reloadForChunk(undefined, t)).toBe(false);
+    const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => {} };
+    expect(reloadForChunk(blocked, t)).toBe(false);
   });
 });
