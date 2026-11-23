@@ -1,7 +1,7 @@
 import type { FullResult, Reporter, TestCase, TestResult } from "@playwright/test/reporter";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseExceptions } from "./exceptions";
+import { parseExceptions, parseReviewed, reviewFor } from "./exceptions";
 import type { ScanRecord } from "./axe";
 
 // Writes up every accessibility scan in the run: .a11y/report.md (for a person) and .a11y/report.json. CI uploads them
@@ -76,7 +76,9 @@ function markdown(rows: Row[], result: FullResult, flaky: string[]): string {
   }
   lines.push("");
   const incomplete = rows.flatMap((r) => r.incomplete.map((i) => ({ r, i })));
-  lines.push("## Needs review", "", "What axe couldn't decide by itself (axe's \"incomplete\"): a person checks these.", "");
+  const reviews = parseReviewed(JSON.parse(readFileSync(resolve(process.cwd(), "test/a11y-reviewed.json"), "utf8")));
+  lines.push("## Needs review", "", "What axe couldn't decide by itself (axe's \"incomplete\"): a person checks these. Each kind a person has "
+    + "checked is marked with what they found (test/a11y-reviewed.json); a kind marked **not reviewed yet** is new.", "");
   if (!incomplete.length) lines.push("None.", "");
   for (const [rule, xs] of group(incomplete, (x) => x.i.rule)) {
     lines.push(`- **${rule}**: ${xs[0].i.help}.`);
@@ -84,8 +86,10 @@ function markdown(rows: Row[], result: FullResult, flaky: string[]): string {
     const nodes = xs.flatMap((x) => x.i.nodes.map((n) => ({ ...n, state: x.r.state })));
     for (const [why, ys] of group(nodes, (n) => n.why.replace(/#[0-9a-f]{3,8}|\d+(\.\d+)?(:1|px|pt)?/gi, "…"))) {
       const targets = [...new Set(ys.map((y) => y.target))];
+      const review = reviewFor(reviews, rule, why);
       lines.push(`  - ${why || "No reason given"} (${targets.length} elements, ${new Set(ys.map((y) => y.state)).size} states): `
-        + `${targets.slice(0, 6).map((t) => `\`${t}\``).join(", ")}${targets.length > 6 ? ", …" : ""}`);
+        + `${targets.slice(0, 6).map((t) => `\`${t}\``).join(", ")}${targets.length > 6 ? ", …" : ""}`,
+        review ? `    - Reviewed ${review.checked}: ${review.reason}` : "    - **Not reviewed yet.**");
     }
   }
   lines.push("");

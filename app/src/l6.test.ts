@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { ByYear as ByYearChart, END_GAP } from "./ByYear";
+import { initialSession as freshSession } from "./session";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { niceTicks, valueTicks } from "./axes";
@@ -277,5 +279,18 @@ describe("A-7's Medicare note names the threshold for the filing status (audit C
   it("says $200,000 for a single filer and $250,000 for a joint return", () => {
     expect(gloss(context())).toBe("the additional 0.9% over $200,000 included");
     expect(gloss(context("colAdjustedTotal", undefined, 4, { filingStatus: "joint" }))).toBe("the additional 0.9% over $250,000 included");
+  });
+});
+
+describe("L-1's line-end labels are far enough apart to tap (audit P6, WCAG 2.5.8)", () => {
+  it("two offers ending close together are pushed END_GAP (26px) apart, past the 24px a target needs", () => {
+    // The samples: A and C end year 4 about $1,400 apart, a pixel or two on the axis, so their labels are pushed apart.
+    const ctx = context();
+    const html = renderToStaticMarkup(createElement(WorkProvider, { ctx,
+      children: createElement(ByYearChart, { ctx, ui: freshSession("2026-07-13").ui, sample: true, dispatch: () => {} }) }));
+    const tops = [...html.matchAll(/class="end-label offer-[ABC]" style="left:[^;]+;top:([-\d.]+)px"/g)].map((m) => Number(m[1])).sort((a, b) => a - b);
+    expect(tops.length).toBe(3);
+    expect(END_GAP).toBeGreaterThanOrEqual(24);
+    for (let i = 1; i < tops.length; i++) expect(tops[i] - tops[i - 1], `labels ${i} and ${i + 1}`).toBeGreaterThanOrEqual(END_GAP - 0.001);
   });
 });
