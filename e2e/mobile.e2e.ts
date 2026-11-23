@@ -104,7 +104,9 @@ test.describe("phone", () => {
     await expect(page.locator(".lead .verdict")).toBeInViewport();
   });
 
-  test("the bar comes back after the screen changes size (a rotation), and pinch-zoom isn't taken for the keyboard", async ({ page }) => {
+  test("the bar comes back after the screen changes size (a rotation), and pinch-zoom isn't taken for the keyboard", async ({ page, browserName }) => {
+    // It pinch-zooms through a DevTools session (CDP), which only Chromium has: WebKit (phone-webkit) runs the rest.
+    test.skip(browserName !== "chromium", "pinch-zoom needs Chromium's DevTools protocol");
     await openCompare(page);
     const bar = page.locator(".verdict-bar.is-bottom");
     await page.setViewportSize({ width: 390, height: 300 });
