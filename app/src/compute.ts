@@ -1,4 +1,4 @@
-import { estimateRent, type RentEstimate } from "../../src/col/rent";
+import { estimateRentAt, type RentEstimate } from "../../src/col/rent";
 import { annuityFactor, annuityTerms, horizonSweep, rentFlipFrom } from "../../src/offer/compare";
 import { projectScenario } from "../../src/offer/project";
 import { withholdingShortfall } from "../../src/offer/withholding";
@@ -40,9 +40,9 @@ export interface Computed {
 
 export function compute(req: Omit<EngineRequest, "gen">, cache: OwnCache = new Map()): Computed {
   const rents: Record<string, RentEstimate> = {};
-  for (const { area, state } of req.rents) {
+  for (const r of req.rents) {
     try {
-      rents[rentKey(area, state)] = estimateRent(area, state);
+      rents[rentKey(r)] = estimateRentAt(r.area, r.state, r.startDate, r.growth);
     } catch { /* an unknown area just shows no estimate */ }
   }
   const c = req.offers;

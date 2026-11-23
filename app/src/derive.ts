@@ -1016,7 +1016,7 @@ function rentNoteWork(ctx: WorkContext, letter: L): Work {
   const leadPV = apart * f.nonHousingFactor * f.rentFactor;
   const name = estimateName(note);
   const estLabel = est.source === "fmr"
-    ? `HUD's Fair Market Rent for ${note.city}, ${est.bedrooms} bedroom (FY${est.fiscalYear})`
+    ? `HUD's Fair Market Rent for ${note.city}, ${est.bedrooms} bedroom (FY${est.fiscalYear}${est.grown ? `, grown to FY${est.grown.toFiscalYear}, your start's` : ""})`
     : `The estimate for ${note.city}: BEA housing prices × the U.S. median rent`;
   const inputs = fromInputs(ctx, letter, ["costOfLiving.monthlyRent"]);
   const totals: WorkLine[] = [
@@ -2827,14 +2827,21 @@ function inputWork(ctx: WorkContext, letter: L, path: string): Work {
       }
       return {
         title: title("rent, estimated"),
-        lines: est.source === "fmr"
+        lines: est.source === "fmr" && est.grown
+          // A start in a later fiscal year than HUD's: its figure grown at the rent growth, once a fiscal year (audit C27).
+          ? [{ label: `HUD FY${est.fiscalYear} Fair Market Rent, 1 bedroom`, value: dollars(est.grown.published), note: est.hudAreaName, tick: "traced" },
+            { op: "×", label: `(1 + ${percent(est.grown.growth)})^${est.grown.years}: the rent growth, a year for each fiscal year to FY${est.grown.toFiscalYear}, your start's`,
+              value: String(+((1 + est.grown.growth) ** est.grown.years).toFixed(6)), tick: "traced" },
+            { op: "=", label: "Estimated rent a month, the first lease year", value: dollars(est.monthlyRent), rule: "double" }]
+          : est.source === "fmr"
           ? [{ label: `HUD FY${est.fiscalYear} Fair Market Rent, 1 bedroom`, value: dollars(est.monthlyRent), note: est.hudAreaName, tick: "traced" }]
           : [{ label: "U.S. median gross rent (ACS 2024)", value: dollars(est.anchorRent), tick: "traced" },
             { op: "×", label: "Housing price ratio (BEA)", value: est.housingRatio.toFixed(4), tick: "traced" },
             { op: "=", label: "Estimated rent a month", value: dollars(est.monthlyRent), rule: "double" }],
         notes: [
           est.source === "fmr"
-            ? "HUD's Fair Market Rent is what recent movers pay for a typical 1-bedroom across the metro: the 40th percentile, utilities included."
+            ? `HUD's Fair Market Rent is what recent movers pay for a typical 1-bedroom across the metro: the 40th percentile, utilities included${
+              est.grown ? `. HUD's FY${est.fiscalYear} figure is for leases from October 1, ${est.fiscalYear - 1}; your start is in FY${est.grown.toFiscalYear}` : ""}.`
             : "No HUD Fair Market Rent covers this area, so the estimate scales the U.S. median rent by BEA's housing price level.",
           "Metro-wide estimates are often below city-center rents: edit it to your actual rent.",
         ],

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { DATA_YEARS } from "../../src/col/cities";
+import { DATA_YEARS, dataDue } from "../../src/col/cities";
 import { rentKey, tieJob } from "./protocol";
 import { About } from "./About";
 import { asymmetries, asymmetryText } from "./comparability";
@@ -14,7 +14,7 @@ import type { OfferIssue } from "../../src/offer/validate";
 import { fieldId } from "./fields";
 import { HELP, helpKey } from "./help";
 import { Ledger as LedgerView, sectionOfPath } from "./Ledger";
-import { ASSUMPTIONS, firstYear, type Letter, type Missing, toHousehold, toOfferInput } from "./model";
+import { ASSUMPTIONS, firstYear, type Letter, type Missing, rentRequestOf, toHousehold, toOfferInput } from "./model";
 import { NewerSave } from "./Recovery";
 import { clearSession, type KeyValueStore, loadSession, reducer, type SaveStatus, saveSession, type Theme, type Ticks, type UiState } from "./session";
 import { type EditTarget, rentNotes, type WorkContext } from "./metrics";
@@ -184,6 +184,8 @@ export function App() {
     }
   };
 
+  // Data releases due and not in yet, for the sources line (audit C27).
+  const due = dataDue(today);
   const stayYears = session.household.stayYears;
   const wagesYear = firstYear(session.offers, today);
   const built = session.offers.map((o) => ({ o, r: toOfferInput(o) }));
@@ -201,9 +203,8 @@ export function App() {
   const compare = comparing ? request : null;
   // Rent estimates come from the worker, which holds the HUD and BEA tables.
   const rents = [...new Map(session.offers.flatMap((o) => {
-    const area = o.draft.costOfLiving.area;
-    const state = o.draft.residence.state;
-    return area && state ? [[rentKey(area, state), { area, state }] as const] : [];
+    const r = rentRequestOf(o);
+    return r ? [[rentKey(r), r] as const] : [];
   })).values()];
   const engine = useEngine({ offers: request, ids: complete.map((x) => x.o.id), rents, check: complete.map((x) => x.offer) }, session.revision ?? 0);
   // The breakdowns' code loads beside the worker, once the page has first painted (docs/v2-plan.md, item 5, "Bundle and LCP").
@@ -485,6 +486,9 @@ export function App() {
           Tax law {DATA_YEARS.tax} (later years projected) · Prices: BEA Regional Price Parities {DATA_YEARS.rpp} · Rent estimates: HUD Fair
           Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null && <span className="no-print">: {engine.ms.toFixed(0)} ms</span>} in a Web Worker.
           Not financial advice.
+          {due.length > 0 && <> <strong className="data-due">Newer data is due, so these may be out of date: {due.map((d) => (d.what === "fmr"
+            ? `HUD's FY${d.next} rents (from ${longDate(d.due)})` : d.what === "rpp" ? `BEA's ${d.next} prices (expected by ${longDate(d.due)})`
+            : `${d.next} tax law (expected by ${longDate(d.due)})`)).join("; ")}.</strong></>}
         </p>
         <p className="rights">© 2026 Owen Chapman. All rights reserved.</p>
       </footer>

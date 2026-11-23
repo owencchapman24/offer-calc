@@ -13,8 +13,9 @@ import { federalIncomeTax } from "../src/tax/federal";
 import { addMonths, fromDays, nextOccurrence, toDays } from "../src/offer/dates";
 import { snapToVestDate } from "../src/offer/vesting";
 import { areaStates, cityOptions, findRppAreas, nonHousingRpp, RPP, rppArea } from "../src/col/index";
-import { estimateRent, FMR, fmrArea, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
+import { estimateRent, estimateRentAt, FMR, fmrArea, hudFiscalYear, US_MEDIAN_GROSS_RENT } from "../src/col/rent";
 import cities from "../src/col/cities.json";
+import { DATA_YEARS, dataDue } from "../src/col/cities";
 
 const single: Household = { filingStatus: "single" };
 
@@ -865,6 +866,41 @@ describe("cost of living (BEA RPPs)", () => {
     expect(r.employmentYears[0].costOfLiving!.rent).toBe(12 * 1_640);
     // An entered rent always wins.
     expect(projectScenario(clt, single, { years: 1 }).costOfLiving).toMatchObject({ monthlyRent: 1_700, rentSource: "input" });
+  });
+  it("HUD's rent grows to a start in a later fiscal year, a year at a time at the rent growth (audit C27; hand-checked)", () => {
+    // Charlotte's FY2027 figure, $1,640 a month, is for leases from Oct 1, 2026 to Sep 30, 2027.
+    expect([hudFiscalYear("2026-09-30"), hudFiscalYear("2026-10-01"), hudFiscalYear("2027-09-30"), hudFiscalYear("2027-10-01")])
+      .toEqual([2026, 2027, 2027, 2028]);
+    // FY2027's last day: as published.
+    expect(estimateRentAt("16740", "NC", "2027-09-30", 0.025)).toEqual(estimateRent("16740", "NC"));
+    // The next day is FY2028: one year's growth, 1,640 x 1.025 = 1,681.
+    expect(estimateRentAt("16740", "NC", "2027-10-01", 0.025)).toMatchObject({ source: "fmr", fiscalYear: 2027,
+      monthlyRent: expect.closeTo(1_681, 9), grown: { published: 1_640, years: 1, growth: 0.025, toFiscalYear: 2028 } });
+    // Oct 1, 2029 is FY2030: three years, 1,640 x 1.025^3 = 1,640 x 1.076890625 = 1,766.100625.
+    expect(estimateRentAt("16740", "NC", "2029-10-01", 0.025).monthlyRent).toBeCloseTo(1_766.100625, 6);
+    // At an entered 4% a year: 1,640 x 1.04 = 1,705.60.
+    expect(estimateRentAt("16740", "NC", "2028-01-15", 0.04).monthlyRent).toBeCloseTo(1_705.6, 6);
+    // Before HUD's year, or with no start yet, it's as published (not shrunk); the estimate from BEA's housing prices isn't grown.
+    expect(estimateRentAt("16740", "NC", "2026-07-13", 0.025)).toEqual(estimateRent("16740", "NC"));
+    expect(estimateRentAt("16740", "NC", null, 0.025)).toEqual(estimateRent("16740", "NC"));
+    expect(estimateRentAt("37999", "NC", "2030-01-01", 0.025)).toEqual(estimateRent("37999", "NC"));
+    // The projection's first lease year takes it: a start on Oct 1, 2027 pays 12 x 1,681 in year 1.
+    const later = projectScenario({ ...clt, startDate: "2027-10-01", costOfLiving: { area: "16740" } }, single, { years: 1 });
+    expect(later.costOfLiving).toMatchObject({ monthlyRent: 1_681, rentSource: "fmr", rentEstimate: { grown: { years: 1, toFiscalYear: 2028 } } });
+    expect(later.employmentYears[0].costOfLiving!.rent).toBeCloseTo(12 * 1_681, 6);
+  });
+  it("says which data releases are due and not in yet, from the day each is due (audit C27)", () => {
+    const { fmr, rpp, tax } = DATA_YEARS;
+    const all = dataDue("9999-12-31");
+    // HUD's next fiscal year from Oct 1; BEA's next year of prices by Mar 1 two years after its end; the next tax year by its Mar 1.
+    expect(all).toEqual([{ what: "fmr", next: fmr + 1, due: `${fmr}-10-01` }, { what: "rpp", next: rpp + 1, due: `${rpp + 3}-03-01` },
+      { what: "tax", next: tax + 1, due: `${tax + 1}-03-01` }]);
+    expect(dataDue("2000-01-01")).toEqual([]);
+    for (const d of all) {
+      const before = fromDays(toDays(d.due) - 1);
+      expect(dataDue(before).map((x) => x.what), `${d.what} the day before`).not.toContain(d.what);
+      expect(dataDue(d.due).map((x) => x.what), `${d.what} on the day`).toContain(d.what);
+    }
   });
   it("HUD FMR areas for the sample metros: the area with most of the metro's people, in your state when it spans states", () => {
     // New York metro: seven FMR areas; New York, NY HMFA (9.9M people) for NY, Newark (2.1M, the largest

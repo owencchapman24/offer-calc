@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import Methodology, { sectionAnchor } from "./Methodology";
-import { blankDraft, type Letter, type OfferDraft } from "./model";
+import { blankDraft, type Letter, type OfferDraft, rentRequestOf } from "./model";
+import { rentKey } from "./protocol";
 import { derive, highlightedSentence, metricSection } from "./derive";
 import { type MetricId, metricKind, type WorkContext } from "./metrics";
 import { bridge, byYear } from "./byYearModel";
@@ -370,6 +371,21 @@ describe("every figure has a tickmark kind, a methodology section and a derivati
     expect(metricKind("in.B.costOfLiving.monthlyRent", ctx)).toBe("estimate");
     expect(metricKind("in.A.costOfLiving.monthlyRent", ctx)).toBe("traced");
     expect(render(ctx)).toContain('data-tick="in.B.costOfLiving.monthlyRent"');
-    expect(derive("in.B.costOfLiving.monthlyRent", ctx).lines[0].value).toBe(`$${figure(ctx.rents["16740|NC"].monthlyRent)}`);
+    const b = ctx.offers.find((o) => o.letter === "B")!;
+    expect(derive("in.B.costOfLiving.monthlyRent", ctx).lines[0].value).toBe(`$${figure(ctx.rents[rentKey(rentRequestOf(b)!)].monthlyRent)}`);
+  });
+
+  it("an estimated rent for a start in a later fiscal year shows HUD's figure grown to it, and the ledger shows the same (audit C27)", () => {
+    // B in Charlotte with its rent left blank, starting Oct 1, 2027 (FY2028): HUD's FY2027 $1,640 x 1.025 = $1,681.
+    const ctx = context("colAdjustedTotal", (os) => os.map((o) => (o.letter === "B"
+      ? { ...o, draft: { ...o.draft, startDate: "2027-10-01", costOfLiving: { ...o.draft.costOfLiving, monthlyRent: null } } } : o)));
+    const d = derive("in.B.costOfLiving.monthlyRent", ctx);
+    expect(d.lines.map((l) => [l.op ?? "", l.value])).toEqual([["", "$1,640"], ["×", "1.025"], ["=", "$1,681"]]);
+    expect(d.lines[1].label).toContain("to FY2028, your start's");
+    footsAsDisplayed("in.B.costOfLiving.monthlyRent", d);
+    // The estimate the ledger and the verdict read is the engine's: the same $1,681.
+    const b = ctx.offers.find((o) => o.letter === "B")!;
+    expect(Math.round(ctx.rents[rentKey(rentRequestOf(b)!)].monthlyRent)).toBe(1_681);
+    expect(Math.round(ctx.results!.detail!.offers[ctx.results!.letters.indexOf("B")]!.costOfLiving!.monthlyRent)).toBe(1_681);
   });
 });

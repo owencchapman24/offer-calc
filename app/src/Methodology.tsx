@@ -377,7 +377,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             effective October 1, 2026): the 40th percentile of what recent movers pay, utilities included, for the HUD area holding
             most of the metro's people. Where HUD has no figure, we scale the U.S. median gross rent ($1,487, Census ACS 2024) by
             the area's housing prices. Estimates are metro-wide and often below city-center rents, so they carry an E tickmark and
-            ask for your actual rent.
+            ask for your actual rent. HUD's figure is for leases starting in its fiscal year (October to September); for a start in a
+            later one, it's grown at the rent growth below, once for each fiscal year between, and Show the work says so.
           </p>
           <p>
             The rent you enter is the first lease year's. The lease starts on your start date and rises at each anniversary by the

@@ -34,8 +34,8 @@ export interface EngineRequest {
   ids?: string[];
   /** Every complete offer, to check (validateOffer) before anything is computed. Default: `offers`' offers. */
   check?: OfferInput[];
-  /** Places (with the residence state) whose rent estimate the inputs show. */
-  rents: Array<{ area: string; state: string }>;
+  /** The rent estimates the inputs show: each offer's place, residence state, start and rent growth (rentRequestOf). */
+  rents: RentRequest[];
 }
 
 /** One offer's base-scenario projection over your stay's window: what Show the work, L-1 and the bridge explain. */
@@ -137,7 +137,12 @@ export type EngineResponse = {
   | { ok: false; error: string | null }
 );
 
-export const rentKey = (area: string, state: string) => `${area}|${state}`;
+/**
+ * What an offer's rent estimate depends on: its place and residence state, and for HUD's, its start date and rent growth, since a
+ * start in a later fiscal year grows it (audit C27).
+ */
+export interface RentRequest { area: string; state: string; startDate: string | null; growth: number }
+export const rentKey = (r: RentRequest) => `${r.area}|${r.state}|${r.startDate ?? ""}|${r.growth}`;
 
 /**
  * The worker's error when code it loads on first use didn't load (an optional module, the slow jobs): most likely the site was

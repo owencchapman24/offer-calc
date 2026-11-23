@@ -241,6 +241,7 @@ export const rppVintage = (v: { dataYear: number; release: string }) => `${v.dat
 export function rentSource(source: "input" | "fmr" | "derived", estimate?: RentEstimate): string {
   if (source === "input" || !estimate) return source === "derived" ? "derived from the housing RPPs" : "as entered";
   return estimate.source === "fmr"
-    ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${estimate.bedrooms} bedroom, ${estimate.hudAreaName}`
+    ? `HUD FY${estimate.fiscalYear} Fair Market Rent, ${estimate.bedrooms} bedroom, ${estimate.hudAreaName}${estimate.grown
+      ? `, grown ${pct(estimate.grown.growth, 2)} a year to FY${estimate.grown.toFiscalYear}, your start's` : ""}`
     : `derived from the housing RPPs: ${usd(estimate.anchorRent)} x ${estimate.housingRatio.toFixed(4)}`;
 }

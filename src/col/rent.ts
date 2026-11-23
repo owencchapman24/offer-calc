@@ -48,9 +48,38 @@ export function fmrArea(beaCode: string, residenceState?: string): (FmrArea & { 
 }
 
 export type RentEstimate =
-  | { monthlyRent: number; source: "fmr"; hudArea: string; hudAreaName: string; bedrooms: 1; fiscalYear: number }
+  | { monthlyRent: number; source: "fmr"; hudArea: string; hudAreaName: string; bedrooms: 1; fiscalYear: number;
+      /**
+       * For a lease starting in a later fiscal year than the FMR's (estimateRentAt): HUD's figure, grown at the rent growth for each
+       * fiscal year between (audit C27). Absent when it's used as published.
+       */
+      grown?: { published: number; years: number; growth: number; toFiscalYear: number } }
   /** anchorRent in anchorArea, times the area's housing (rents) RPP / the anchor area's. */
   | { monthlyRent: number; source: "derived"; anchorRent: number; anchorArea: string; housingRatio: number };
+
+/** HUD's fiscal year for a civil date ("2027-10-01" -> 2028): FY N runs from October 1 of N - 1 to September 30 of N. */
+export function hudFiscalYear(date: string): number {
+  const [y, m] = date.split("-").map(Number);
+  return m >= 10 ? y + 1 : y;
+}
+
+/**
+ * The rent estimate for a lease starting on `startDate` (audit C27): HUD's Fair Market Rent is for its fiscal year (FY2027's from
+ * October 1, 2026), so a start in a later fiscal year grows it at the rent growth, once for each fiscal year between, as the lease
+ * itself grows at each anniversary. A start in or before its year, or none yet, takes it as published. The estimate derived from
+ * BEA's housing prices isn't grown.
+ */
+export function estimateRentAt(
+  beaCode: string, residenceState: string | undefined, startDate: string | null, growth: number,
+  opts: { anchorRent?: number; anchorArea?: string } = {},
+): RentEstimate {
+  const e = estimateRent(beaCode, residenceState, opts);
+  if (e.source !== "fmr" || startDate === null) return e;
+  const years = hudFiscalYear(startDate) - e.fiscalYear;
+  if (years <= 0) return e;
+  return { ...e, monthlyRent: e.monthlyRent * (1 + growth) ** years,
+    grown: { published: e.monthlyRent, years, growth, toFiscalYear: e.fiscalYear + years } };
+}
 
 /**
  * Rent for an area when you haven't entered yours. HUD's FMR for 1 bedroom when the metro has one;
