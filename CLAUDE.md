@@ -34,8 +34,8 @@ behind every figure.
   shards (T3), the property tests (T4), frozen law for the tests
   (T2), the performance gates (P1-P4), a defaults test that sees what it checks (T5), the hooks linter (H1), CI hygiene (S2, in
   part), this file (D2, D5, D6), the design docs marked historical (D7), v2's plan brought up to date (D8), per hour documented
-  as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and the `main` ruleset is on (S1, in
-  part). What's left: section 3.
+  as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); and S1: the `main` ruleset, and Vercel
+  waiting for the CI checks (2026-11-22). What's left: section 3.
 - **The November 2026 audit** (`docs/audit-2026-11.md`, of `main` at `09c2ea6`, 2026-11-10; its table keeps each finding's
   status): fixed in #83-#95, all merged by 2026-11-21, are the IRS's 2027 amounts (N1), tax-free benefits when leaving early (N2),
   pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
@@ -85,15 +85,16 @@ to pick.
 
 **Pre-launch checklist** (before the public launch):
 1. **Visibility and settings:** public (section 2). `docs/slice-3-plan.md`, "Public-repo prep",
-   item 7, has each setting; the ruleset it plans is in place (section 4). What's left of audit S1: Vercel still deploys every push
-   to `main` without waiting for CI; have it wait for the checks before promoting.
+   item 7, has each setting; the ruleset it plans is in place, and Vercel waits for the CI checks before promoting (section 4;
+   audit S1 and N12, done 2026-11-22).
 2. **Re-run the history scan** (author addresses, secret-shaped strings, sensitive files).
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
    and the tickmark setting): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
 4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C17-C19, C24 (in part: #91
-   did the engine's error and a missing chunk), C27, C28, T6, T7, T9, S1, S2's `npm audit` step, D9, D11, P5-P7; November's N12
-   (S1). (N11, the owner's offer, was fixed 2026-11-22 in #105; D10, the README's drift, 2026-10-17 with the
+   did the engine's error and a missing chunk), C27, C28, T6, T7, T9, S2's `npm audit` step, D9, D11, P5-P7; none of November's.
+   (S1 and N12, Vercel waiting for CI, were done 2026-11-22 in its settings; N11, the owner's offer, was fixed 2026-11-22 in #105;
+   D10, the README's drift, 2026-10-17 with the
    README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like
    case; C7 and N8, the ranges' order, 2026-11-21 in #97; C25 and N9, the bounds on inputs and imports, 2026-11-21 in #98.)
 5. **Retake the README's screenshot** if the page has changed since 2026-10-17 (one offer's breakdown, a first visit at 1440 px:
@@ -111,7 +112,9 @@ to pick.
 
   Before opening it: tests, the typecheck and the hooks linter pass locally (the tests include the grid's baseline, section 8);
   `npm run build` for UI work.
-- **Merging to `main` deploys to production** (Vercel). Keep `main` green.
+- **Merging to `main` deploys to production** (Vercel). Keep `main` green. Vercel builds each push to `main` at once but promotes
+  it to the site only once its commit passes the seven CI checks (the project's Deployment Checks, Settings, Build and Deployment;
+  since 2026-11-22). Force Promote, on a deployment's page, skips them.
 - **Tests:** hand-check at the edges: the day before and the day of a vest, payout or window end; thresholds; bracket crossings.
   Hand-checked values carry their arithmetic in comments.
 - **Review stops:** stop after each slice (or each v2 stop) for review. Engine slices: show the `npm run offers` tables. UI slices:
