@@ -1,7 +1,7 @@
-# Tests, the engine's formatting guard, the type check, the hooks linter, the build and its size budget, on every pull
-# request and every push to main; beside them, Lighthouse and Playwright (the accessibility scan, the smoke
-# and keyboard tests) on the production build. Pushes to other branches run only through their pull
-# request, so CI runs once per push.
+# The production dependencies' known advisories (npm audit), tests, the engine's formatting guard, the type check, the hooks
+# linter, the build and its size budget, on every pull request and every push to main; beside them, Lighthouse and Playwright
+# (the accessibility scan, the smoke and keyboard tests) on the production build. Pushes to other branches run only through
+# their pull request, so CI runs once per push.
 # The PolicyEngine comparison (npm run oracle) stays manual: it needs Python and PolicyEngine and takes
 # minutes. The property tests' nightly run on a random seed is fuzz.yml.
 # Every action is pinned to a commit, with its release in a comment (audit S2): a tag can be moved, a commit can't. To
@@ -32,6 +32,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Any advisory against what ships (react, react-dom, the fonts) fails the check, so it's fixed before it deploys (audit S2).
+      # Dev tools are left out: they never reach a visitor, and Dependabot's alerts (on for this repository) raise theirs.
+      - run: npm audit --omit=dev
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
