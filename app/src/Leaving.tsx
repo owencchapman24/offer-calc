@@ -275,7 +275,8 @@ function Panel({ ctx, axis, at, basis, compare, lines, error }: {
   return (
     <div className="leave-panel">
       <p className="extra-title">If your last day is {longDate(date)}{date === axis.stayEnd ? ", the last day of your stay" : ""}</p>
-      {!panels ? <p className="note">{error ?? "Working it out…"}</p> : (
+      {/* Until the first panel's in, its room is held (about 10em an offer), so it doesn't push the caption down as it fills (audit T6). */}
+      {!panels ? <p className="note leave-panel-wait" style={{ minHeight: `${r.letters.length * 10}em` }}>{error ?? "Working it out…"}</p> : (
         <ul className="leave-offers">
           {r.letters.map((letter, i) => (
             <Offer key={letter} letter={letter} start={compare.offers[i]?.startDate ?? ""} panel={panels[i] ?? null} basis={basis} axis={axis}

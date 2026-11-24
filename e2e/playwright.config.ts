@@ -57,7 +57,7 @@ export default defineConfig({
     { name: "phone-dark", testMatch: "a11y.e2e.ts", use: { ...phone, colorScheme: "dark" } },
     { name: "tablet-light", testMatch: "a11y.e2e.ts", grep: comparison, use: { ...tablet, colorScheme: "light" } },
     { name: "tablet-dark", testMatch: "a11y.e2e.ts", grep: comparison, use: { ...tablet, colorScheme: "dark" } },
-    { name: "smoke", testMatch: ["smoke.e2e.ts", "keyboard.e2e.ts"], use: { ...desktop, colorScheme: "light" } },
+    { name: "smoke", testMatch: ["smoke.e2e.ts", "keyboard.e2e.ts", "budget.e2e.ts"], use: { ...desktop, colorScheme: "light" } },
     { name: "phone", testMatch: "mobile.e2e.ts", use: { ...phone, colorScheme: "light" } },
     { name: "tablet", testMatch: "mobile.e2e.ts", use: { ...tablet, colorScheme: "light" } },
     // iOS Safari is most of the phone traffic the phone tests stand for: its engine, in CI, which installs it (locally there's no
