@@ -94,8 +94,8 @@ to pick.
    paths or personal email in any patch or message; no blob over 500 KB; two files ever deleted, both harmless
    (`.claude/launch.json`, `app/src/Warnings.tsx`). The owner's offer's details stay in the history before #105 (N11). Re-run it
    just before launch.
-3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 40 minutes, updated for item 5; after D11's remaining steps, Print…
-   and the tickmark setting): the user runs it and sends
+3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 55 minutes, updated for item 5 and, on 2026-11-23, with D11's
+   steps: L-1 loading as you reach it, A-7's tables, Download CSV, the tickmark setting and Print…): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
 4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C27, C28, T6, T7, T9, D9,
    D11, P5-P7; none of November's. (C17-C19 were fixed 2026-11-22 in #107-#109, C24 in #91 and #111, and S2's `npm audit` step in
@@ -605,6 +605,6 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 | `docs/ui-design.md` | The UI design (rev 4: §1 evaluator-first) and §12, how each slice and stop was built | Historical, except §1 (current); §12 as built |
 | `docs/offer-model.md` | The offer model's design (rev 3) | Historical; `src/offer/types.ts` is authoritative |
 | `docs/ui-slices-4-8-plan.md`, `docs/slice-3-plan.md`, `docs/copy-as-document-plan.md` | Plans, each built (the last with `copy-as-document-sample.html`) | Done; `slice-3-plan.md`'s public-repo settings (item 7) still apply |
-| `docs/nvda-walkthrough.md` | The screen-reader script | Updated for item 5 (2026-10-16); needs D11's other steps (Print…, the tickmark setting) before it's run |
+| `docs/nvda-walkthrough.md` | The screen-reader script | Current: updated for item 5 (2026-10-16) and D11's steps (2026-11-23); ready to run |
 | `docs/history.md` | What CLAUDE.md recorded before 2026-10-15: each slice, the sizes and load times, dated rationale | Archive, not maintained |
 | `README.md` | The project for a visitor: what it does with one offer and with more, how it's validated, sources, how it was built | Current (refreshed 2026-10-17, with its screenshot) |

@@ -1,12 +1,13 @@
 # NVDA walkthrough (slice 7, stop C; updated for v2's stops 5A to 5C)
 
-A screen-reader check of Offer Calc's main flows, about 40 minutes, with NVDA and Chrome on Windows. You run it and send
+A screen-reader check of Offer Calc's main flows, about 55 minutes, with NVDA and Chrome on Windows. You run it and send
 back NVDA's Speech Viewer log; Claude fixes what it shows (`docs/ui-slices-4-8-plan.md`, slice 7). **When:** before the public
 launch (CLAUDE.md, "Pre-launch checklist"). Written 2026-10-10; the two gaps found while writing it (the editors' "Edit"
 buttons, L-4's slider) are fixed and the steps expect the fixes. **Updated 2026-10-16** for v2's item 5 (stops 5A to 5C): a first
 visit is one sample offer on its own, every offer has its breakdown (A-1 to A-7), the comparison's breakdowns switch one offer at
-a time, and Copy as document copies one offer's breakdown or offers a choice (parts 2, 3, 7 and 8 are new). **Still to add before
-it's run** (audit D11): Print… and the tickmark setting.
+a time, and Copy as document copies one offer's breakdown or offers a choice (parts 2, 3, 7 and 8 are new). **Updated 2026-11-23**
+(audit D11): L-1 loading as you reach it, its chart's slider, table view and Download CSV (part 13); an offer's A-7 tables (part
+14); the tickmark setting (part 15); and Print… (part 16). It's now about 55 minutes, and ready to run.
 
 **How to read the steps.** Each step gives the keys to press, then what NVDA should say. NVDA's wording and word order vary a
 little between versions ("heading level 2, About you" or "About you, heading level 2"), so match the content, not the
@@ -270,13 +271,58 @@ hand, and **Escape** returns to browse mode. Each step says which mode it needs.
 65. **Tab** to "See the comparison, link", then **Enter**. You're back on the comparison with the same verdict: press **H**
     until "L Lead schedule", then **Down Arrow** to hear "C leaves you about … $507 a month …".
 
-## Part 13 · Send me the log (2 min)
+## Part 13 · L-1 by year, loaded as you reach it (4 min)
 
-66. Press **Insert+F12** a last time.
-67. **Alt+Tab** to the **NVDA Speech Viewer** window and click in its text (or press Tab once to put focus there).
-68. **Ctrl+A**, then **Ctrl+C**, then paste it into our chat with **Ctrl+V**. Send all of it, however long. The time stamps
+66. **Insert+F12. Ctrl+Home**, then **H** until "L Lead schedule, heading level 2", then **H** again. The next heading should be "L-1
+    By year, heading level 2". L-1 loads as you come within a screen of it, so if NVDA reads a later heading first, press **Shift+H**
+    back, wait a second, and press **H** again. Note it if L-1 never comes.
+67. **Tab** until the chart: "After rent, at U.S. prices, each employment year, slider" (focus mode). NVDA should say its value,
+    "Year 1: A 62,594, B …, C …", and the hint "Arrow keys move a year. The table view lists every value."
+68. **Right Arrow.** NVDA should say once: "Year 2: A …, B …, C …". **End** goes to "Year 4: …"; **Home** back to "Year 1: …".
+69. **Escape** (browse mode), then **B** until "Table view, button, collapsed". **Enter.** NVDA should say "Hide the table view,
+    button, expanded". Press **T**: "Each offer by employment year, U.S.-avg $, as paid, table", with a row for each year and a
+    column for each offer.
+70. **B** until "Download CSV: L-1, by year, button". **Enter.** NVDA should say "Saved offer-calc-….csv." (a status message), and Chrome
+    shows the download. You needn't open it.
+
+## Part 14 · An offer's tables, A-7 (3 min)
+
+71. **Insert+F12.** Press **H** until "A-7 The work, heading level 3", in A's breakdown. Then **B** until "Show the tables, button,
+    collapsed", and **Enter**. NVDA should say "Hide the tables, button, expanded".
+72. **T** jumps into the first table: NVDA should say its name, "A-7, employment years", and the number of rows and
+    columns. **Ctrl+Alt+Down Arrow** goes down a row; each figure is a button that names itself, as "How A, year 1, line 1, Salary,
+    $110,000 was worked out (recomputed)".
+73. **B** until "Download CSV: A-7, employment years, button" (each table has its own). **Enter**: "Saved offer-calc-….csv." as
+    before. Then **Shift+B** back to "Hide the tables, button, expanded" and **Enter** to close them.
+
+## Part 15 · The tickmark setting (2 min)
+
+74. **Insert+F12. Ctrl+End**, then **Shift+R** (previous radio button) until "Hide tickmarks, radio button, not checked, 2 of 2"
+    (its group is "Tickmarks"). **Space.** NVDA should say "checked".
+75. **Ctrl+Home**, then **B** to any figure, as "How U.S.-avg $507 a month over your stay was worked out (recomputed), button". Its
+    name should be the same as before: hiding the marks hides only the ✓ and the other marks. **Shift+H**/**H** to a schedule's
+    foot: its legend should say "Tickmarks are hidden: each figure keeps a dotted underline and still opens its work. Show
+    tickmarks, button".
+76. Back to **Ctrl+End**, **Shift+R** until "Show tickmarks, radio button", and **Space**, so the rest reads as before.
+
+## Part 16 · Print… (3 min)
+
+77. **Insert+F12. Ctrl+Home**, then **B** until "Print…, button, collapsed". **Enter.** NVDA should say "What to print, grouping"
+    and "Summary, radio button, checked, 1 of 2", with its hint ("every offer's breakdown, …").
+78. **Down Arrow**: "Full workpaper, radio button, checked, 2 of 2, adds every payment, to the cent: many more pages". **Up Arrow**
+    back to "Summary".
+79. **Tab** to "Print, button", then **Enter**. NVDA should say "Getting every schedule ready…" (a status message), and after a few
+    seconds Chrome's print preview opens. Press **Escape** to close it without printing. Focus should be back on "Print…, button";
+    note it if NVDA says "Offer Calc, document" instead.
+80. **Enter** opens the choice again; **Escape** closes it, and NVDA should say "Print…, button, collapsed".
+
+## Part 17 · Send me the log (2 min)
+
+81. Press **Insert+F12** a last time.
+82. **Alt+Tab** to the **NVDA Speech Viewer** window and click in its text (or press Tab once to put focus there).
+83. **Ctrl+A**, then **Ctrl+C**, then paste it into our chat with **Ctrl+V**. Send all of it, however long. The time stamps
     split it into parts.
-69. Tell me, in a line each:
+84. Tell me, in a line each:
     - your NVDA version (Insert+N, then Help, then About) and Chrome's (type `chrome://version` in the address bar);
     - any step where a key did something other than the step said: the step number and what happened;
     - at step 58, whether the figures came quickly enough, and whether you'd rather hear less (or more) on each step.
