@@ -54,7 +54,8 @@ export async function quiet(page: Page) {
     for (const schedule of [".ties", ".leaving"]) {
       // Loaded but never worked out, off screen: anything that scrolls mid-scan (axe's own checks can) would set it working, and
       // it dims once its first half is in. Work it out first (seen in CI on a tablet, 2026-10-12).
-      const idle = page.locator(`${schedule}[data-ready='0']:not(.is-updating)`);
+      // One whose inputs have a problem (is-invalid) shows the last valid results and won't work anything out until it's fixed.
+      const idle = page.locator(`${schedule}[data-ready='0']:not(.is-updating):not(.is-invalid)`);
       if (await idle.count()) {
         await idle.scrollIntoViewIfNeeded();
         await expect(page.locator(schedule)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
@@ -82,7 +83,7 @@ export async function quiet(page: Page) {
 async function nearbyWorkedOut(page: Page) {
   const working = await page.evaluate(() => [".ties", ".leaving"].filter((sel) => {
     const el = document.querySelector<HTMLElement>(sel);
-    if (!el || el.dataset.ready !== "0") return false;
+    if (!el || el.dataset.ready !== "0" || el.classList.contains("is-invalid")) return false;
     const r = el.getBoundingClientRect();
     return r.bottom > -0.5 * window.innerHeight && r.top < 1.5 * window.innerHeight;
   }));

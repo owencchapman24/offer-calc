@@ -1,6 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { copyDocument, loadByYearOnly, openAlone, openCompare, openParts, openWithSaved, openWork, ownSettled, printed, printWithButton, SAVED, settled, showByYear, stubPrint, verdictText } from "./lib/app";
+import {
+  copyDocument, EDITORS, fillOffer, loadByYearOnly, loadSchedules, openAlone, openCompare, openEditor, openParts, openSection, openWithSaved, openWork,
+  ownSettled, printed, printWithButton, SAVED, selectOffer, settled, showByYear, stubPrint, verdictText,
+} from "./lib/app";
 
 // The smoke tests (docs/ui-design.md §10): the app works end to end on the production build. A salary edit updates the
 // verdict; an export, imported back, gives the same results.
@@ -409,4 +412,126 @@ test("a chunk that won't load reloads the page once, keeping what was just typed
   await page.waitForTimeout(2_000);
   expect(loads).toBe(1);
   expect(aborted).toBeGreaterThanOrEqual(1);
+});
+
+// ---- Audit T7: interactions no browser test drove ---------------------------------------------------------------------
+
+/** An offer's draft as this browser saved it, once the save (500 ms after an edit) has happened. */
+const savedDraft = (page: Page, letter: string) => page.evaluate((l) => {
+  const s = JSON.parse(localStorage.getItem("offer-calc:v1") ?? "{}") as { offers?: Array<{ letter: string; draft: Record<string, unknown> }> };
+  return s.offers?.find((o) => o.letter === l)?.draft ?? null;
+}, letter);
+
+test("T7: an input's ⓘ opens its help, which loads on first use, with its way to the methodology", async ({ page }) => {
+  await openCompare(page);
+  await page.getByRole("button", { name: "More help" }).first().click();
+  const hide = page.getByRole("button", { name: "Hide help" }).first();
+  await expect(hide).toHaveAttribute("aria-expanded", "true");
+  const body = page.locator(".help-body").first();
+  await expect(body).toBeVisible();
+  // Quick mode's help is a chunk of its own, loaded as the ⓘ is reached: never stuck on its placeholder.
+  await expect(body).not.toContainText("Getting the help…", { timeout: 10_000 });
+  await expect(body.getByRole("link", { name: "How this is used →" })).toHaveAttribute("href", /#\/method\/M-/);
+  await hide.click();
+  await expect(page.locator(".help-body")).toHaveCount(0);
+});
+
+test("T7: a problem's Fix it goes to the field; the results say they're the last valid ones until it's fixed", async ({ page }) => {
+  await openCompare(page);
+  // Over the $100,000,000 an amount can be (audit C25): a problem at the field.
+  await page.locator("#in-B-salary-annual").fill("200000000");
+  const fix = page.getByRole("button", { name: "Fix it" }).first();
+  await expect(fix).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".lead")).toContainText("These results are for your last valid inputs.");
+  await page.locator("#about-filing").focus();
+  await fix.click();
+  await expect(page.locator("#in-B-salary-annual")).toBeFocused();
+  await page.locator("#in-B-salary-annual").fill("80000");
+  await expect(page.getByRole("button", { name: "Fix it" })).toHaveCount(0, { timeout: 15_000 });
+  await settled(page);
+});
+
+test("T7: + range adds a bear and a bull case, saved with the offer; No range takes them out", async ({ page }) => {
+  await openCompare(page);
+  await openSection(page, "pay");
+  await selectOffer(page, "A");
+  await page.getByRole("button", { name: "Add a range to offer A merit raise" }).click();
+  await expect(page.locator("#in-A-salary-raise-bear")).toBeVisible();
+  await page.locator("#in-A-salary-raise-bear").fill("0");
+  await page.locator("#in-A-salary-raise-bull").fill("8");
+  await expect.poll(async () => (await savedDraft(page, "A") as { salary?: { raise?: { bear: number; bull: number } } } | null)?.salary?.raise)
+    .toMatchObject({ bear: 0, bull: 0.08 });
+  await settled(page);
+  await page.locator(".field.range", { has: page.locator("#in-A-salary-raise-bear") }).getByRole("button", { name: "No range" }).click();
+  await expect(page.locator("#in-A-salary-raise-bear")).toHaveCount(0);
+});
+
+test("T7: a row editor adds a row and removes it; Reset to the default puts a field back", async ({ page }) => {
+  await openCompare(page);
+  await openEditor(page, EDITORS.find((e) => e.row === "salary.promotions")!);
+  const editor = page.locator("#editor-salary-promotions");
+  const rows = editor.getByRole("button", { name: /^Remove promotion / });
+  const before = await rows.count();
+  await editor.getByRole("button", { name: "+ Add a promotion" }).click();
+  await expect(rows).toHaveCount(before + 1);
+  await editor.getByRole("button", { name: `Remove promotion ${before + 1}` }).click();
+  await expect(rows).toHaveCount(before);
+  // C's first RSU grant, given a date of its own, then put back to its default (the start date).
+  await openEditor(page, EDITORS.find((e) => e.row === "equity.grants")!);
+  const grants = page.locator("#editor-equity-grants");
+  const date = page.locator("#in-C-equity-grants-0-grantDate");
+  const was = await date.inputValue();
+  await date.fill("2030-08-01");
+  // The field's ⓘ offers the reset once it's away from its default.
+  const field = grants.locator(".editor-field", { has: date });
+  await field.getByRole("button", { name: "More help" }).click();
+  const reset = field.locator(".reset");
+  await expect(reset).toContainText("Reset to the default");
+  await reset.getByRole("button").first().click();
+  await expect(reset).toHaveCount(0);
+  await expect(date).toHaveValue(was);
+});
+
+test("T7: Start with my offer: a blank offer says what's missing, then its bottom line once it's filled", async ({ page }) => {
+  await page.goto("/#/");
+  await page.getByRole("button", { name: "Start with my offer" }).click();
+  await expect(page.locator("#in-A-salary-annual")).toHaveValue("");
+  await expect(page.locator("#own")).toContainText("Add a salary, a city and a start date to see A on its own.");
+  await fillOffer(page, "A", "90000", "Charlotte-Concord-Gastonia, NC-SC");
+  await ownSettled(page);
+  await expect(page.locator("#own .own-body")).toBeVisible();
+});
+
+test("T7: Delete all data, confirmed, leaves only the sample offer saved, and a reload starts there", async ({ page }) => {
+  await openCompare(page);
+  await page.locator("#in-B-salary-annual").fill("123456");
+  await expect.poll(async () => (await savedDraft(page, "B") as { salary?: { annual?: number } } | null)?.salary?.annual).toBe(123_456);
+  await page.goto("/#/data");
+  await page.getByRole("button", { name: "Delete all data…" }).click();
+  const confirm = page.getByRole("alertdialog");
+  await expect(confirm).toContainText("This can't be undone");
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Deleted. The sample offer is loaded again.")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem("offer-calc:v1") ?? "{}") as { offers?: unknown[] }).offers?.length ?? 0))
+    .toBe(1);
+  await page.goto("/#/");
+  await page.reload();
+  await ownSettled(page);
+  await expect(page.locator("#in-B-salary-annual")).toHaveCount(0);
+});
+
+test("T7: after an edit, L-3 and L-4 follow it rather than keep the old figures", async ({ page }) => {
+  test.setTimeout(180_000);
+  await openCompare(page);
+  await loadSchedules(page);
+  const l3 = page.locator(".ties");
+  const l4 = page.locator(".leaving .leave-offers");
+  const before = [await l3.innerText(), await l4.innerText()];
+  await page.locator("#in-B-salary-annual").fill("400000");
+  await settled(page);
+  await loadSchedules(page);
+  await expect.poll(async () => [await l3.innerText(), await l4.innerText()].map((t, i) => t !== before[i]), { timeout: 30_000 })
+    .toEqual([true, true]);
+  // B now leads: L-3 asks what would tie B, not C.
+  await expect(l3).toContainText("To tie B");
 });
