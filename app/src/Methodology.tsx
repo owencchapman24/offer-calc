@@ -61,7 +61,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             <a href="#/">Back to your offers</a>
           </p>
           <p className="method-version">
-            Engine {ENGINE_VERSION} · tax law 2026, later years projected · prices: BEA Regional Price Parities {DATA_YEARS.rpp} ·
+            Engine {ENGINE_VERSION} · tax law {DATA_YEARS.tax}, later years projected · prices: BEA Regional Price Parities {DATA_YEARS.rpp} ·
             rents: HUD Fair Market Rents FY{DATA_YEARS.fmr}
           </p>
         </header>
@@ -200,8 +200,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             first months are taxed lightly: half a year of pay sits in the low brackets.
           </p>
           <p>
-            <strong>What's included:</strong> federal income tax (2026 brackets and standard deduction, or itemizing when that's
-            lower, with state and local tax capped at the 2026 SALT limit); Social Security (6.2% up to the wage base) and Medicare
+            <strong>What's included:</strong> federal income tax ({DATA_YEARS.tax} brackets and standard deduction, or itemizing when
+            that's lower, with state and local tax capped at the {DATA_YEARS.tax} SALT limit); Social Security (6.2% up to the wage base) and Medicare
             (1.45%, plus 0.9% above $200,000, or $250,000 on a joint return); state income tax for all 50 states and DC, and state
             payroll taxes such as California's SDI; New York City's income tax and Philadelphia's wage tax, for residents (you say
             whether you'd live inside the city); and any other local income tax you enter, at its flat rate. Your 401(k) deferrals and health premiums come out
@@ -209,7 +209,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             Indiana, whose county taxes are on state taxable income.
           </p>
           <p>
-            <strong>Later years.</strong> Tax law after 2026 is projected until it's published: federal brackets, deductions and
+            <strong>Later years.</strong> Tax law after {DATA_YEARS.tax} is projected until it's published: federal brackets, deductions and
             limits rise with the inflation assumption ({percent(ASSUMPTIONS.inflation)} a year), and the SALT cap follows its
             statutory schedule (101% a year through 2029, $10,000 from 2030). Where a later year's amount has already been
             published, it's used as published and projected on from there. For 2027, every federal amount the tool takes from the
@@ -217,7 +217,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
             joint, $24,925 head of household), the educational assistance ($5,400) and commuter ($350 a month) limits (the IRS's
             Rev. Proc. 2026-35, November 5, 2026), the 401(k) limit ($25,500; the IRS's Notice 2026-66, November 12, 2026), the HSA
             limits ($4,500 self-only, $9,000 family; Rev. Proc. 2026-24) and the Social Security wage base ($192,300; October 14,
-            2026). State law is held at 2026 rules, except California, which indexes by statute, and amounts tied to federal ones.
+            2026). State law is held at {DATA_YEARS.tax} rules, except California, which indexes by statute, and amounts tied to federal ones.
           </p>
           <p>
             <strong>The effective tax rate.</strong> A-1 and A-6 state an offer's tax as a share of its pay: the offer's tax over your
@@ -592,7 +592,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               and a school district's separate tax, are left to you to fold in.</li>
             <li>No dependents or credits such as the child tax credit or EITC, and no alternative minimum tax. Head of household
               uses single filers' state rules.</li>
-            <li>State law after 2026 is held at 2026 rules except California's indexing; states that index by law may be
+            <li>State law after {DATA_YEARS.tax} is held at {DATA_YEARS.tax} rules except California's indexing; states that index by law may be
               overstated by about $15–20 a year at first, growing over time. Scheduled state rate cuts aren't applied.</li>
             <li>Small state gaps: Vermont's brackets (up to about $150), Oregon and North Dakota indexing, low-income credits in
               Connecticut, Arkansas, Maine, New Mexico, Hawaii and Minnesota, Colorado's sales-tax refund, Alaska's dividend.</li>

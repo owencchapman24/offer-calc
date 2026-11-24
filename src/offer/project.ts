@@ -1,4 +1,5 @@
 import { computeTaxes, paramsForYear } from "../tax/index";
+import { BASE_YEAR } from "../tax/params/index";
 import type { TaxInput, TaxParams } from "../tax/index";
 import { clawbackFraction, SECTION_1341_THRESHOLD } from "./clawback";
 import { addMonths, fromDays, jan1, toDays, yearOfDay } from "./dates";
@@ -44,7 +45,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
   if (!Number.isInteger(years) || years < 1 || years > 40) throw new Error("years must be an integer from 1 to 40.");
   if (!(offer.salary.annual >= 0)) throw new Error("Salary must be a non-negative number.");
   const start = toDays(offer.startDate);
-  if (yearOfDay(start) < 2026) throw new Error("Start dates before 2026 aren't supported: tax data starts in 2026.");
+  if (yearOfDay(start) < BASE_YEAR) throw new Error(`Start dates before ${BASE_YEAR} aren't supported: tax data starts in ${BASE_YEAR}.`);
   const leave = offer.leaveDate !== undefined ? toDays(offer.leaveDate) : undefined;
   if (leave !== undefined && leave < start) throw new Error("The leave date can't be before the start date.");
   const discountRate = options.discountRate ?? 0.05;
@@ -122,7 +123,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     ...paidCash,
     ...[...grants, ...refreshers].flatMap((g) => rsuEvents(g, growth, workEnd)),
   ];
-  if (raw.some((e) => yearOfDay(e.day) < 2026)) throw new Error("Payments before 2026 aren't supported.");
+  if (raw.some((e) => yearOfDay(e.day) < BASE_YEAR)) throw new Error(`Payments before ${BASE_YEAR} aren't supported.`);
 
   // ---- unused vacation, paid on the last day (docs/v2-plan.md, 4a) ----------------------------
   // It banks evenly over each employment year worked (the part of a year counting by its days), and is paid at the salary rate
@@ -649,7 +650,7 @@ export function projectScenario(offer: OfferInput, household: Household, options
     { code: "monthlyAccrual", params: {} },
     { code: "incrementalTax", params: {} },
     { code: "residence", params: { state: offer.residence.state, ...(locality ? { locality } : {}) } },
-    { code: "projectedLaw", params: { inflation } },
+    { code: "projectedLaw", params: { inflation, base: BASE_YEAR } },
   ];
   if (path.steps.length > 1) {
     assumptions.push({ code: "salaryChanges", params: { scenario,

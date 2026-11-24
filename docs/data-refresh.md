@@ -89,7 +89,13 @@ From 2026 to 2027, once the Tax Foundation's 2027 table is out (about February 2
 - the oracle's year (`YEAR` in `scripts/oracle.py`, `GRID_YEAR` in `scripts/lib/grid.ts`) and both baselines, taken afresh and
   named for the year (`test/baselines/grid-2027.json` and `oracle-2027.json`, the test's path with them; the 2026 files deleted);
 - the tests' hand-checked values, and the tests' frozen law (`test/frozen-enacted.ts`, which moves only then);
-- the base year typed as a literal in the engine and the UI (audit C28 lists them; `BASE_YEAR` is exported but not yet used).
+- `npm run build-cities`, so the city list's copy of the base year (`taxBaseYear`, the main thread's `DATA_YEARS.tax`) moves with
+  `BASE_YEAR` (`test/offer.test.ts` and `scripts/lib/baseyear.test.ts` fail until it does). Everything else that names the base
+  year follows it on its own (audit C28): the first date accepted (`validate.ts`' `beforeBaseYear`, `project.ts`, the date
+  fields' `min`), "2026 tax law" and "projected from 2026" in A-7, the CSVs, the derivations and the copied document, the help,
+  the sources line and M-3's and M-10's generic lines. `baseyear.test.ts` fails on one typed in again;
+- by hand: the methodology's dated amounts and sources (M-3's "Later years" paragraph names 2027's published amounts, M-11's
+  table), and whether offers starting in the old base year are still accepted (they aren't, as the first date moves).
 
 Until then, amounts published for 2027 go in `FEDERAL_2027` and the rest of 2027 is projected.
 

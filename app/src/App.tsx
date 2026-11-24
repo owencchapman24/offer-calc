@@ -482,7 +482,7 @@ export function App() {
           <button type="button" className="link" onClick={() => dispatch({ type: "loadSamples", today })}>Reload the samples</button>
         </p>
         <p className="sources">
-          Tax law 2026 (later years projected) · Prices: BEA Regional Price Parities {DATA_YEARS.rpp} · Rent estimates: HUD Fair
+          Tax law {DATA_YEARS.tax} (later years projected) · Prices: BEA Regional Price Parities {DATA_YEARS.rpp} · Rent estimates: HUD Fair
           Market Rents FY{DATA_YEARS.fmr} · Engine{engine.ms !== null && <span className="no-print">: {engine.ms.toFixed(0)} ms</span>} in a Web Worker.
           Not financial advice.
         </p>

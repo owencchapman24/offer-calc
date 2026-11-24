@@ -2,6 +2,7 @@
  "source": "Generated from rpp.json (BEA metro and state-nonmetro areas) by scripts/build-cities.ts; do not edit.",
  "rppDataYear": 2024,
  "fmrFiscalYear": 2027,
+ "taxBaseYear": 2026,
  "cities": [
   {"code":"10180","name":"Abilene, TX","states":["TX"]},
   {"code":"10420","name":"Akron, OH","states":["OH"]},

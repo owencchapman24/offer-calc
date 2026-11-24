@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CITIES } from "../../src/col/cities";
+import { CITIES, DATA_YEARS } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
 import { type AppOffer, bonusBasis, type BonusDraft, NYC_METRO, PHILADELPHIA_METRO, statesFor, withBase } from "./model";
@@ -33,7 +33,7 @@ export function StartRow() {
     <FieldRow k="startDate">
       {(o) => (
         <input id={fieldId(o.letter, "startDate")} type="date" aria-label={`Offer ${o.letter} start date`} value={o.draft.startDate ?? ""}
-          min="2026-01-01" data-help="startDate" aria-describedby={hintId("startDate")}
+          min={`${DATA_YEARS.tax}-01-01`} data-help="startDate" aria-describedby={hintId("startDate")}
           aria-invalid={issuesAt(api, o.letter, "startDate").length > 0 || undefined}
           onChange={(e) => api.set(o, { startDate: e.target.value || null })} />
       )}

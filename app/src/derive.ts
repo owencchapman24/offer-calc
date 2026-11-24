@@ -11,6 +11,7 @@ import {
   timeOffInput, toOfferInput,
 } from "./model";
 import { daysOff, weeksWorked } from "../../src/offer/timeOff";
+import { DATA_YEARS } from "../../src/col/cities";
 import {
   type A2Line, type A2Part, type A6Line, aboutIsDefault, type AboutField, basisPhrase, type BridgeLine, cityName, type Derivation, detailOf, type EditTarget, indexOf,
   type InputRef, join, type L6Line, type LeaveContext, metricKind, type MetricId, offerByLetter, ownOf as breakdownOf, type OwnLine, pathOf, pricesOf, type PvPart,
@@ -1918,7 +1919,7 @@ function bridgeWork(ctx: WorkContext, letter: L, n: number, line: BridgeLine): W
             + `Each payment's tax is to the cent; ${letter}-7 lists them.`,
           ...rates.map((t) => `${t.year}: ${rate2(t.rate)} of ${figure(t.gross)} = federal income tax ${rate2(t.parts.federal / t.gross)}, `
             + `Social Security and Medicare ${rate2(t.parts.fica / t.gross)}, ${st} ${rate2(t.parts.state / t.gross)}`
-            + `${t.parts.local ? `, ${local} ${rate2(t.parts.local / t.gross)}` : ""}${t.projectedLaw ? " (tax law projected from 2026)" : ""}.`),
+            + `${t.parts.local ? `, ${local} ${rate2(t.parts.local / t.gross)}` : ""}${t.projectedLaw ? ` (tax law projected from ${DATA_YEARS.tax})` : ""}.`),
         ],
         ties: [l6("tax")], ...fromInputs(ctx, letter, ["costOfLiving.area"]),
       };
@@ -2597,7 +2598,7 @@ function l6TaxWork(ctx: WorkContext, letter: L, year: number, line: TaxLine, col
   const id = (l: TaxLine, c: TaxCol): MetricId => `l6t.${letter}.${year}.${l}.${c}`;
   const colName = { with: "with the offer", without: "without it", offer: "the offer's share" }[col];
   const title = `${letter} · ${year} · ${lowerFirst(row.label)}, ${colName}`;
-  const scope = `Base case · calendar year ${year}${t.projectedLaw ? " · tax law projected from 2026" : " · 2026 tax law"}`;
+  const scope = `Base case · calendar year ${year}${t.projectedLaw ? ` · tax law projected from ${DATA_YEARS.tax}` : ` · ${DATA_YEARS.tax} tax law`}`;
   const engineNote = (v: number) => `The tax engine's figure: ${toCent(v)}.`;
   const runOf = (c: "with" | "without") => (c === "with" ? t.t.with : t.t.without);
   const KEY: Partial<Record<TaxLine, keyof TaxRun>> = {
@@ -3734,7 +3735,7 @@ function taxYearWork(ctx: WorkContext, letter: L, year: number, line: A6Line): W
   const r = taxYearsOf(b.detail, b.window).find((x) => x.year === year);
   if (!r) throw new Error(`No ${year} tax for ${letter} in its stay.`);
   const v = r.values;
-  const scope = `Base case · calendar year ${year}${r.projectedLaw ? " · tax law projected from 2026" : " · 2026 tax law"} · $, as paid`;
+  const scope = `Base case · calendar year ${year}${r.projectedLaw ? ` · tax law projected from ${DATA_YEARS.tax}` : ` · ${DATA_YEARS.tax} tax law`} · $, as paid`;
   const title = (what: string) => `${letter}-6 · ${year} · ${what}`;
   const KIND: Record<"federal" | "fica" | "state" | "local", string> = {
     federal: "federal income tax", fica: "Social Security and Medicare", state: "state income and payroll tax", local: "local income tax",

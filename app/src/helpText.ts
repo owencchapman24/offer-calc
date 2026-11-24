@@ -1,4 +1,5 @@
 import { addHelpText, type FieldText } from "./help";
+import { DATA_YEARS } from "../../src/col/cities";
 
 // Detailed mode's help text (docs/ui-design.md §3.5): the hint and the ⓘ help for each detailed input,
 // keyed like help.ts. It loads with detailed mode and fills in help.ts's registry, so quick-mode
@@ -310,7 +311,7 @@ export const DETAILED_TEXT: Record<string, FieldText> = {
     hint: "Days after you start, or a date.",
     help: "When the payment lands. 30 days after your start date is the default: sign-ons usually come with the first paycheck or "
       + "two. A date before your start, such as relocation paid before day one, counts with your first year, taxed in the year it's "
-      + "paid. Dates before 2026 aren't supported.",
+      + `paid. Dates before ${DATA_YEARS.tax} aren't supported.`,
   },
   "cashAwards.clawback": {
     hint: "What you'd owe back if you left early.",

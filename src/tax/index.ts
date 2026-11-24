@@ -4,6 +4,7 @@ import { paramsForYear, type TaxParams } from "./params";
 import { round2, clamp0 } from "./schedule";
 import { stateTax } from "./state";
 import type { TaxInput, TaxResult } from "./types";
+import { BASE_YEAR } from "./params/index";
 
 export * from "./types";
 export { STATES_2026 } from "./params/states2026";
@@ -77,7 +78,7 @@ function computeOnce(input: TaxInput, params: TaxParams): Omit<TaxResult, "margi
   const k401Limit = params.federal.k401Limit;
   if (k401 > k401Limit) warnings.push({ code: "k401OverLimit", params: { year: params.year, limit: k401Limit } });
   if (federalAGI > 400_000) warnings.push({ code: "amtNotModeled", params: {} });
-  if (params.projected) warnings.push({ code: "projectedLaw", params: { year: params.year } });
+  if (params.projected) warnings.push({ code: "projectedLaw", params: { year: params.year, base: BASE_YEAR } });
 
   const totalTax = best.fed.tax + fica.socialSecurity + fica.medicare + fica.additionalMedicare
     + best.state.tax + best.state.payrollTax + best.local.tax;

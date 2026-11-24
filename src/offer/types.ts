@@ -509,7 +509,7 @@ export type Assumption =
   | { code: "monthlyAccrual"; params: NoParams }
   | { code: "incrementalTax"; params: NoParams }
   | { code: "residence"; params: { state: string; locality?: "nyc" | "philadelphia" | "flat" } }
-  | { code: "projectedLaw"; params: { inflation: number } }
+  | { code: "projectedLaw"; params: { inflation: number; base: number } }
   | { code: "salaryChanges"; params: { scenario: Scenario; changes: Array<{ date: ISODate; annual: number; reasons: SalaryChangeReason[] }> } }
   | { code: "bonus"; params: { scenario: Scenario; basis: "percentOfSalary"; rate: number } }
   | { code: "bonus"; params: { scenario: Scenario; basis: "fixed"; amount: number } }

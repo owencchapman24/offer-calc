@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeTaxes, paramsForYear } from "../src/tax/index";
+import { BASE_YEAR } from "../src/tax/params/index";
 import {
   breakeven, breakevenSteps, byYear, cliffs, compareOffers, comparisonWindow, convenienceRuleWarning, keptIfLeaving, leaveDateSweep, leaveDaySweep,
   nextCliff, projectOffer, rentFlip, rentFlipFrom,
@@ -819,7 +820,7 @@ describe("cost of living (BEA RPPs)", () => {
     expect(options.every((o) => o.states.length > 0)).toBe(true);
     // The UI's slim list (src/col/cities.json) is generated from the same data: run `npm run build-cities` if this fails.
     expect(cities.cities).toEqual(options);
-    expect([cities.rppDataYear, cities.fmrFiscalYear]).toEqual([RPP.dataYear, FMR.fiscalYear]);
+    expect([cities.rppDataYear, cities.fmrFiscalYear, cities.taxBaseYear]).toEqual([RPP.dataYear, FMR.fiscalYear, BASE_YEAR]);
   });
   it("non-housing RPP backs housing out at BEA's 16% weight: U.S. 99.8802, Charlotte 97.2933", () => {
     // (100 - 0.16 x 100.629) / 0.84 and (97.348 - 0.16 x 97.635) / 0.84.
