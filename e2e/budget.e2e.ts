@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./lib/fixtures";
 import { loadSchedules, openCompare, openParts, settled } from "./lib/app";
 
 // Audit T6: how fast an edit's figures arrive, and whether anything on screen moves while you only scroll. The other browser tests wait
