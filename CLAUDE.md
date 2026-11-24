@@ -257,7 +257,8 @@ to pick.
   whole years to start on or after today, so present values are from today. They're stamped illustrative wherever they appear. A
   first visit (and "Delete all data") is sample A on its own; "See a sample comparison" and the footer's "Reload the samples" load
   all three. The banner under the masthead says so, with "Start with my offer".
-- **Today:** the app passes the user's local date as `valuationDate`.
+- **Today:** the app passes the user's local date as `valuationDate`. From the day a data release is due and not in (`dataDue`,
+  `src/col/cities.ts`: HUD's next year Oct 1, BEA's prices and the next tax year by Mar 1), the footer says so (audit C27).
 - **Words:** labels follow "Prices in" (`app/src/prices.ts`). Under v2's B13, every rate and share states its period ("a month over
   your stay", "of its 2027 pay"), and under condition 1 every figure names its dollars: after rent the place's, "$" before rent and
   prices; an offer's own city's dollars only inside its breakdown (`docs/v2-plan.md`, item 5's conditions). Where it's said:
@@ -388,7 +389,10 @@ to pick.
 - **Rent:** the rent entered per offer. Left blank: HUD's Fair Market Rent for the metro, 1 bedroom (the FMR area holding most of
   the metro's 2024 population, in your residence state if any is); only where there's no FMR (BEA state nonmetro portions), an anchor
   rent (the U.S. median gross rent, $1,487, ACS 2024) × the housing RPP ratio. It's the first lease year's rent; the lease starts on
-  the start date and rises by `rentGrowth` (default: inflation) at each anniversary.
+  the start date and rises by `rentGrowth` (default: inflation) at each anniversary. HUD's figure is for its fiscal year (October
+  to September): a start in a later one grows it by `rentGrowth`, once for each fiscal year between (`estimateRentAt`; audit C27,
+  2026-11-23); the BEA-derived estimate isn't grown. The worker's estimates are keyed by place, state, start and growth
+  (`rentKey`), so the ledger and the projection show one figure.
 - **The after-rent total** (`colAdjustedTotal`): spending money is local, saved money isn't. Converted through the non-housing
   factor: discretionary income after rent, less expected out-of-pocket health costs. At face value: planned savings, your 401(k)
   and HSA, vested employer 401(k), employer HSA, perks. Check: it equals total rewards − rent + (factor − 1) × (local non-housing −
@@ -581,8 +585,8 @@ The one list; the methodology's M-10 says the same in plain words. Rough priorit
 **Cost of living**
 - Relative prices are held at the 2024 RPPs; one national housing weight. RPPs are metro-wide (the NYC metro averages Manhattan with
   its suburbs).
-- Rent grows at one rate per offer, stepped at each anniversary, paid only while employed there. HUD's estimate is used as published
-  for any start date (audit C27).
+- Rent grows at one rate per offer, stepped at each anniversary, paid only while employed there. HUD's estimate grows to a later
+  fiscal year at that rate, not by HUD's own trend factors; the BEA-derived estimate (from 2024's ACS median) isn't grown.
 - FMRs are 40th-percentile gross rents across a county group; city-center rents for new grads run higher (the UI calls it an
   estimate to edit). ZIP-level rents (HUD's Small Area FMRs) are in the backlog (`docs/v2-plan.md`).
 - Perks count at face value, though 132(f) money buys local transit.

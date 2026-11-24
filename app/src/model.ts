@@ -1,3 +1,4 @@
+import type { RentRequest } from "./protocol";
 import { statesOf } from "../../src/col/cities";
 import type {
   AnnualBonus, ByScenario, CashAward, Clawback, Commission, CommissionTerms, Espp, Household, MonthDay, OfferInput, Retirement, Scenario, TimeOff, VestingSchedule,
@@ -325,6 +326,13 @@ export const MAX_AMOUNT = 100_000_000;
 export const NYC_METRO = "35620";
 export const PHILADELPHIA_METRO = "37980";
 export const ASSUMPTIONS = { inflation: 0.025, discountRate: 0.05 } as const;
+
+/** What an offer's rent estimate is worked out from (protocol.ts, RentRequest), as the engine takes it: null until it has a place. */
+export function rentRequestOf(o: AppOffer): RentRequest | null {
+  const area = o.draft.costOfLiving.area;
+  const state = o.draft.residence.state;
+  return area && state ? { area, state, startDate: o.draft.startDate, growth: o.draft.costOfLiving.rentGrowth ?? ASSUMPTIONS.inflation } : null;
+}
 
 /**
  * Engine defaults the draft fills in for null fields (the engine's own defaults are used where it has

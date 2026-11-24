@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CITIES, DATA_YEARS } from "../../src/col/cities";
 import type { RentEstimate } from "../../src/col/rent";
 import { rentKey } from "./protocol";
-import { type AppOffer, bonusBasis, type BonusDraft, NYC_METRO, PHILADELPHIA_METRO, statesFor, withBase } from "./model";
+import { type AppOffer, bonusBasis, type BonusDraft, NYC_METRO, PHILADELPHIA_METRO, rentRequestOf, statesFor, withBase } from "./model";
 import { dollars } from "./text";
 import { DefaultTick, FieldRow, fieldId, hintId, issuesAt, useLedger } from "./fields";
 import { TickButton } from "./Tickmarks";
@@ -173,10 +173,9 @@ export function RentRow({ rents }: { rents: Record<string, RentEstimate> }) {
   return (
     <FieldRow k="costOfLiving.monthlyRent">
       {(o) => {
-        const { area } = o.draft.costOfLiving;
-        const state = o.draft.residence.state;
+        const r = rentRequestOf(o);
         return <RentField offer={o} set={(v) => api.set(o, { "costOfLiving.monthlyRent": v })}
-          estimate={area && state ? rents[rentKey(area, state)] ?? null : null} />;
+          estimate={r ? rents[rentKey(r)] ?? null : null} />;
       }}
     </FieldRow>
   );

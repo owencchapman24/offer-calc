@@ -2,7 +2,7 @@ import type { RentEstimate } from "../../src/col/rent";
 import type { Basis, Component, EmploymentYearResult, HorizonRow, HorizonSweep, ISODate, RentFlipResult, Scenario, ValueBasis } from "../../src/offer/types";
 import { CITIES } from "../../src/col/cities";
 import { isDefault } from "./defaults";
-import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, type Letter } from "./model";
+import { type AppHousehold, type AppOffer, DEFAULT_HOUSEHOLD, type Letter, rentRequestOf } from "./model";
 import { type PriceWords, priceWords, shortCity, US_PRICES } from "./prices";
 import type { LeaveBasis } from "./leaveModel";
 import { type Breakdown, type LeavePanel, type OfferDetail, type OfferTerms, rentKey, type StayDetail, type Ties, type WorkOffer } from "./protocol";
@@ -296,7 +296,8 @@ export function offerByLetter(ctx: WorkContext, letter: L): AppOffer | undefined
   return ctx.offers.find((o) => o.letter === letter);
 }
 export function rentEstimate(ctx: WorkContext, o: AppOffer | undefined): RentEstimate | null {
-  return o?.draft.costOfLiving.area && o.draft.residence.state ? ctx.rents[rentKey(o.draft.costOfLiving.area, o.draft.residence.state)] ?? null : null;
+  const r = o ? rentRequestOf(o) : null;
+  return r ? ctx.rents[rentKey(r)] ?? null : null;
 }
 export function aboutIsDefault(h: AppHousehold, f: AboutField): boolean {
   switch (f) {

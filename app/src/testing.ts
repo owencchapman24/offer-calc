@@ -29,7 +29,7 @@ import { verdictModule } from "./Later";
 import { detailedModule, Ledger } from "./Ledger";
 import {
   type AppHousehold, type AppOffer, ASSUMPTIONS, DEFAULT_HOUSEHOLD, type EsppDraft, firstYear, type Letter, type Missing, sampleOffers,
-  toHousehold, toOfferInput, blankCommission,
+  rentRequestOf, toHousehold, toOfferInput, blankCommission,
 } from "./model";
 import { type Derivation, type MetricId, rentNotes, type WorkContext } from "./metrics";
 import { priceWords } from "./prices";
@@ -114,7 +114,7 @@ export function contextOf(offers: AppOffer[], household: AppHousehold, today: st
     offers: { offers: inputs, household: toHousehold(household, wagesYear), stays: staysFor(household.stayYears), stayYears: household.stayYears,
       valuationDate: today, inflation: ASSUMPTIONS.inflation, discountRate: ASSUMPTIONS.discountRate },
     ids: letters,
-    rents: offers.map((o) => ({ area: o.draft.costOfLiving.area!, state: o.draft.residence.state! })),
+    rents: offers.flatMap((o) => { const r = rentRequestOf(o); return r ? [r] : []; }),
   });
   if (!out.breakdowns || out.issues.some((x) => x.length)) return { issues: out.issues };
   // Each offer's breakdown, as the app keeps it: restated at the prices picked once they're a city's or there's a comparison; with the

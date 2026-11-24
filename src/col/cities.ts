@@ -12,6 +12,25 @@ export const CITIES: City[] = data.cities;
  */
 export const DATA_YEARS = { rpp: data.rppDataYear, fmr: data.fmrFiscalYear, tax: data.taxBaseYear };
 
+/** A data release that's due and not in yet: which, the year it brings, and the day it was due (an ISO date). */
+export interface DataDue { what: "fmr" | "rpp" | "tax"; next: number; due: string }
+
+/**
+ * The data releases due by `today` (an ISO date) that the tables don't have yet (audit C27), so the page can say a figure may be
+ * out of date rather than pass it off as current. HUD's next fiscal year of rents takes effect October 1 (FY2028's on Oct 1,
+ * 2027). BEA's next year of prices is usually out in December and has come as late as February: due by March 1 two years after
+ * the data year's end (the 2025 prices by Mar 1, 2027). The next tax year's law is the base-year move, by March 1 of that year.
+ * docs/data-refresh.md has the calendar.
+ */
+export function dataDue(today: string): DataDue[] {
+  const due: DataDue[] = [
+    { what: "fmr", next: DATA_YEARS.fmr + 1, due: `${DATA_YEARS.fmr}-10-01` },
+    { what: "rpp", next: DATA_YEARS.rpp + 1, due: `${DATA_YEARS.rpp + 3}-03-01` },
+    { what: "tax", next: DATA_YEARS.tax + 1, due: `${DATA_YEARS.tax + 1}-03-01` },
+  ];
+  return due.filter((d) => today >= d.due);
+}
+
 const byCode = new Map(CITIES.map((c) => [c.code, c]));
 
 export const cityByCode = (code: string): City | undefined => byCode.get(code);

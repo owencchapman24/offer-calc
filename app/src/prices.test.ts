@@ -6,6 +6,8 @@ import Methodology from "./Methodology";
 import { type MetricId, metricKind, rentNotes, type WorkContext } from "./metrics";
 import { bridge } from "./byYearModel";
 import { priceWords, shortCity, US_PRICES } from "./prices";
+import { rentRequestOf } from "./model";
+import { rentKey } from "./protocol";
 import { context, footsAsDisplayed, renderPage, withLeave, withTies } from "./testing";
 
 // Slice 8, prices in a city you know (docs/ui-design.md §5, item 6), and the lead's rent note.
@@ -177,7 +179,8 @@ describe("the rent note under the verdict", () => {
   });
 
   it("the winner's own rent: with HUD at $3,500 for Seattle, over C's $3,086.42, A would win; the note names whose rent", () => {
-    const high = { ...ctx, rents: { ...ctx.rents, "42660|WA": { ...ctx.rents["42660|WA"], monthlyRent: 3_500 } } };
+    const seattle = rentKey(rentRequestOf(ctx.offers.find((o) => o.letter === "C")!)!);
+    const high = { ...ctx, rents: { ...ctx.rents, [seattle]: { ...ctx.rents[seattle], monthlyRent: 3_500 } } };
     expect(rentNotes(high).map((n) => [n.letter, n.wins, n.against, n.flip.to])).toEqual([["A", "A", "C", 3_303.16], ["C", "A", "A", 3_086.42]]);
     expect(words(renderPage(high))).toContain("This depends on rent: at HUD's estimate for New York ($2,729 a month in the first lease year), A wins; at "
       + "HUD's estimate for C's rent in Seattle ($3,500 a month in the first lease year), A wins.");

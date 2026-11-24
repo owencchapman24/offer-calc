@@ -11,7 +11,7 @@ import {
   vestedFraction,
 } from "./benefits";
 import { NATIONAL, nonHousingRpp, RPP, rppArea } from "../col/index";
-import { estimateRent, type RentEstimate } from "../col/rent";
+import { estimateRentAt, type RentEstimate } from "../col/rent";
 import { daysOff, payoutRule, VACATION_PAYOUT_STATES, vacationBanked, weeksWorked, WORKDAYS_A_YEAR } from "./timeOff";
 import { optional } from "./optional";
 import type {
@@ -453,17 +453,18 @@ export function projectScenario(offer: OfferInput, household: Household, options
     if (!(savingsRate >= 0 && savingsRate < 1)) throw new Error("savingsRate must be at least 0 and below 1.");
     // No rent entered: HUD's Fair Market Rent for the metro, or for areas without one, an anchor rent
     // (yours at the reference location, else the U.S. median) scaled by the housing RPPs.
+    const rentGrowth = offer.costOfLiving.rentGrowth ?? inflation;
+    if (!(rentGrowth > -1)) throw new Error("Rent growth must be greater than -100%.");
+    // HUD's estimate is for its fiscal year: a start in a later one grows it at the rent growth to the start's (audit C27).
     let monthlyRent = offer.costOfLiving.monthlyRent;
     let rentEstimate: RentEstimate | undefined;
     if (monthlyRent === undefined) {
-      rentEstimate = estimateRent(area.code, offer.residence.state,
+      rentEstimate = estimateRentAt(area.code, offer.residence.state, offer.startDate, rentGrowth,
         hc.referenceMonthlyRent !== undefined ? { anchorRent: hc.referenceMonthlyRent, anchorArea: ref.code } : {});
       monthlyRent = rentEstimate.monthlyRent;
     }
     const rentSource: CostOfLivingInfo["rentSource"] = rentEstimate?.source ?? "input";
     if (!(monthlyRent >= 0)) throw new Error("Rent can't be negative.");
-    const rentGrowth = offer.costOfLiving.rentGrowth ?? inflation;
-    if (!(rentGrowth > -1)) throw new Error("Rent growth must be greater than -100%.");
     const used = (a: ReturnType<typeof rppArea>) =>
       ({ code: a.code, name: a.name, allItems: a.allItems, housing: a.housing, nonHousing: Math.round(nonHousingRpp(a) * 1000) / 1000 });
     const flows: ColFlow[] = [];
