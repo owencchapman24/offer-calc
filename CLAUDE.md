@@ -281,8 +281,9 @@ to pick.
     heading);
   - the sticky verdict bars never hide the focused element (WCAG 2.4.11: scroll padding, `useFocusClearOfBars`, and the phone's bar
     hides while the keyboard is up);
-  - lone tickmarks are 24 × 24 px boxes (WCAG 2.5.8); "⚠ Last valid results" keeps full contrast (dimming while "Updating…" is
-    audit P5, a decision for before launch).
+  - lone tickmarks are 24 × 24 px boxes (WCAG 2.5.8); "⚠ Last valid results" keeps full contrast, and so does a schedule being
+    worked out: its text turns graphite (8.2:1 light, 9.2:1 dark) with "Updating…" in its head, never faded (audit P5, decided
+    2026-11-23 at the user's word to use judgment); the scan checks every schedule held in that state.
 - **Out of the page:**
   - Print… lays the page out as a 680 px column, loads every schedule and waits for it; Ctrl+P prints what's loaded. A is solid, B
     dashed, C dotted.

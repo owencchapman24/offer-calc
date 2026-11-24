@@ -45,10 +45,11 @@ async function exceptionFor(page: Page, rule: string, target: string): Promise<A
  * (position: static: the same box, unstuck), where it's scanned like everything else. Whether it ever covers the focused
  * element when stuck is WCAG 2.4.11's, checked by the phone and tablet tests (mobile.e2e.ts).
  *
- * It scans a quiet page (app.ts, quiet): never a schedule caught dimmed for the moment it's being worked out.
+ * It scans a quiet page (app.ts, quiet), so a schedule isn't caught mid-change; `held: true` skips that wait, for a state a test
+ * holds on purpose (every schedule shown as it is while being worked out, audit P5).
  */
-export async function scan(page: Page, state: string): Promise<ScanRecord> {
-  await quiet(page);
+export async function scan(page: Page, state: string, { held = false }: { held?: boolean } = {}): Promise<ScanRecord> {
+  if (!held) await quiet(page);
   const unstick = await page.addStyleTag({ content: ".verdict-bar { position: static !important; }" });
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze().finally(() => unstick.evaluate((el) => (el as Element).remove()));
   const record: ScanRecord = {

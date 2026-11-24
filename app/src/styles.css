@@ -226,8 +226,11 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .note { font-size: 14px; color: var(--graphite); }
 .note.error { color: var(--warning); }
 
-.verdict, .ranks, .stays, .pipeline, .extra { transition: opacity 120ms; }
-.is-updating .verdict, .is-updating .ranks, .is-updating .stays, .is-updating .pipeline, .is-updating .extra { opacity: 0.6; }
+/* While a schedule is being worked out (is-updating), its text turns from ink to graphite, with "Updating…" in its head. It
+   used to dim to 60% opacity, 2.99:1 against the sheet; graphite keeps WCAG 1.4.3's 4.5:1 (8.2:1 light, 9.2:1 dark), and the
+   accessibility scan checks every schedule in that state (audit P5). */
+.verdict, .ranks, .stays, .pipeline, .extra { transition: color 120ms; }
+.is-updating .verdict, .is-updating .ranks, .is-updating .stays, .is-updating .pipeline, .is-updating .extra { color: var(--graphite); }
 
 .verdict-lede { margin: 0; font-size: 19px; }
 .hero { margin: 2px 0; font-size: clamp(40px, 5vw, 56px); line-height: 1.1; font-weight: 650; letter-spacing: -0.01em; }
@@ -237,8 +240,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .scope { margin: 8px 0 0; font-size: 13.5px; color: var(--graphite); }
 .close { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
 .close .stamp { margin-right: 6px; }
-.close .fig { transition: opacity 120ms; }
-.close.is-updating .fig { opacity: 0.6; }
+.close .fig { transition: color 120ms; }
+.close.is-updating .fig { color: var(--graphite); }
 .close .updating { margin-left: 4px; }
 /* The rent note (slice 8): the verdict turns on an entered rent against its estimate. */
 .rent-note { margin: 8px 0 0; font-size: 14px; line-height: 1.6; font-variant-numeric: tabular-nums; }
@@ -730,8 +733,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .breakdown { margin-top: 24px; }
 .part-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .part-title .ref { min-width: 34px; height: 30px; font-size: 13px; }
-.own-body { transition: opacity 120ms; }
-.is-updating .own-body { opacity: 0.6; }
+.own-body { transition: color 120ms; }
+.is-updating .own-body { color: var(--graphite); }
 .own-body > p { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
 .breakdown .own-body { max-width: 880px; }
 /* A-1's head is one sentence (its dollars said once), its parts on lines of their own. */
@@ -753,8 +756,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 
 .own-parts { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .own-parts > .part { border-top: 1px solid var(--rule); padding-top: 14px; }
-.own-parts > .part > :not(.part-head) { transition: opacity 120ms; }
-.own-parts.is-updating > .part > :not(.part-head) { opacity: 0.6; }
+.own-parts > .part > :not(.part-head) { transition: color 120ms; }
+.own-parts.is-updating > .part > :not(.part-head) { color: var(--graphite); }
 .part-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 8px; }
 .part-head .part-title { margin: 0; }
 .part-head select { min-height: 30px; padding: 2px 6px; }
@@ -819,8 +822,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* ---- L-3 what it would take ------------------------------------------------------------------------- */
 
 .ties { margin-top: 24px; }
-.ties > :not(.schedule-head) { transition: opacity 120ms; }
-.ties.is-updating > :not(.schedule-head, .caption, .legend) { opacity: 0.6; }
+.ties > :not(.schedule-head) { transition: color 120ms; }
+.ties.is-updating > :not(.schedule-head, .caption, .legend) { color: var(--graphite); }
 .tie-scope { margin: 2px 0 10px; font-size: 14.5px; line-height: 1.55; max-width: 96ch; font-variant-numeric: tabular-nums; }
 .tie-offers { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 14px; }
 .tie-offer { font-size: 14.5px; line-height: 1.55; font-variant-numeric: tabular-nums; max-width: 96ch; }
@@ -839,9 +842,9 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 .leaving { margin-top: 24px; }
 /* The schedules after the lead dim their figures while they're from earlier inputs; the head says why (StaleNote). */
 /* Only figures dim (a moment, while they're worked out): not captions, legends or "Working it out…" (ui.tsx, staleClass). */
-.by-year .by-year-grid, .risk > :not(.schedule-head), .leaving .leave-chart, .leaving .leave-offers { transition: opacity 120ms; }
+.by-year .by-year-grid, .risk > :not(.schedule-head), .leaving .leave-chart, .leaving .leave-offers { transition: color 120ms; }
 .by-year.is-updating .by-year-grid, .risk.is-updating > :not(.schedule-head, .caption, .legend), .leaving.is-updating .leave-chart,
-.leaving.is-updating .leave-offers { opacity: 0.6; }
+.leaving.is-updating .leave-offers { color: var(--graphite); }
 .leave-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 6px 0 10px; font-size: 14px; }
 .leave-controls label { font-weight: 700; }
 .leave-controls input[type="date"] { min-height: 32px; padding: 2px 6px; font: inherit; font-variant-numeric: tabular-nums; color: var(--ink);
@@ -875,8 +878,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* ---- L-5 warnings, and the lead's pointer to it -------------------------------------------------------- */
 
 .warnings { margin-top: 24px; }
-.warnings > :not(.schedule-head) { transition: opacity 120ms; }
-.warnings.is-updating > :not(.schedule-head, .caption, .legend) { opacity: 0.6; }
+.warnings > :not(.schedule-head) { transition: color 120ms; }
+.warnings.is-updating > :not(.schedule-head, .caption, .legend) { color: var(--graphite); }
 .warn-none { margin: 2px 0 6px; font-size: 14.5px; max-width: 76ch; }
 .warn-group { margin: 6px 0 14px; }
 .warn-head { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--graphite); }
@@ -924,8 +927,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
   font-size: 15px; line-height: 1.4; font-variant-numeric: tabular-nums;
 }
 .verdict-bar.is-top .bar-go { padding: 8px 24px; }
-.bar-text { min-width: 0; transition: opacity 120ms; }
-.verdict-bar.is-updating .bar-text { opacity: 0.6; }
+.bar-text { min-width: 0; transition: color 120ms; }
+.verdict-bar.is-updating .bar-text { color: var(--graphite); }
 .bar-figure { font-weight: 700; font-size: 17px; }
 .bar-scope { color: var(--graphite); font-size: 13.5px; white-space: nowrap; }
 .bar-text .stamp { font-size: 10px; }
@@ -972,8 +975,8 @@ input[aria-invalid="true"] { border-bottom-color: var(--warning); }
 /* The years table has the line numbers first: band the year columns, not the labels. */
 .l6-years td:nth-child(even), .l6-years th:nth-child(even) { background: none; }
 .l6-years td:nth-child(odd):not(:first-child), .l6-years thead th:nth-child(odd):not(:first-child) { background: var(--band); }
-.the-work .l6-scroll { transition: opacity 120ms; }
-.the-work.is-updating .l6-scroll { opacity: 0.6; }
+.the-work .l6-scroll { transition: color 120ms; }
+.the-work.is-updating .l6-scroll { color: var(--graphite); }
 
 /* ---- slice 6, stop B: CSV, the tickmark setting, print ---------------------------------------------------------- */
 
