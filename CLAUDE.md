@@ -271,7 +271,9 @@ to pick.
   `labels.test.ts` checks every figure the app renders, each sentence, the CSVs and the document; a new figure needs its entry in
   its `expectOf`.
 - **Accessibility:** WCAG 2.2 A and AA, checked by the scan in every state (`e2e/a11y.e2e.ts`); an exception needs a rule, a
-  selector and a reason in `test/a11y-exceptions.json` (none today). Behaviors to keep:
+  selector and a reason in `test/a11y-exceptions.json` (none today). What axe can't decide (its "needs review") is checked by a
+  person and recorded in `test/a11y-reviewed.json` (audit P6, 2026-11-23), resting on the tokens' contrast
+  (`scripts/lib/contrast.test.ts`); the report marks a kind not in it "not reviewed yet". Behaviors to keep:
   - the verdict is announced in one polite live region (`#verdict-live`), one sentence a second after the last result, only when
     it changes, never on the first load;
   - a chart is a keyboard slider over its axis (L-1's years, L-4's last day), its value text naming every offer; the drawn tooltip

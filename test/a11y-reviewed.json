@@ -1,0 +1,70 @@
+{
+  "reviewed": [
+    {
+      "rule": "color-contrast",
+      "why": "Element content contains only non-text characters",
+      "reason": "Tickmark glyphs (✓ ^ < T D E), the ⓘ help buttons and the brand mark. They're graphite or muted on the sheet (8.2:1 and 5.7:1 light, 9.2:1 and 6.0:1 dark), past 4.5:1 for text and 3:1 for non-text; scripts/lib/contrast.test.ts checks the tokens.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element's background color could not be determined due to a pseudo element",
+      "reason": "An offer's letter, stamp and remove button in its head. The pseudo element is the offer's 3px colored rule under them (.offer-head::before), not behind the text, which is ink on the sheet (17.6:1 light, 14.9:1 dark).",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element content is too short to determine if it is actual text content",
+      "reason": "The single letters (A, B, C) at L-1's and L-2's line ends and an axis's 0: ink or muted on the sheet, 17.6:1 and 5.7:1 light, 14.9:1 and 6.0:1 dark.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element's background color could not be determined because element contains an image node",
+      "reason": "The SVG axis labels of L-1, L-2 and L-4, drawn in the chart's own SVG: muted on the sheet (5.7:1 light, 6.0:1 dark). The gridlines are 1px rules beside the labels, not a background under them.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element's background color could not be determined because it is overlapped by another element",
+      "reason": "Figures in A-7's tables under the Show the work popover, in the states that open it: covered while it's open (Escape closes it and returns focus), and ink on the sheet once it closes.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element's background color could not be determined because it partially overlaps other elements",
+      "reason": "The Show the work popover's own notes, ties and figures over the page: the popover has the sheet's background and ink text (17.6:1 light, 14.9:1 dark), so what's under it doesn't matter.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "color-contrast",
+      "why": "Element's background color could not be determined because it's partially obscured by another element",
+      "reason": "The bridge's operator column (.bridge-lead: +, −, =) hangs 3em into the cell before it, in A-2's bridge and A-5's benefits table, and figures beside horizontally scrolling tables. Graphite or ink on the sheet or band (7.6:1 or more).",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "target-size",
+      "why": "Element size could not be accurately determined due to overflow content",
+      "reason": "L-1's line-end figures (ey.A.4, ey.C.4), text buttons whose label overflows the box. Since this review their labels are at least 26px apart (ByYear.tsx, END_GAP; l6.test.ts checks it), and the table view and the slider give the same figures.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "target-size",
+      "why": "Target has insufficient space to its closest neighbors",
+      "reason": "L-1's line-end figures when two offers end close together: they were pushed 22px apart, under 2.5.8's 24px. Now 26px (END_GAP in ByYear.tsx, checked in l6.test.ts).",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "target-size",
+      "why": "Element with negative tabindex has insufficient size",
+      "reason": "The same line-end figure, outside the roving tab order (tabindex -1: arrow keys move between figures). Spaced 26px from its neighbour now, as above.",
+      "checked": "2026-11-23"
+    },
+    {
+      "rule": "th-has-data-cells",
+      "why": "Table data cells are missing or empty",
+      "reason": "A-7's tables have row-group headers (a year, a section) spanning the row with no cells of their own, and empty cells where a figure doesn't apply. The headers still label the rows under them, as the scan's other checks confirm.",
+      "checked": "2026-11-23"
+    }
+  ]
+}

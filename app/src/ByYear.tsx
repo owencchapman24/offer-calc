@@ -94,6 +94,11 @@ export function ByYear({ ctx, ui, sample, dispatch, status = null }: ByYearProps
 
 const H = 240;
 const M = { top: 14, right: 132, bottom: 30, left: 52 };
+/**
+ * How far apart two line-end labels sit, at least (px between their middles): each is a figure's button, and WCAG 2.5.8 wants a
+ * 24px circle round an undersized target clear of its neighbour's (audit P6: they were 22px apart).
+ */
+export const END_GAP = 26;
 
 function Chart({ offers, basis, units, running, title, say }: {
   offers: ByYearData[]; basis: Basis; units: string; running: boolean; title: string; /** A figure as its label says it. */ say: (v: number, n?: number) => string;
@@ -118,12 +123,12 @@ function Chart({ offers, basis, units, running, title, say }: {
   const x = (year: number) => M.left + (n === 1 ? plotW / 2 : ((year - 1) / (n - 1)) * plotW);
   const y = (v: number) => M.top + H - ((v - bottom) / (top - bottom)) * H;
 
-  // End labels at each line's last point; where two would overlap they're pushed apart, with a leader.
+  // End labels at each line's last point; where two would overlap they're pushed apart, with a leader, END_GAP apart.
   const ends = series.filter((s) => s.points.length).map((s) => {
     const last = s.points[s.points.length - 1];
     return { letter: s.letter, n: last.n, value: last.value, py: y(last.value), ly: y(last.value) };
   }).sort((a, b) => a.py - b.py);
-  for (let i = 1; i < ends.length; i++) ends[i].ly = Math.max(ends[i].ly, ends[i - 1].ly + 22);
+  for (let i = 1; i < ends.length; i++) ends[i].ly = Math.max(ends[i].ly, ends[i - 1].ly + END_GAP);
   const overflow = ends.length ? ends[ends.length - 1].ly - (M.top + H + 6) : 0;
   if (overflow > 0) for (const e of ends) e.ly -= overflow;
 
