@@ -14,7 +14,7 @@ behind every figure.
   A-1 (its bottom line) to A-7 (the work), and Copy as document copies one offer's breakdown, the comparison or both.
 - **No backend, no login.** The engine runs in a Web Worker in the browser; the session is saved in that browser only.
 
-## 2. Current state (2026-11-22)
+## 2. Current state (2026-11-23)
 - **Engine:** complete for v1 (`src/tax`, `src/offer`, `src/col`). Tax law is 2026's, validated against PolicyEngine-US; later
   years are projected from it, except amounts published for them (every federal amount for 2027: the brackets, standard
   deduction, 127, 132(f), 401(k) and HSA limits, and the Social Security wage base).
@@ -37,7 +37,11 @@ behind every figure.
   per hour documented as the code works it out (D1) and the methodology's lines the code didn't bear out (D3); S1: the `main`
   ruleset, and Vercel waiting for the CI checks (2026-11-22); and, on 2026-11-22, L-1's and L-4's values below zero (C17, #107),
   the joint Medicare threshold in A-7 (C18, #108), L-3's city names (C19, #109) and recovery when a chunk or the worker won't load
-  (C24, #91 and #111). What's left: section 3.
+  (C24, #91 and #111); and, on 2026-11-23, at the user's word to use judgment on what was left: the tax base year as `BASE_YEAR`
+  (C28, #113), HUD's rent grown to the start's fiscal year and the data that's due said (C27, #116), PolicyEngine-US named as a
+  source (D9, #114), a schedule being worked out at full contrast (P5, #115), axe's needs-review list reviewed (P6, #117), the
+  NVDA script's missing steps (D11, #118), the interactions no browser test drove (T7, #119), a pinned clock and WebKit (T9, #120)
+  and speed and layout-shift budgets (T6, #121). What's left: P7, the NVDA pass (section 3).
 - **The November 2026 audit** (`docs/audit-2026-11.md`, of `main` at `09c2ea6`, 2026-11-10; its table keeps each finding's
   status): fixed in #83-#95, all merged by 2026-11-21, are the IRS's 2027 amounts (N1), tax-free benefits when leaving early (N2),
   pay due after the last day (N3, October's C6), a cliff's own value (N4), one tax figure a year in A-6 and A-7 (N5), an engine error
@@ -97,8 +101,9 @@ to pick.
 3. **The NVDA walkthrough** (`docs/nvda-walkthrough.md`, about 55 minutes, updated for item 5 and, on 2026-11-23, with D11's
    steps: L-1 loading as you reach it, A-7's tables, Download CSV, the tickmark setting and Print…): the user runs it and sends
    the Speech Viewer log; fix what it finds. With it, a VoiceOver pass on a phone for the offer tabs and the verdict bar.
-4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's C27, C28, T6, T7, T9, D9,
-   D11, P5-P7; none of November's. (C17-C19 were fixed 2026-11-22 in #107-#109, C24 in #91 and #111, and S2's `npm audit` step in
+4. **The audits' "fix before going public" and "fix before launch" items** (their tables): October's P7 (the NVDA pass, item 3);
+   none of November's. (C27, C28, T6, T7, T9, D9, D11, P5 and P6 were done 2026-11-23 in #113-#121; C17-C19 were fixed 2026-11-22
+   in #107-#109, C24 in #91 and #111, and S2's `npm audit` step in
    #110; S1 and N12, Vercel waiting for CI, were done 2026-11-22 in its settings; N11, the owner's offer, was fixed 2026-11-22 in
    #105; D10, the README's drift, 2026-10-17 with the
    README's refresh; C16, the minus zero, 2026-11-20 in #90; C6, pay due after the last day, 2026-11-20 with commission's like
@@ -155,8 +160,10 @@ to pick.
   `npm run lighthouse -- --fonts-late [ms]`: the late-fonts pass, three runs with the web fonts held back (1.5 s), so the page paints
   in the fallback fonts first; it gates only CLS (the swap mustn't move text). CI runs both.
 - `npm run e2e` (after a build): Playwright on the production build, served as Vercel serves it (`scripts/serve-dist.ts`, port
-  4180): the accessibility scan, then the smoke, keyboard and phone/tablet tests. Locally it drives the installed Edge; CI runs
-  Chromium in four shards. One project: `npm run e2e -- --project=phone-dark`. Don't pass `--reporter` (it drops the scan's).
+  4180): the accessibility scan, then the smoke, keyboard, budget and phone/tablet tests. Every test runs on a pinned date
+  (`e2e/lib/fixtures.ts`, 2026-11-23 noon) but the first visit, which runs on the real one. Locally it drives the installed Edge; CI
+  runs Chromium in four shards, and the phone tests on WebKit too (`phone-webkit`, CI only: it installs WebKit). One project:
+  `npm run e2e -- --project=phone-dark`. Don't pass `--reporter` (it drops the scan's).
   Reports: `.a11y/report.md`, `.playwright/report/`.
 - `npm run grid`: the tax engine over the oracle's grid, to `grid_ts.json` (git-ignored), the oracle's input. `test/grid.test.ts`
   checks the same rows, and more, against the committed baseline in every `npm test`; `npx vitest run test/grid.test.ts -u`
@@ -514,18 +521,20 @@ L-5 and L-6 retired at stop 5B (B8): each offer's warnings are in its A-6, its t
   `phone`;
 - inputs and state: `help`, `defaults`, `comparability`, `app` (the session, migrations, the model), `exchange`, `jobs` (the lanes, and loading on first use);
 - the tooling: `scripts/lib/*.test.ts` (the bundle, import and Lighthouse rules, the worker's chunks among them, the lock, the hooks
-  linter, the engine's tables against the record),
-  `e2e/lib/exceptions.test.ts`;
+  linter, the engine's tables against the record; `baseyear.test.ts`: no base year typed as a literal; `contrast.test.ts`: the
+  colour tokens' contrast; `ci.test.ts`: CI's check job audits the dependencies), `e2e/lib/exceptions.test.ts` (the scan's
+  exceptions and its reviews, `test/a11y-reviewed.json`);
+- speed and steadiness: `e2e/budget.e2e.ts` (an edit's figures within budget; scrolling moves nothing on screen: audit T6);
 - the docs: `scripts/lib/docs.test.ts` (every doc indexed in section 11, historical ones marked at their head, every
   `docs/<doc>.md §N` citation a section the doc has), `scripts/lib/plan.test.ts` (the audit's fix-before-v2 items: merged or open
   here, and as v2's plan says).
 
-**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`;
-`baselines/`, the grid's and the oracle's report, `grid-2026.json` and `oracle-2026.json`); `e2e/` (Playwright: the
-scan, smoke, keyboard and mobile tests, `lib/app.ts` to drive the app); `scripts/` (the commands above; `lib/` holds what they test,
-and what they share with the tests: `bundle.ts`, `grid.ts` (the grid's loop), `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`,
-`tables.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`, `fuzz.yml`);
-`eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).
+**Around it:** `test/` (the engine's tests, `law.test.ts`, `frozen-enacted.ts`, `setup.ts`, `a11y-exceptions.json`,
+`a11y-reviewed.json`; `baselines/`, the grid's and the oracle's report, `grid-2026.json` and `oracle-2026.json`); `e2e/`
+(Playwright: the scan, smoke, keyboard, budget and mobile tests, `lib/app.ts` to drive the app, `lib/fixtures.ts` the pinned
+clock); `scripts/` (the commands above; `lib/` holds what they test, and what they share with the tests: `bundle.ts`, `grid.ts`
+(the grid's loop), `imports.ts`, `lighthouse.ts`, `lock.ts`, `serve.ts`, `tables.ts`, `zip.ts`); `.github/workflows/` (`ci.yml`,
+`fuzz.yml`); `eslint.config.js` (the hooks linter); `vercel.json` (CSP and headers).
 
 ## 10. Known gaps
 The one list; the methodology's M-10 says the same in plain words. Rough priority within each group.
