@@ -162,7 +162,8 @@ to pick.
 - `npm run e2e` (after a build): Playwright on the production build, served as Vercel serves it (`scripts/serve-dist.ts`, port
   4180): the accessibility scan, then the smoke, keyboard, budget and phone/tablet tests. Every test runs on a pinned date
   (`e2e/lib/fixtures.ts`, 2026-11-23 noon) but the first visit, which runs on the real one. Locally it drives the installed Edge; CI
-  runs Chromium in four shards, and the phone tests on WebKit too (`phone-webkit`, CI only: it installs WebKit). One project:
+  runs Chromium in four shards, and in a job of its own, "e2e (WebKit)", the phone tests on WebKit (`phone-webkit`, on where
+  `E2E_WEBKIT` is set; not a required check, so a slow install can't hold up a merge). One project:
   `npm run e2e -- --project=phone-dark`. Don't pass `--reporter` (it drops the scan's).
   Reports: `.a11y/report.md`, `.playwright/report/`.
 - `npm run grid`: the tax engine over the oracle's grid, to `grid_ts.json` (git-ignored), the oracle's input. `test/grid.test.ts`
