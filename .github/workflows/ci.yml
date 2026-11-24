@@ -95,12 +95,13 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-webkit
-      # WebKit for the phone tests on iOS Safari's engine (playwright.config.ts, phone-webkit; audit T9).
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      # Chromium only: WebKit and its system libraries (GStreamer, the media codecs) install in e2e-webkit, below. Every shard
+      # installing them hung one on a slow package mirror past its 15 minutes (2026-11-24).
       - if: steps.browsers.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
       - if: steps.browsers.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium webkit
+        run: npx playwright install-deps chromium
       - run: npm run e2e -- --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
@@ -109,6 +110,44 @@ jobs:
           path: .playwright/blob/
           include-hidden-files: true
           retention-days: 1
+
+  # The phone tests on WebKit, iOS Safari's engine (playwright.config.ts, phone-webkit, which E2E_WEBKIT turns on; audit T9), in a
+  # job of their own: WebKit's system libraries are a slow install, given its own time, and kept off the four shards. It isn't one
+  # of the checks the ruleset and Vercel wait for, so a slow package mirror can't hold up a merge or a deploy; it shows on every
+  # pull request all the same.
+  e2e-webkit:
+    name: e2e (WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_WEBKIT: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-webkit
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps webkit
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps webkit
+      - run: npm run e2e -- --project=phone-webkit
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: webkit-blob-report
+          path: .playwright/blob/
+          include-hidden-files: true
+          retention-days: 7
 
   # The shards' reports merged into one: the accessibility report (.a11y/report.md) and Playwright's HTML report, uploaded as
   # a11y-report. It fails when any shard failed, so "e2e" stays the one check to require.

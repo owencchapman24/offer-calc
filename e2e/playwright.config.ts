@@ -6,8 +6,9 @@ import { defineConfig, devices, type PlaywrightTestConfig } from "@playwright/te
 //   light and dark, for the comparison page (its sticky verdict bar);
 // - the smoke and keyboard tests (smoke.e2e.ts, keyboard.e2e.ts), once, on a desktop; the phone's tabs and the verdict
 //   bars (mobile.e2e.ts), on a phone and a tablet.
-// Locally it drives the installed Edge, so nothing is downloaded; CI installs Chromium, and WebKit for the phone tests on iOS
-// Safari's engine (phone-webkit, CI only: audit T9). Every test runs on a pinned date (lib/fixtures.ts) but one.
+// Locally it drives the installed Edge, so nothing is downloaded; CI installs Chromium, and in a job of its own WebKit, for the phone
+// tests on iOS Safari's engine (phone-webkit, which E2E_WEBKIT turns on: audit T9). Every test runs on a pinned date
+// (lib/fixtures.ts) but one.
 // CI runs the suite in shards (.github/workflows/ci.yml, `--shard`): each shard writes a blob report, and the e2e job merges
 // them (merge.config.ts) into Playwright's HTML report and the accessibility report, one of each for the whole run.
 // E2E_BLOB=1 writes the blob locally too, to try the merge.
@@ -60,8 +61,9 @@ export default defineConfig({
     { name: "smoke", testMatch: ["smoke.e2e.ts", "keyboard.e2e.ts", "budget.e2e.ts"], use: { ...desktop, colorScheme: "light" } },
     { name: "phone", testMatch: "mobile.e2e.ts", use: { ...phone, colorScheme: "light" } },
     { name: "tablet", testMatch: "mobile.e2e.ts", use: { ...tablet, colorScheme: "light" } },
-    // iOS Safari is most of the phone traffic the phone tests stand for: its engine, in CI, which installs it (locally there's no
-    // WebKit to drive, and installing one is a download). The copy tests stay on Chromium: WebKit has no clipboard permission to grant.
-    ...(CI ? [{ name: "phone-webkit", testMatch: "mobile.e2e.ts", use: { ...devices["iPhone 13"], colorScheme: "light" as const } }] : []),
+    // iOS Safari is most of the phone traffic the phone tests stand for: its engine, where E2E_WEBKIT is set (CI's e2e-webkit job,
+    // which installs it; locally there's no WebKit to drive, and installing one is a download). The copy tests stay on Chromium:
+    // WebKit has no clipboard permission to grant.
+    ...(process.env.E2E_WEBKIT ? [{ name: "phone-webkit", testMatch: "mobile.e2e.ts", use: { ...devices["iPhone 13"], colorScheme: "light" as const } }] : []),
   ],
 });
