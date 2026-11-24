@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./lib/fixtures";
 import { readFileSync } from "node:fs";
 import { scan } from "./lib/axe";
 import {

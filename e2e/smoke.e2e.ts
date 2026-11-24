@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./lib/fixtures";
 import { readFileSync } from "node:fs";
 import {
   copyDocument, EDITORS, fillOffer, loadByYearOnly, loadSchedules, openAlone, openCompare, openEditor, openParts, openSection, openWithSaved, openWork,
@@ -283,6 +284,10 @@ test("Copy as document with one offer: its summary (the default) or its full det
   for (const part of ["A, NYC BANK, ON ITS OWN", "B, CHARLOTTE CORP, ON ITS OWN", "C, SEATTLE TECH, ON ITS OWN", "THE COMPARISON"]) expect(got["text/plain"]).toContain(part);
 });
 
+// On the real date (audit T9): every other test runs on the pinned clock (lib/fixtures.ts), so this one still sees whatever today does
+// to the samples' dates.
+test.describe("on the real date", () => {
+  test.use({ pinClock: false });
 test("the first visit: sample A on its own, its two ways on, side by side and in view", async ({ page }) => {
   await openAlone(page);
   await expect(page.locator("[id^=in-][id$=-salary-annual]")).toHaveCount(1);
@@ -294,6 +299,7 @@ test("the first visit: sample A on its own, its two ways on, side by side and in
   await page.getByRole("button", { name: "Start with my offer" }).click();
   await expect(page.locator(".sample-banner")).toHaveCount(0);
   await expect(page.locator("#in-A-salary-annual")).toHaveValue("");
+});
 });
 
 test("export, then import: the same results", async ({ page }) => {
