@@ -434,8 +434,8 @@ to pick.
   VA $300k, GA $300k+).
 - MO's federal-tax deduction tiers include their upper bound (RSMo 143.171.2 puts exactly $100,000 in the 15% tier; PolicyEngine
   applies 5%): −$62 single, −$36 joint at $100k only.
-- Data from PolicyEngine-US: state payroll parameters and nine of the ten `OVERRIDE:`s were copied from it, and Arizona's standard
-  deduction, so agreement there is circular (audit D9).
+- Data from PolicyEngine-US: state payroll parameters and nine of the eleven `OVERRIDE:`s were copied from it (all but MA's and
+  SC's), and Arizona's standard deduction, so agreement there is circular (audit D9). The README, M-4 and M-11 say so.
 
 ## 9. Code map
 **The engine** (`src/`):

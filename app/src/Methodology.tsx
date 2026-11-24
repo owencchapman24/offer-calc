@@ -244,13 +244,16 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
           <p>
             The tax engine is checked against PolicyEngine-US (version 2.30.3, an open-source microsimulation model) for 2026 law,
             on a grid of wages from $40,000 to $320,000 in $20,000 steps, for every state and DC, single and married filing
-            jointly. The last run was on October 8, 2026.
+            jointly. The last run was on October 8, 2026. Where a value was copied from PolicyEngine-US (the state payroll taxes,
+            Arizona's standard deduction and most of the state laws enacted after the Tax Foundation's table: <Ref id="M-11" />),
+            agreeing with it checks the arithmetic, not the source.
           </p>
           <table className="method-table">
             <thead><tr><th scope="col">Tax</th><th scope="col">Result</th></tr></thead>
             <tbody>
               <tr><th scope="row">Social Security and Medicare</th><td>Exact at every grid point</td></tr>
-              <tr><th scope="row">State payroll taxes</th><td>Exact (within $0.01)</td></tr>
+              <tr><th scope="row">State payroll taxes</th><td>Exact (within $0.01). Their parameters were copied from PolicyEngine-US,
+                so this agreement is circular: it shows they're applied as PolicyEngine applies them, not that they're right.</td></tr>
               <tr><th scope="row">New York City</th><td>Within $0.48</td></tr>
               <tr><th scope="row">Federal income tax, single, $60k–$200k</th><td>50 of 51 within $5. Alaska is $120–$240 lower: PolicyEngine
                 counts the Permanent Fund Dividend as income; we don't.</td></tr>
@@ -676,7 +679,7 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">SSA 2026 and 2027 COLA fact sheets; IRC 3101(b)(2)</th><td>Social Security wage base ($184,500; $192,300
                 in 2027) and rates; Additional Medicare Tax</td><td>2026, 2027</td></tr>
               <tr><th scope="row">Tax Foundation, State Individual Income Tax Rates and Brackets, 2026</th><td>State brackets, deductions and
-                exemptions; state payroll taxes</td><td>Data as of Feb 11, 2026</td></tr>
+                exemptions</td><td>Data as of Feb 11, 2026</td></tr>
               <tr><th scope="row">State laws enacted after that table</th><td>
                 <ul className="overrides">
                   <li>Arkansas: Act 1 of 2026 (1st Extraordinary Session), A.C.A. 26-51-201</li>
@@ -690,7 +693,8 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
                   <li>West Virginia: W. Va. Code 11-21-4j</li>
                   <li>District of Columbia: decoupled from the federal deduction increase (2025 D-40 instructions)</li>
                 </ul>
-                Most were read as modeled in PolicyEngine-US.</td><td>2026</td></tr>
+                Nine of the eleven were copied as modeled in PolicyEngine-US: Arkansas, California, Georgia, Hawaii, Maine, Ohio,
+                Utah, West Virginia and the District of Columbia. Massachusetts' and South Carolina's were read from the state.</td><td>2026</td></tr>
               <tr><th scope="row">NYS IT-201 instructions; City of Philadelphia Department of Revenue, Wage Tax rates</th><td>New York City and Philadelphia
                 resident tax</td><td>2026</td></tr>
               <tr><th scope="row">Comptroller of Maryland, resident income tax booklet (local tax brackets); Indiana Department of Revenue,
@@ -704,7 +708,9 @@ export default function Methodology({ ctx, section, sample }: { ctx: WorkContext
               <tr><th scope="row">Census ACS 1-year, table B25064</th><td>U.S. median gross rent, $1,487 (±$3): the anchor where HUD has
                 no figure</td><td>2024</td></tr>
               <tr><th scope="row">IRS Pub. 15 and 15-T</th><td>Supplemental withholding (22%, 37% over $1 million) and the percentage method</td><td>2026</td></tr>
-              <tr><th scope="row">PolicyEngine-US</th><td>Validation of the tax engine (<Ref id="M-4" />)</td><td>Version 2.30.3</td></tr>
+              <tr><th scope="row">PolicyEngine-US</th><td>Validation of the tax engine (<Ref id="M-4" />); and a source: the state payroll
+                taxes' parameters (disability, paid leave and long-term care), Arizona's standard deduction ($15,750; the Tax Foundation's
+                table shows $8,350), and nine of the later state laws above</td><td>Version 2.30.3</td></tr>
             </tbody>
           </table>
         </Section>
